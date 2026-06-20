@@ -133,7 +133,28 @@ def _guardian_precheck() -> None:
     click.echo("", err=True)
 
 
-@click.group()
+class _GracefulGroup(click.Group):
+    """顶层命令组: 把"缺失的可选服务"从 ModuleNotFoundError traceback 降级成友好提示。
+
+    发布版(白名单平台)不含某些内部/隐私服务(resume_steward / work_history /
+    _authoring.docauthor 等); 调用依赖它们的子命令时优雅提示, 而非崩栈。
+    内部版服务齐全 → 永不触发, 完全无感。
+    """
+
+    def invoke(self, ctx):
+        try:
+            return super().invoke(ctx)
+        except ModuleNotFoundError as e:
+            name = e.name or ""
+            if name.startswith("omnicompany.packages.services"):
+                raise click.ClickException(
+                    f"此命令依赖的服务未包含在本构建中: {name}\n"
+                    f"  (这是发布版裁掉的内部/可选服务; 完整能力见内部版或自行实现该服务。)"
+                ) from None
+            raise
+
+
+@click.group(cls=_GracefulGroup)
 def cli():
     """omnicompany CLI — 统一执行、观测、管理"""
     _guardian_precheck()
