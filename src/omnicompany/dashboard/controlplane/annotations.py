@@ -67,13 +67,13 @@ class AnnotationCreate(BaseModel):
 
 
 @annotations_router.get("/notes/{note_id:path}/annotations")
-async def list_annotations(note_id: str) -> dict[str, Any]:
+def list_annotations(note_id: str) -> dict[str, Any]:
     items = _load(note_id)
     return {"items": items, "total": len(items)}
 
 
 @annotations_router.post("/notes/{note_id:path}/annotations")
-async def create_annotation(note_id: str, body: AnnotationCreate) -> dict[str, Any]:
+def create_annotation(note_id: str, body: AnnotationCreate) -> dict[str, Any]:
     if not body.comment.strip():
         raise HTTPException(status_code=400, detail="empty comment")
     items = _load(note_id)
@@ -91,7 +91,7 @@ async def create_annotation(note_id: str, body: AnnotationCreate) -> dict[str, A
 
 
 @annotations_router.delete("/notes/{note_id:path}/annotations/{ann_id}")
-async def delete_annotation(note_id: str, ann_id: str) -> dict[str, Any]:
+def delete_annotation(note_id: str, ann_id: str) -> dict[str, Any]:
     items = _load(note_id)
     new_items = [a for a in items if a.get("id") != ann_id]
     if len(new_items) == len(items):
@@ -101,7 +101,7 @@ async def delete_annotation(note_id: str, ann_id: str) -> dict[str, Any]:
 
 
 @annotations_router.patch("/notes/{note_id:path}/annotations/{ann_id}")
-async def patch_annotation(note_id: str, ann_id: str, body: dict[str, Any]) -> dict[str, Any]:
+def patch_annotation(note_id: str, ann_id: str, body: dict[str, Any]) -> dict[str, Any]:
     items = _load(note_id)
     found = None
     for a in items:

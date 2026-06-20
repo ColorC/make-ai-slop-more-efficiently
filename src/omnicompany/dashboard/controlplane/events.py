@@ -22,7 +22,7 @@ events_router = APIRouter(tags=["events"])
 
 
 @events_router.get("/events")
-async def api_events(
+def api_events(
     limit: int = Query(200, ge=1, le=2000),
     offset: int = Query(0, ge=0),
     tool: str = Query("", description="Filter by tool_name"),
@@ -73,7 +73,7 @@ async def api_events(
 
 
 @events_router.get("/events/{event_id}")
-async def api_event_detail(event_id: int):
+def api_event_detail(event_id: int):
     """Full detail for a single event — shows all columns."""
     paths = db_paths()
     conn = safe_conn(paths["intent_traces"])
@@ -91,7 +91,7 @@ async def api_event_detail(event_id: int):
 
 
 @events_router.get("/system_events")
-async def api_system_events(
+def api_system_events(
     limit: int = Query(200, ge=1, le=2000),
     offset: int = Query(0, ge=0),
     event_type: str = Query("", description="Filter by event_type"),
@@ -135,7 +135,7 @@ async def api_system_events(
 
 
 @events_router.get("/event_types")
-async def api_event_types():
+def api_event_types():
     """Distinct event types for filter dropdown."""
     paths = db_paths()
     conn = safe_conn(paths["events"])

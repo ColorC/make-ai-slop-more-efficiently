@@ -161,7 +161,7 @@ def _native_provider_commands(provider: str) -> list[dict[str, Any]] | None:
 
 
 @chatinterface_stubs_router.post("/commands/list")
-async def list_slash_commands(body: SlashCommandsListBody | None = None) -> dict[str, Any]:
+def list_slash_commands(body: SlashCommandsListBody | None = None) -> dict[str, Any]:
     """ChatComposer 打 `/` 时 fetch 这个拿可用 slash 命令列表.
 
     按 body.provider 字段分发. 各 provider 的命令是 hardcoded 已知集合 (跟 claude
@@ -353,7 +353,7 @@ async def execute_slash_command(body: SlashCommandExecuteBody) -> dict[str, Any]
 
 
 @chatinterface_stubs_router.get("/taskmaster/status")
-async def taskmaster_status(projectId: str | None = None) -> dict[str, Any]:
+def taskmaster_status(projectId: str | None = None) -> dict[str, Any]:
     return {
         "hasTaskmaster": False,
         "status": "not-configured",
@@ -365,13 +365,13 @@ async def taskmaster_status(projectId: str | None = None) -> dict[str, Any]:
 
 
 @chatinterface_stubs_router.get("/settings/server-env")
-async def settings_server_env() -> dict[str, Any]:
+def settings_server_env() -> dict[str, Any]:
     """ChatInterface QuickSettingsPanel 等可能问 server env. stub 返最小."""
     return {"isPlatform": False, "features": {}}
 
 
 @chatinterface_stubs_router.get("/projects/{project_id:path}/sessions/{sid}/token-usage")
-async def project_session_token_usage(project_id: str, sid: str) -> dict[str, Any]:
+def project_session_token_usage(project_id: str, sid: str) -> dict[str, Any]:
     """token usage 初始值. ChatComposer TokenUsagePie 读 .used / .total 两个字段.
     我们没记 session 真累计 token, 返 0/200000 作初始, 第一次 result 帧后 adapter
     会 setTokenBudget({used, total}) 覆盖.
@@ -380,7 +380,7 @@ async def project_session_token_usage(project_id: str, sid: str) -> dict[str, An
 
 
 @chatinterface_stubs_router.get("/projects/{project_id:path}/files")
-async def project_files(project_id: str) -> list[Any]:
+def project_files(project_id: str) -> list[Any]:
     """sidebar file browser / @ mention 数据.
     useFileMentions 直接 forEach 数组形态: ProjectFileNode[] = {name, type, path?, children?}.
     stub 返空数组. 之前返 {files:[], directories:[]} 让前端 t.forEach is not a function."""
@@ -388,12 +388,12 @@ async def project_files(project_id: str) -> list[Any]:
 
 
 @chatinterface_stubs_router.get("/taskmaster/installation-status")
-async def taskmaster_installation_status() -> dict[str, Any]:
+def taskmaster_installation_status() -> dict[str, Any]:
     return {"installed": False, "version": None}
 
 
 @chatinterface_stubs_router.get("/providers/auth")
-async def provider_auth_status() -> dict[str, Any]:
+def provider_auth_status() -> dict[str, Any]:
     """ChatInterface 顶栏 / ProviderSelector 调这个判断各 provider 可不可用.
 
     本 stub 简单返"全部可用". 真实现应该:

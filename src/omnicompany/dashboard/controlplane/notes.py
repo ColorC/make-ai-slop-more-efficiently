@@ -152,19 +152,19 @@ def _docs_token() -> float:
 
 
 @notes_router.get("/notes")
-async def list_notes() -> dict[str, Any]:
+def list_notes() -> dict[str, Any]:
     items = _scan_cached(_docs_token())
     return {"items": items, "total": len(items)}
 
 
 @notes_router.get("/notes/_links")
-async def list_links() -> dict[str, Any]:
+def list_links() -> dict[str, Any]:
     """Global link graph (outgoing + backlinks + edge list)."""
     return _link_graph_cached(_docs_token())
 
 
 @notes_router.get("/notes/_search")
-async def search_notes(q: str = "", limit: int = 30) -> dict[str, Any]:
+def search_notes(q: str = "", limit: int = 30) -> dict[str, Any]:
     """Server-side full-text search across notes (sub-string, case-insensitive).
 
     Useful as fallback to MiniSearch on frontend when memory is constrained.
@@ -194,7 +194,7 @@ async def search_notes(q: str = "", limit: int = 30) -> dict[str, Any]:
 
 
 @notes_router.get("/notes/{note_id:path}/links")
-async def note_links(note_id: str) -> dict[str, Any]:
+def note_links(note_id: str) -> dict[str, Any]:
     """For a single note: its outgoing links + backlinks + unresolved targets."""
     g = _link_graph_cached(_docs_token())
     if note_id not in {it["id"] for it in _scan_cached(_docs_token())}:
@@ -223,7 +223,7 @@ _ASSET_EXTS = {
 
 
 @notes_router.get("/notes/{note_id:path}/asset/{asset_path:path}")
-async def get_note_asset(note_id: str, asset_path: str):
+def get_note_asset(note_id: str, asset_path: str):
     """Serve an asset (image, etc.) referenced by `![[asset_path]]` from a note.
 
     Resolution: `asset_path` is interpreted RELATIVE to the note's directory
@@ -253,7 +253,7 @@ async def get_note_asset(note_id: str, asset_path: str):
 
 
 @notes_router.get("/notes/{note_id:path}")
-async def get_note(note_id: str) -> dict[str, Any]:
+def get_note(note_id: str) -> dict[str, Any]:
     docs = _docs_root()
     md_path = docs / (note_id + ".md")
     try:
@@ -290,7 +290,7 @@ async def get_note(note_id: str) -> dict[str, Any]:
 
 
 @notes_router.put("/notes/{note_id:path}")
-async def put_note(note_id: str, body: NoteWrite) -> dict[str, Any]:
+def put_note(note_id: str, body: NoteWrite) -> dict[str, Any]:
     """Write back to existing note. Refuses path escape, refuses to create new files
     (use a separate POST endpoint later if needed). Caches reset on success.
     """

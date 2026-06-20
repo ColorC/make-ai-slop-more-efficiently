@@ -96,7 +96,7 @@ def _result_payload(result) -> dict[str, Any]:
 
 
 @external_agents_router.get("/external-agents/providers")
-async def list_external_agent_providers() -> dict[str, Any]:
+def list_external_agent_providers() -> dict[str, Any]:
     registry = build_default_external_agent_worker_registry()
     providers = registry.list_providers()
     return {

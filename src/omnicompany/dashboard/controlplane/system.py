@@ -17,7 +17,7 @@ def _project_root() -> Path:
 
 
 @system_router.get("/system/info")
-async def system_info() -> dict[str, Any]:
+def system_info() -> dict[str, Any]:
     from omnicompany.core.config import resolve_unified_db_path
     try:
         from omnicompany._core_version import __version__

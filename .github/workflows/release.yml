@@ -45,12 +45,11 @@ jobs:
           - os: ubuntu-latest
             asset-name: omni-linux-x86_64
             binary-path: dist/omni
-          - os: macos-13
-            asset-name: omni-macos-x86_64
-            binary-path: dist/omni
           - os: windows-latest
             asset-name: omni-windows-x86_64.exe
             binary-path: dist/omni.exe
+          # macOS 暂不出原生可执行: 免费版 macOS runner 排队不可靠(macos-13 已弃用)。
+          # macOS 用户走 `pip install`(跨平台 wheel)。有需求再加回 macos-latest。
 
     steps:
       - name: Checkout

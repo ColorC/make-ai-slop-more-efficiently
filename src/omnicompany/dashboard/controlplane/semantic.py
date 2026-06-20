@@ -20,7 +20,7 @@ semantic_router = APIRouter(prefix="/v2", tags=["semantic"])
 
 
 @semantic_router.get("/types")
-async def api_types(
+def api_types(
     limit: int = Query(100, ge=1, le=500),
     q: str = Query("", description="Search in type_id or description"),
     active_only: bool = Query(True),
@@ -57,7 +57,7 @@ async def api_types(
 
 
 @semantic_router.get("/open-loops")
-async def api_open_loops(last_rounds: int = 20, round_num: int | None = None):
+def api_open_loops(last_rounds: int = 20, round_num: int | None = None):
     """未闭合 Intent 列表."""
     conn = sem_db()
     if not conn:
@@ -86,7 +86,7 @@ async def api_open_loops(last_rounds: int = 20, round_num: int | None = None):
 
 
 @semantic_router.get("/pain")
-async def api_pain(node_id: str | None = None, round_num: int | None = None, limit: int = 30):
+def api_pain(node_id: str | None = None, round_num: int | None = None, limit: int = 30):
     """痛觉事件."""
     conn = sem_db()
     if not conn:

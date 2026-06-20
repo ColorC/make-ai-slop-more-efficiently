@@ -25,6 +25,7 @@ import json
 import os
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -315,6 +316,8 @@ _ACTIVITY_CACHE: dict[str, tuple[float, list[str]]] = {}
 # 过期/未命中时立刻返回旧值(没有就空), 后台线程刷新写回缓存。_ACTIVITY_REFRESHING 防同项目并发重刷。
 _ACTIVITY_REFRESHING: set[str] = set()
 _ACTIVITY_REFRESH_LOCK = threading.Lock()
+# 上限 2 个后台线程: 22 个项目一次性开 22 线程会 GIL 抢占、拖慢事件循环。封顶后排队跑, 一样最终补齐。
+_ACTIVITY_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="activity-refresh")
 
 
 def _refresh_activity_async(item: dict[str, Any], pid: str) -> None:
@@ -335,7 +338,7 @@ def _refresh_activity_async(item: dict[str, Any], pid: str) -> None:
             with _ACTIVITY_REFRESH_LOCK:
                 _ACTIVITY_REFRESHING.discard(pid)
 
-    threading.Thread(target=_work, name=f"activity-refresh-{pid}", daemon=True).start()
+    _ACTIVITY_EXECUTOR.submit(_work)
 
 
 def _project_roots(item: dict[str, Any]) -> list[Path]:

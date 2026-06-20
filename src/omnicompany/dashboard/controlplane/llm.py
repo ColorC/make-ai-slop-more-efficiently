@@ -62,7 +62,7 @@ def _iter_audit_records(*, trace_id: str | None = None, limit: int = 200) -> lis
 
 
 @llm_router.get("/llm/audit")
-async def list_audit(
+def list_audit(
     trace_id: str | None = Query(None, description="按 trace_id 过滤"),
     limit: int = Query(50, ge=1, le=500),
 ) -> dict[str, Any]:
@@ -87,7 +87,7 @@ async def list_audit(
 
 
 @llm_router.get("/llm/audit/{trace_id}")
-async def get_audit_by_trace(trace_id: str, limit: int = 200) -> dict[str, Any]:
+def get_audit_by_trace(trace_id: str, limit: int = 200) -> dict[str, Any]:
     """单 trace_id 的全部 LLM 调用记录."""
     records = _iter_audit_records(trace_id=trace_id, limit=limit)
     if not records:
@@ -96,7 +96,7 @@ async def get_audit_by_trace(trace_id: str, limit: int = 200) -> dict[str, Any]:
 
 
 @llm_router.get("/llm/stats")
-async def llm_stats(limit: int = 1000) -> dict[str, Any]:
+def llm_stats(limit: int = 1000) -> dict[str, Any]:
     """LLM 调用统计.
 
     返回 count / by_model / by_pipeline / 估算 prompt+response 字符总数.

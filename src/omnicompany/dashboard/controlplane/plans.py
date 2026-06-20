@@ -29,7 +29,7 @@ plans_router = APIRouter()
 
 
 @plans_router.get("/plans")
-async def list_plans() -> dict[str, Any]:
+def list_plans() -> dict[str, Any]:
     items = _scan()
     # 治理部门(plan_steward)的中文标题浮出 — 用户 2026-06-12: 计划要汉化
     try:
@@ -89,7 +89,7 @@ _TOPIC_BAD = re.compile(r'[\\/:*?"<>|\[\]]+')
 
 
 @plans_router.post("/plans")
-async def create_plan(body: CreatePlanBody) -> dict[str, Any]:
+def create_plan(body: CreatePlanBody) -> dict[str, Any]:
     """在项目的计划类目目录下一键新建一篇计划书: docs/plans/<category>/[日期]主题/plan.md。
 
     撰写态草稿(纯文本)由前端送来; formalize=True 时先经性价比模型整理成规范计划书再落盘。
@@ -167,7 +167,7 @@ def _doc_summary(path: Path, limit: int = 160) -> str:
 
 
 @plans_router.get("/plans/{plan_id:path}")
-async def get_plan(plan_id: str) -> dict[str, Any]:
+def get_plan(plan_id: str) -> dict[str, Any]:
     pr = _plans_root()
     folder = pr / plan_id
     try:

@@ -36,7 +36,7 @@ def _sandbox_root() -> Path:
 
 
 @sandbox_router.get("/sandbox/drafts")
-async def list_drafts() -> dict[str, Any]:
+def list_drafts() -> dict[str, Any]:
     """列沙盒 drafts/ 草稿清单, 按 kind 分组."""
     drafts = _sandbox_root() / "drafts"
     if not drafts.is_dir():
@@ -65,7 +65,7 @@ async def list_drafts() -> dict[str, Any]:
 
 
 @sandbox_router.get("/sandbox/archive")
-async def list_archive() -> dict[str, Any]:
+def list_archive() -> dict[str, Any]:
     """列沙盒 archive/ 归档清单 (按时间倒序)."""
     archive = _sandbox_root() / "archive"
     if not archive.is_dir():
@@ -87,7 +87,7 @@ async def list_archive() -> dict[str, Any]:
 
 
 @sandbox_router.get("/sandbox/guides/{kind}")
-async def get_guide(kind: str) -> dict[str, str]:
+def get_guide(kind: str) -> dict[str, str]:
     """显示某 kind 的向导.md (8 kind + header + omni-header / omnicompany_cli / sandbox 三份 cli 规范)."""
     proj = _project_root()
     if kind == "header":
@@ -108,14 +108,14 @@ async def get_guide(kind: str) -> dict[str, str]:
 
 
 @sandbox_router.get("/identity/who")
-async def who() -> dict[str, Any]:
+def who() -> dict[str, Any]:
     """当前 session 身份 (跟 omni who 同源)."""
     from omnicompany.packages.services._core.identity import current_session_meta
     return current_session_meta()
 
 
 @sandbox_router.get("/identity/writes")
-async def writes(limit: int = 50) -> dict[str, Any]:
+def writes(limit: int = 50) -> dict[str, Any]:
     """当前 session 写过的文件 (跟 omni who --writes 同源)."""
     from omnicompany.packages.services._core.identity import (
         resolve_active_trace_id, session_writes,

@@ -27,7 +27,7 @@ lock_router = APIRouter()
 
 
 @lock_router.get("/lock/status")
-async def lock_status() -> dict[str, Any]:
+def lock_status() -> dict[str, Any]:
     """看锁状态."""
     policy = load_policy()
     baseline = load_baseline()
@@ -42,7 +42,7 @@ async def lock_status() -> dict[str, Any]:
 
 
 @lock_router.get("/lock/violations")
-async def list_violations(
+def list_violations(
     classification: str | None = Query(None, pattern="^(internal_misplace|external_write)$"),
     limit: int = Query(100, ge=1, le=1000),
 ) -> dict[str, Any]:
@@ -63,7 +63,7 @@ async def list_violations(
 
 
 @lock_router.get("/lock/baseline")
-async def list_baseline(limit: int = Query(200, ge=1, le=2000)) -> dict[str, Any]:
+def list_baseline(limit: int = Query(200, ge=1, le=2000)) -> dict[str, Any]:
     """看 baseline 路径列表 (预览前 N 条)."""
     bl = sorted(load_baseline())
     return {

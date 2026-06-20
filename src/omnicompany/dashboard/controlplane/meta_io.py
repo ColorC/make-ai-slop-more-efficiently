@@ -23,7 +23,7 @@ meta_io_router = APIRouter()
 
 
 @meta_io_router.get("/meta_io")
-async def list_meta_io_api(
+def list_meta_io_api(
     kind: str | None = Query(None, pattern="^(read|write|mutate)$"),
     target_type: str | None = Query(None),
     limit: int = Query(200, ge=1, le=2000),
@@ -49,7 +49,7 @@ async def list_meta_io_api(
 
 
 @meta_io_router.get("/meta_io/{meta_io_id}")
-async def get_meta_io_api(meta_io_id: str) -> dict[str, Any]:
+def get_meta_io_api(meta_io_id: str) -> dict[str, Any]:
     """单条元 IO 详情 (含 state_check)."""
     from omnicompany.packages.services._core.meta_io import get_meta_io
     m = get_meta_io(meta_io_id)

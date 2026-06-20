@@ -24,13 +24,13 @@ nodes_router = APIRouter(tags=["nodes"])
 
 
 @nodes_router.get("/nodes")
-async def api_nodes():
+def api_nodes():
     paths = db_paths()
     return fetch_route_nodes(paths["route_graph"])
 
 
 @nodes_router.get("/v2/nodes")
-async def api_nodes_v2(
+def api_nodes_v2(
     active: int | None = None,
     limit: int = Query(100, le=500),
 ):
@@ -53,7 +53,7 @@ async def api_nodes_v2(
 
 
 @nodes_router.get("/v2/node/{node_id}")
-async def api_node_with_spans(node_id: str, spans_limit: int = 5):
+def api_node_with_spans(node_id: str, spans_limit: int = 5):
     """单节点详情 + 最近调用 signal_spans."""
     conn = sem_db()
     if not conn:
@@ -88,7 +88,7 @@ class NodePatch(BaseModel):
 
 
 @nodes_router.patch("/v2/node/{node_id}")
-async def api_node_patch(node_id: str, patch: NodePatch):
+def api_node_patch(node_id: str, patch: NodePatch):
     """在线编辑节点字段."""
     conn = sem_db()
     if not conn:
@@ -140,7 +140,7 @@ async def api_node_patch(node_id: str, patch: NodePatch):
 
 
 @nodes_router.get("/v2/node-detail/{node_id}")
-async def api_node_detail_strict(node_id: str):
+def api_node_detail_strict(node_id: str):
     """Full metadata for a single semantic node (严格匹配 node_id, 不 LIKE)."""
     conn = sem_db()
     if not conn:

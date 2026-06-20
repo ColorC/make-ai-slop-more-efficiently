@@ -73,7 +73,7 @@ def _tokens() -> dict[str, str]:
 
 
 @dev_reload_router.get("/dev/versions")
-async def dev_versions() -> dict[str, Any]:
+def dev_versions() -> dict[str, Any]:
     """当前 ui / ext 版本 token. 客户端只做字符串比较, 不解析内部结构."""
     return _tokens()
 
@@ -83,7 +83,7 @@ class BumpRequest(BaseModel):
 
 
 @dev_reload_router.post("/dev/bump")
-async def dev_bump(req: BumpRequest) -> dict[str, Any]:
+def dev_bump(req: BumpRequest) -> dict[str, Any]:
     """强制顶一次 epoch — 对应客户端无条件刷新/热换 (不需要重新构建)."""
     if req.target not in _VALID_TARGETS:
         raise HTTPException(status_code=400, detail=f"target 必须是 {_VALID_TARGETS} 之一")

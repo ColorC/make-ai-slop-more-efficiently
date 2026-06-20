@@ -59,13 +59,13 @@ def _scan() -> list[dict[str, Any]]:
 
 
 @workers_router.get("/workers")
-async def list_workers() -> dict[str, Any]:
+def list_workers() -> dict[str, Any]:
     items = _scan()
     return {"items": items, "total": len(items)}
 
 
 @workers_router.get("/workers/{worker_id:path}/traces")
-async def get_worker_traces(worker_id: str, limit: int = 30) -> dict[str, Any]:
+def get_worker_traces(worker_id: str, limit: int = 30) -> dict[str, Any]:
     """List traces where this worker appears (matched by source/payload).
 
     Source field in events DB is short like 'block_designer' (worker leaf name),
@@ -115,7 +115,7 @@ async def get_worker_traces(worker_id: str, limit: int = 30) -> dict[str, Any]:
 
 
 @workers_router.get("/workers/{worker_id:path}")
-async def get_worker(worker_id: str) -> dict[str, Any]:
+def get_worker(worker_id: str) -> dict[str, Any]:
     root = _packages_root()
     py_path = root / (worker_id + ".py")
     try:

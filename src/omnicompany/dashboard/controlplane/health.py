@@ -18,7 +18,7 @@ health_router = APIRouter(tags=["health"])
 
 
 @health_router.get("/marathon")
-async def api_marathon():
+def api_marathon():
     """Marathon checkpoint + budget."""
     paths = db_paths()
     checkpoint = read_json(paths["dir"] / "marathon_checkpoint.json")
@@ -27,14 +27,14 @@ async def api_marathon():
 
 
 @health_router.get("/guardian")
-async def api_guardian():
+def api_guardian():
     """MetaGuardian audit log."""
     paths = db_paths()
     return read_jsonl(paths["meta_guardian_log"])
 
 
 @health_router.get("/health")
-async def api_health():
+def api_health():
     paths = db_paths()
     d = paths["dir"]
     present = {name: paths[name].is_file() for name in paths if name != "dir"}

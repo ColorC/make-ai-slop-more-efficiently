@@ -28,7 +28,7 @@ registry_router = APIRouter()
 
 
 @registry_router.get("/registry/types")
-async def list_types() -> dict[str, Any]:
+def list_types() -> dict[str, Any]:
     """列已注册的 kind 类型 (验证 omnicompany 8 种齐)."""
     types = meta_registry.all_types()
     return {
@@ -46,7 +46,7 @@ async def list_types() -> dict[str, Any]:
 
 
 @registry_router.get("/registry/instances")
-async def list_instances(
+def list_instances(
     kind: str | None = Query(None, description="按 kind 过滤"),
     package: str | None = Query(None, description="按 package 过滤"),
     source: str = Query("all", pattern="^(all|explicit|ast_scan)$",
@@ -94,7 +94,7 @@ async def list_instances(
 
 
 @registry_router.get("/registry/instances/{entity_id:path}")
-async def get_instance(entity_id: str) -> dict[str, Any]:
+def get_instance(entity_id: str) -> dict[str, Any]:
     """单 entity 详情. entity_id 形如 router:demogame.team_table.SchemaAssembler ."""
     reg = get_registry()
     entry = reg.read(entity_id)
@@ -104,7 +104,7 @@ async def get_instance(entity_id: str) -> dict[str, Any]:
 
 
 @registry_router.get("/registry/by-trace/{trace_id}")
-async def list_by_trace(trace_id: str, limit: int = 100) -> dict[str, Any]:
+def list_by_trace(trace_id: str, limit: int = 100) -> dict[str, Any]:
     """按 trace_id 查 - 跟 G1 身份模块联动. 显示某 session 注册过的所有 entity."""
     reg = get_registry()
     items = []

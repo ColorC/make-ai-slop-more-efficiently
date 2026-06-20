@@ -145,7 +145,7 @@ async def send_action(body: SendActionRequest, request: Request):
 
 
 @ide_router.get("/ide/sessions", response_model=list[SessionInfo])
-async def list_sessions(request: Request):
+def list_sessions(request: Request):
     """返回所有活跃会话。"""
     mgr = _get_session_manager(request)
     return mgr.list_sessions()
@@ -208,7 +208,7 @@ async def trace_files(trace_id: str, request: Request):
 
 
 @ide_router.get("/ide/metrics")
-async def get_metrics(
+def get_metrics(
     caller_prefix: str | None = Query(None, description="Filter by caller prefix (e.g. pipeline.demogame_qa)"),
 ):
     """LLM 计量数据：token 用量、成本、按节点分组。"""

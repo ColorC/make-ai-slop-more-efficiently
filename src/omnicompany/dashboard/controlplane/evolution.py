@@ -22,13 +22,13 @@ evolution_router = APIRouter(tags=["evolution"])
 
 
 @evolution_router.get("/evolution")
-async def api_evolution():
+def api_evolution():
     paths = db_paths()
     return read_jsonl(paths["evolution_log"])
 
 
 @evolution_router.get("/reflections")
-async def api_reflections():
+def api_reflections():
     paths = db_paths()
     data = read_json(paths["mutation_state"])
     if not isinstance(data, dict):
@@ -38,7 +38,7 @@ async def api_reflections():
 
 
 @evolution_router.get("/semantic_types")
-async def api_semantic_types():
+def api_semantic_types():
     """Semantic type registry — the evolved replacement for conditional_rules."""
     paths = db_paths()
     st_path = paths["dir"] / "semantic_types.json"
@@ -47,7 +47,7 @@ async def api_semantic_types():
 
 
 @evolution_router.get("/params")
-async def api_params():
+def api_params():
     paths = db_paths()
     current = read_json(paths["params"])
     if current is None:
@@ -59,7 +59,7 @@ async def api_params():
 
 
 @evolution_router.get("/v2/evo")
-async def api_evo(limit: int = 20, node_id: str | None = None):
+def api_evo(limit: int = 20, node_id: str | None = None):
     """进化历史."""
     conn = sem_db()
     if not conn:

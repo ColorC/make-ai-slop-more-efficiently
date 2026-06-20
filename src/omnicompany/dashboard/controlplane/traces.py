@@ -25,7 +25,7 @@ traces_router = APIRouter(prefix="/v2", tags=["traces"])
 
 
 @traces_router.get("/rounds")
-async def api_rounds(limit: int = Query(20, le=200)):
+def api_rounds(limit: int = Query(20, le=200)):
     """最近 N 轮摘要."""
     conn = sem_db()
     if not conn:
@@ -56,7 +56,7 @@ async def api_rounds(limit: int = Query(20, le=200)):
 
 
 @traces_router.get("/round/{round_num}")
-async def api_round_detail(round_num: int):
+def api_round_detail(round_num: int):
     """单轮详情: routing events + pain signals + execution metadata."""
     conn = sem_db()
     if not conn:
@@ -90,7 +90,7 @@ async def api_round_detail(round_num: int):
 
 
 @traces_router.get("/trace/{trace_id}")
-async def api_trace(trace_id: str):
+def api_trace(trace_id: str):
     """单次 trace 的完整 Signal 流."""
     conn = sem_db()
     if not conn:
@@ -119,7 +119,7 @@ async def api_trace(trace_id: str):
 
 
 @traces_router.get("/trace-list")
-async def api_trace_list(
+def api_trace_list(
     limit: int = Query(30, ge=1, le=200),
     offset: int = Query(0, ge=0),
     q: str = Query("", description="Search in task description"),
@@ -223,7 +223,7 @@ async def api_trace_list(
 
 
 @traces_router.get("/trace-detail/{trace_id}")
-async def api_trace_detail(trace_id: str):
+def api_trace_detail(trace_id: str):
     """Full trace detail — searches ALL events.db for the given trace_id."""
     result: dict[str, Any] = {"trace_id": trace_id, "events": [], "routing_events": [], "signal_spans": [], "intent_steps": []}
 

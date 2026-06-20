@@ -31,7 +31,7 @@ projects_router = APIRouter(tags=["projects"])
 
 
 @projects_router.get("/projects")
-async def get_projects(fresh: bool = False) -> dict[str, Any]:
+def get_projects(fresh: bool = False) -> dict[str, Any]:
     """项目工作板全量(含 last_active / activity_7d / quick_actions)。用户首页与总控共用。
 
     fresh=1 = 用户点了刷新按钮: 穿透 index 解析缓存, 保证读到最新。
@@ -56,7 +56,7 @@ class ProjectUpsert(BaseModel):
 
 
 @projects_router.post("/projects")
-async def upsert_project(req: ProjectUpsert) -> dict[str, Any]:
+def upsert_project(req: ProjectUpsert) -> dict[str, Any]:
     fields = req.model_dump(exclude={"id", "by"}, exclude_none=True)
     try:
         item = set_project(req.id, by=req.by, **fields)
@@ -66,13 +66,13 @@ async def upsert_project(req: ProjectUpsert) -> dict[str, Any]:
 
 
 @projects_router.post("/projects/remove")
-async def delete_project(req: dict) -> dict[str, Any]:
+def delete_project(req: dict) -> dict[str, Any]:
     pid = str(req.get("id") or "")
     return {"ok": remove_project(pid)}
 
 
 @projects_router.get("/projects/{project_id}/plans")
-async def get_project_plans(project_id: str) -> dict[str, Any]:
+def get_project_plans(project_id: str) -> dict[str, Any]:
     """项目关联计划 — **服务端**归属(治理覆盖表优先, 退回前缀规则)。
 
     2026-06-12 用户: demogame 各项目计划列表全错。根因之一是前端自带一份前缀匹配逻辑,
@@ -98,7 +98,7 @@ async def get_project_plans(project_id: str) -> dict[str, Any]:
 
 
 @projects_router.get("/projects/{project_id}/findings")
-async def get_project_findings(project_id: str) -> dict[str, Any]:
+def get_project_findings(project_id: str) -> dict[str, Any]:
     """本项目的工作历史证据(重复需求/重复指正) — 治理部门 work_history 的分配结果。
 
     2026-06-12 用户: "重复需求和重复指正可以分配到项目上"。数据 = 最近一次
@@ -125,7 +125,7 @@ async def get_project_findings(project_id: str) -> dict[str, Any]:
 
 
 @projects_router.get("/projects/{project_id}/index")
-async def get_project_index(project_id: str) -> dict[str, Any]:
+def get_project_index(project_id: str) -> dict[str, Any]:
     """index 文件全文 + frontmatter 解析(项目详情页用)。"""
     proj = next((p for p in list_projects() if p.get("id") == project_id), None)
     if proj is None:
@@ -145,7 +145,7 @@ async def get_project_index(project_id: str) -> dict[str, Any]:
 
 
 @projects_router.get("/project-assets/{filename}")
-async def get_project_asset(filename: str) -> FileResponse:
+def get_project_asset(filename: str) -> FileResponse:
     """项目背景图等生成资产(data/boss_sight/project_assets/)。"""
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="非法文件名")
