@@ -1,0 +1,14 @@
+id: ART-v21-report
+type: artifact
+kind: report
+
+artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v21_h034_falsified_schema_5steps_2026-05-07.md"
+
+supports_evidence:
+  - EV-v21-csv-to-md-fail-retry
+
+checker:
+  kind: path_exists
+  status: not_checked_in_this_example
+
+coverage_note: "该 report 支撑 H-034 被具体反例攻击，但不证明 H-038 已完整覆盖所有错误处理模式。"

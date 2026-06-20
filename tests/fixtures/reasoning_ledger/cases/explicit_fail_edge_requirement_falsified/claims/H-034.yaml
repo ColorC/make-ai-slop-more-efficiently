@@ -1,0 +1,36 @@
+id: H-034
+type: claim
+kind: diagnostic
+strictness: defeasible
+status: falsified
+
+text: "没有显式 condition=FAIL edge 的 team 可能缺错误处理。"
+
+valid_under:
+  domain: omnicompany_team_topology
+  scope: "只考虑 TeamSpec.edges 中显式 condition=FAIL 的边。"
+  model_version: "diagnosis-v0"
+  ambiguity: medium
+  known_limitation: "没有覆盖 AnchorSpec.routes、节点内部 retry、外部 driver、MaterialDispatcher 等错误处理模式。"
+
+supported_by:
+  - EV-v19-batch-finding
+
+attacked_by:
+  - EV-v21-csv-to-md-fail-retry
+  - EV-v26-five-fail-patterns
+
+relations:
+  refined_by:
+    - H-038
+  conflicts:
+    - CON-h038-attacks-h034
+
+provenance:
+  created_from: "V18 HypothesisDeriverAgent"
+  created_at: "2026-05-06"
+  source_artifact: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v18_team_derivation_2026-05-07.md"
+
+notes:
+  - "该 claim 不应作为全局健康规则继续使用。"
+  - "可降级为一种局部模式检查：显式 FAIL edge 是否存在。"

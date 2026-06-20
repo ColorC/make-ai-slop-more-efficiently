@@ -24,6 +24,15 @@ try:
 except ImportError:
     pass
 
+# Windows: 隐藏本进程(8210) spawn 的所有子进程 console 窗口。本进程被 DETACHED_PROCESS 启动
+# (无 console), 故任何 git/pytest/python 子进程都会被分配新前台窗口抢焦点(用户硬规则: 禁止前台跳窗)。
+# ccdaemon 早有此 monkey-patch 但只在 8201 进程装; 8210 一直漏。在任何 router 装载前装一次, 非 win 自动 noop。
+try:
+    from omnicompany.dashboard.ccdaemon import _subprocess_hide as _sub_hide
+    _sub_hide.install_subprocess_hide()
+except Exception:  # noqa: BLE001 — 隐藏窗口尽力而为, 失败不该挡 dashboard 启动
+    pass
+
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware

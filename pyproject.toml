@@ -52,6 +52,7 @@ selftest = [
 dev = [
   "pytest>=7.0",
   "pytest-asyncio>=0.21.0",
+  "ruff>=0.6",
 ]
 
 [project.urls]
@@ -71,3 +72,12 @@ markers = [
   "e2e: 需要真实 API key 的端到端测试（THE_COMPANY_API_KEY）",
   "slow: 慢测试 (>10s · 如 agent loop · 真跑 LLM 多轮)",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+# CI 阻断只看真 bug（语法错误 / 未定义名）。海量 cosmetic（unused-import / f-string
+# 占位符等）尚未清理，留作 good-first-issue 渐进收敛，不阻断构建。
+select = ["E9", "F63", "F7", "F82"]

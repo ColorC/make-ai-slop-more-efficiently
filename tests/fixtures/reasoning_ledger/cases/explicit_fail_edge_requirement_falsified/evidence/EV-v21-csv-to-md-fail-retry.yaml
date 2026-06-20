@@ -1,0 +1,27 @@
+id: EV-v21-csv-to-md-fail-retry
+type: evidence
+kind: counterexample
+
+summary: "csv_to_md 没有显式 condition=FAIL edge，但通过节点内 Verdict(FAIL)+RETRY 合法处理错误。"
+
+supports:
+  - H-038
+
+attacks:
+  - H-034
+
+source:
+  source_type: report
+  artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v21_h034_falsified_schema_5steps_2026-05-07.md"
+  producer: "ChallengeDiagnosticAgent"
+  method: "LLM challenge + report"
+
+quality:
+  strength: high
+  limitation: "这是一个具体反例，能证伪 H-034 的全局形式，但不证明所有无 FAIL edge team 都合格。"
+  reproducibility: partial
+
+observed:
+  - "team 没有显式 FAIL edge。"
+  - "错误路径由节点内部 Verdict(FAIL)+RETRY 机制处理。"
+  - "因此 H-034 的判定条件过窄。"

@@ -1,0 +1,72 @@
+{
+  "name": "main_hub_smoke_real",
+  "target_module": "main_hub",
+  "preconditions": [
+    "PlayMode is on",
+    "Logged in to main_hub"
+  ],
+  "setup_steps": [
+    {"action": "wait", "target": "1"}
+  ],
+  "test_cases": [
+    {
+      "id": "TC01_main_hub_baseline",
+      "name": "main_hub baseline 状态校验",
+      "steps": [
+        {"action": "wait", "target": "1"}
+      ],
+      "assertions": [
+        {"type": "no_error", "target": "", "expected": "no anomalies"},
+        {"type": "visual_check", "target": "屏幕显示主界面或主城外景，没有错误弹窗", "expected": "main_hub visible"}
+      ]
+    },
+    {
+      "id": "TC02_open_tavern",
+      "name": "导航到 Tavern (月卜馆) 并验证打开",
+      "steps": [
+        {"action": "navigate", "target": "Tavern"},
+        {"action": "wait", "target": "3"}
+      ],
+      "assertions": [
+        {"type": "no_error", "target": "", "expected": "no anomalies"},
+        {"type": "visual_check", "target": "Tavern 月卜馆界面已打开（或类似抽卡/英雄招募界面）", "expected": "tavern visible"}
+      ]
+    },
+    {
+      "id": "TC03_back_to_main_hub",
+      "name": "Tavern 返回主界面",
+      "steps": [
+        {"action": "go_back", "target": ""},
+        {"action": "wait", "target": "2"}
+      ],
+      "assertions": [
+        {"type": "no_error", "target": "", "expected": "no anomalies"},
+        {"type": "visual_check", "target": "回到主城/主界面，能看到地图或菜单按钮", "expected": "main_hub visible"}
+      ]
+    },
+    {
+      "id": "TC04_open_mall",
+      "name": "导航到 Mall 商城",
+      "steps": [
+        {"action": "navigate", "target": "Mall"},
+        {"action": "wait", "target": "3"}
+      ],
+      "assertions": [
+        {"type": "no_error", "target": "", "expected": "no anomalies"},
+        {"type": "visual_check", "target": "商城界面已打开，可看到商品列表或货币显示", "expected": "mall visible"}
+      ]
+    },
+    {
+      "id": "TC05_back_to_main_hub_again",
+      "name": "Mall 返回主界面",
+      "steps": [
+        {"action": "go_back", "target": ""},
+        {"action": "wait", "target": "2"}
+      ],
+      "assertions": [
+        {"type": "no_error", "target": "", "expected": "no anomalies"},
+        {"type": "visual_check", "target": "已返回到主城/主菜单界面", "expected": "main_hub visible"}
+      ]
+    }
+  ]
+}

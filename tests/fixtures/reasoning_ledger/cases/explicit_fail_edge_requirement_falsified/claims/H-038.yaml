@@ -1,0 +1,36 @@
+id: H-038
+type: claim
+kind: diagnostic
+strictness: defeasible
+status: supported
+
+text: "team 的合法错误处理可以通过多种模式体现，不能只检查显式 condition=FAIL edge。"
+
+valid_under:
+  domain: omnicompany_team_topology
+  scope: "OmniCompany team / worker / dispatcher 错误处理模式审查。"
+  model_version: "diagnosis-v1"
+  ambiguity: medium
+  known_limitation: "当前列举的模式仍可能不完整；V26 已发现至少五种，后续需继续审计。"
+
+supported_by:
+  - EV-v21-csv-to-md-fail-retry
+  - EV-v26-five-fail-patterns
+
+attacked_by: []
+
+relations:
+  refines:
+    - H-034
+  conflicts:
+    - CON-h038-attacks-h034
+
+provenance:
+  created_from: "H-034 falsification chain"
+  created_at: "2026-05-07"
+  source_artifact: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v22_h034b_upgraded_2026-05-07.md"
+
+open_questions:
+  - "是否还有第六种、第七种错误处理模式？"
+  - "哪些模式应被视为合格，哪些只是绕过？"
+  - "不同模式是否需要不同的健康检查器？"

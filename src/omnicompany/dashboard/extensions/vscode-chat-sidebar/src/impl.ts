@@ -69,13 +69,6 @@ function appendSessionToUrl(baseUrl: string, sessionId: string | null): string {
   return hash ? `${next}#${hash}` : next;
 }
 
-function appendCacheBustToUrl(baseUrl: string): string {
-  const [pathAndQuery, hash = ''] = baseUrl.split('#', 2);
-  const separator = pathAndQuery.includes('?') ? '&' : '?';
-  const next = `${pathAndQuery}${separator}omnichat_webview=${Date.now()}`;
-  return hash ? `${next}#${hash}` : next;
-}
-
 function appendSurfaceToUrl(baseUrl: string, slot: WebviewSlot): string {
   if (!slot.surface) return baseUrl;
   const [pathAndQuery, hash = ''] = baseUrl.split('#', 2);
@@ -95,7 +88,10 @@ function appendDeeplinkToUrl(baseUrl: string, slot: WebviewSlot): string {
 }
 
 function getDashboardUrlForSlot(slot: WebviewSlot): string {
-  return appendCacheBustToUrl(appendDeeplinkToUrl(appendSurfaceToUrl(appendSessionToUrl(getDashboardUrl(), slot.state.sessionId), slot), slot));
+  // 稳定 URL — 不再每次渲染都打 Date.now() 时间戳。时间戳会让每次开/恢复窗口都拿到全新 URL,
+  // 命不中 webview 的 HTTP 缓存, 整个重型 SPA 冷启动一遍(用户「开窗口就刷新、很慢」的主因)。
+  // Vite 产物已按内容哈希; 静默更新交给 devReload(产物哈希真变才刷); 这里给稳定 URL 让恢复窗口直接吃缓存。
+  return appendDeeplinkToUrl(appendSurfaceToUrl(appendSessionToUrl(getDashboardUrl(), slot.state.sessionId), slot), slot);
 }
 
 function findBackendRoot(): string | null {

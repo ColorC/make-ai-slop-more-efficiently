@@ -80,6 +80,27 @@ class InstanceEntry:
         return cls(**d)
 
 
+# 类型目录读取缓存(进程级, 跨 InstanceRegistry 实例共享 —— get_registry 每次新建实例)。
+# 键 = (registry_dir, type_name); 失效信号 = (文件数, 最新 mtime)。看板高频读注册表时,
+# 没变就只做 N 次 stat(便宜), 不再 read+json.loads 每个文件(原来每个请求全盘重读)。
+_TYPE_CACHE: dict[tuple[str, str], tuple[tuple[int, float], list["InstanceEntry"]]] = {}
+
+
+def _type_dir_token(type_dir: Path) -> tuple[int, float]:
+    """目录指纹: (json 文件数, 最新 mtime)。增删改任一文件都会让它跳变。"""
+    count = 0
+    latest = 0.0
+    for f in type_dir.glob("*.json"):
+        try:
+            mtime = f.stat().st_mtime
+        except OSError:
+            continue
+        count += 1
+        if mtime > latest:
+            latest = mtime
+    return (count, latest)
+
+
 class InstanceRegistry:
     """基于明文 JSON 文件的实例注册表。
 
@@ -139,16 +160,27 @@ class InstanceRegistry:
     # ── 列举 ────────────────────────────────────────────────────────────────
 
     def iter_type(self, type_name: str) -> Iterator[InstanceEntry]:
-        """迭代某类型下的所有实体。"""
+        """迭代某类型下的所有实体(进程级缓存, 目录指纹不变就不重读)。"""
+        yield from self._cached_type_entries(type_name)
+
+    def _cached_type_entries(self, type_name: str) -> list["InstanceEntry"]:
         type_dir = self.registry_dir / type_name
         if not type_dir.exists():
-            return
+            return []
+        token = _type_dir_token(type_dir)
+        cache_key = (str(self.registry_dir), type_name)
+        hit = _TYPE_CACHE.get(cache_key)
+        if hit is not None and hit[0] == token:
+            return hit[1]
+        entries: list[InstanceEntry] = []
         for f in sorted(type_dir.glob("*.json")):
             try:
                 d = json.loads(f.read_text(encoding="utf-8"))
-                yield InstanceEntry.from_dict(d)
+                entries.append(InstanceEntry.from_dict(d))
             except Exception:
                 continue
+        _TYPE_CACHE[cache_key] = (token, entries)
+        return entries
 
     def list_all(self) -> list[InstanceEntry]:
         """列出所有已注册实体。"""

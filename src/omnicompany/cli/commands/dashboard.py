@@ -67,7 +67,9 @@ def _bump(target: str) -> dict | None:
 
 def _run_build(cwd: Path, args: list[str], label: str) -> None:
     click.echo(f"[{label}] {' '.join(args)}  (cwd={cwd})")
-    proc = subprocess.run(args, cwd=str(cwd), shell=(os.name == "nt"))
+    # CREATE_NO_WINDOW: npm/cmd 子进程别弹前台窗(用户硬规则)。输出仍走继承的 stdout, 不影响看构建日志。
+    proc = subprocess.run(args, cwd=str(cwd), shell=(os.name == "nt"),
+                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if proc.returncode != 0:
         click.echo(json.dumps({"ok": False, "step": label, "returncode": proc.returncode}, ensure_ascii=False))
         raise SystemExit(proc.returncode)
@@ -153,7 +155,7 @@ def _kill_port_win(port: int) -> None:
         "foreach ($c in $conns) { taskkill /PID $c.OwningProcess /T /F | Out-Null }"
     )
     subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-                   capture_output=True)
+                   capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
 @cmd_dashboard.command("restart")

@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import threading
 from datetime import datetime, timezone
@@ -348,6 +349,9 @@ def _recent_file_ts(roots: list[Path], days: int = 8, cap: int = 3000) -> list[s
 
 
 _GIT_BREAKER_UNTIL = 0.0  # git 超时/失败后熔断到此刻(EDR 间歇拦子进程时, 别让看板被一串超时拖死)
+# CREATE_NO_WINDOW: 禁止子进程分配新 console 窗口。8210 进程被 DETACHED_PROCESS 启动(无 console),
+# 故每个 git.exe 子进程会被 Windows 分配一个新前台窗口 → 抢键盘焦点(用户硬规则: 禁止前台跳窗)。
+_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
 
 def _git_commit_ts(roots: list[Path], days: int = 8) -> list[str]:
@@ -363,7 +367,8 @@ def _git_commit_ts(roots: list[Path], days: int = 8) -> list[str]:
     for root in roots:
         try:
             top = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"],
-                                 capture_output=True, text=True, timeout=3)
+                                 capture_output=True, text=True, timeout=3,
+                                 creationflags=_NO_WINDOW)
             if top.returncode != 0:
                 continue
             key = top.stdout.strip() + "::" + str(root)
@@ -372,7 +377,8 @@ def _git_commit_ts(roots: list[Path], days: int = 8) -> list[str]:
             seen.add(key)
             r = subprocess.run(["git", "-C", top.stdout.strip(), "log",
                                 f"--since={days} days ago", "--format=%cI", "--", str(root)],
-                               capture_output=True, text=True, timeout=4)
+                               capture_output=True, text=True, timeout=4,
+                               creationflags=_NO_WINDOW)
             if r.returncode == 0:
                 out.extend(ln.strip() for ln in r.stdout.splitlines() if ln.strip())
         except subprocess.TimeoutExpired:

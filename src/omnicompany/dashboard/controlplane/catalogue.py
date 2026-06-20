@@ -532,6 +532,31 @@ def _read_text(path: Path) -> str:
         return ""
 
 
+# ── 源文件解析缓存 ────────────────────────────────────────────────────────
+# team-graph 冷请求里同一个 formats.py 会被每个材料解析一遍、worker 文件按节点解析。
+# 按 (路径, mtime) 缓存 ast.parse 结果: 文件没变就不重复 read+parse(parse 是 CPU 大头)。
+_FILE_PARSE_CACHE: dict[str, tuple[float, str, "ast.Module | None"]] = {}
+
+
+def _read_and_parse(path: Path) -> tuple[str, "ast.Module | None"]:
+    """读源码 + ast.parse, 按 (路径, mtime) 缓存。文件改动(mtime 跳变)即重解析。"""
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return "", None
+    key = str(path)
+    hit = _FILE_PARSE_CACHE.get(key)
+    if hit is not None and hit[0] == mtime:
+        return hit[1], hit[2]
+    source = _read_text(path)
+    try:
+        tree = ast.parse(source) if source else None
+    except SyntaxError:
+        tree = None
+    _FILE_PARSE_CACHE[key] = (mtime, source, tree)
+    return source, tree
+
+
 def _class_attr_value(class_node: ast.ClassDef, attr_name: str) -> Any:
     for stmt in class_node.body:
         target: ast.AST | None = None
@@ -610,12 +635,8 @@ def _extract_fixed_prompt(tree: ast.Module | None, class_node: ast.ClassDef) -> 
 
 
 def _worker_definition_ref(path: Path, pkg_id: str, pkg_dir: Path, node: dict[str, Any], class_names: set[str]) -> dict[str, Any]:
-    source = _read_text(path)
+    source, tree = _read_and_parse(path)
     class_node: ast.ClassDef | None = None
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        tree = None
     if tree is not None:
         classes = [item for item in tree.body if isinstance(item, ast.ClassDef)]
         class_node = next((item for item in classes if item.name in class_names), None)
@@ -706,11 +727,7 @@ def _find_worker_definition(pkg_dir: Path, pkg_id: str, node: dict[str, Any]) ->
 
 
 def _material_definition_ref(path: Path, pkg_id: str, pkg_dir: Path, material_id: str) -> dict[str, Any]:
-    source = _read_text(path)
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        tree = None
+    source, tree = _read_and_parse(path)
 
     symbol: str | None = None
     line_start: int | None = None
@@ -914,9 +931,43 @@ def _load_team_selection(team_id: str, builder: str | None = None) -> tuple[Path
     return path, builders, builder_errors, selected
 
 
+# ── team-graph 结果缓存 ───────────────────────────────────────────────────
+# 原本每次请求都重跑 build*() + 逐节点/材料解析源码, 零缓存。按 (team_id, builder) 缓存
+# 序列化结果; 指纹 = team/worker/material 源文件最新 mtime, 任一改动即失效。
+_TEAM_GRAPH_CACHE: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+
+
+def _team_source_fingerprint(path: Path) -> float:
+    """team 图依赖的源文件最新 mtime(team 文件 + workers/*.py + formats/materials.py)。
+    stat 比 read+ast.parse 便宜几个数量级, 用它当缓存失效信号。"""
+    pkg_dir = path.parent
+    paths = [path, pkg_dir / "formats.py", pkg_dir / "materials.py"]
+    workers_dir = pkg_dir / "workers"
+    if workers_dir.is_dir():
+        paths.extend(sorted(workers_dir.glob("*.py")))
+    latest = 0.0
+    for p in paths:
+        try:
+            m = p.stat().st_mtime
+        except OSError:
+            continue
+        if m > latest:
+            latest = m
+    return latest
+
+
 def _load_team_graph_data(team_id: str, builder: str | None = None) -> dict[str, Any]:
-    path, builders, builder_errors, selected = _load_team_selection(team_id, builder)
-    return _serialize_team_graph(team_id, path, selected, builders, builder_errors)
+    # _resolve_item_path 便宜(team 扫描已 lru_cache); 命中缓存就跳过 import+build*()+逐节点解析。
+    path = _resolve_item_path(_scan_teams_cached, "team", team_id)
+    fingerprint = _team_source_fingerprint(path)
+    key = (team_id, builder or "")
+    cached = _TEAM_GRAPH_CACHE.get(key)
+    if cached is not None and cached[0] == fingerprint:
+        return cached[1]
+    _, builders, builder_errors, selected = _load_team_selection(team_id, builder)
+    data = _serialize_team_graph(team_id, path, selected, builders, builder_errors)
+    _TEAM_GRAPH_CACHE[key] = (fingerprint, data)
+    return data
 
 
 def _doctor_level_counts(findings: list[dict[str, Any]]) -> dict[str, int]:

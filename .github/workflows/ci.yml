@@ -2,25 +2,58 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  smoke:
-    name: Python ${{ matrix.python-version }}
+  test:
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
+    env:
+      OMNICOMPANY_SKIP_GUARDIAN_PRECHECK: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install
-        run: python -m pip install -e .
+      - name: Install (with dev extras)
+        run: python -m pip install -e ".[dev]"
       - name: Syntax check
         run: python -m compileall -q src
+      - name: Unit tests
+        run: python -m pytest tests/ -q
       - name: CLI smoke
-        env:
-          OMNICOMPANY_SKIP_GUARDIAN_PRECHECK: "1"
         run: |
           omni --help
           omni health
+      - name: Domain plugin contract
+        run: python scripts/validate_domains.py
+      - name: Guardian directory-health
+        run: omni guardian patrol --json-out || true
+
+  portability:
+    name: Clean-env install smoke (stranger's machine)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build tooling
+        run: python -m pip install build
+      - name: Clean-env smoke
+        run: python scripts/clean_env_smoke.py
+
+  lint:
+    name: Lint (ruff, non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: python -m pip install ruff
+      - name: Critical lint (undefined names / syntax)
+        run: ruff check src --select E9,F63,F7,F82
