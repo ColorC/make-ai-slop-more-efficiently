@@ -1058,6 +1058,32 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip research pipelines: %s", e)
 
+    # ── slidecast 演示式讲解/说书生成管线（2026-06-20 新开, 类别 aigc-video-content）──
+    _slidecast_pkg = "omnicompany.packages.domains.slidecast"
+    try:
+        register(PipelineEntry(
+            name="slidecast.run",
+            description=(
+                "演示式讲解/说书生成 — 文章/主题→大纲→会动的 slide IR→校验→渲染 Slidev→构建可交互 HTML。\n"
+                "  omni run slidecast.run -i article=<文章md路径>\n"
+                "  omni run slidecast.run -i topic=\"<题目>\" -i build=0\n"
+                "  产物: data/domains/slidecast/runs/<slug>/(slides.md + dist/ 会动的 HTML)"
+            ),
+            domain="slidecast",
+            build_team=_lazy(f"{_slidecast_pkg}.team", "build_slidecast_pipeline"),
+            build_bindings=_lazy_fn(f"{_slidecast_pkg}.run", "build_slidecast_bindings"),
+            default_db_dir="data/domains/slidecast",
+            default_max_steps=10,
+            cli_args=[
+                CliArg(name="article", help="文章 md 路径(personal-homepage 的 curated/works md,绝对或相对)"),
+                CliArg(name="topic", help="题目(无文章时,从题目起)"),
+                CliArg(name="style", help="风格: 讲解|说书", default="讲解"),
+                CliArg(name="build", help="是否 slidev build 出 HTML(默认是,-i build=0 只产 slides.md)", default="1"),
+            ],
+        ))
+    except Exception as e:
+        logger.debug("skip slidecast pipelines: %s", e)
+
     # ── publish 对外发布 / 知识备份管线（2026-06-15 新开）──
     _publish_pkg = "omnicompany.packages.domains.publish"
     try:

@@ -40,8 +40,8 @@ def build_slidecast_pipeline() -> TeamSpec:
     →(可选)导出带旁白视频。IR(结构化 slide JSON)是核心中间层:可校验、可重试、
     内容与表现解耦;换渲染后端(reveal.js)时 IR 不变。
 
-    注: author_ir 与 validate_ir 之间的有界重试(校验失败回填重写)在节点内部处理,
-    拓扑保持 DAG。export_video 默认不跑(需显式开启),是独立视频支线。
+    注: v1 到 build_deck 收尾(出会动的 HTML)。导出带旁白视频是独立支线(export_video),
+    设计见 DESIGN.md,待 HTML 主线稳定后再加,不在本拓扑。
     """
     nodes = [
         _node("intake", "Intake", "slidecast.request", "slidecast.brief",
@@ -62,11 +62,7 @@ def build_slidecast_pipeline() -> TeamSpec:
               "IR→Slidev Markdown(v-click 序号声明动画、代码块 magic-move、Mermaid 图表)。"),
         _node("build_deck", "BuildDeck", "slidecast.slidev_md", "slidecast.deck_html",
               TransformMethod.RULE,
-              "slidev build 出可交互 HTML/SPA(node 子进程);锁 Slidev 安全特性子集保可编译率。"),
-        _node("export_video", "ExportVideo", "slidecast.deck_html", "slidecast.video",
-              TransformMethod.RULE,
-              "可选:导出带旁白 MP4(Remotion 帧锚定 或 截帧+ffmpeg + WhisperX 旁白对齐)。"
-              "默认不跑。中文逐词对齐质量未实测,属风险。"),
+              "slidev build 出可交互 HTML/SPA(node 子进程);失败优雅降级仍交付 slides.md。"),
     ]
     edges = [
         TeamEdge(source="intake", target="outline"),
@@ -74,7 +70,6 @@ def build_slidecast_pipeline() -> TeamSpec:
         TeamEdge(source="author_ir", target="validate_ir"),
         TeamEdge(source="validate_ir", target="render_slidev"),
         TeamEdge(source="render_slidev", target="build_deck"),
-        TeamEdge(source="build_deck", target="export_video"),
     ]
     return TeamSpec(
         id="slidecast.run",
