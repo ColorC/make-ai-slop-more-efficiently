@@ -1,0 +1,2582 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../directory_cleanliness/">
+      
+      
+        <link rel="next" href="../dot_claude_vs_dot_omni/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Directory structure - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Directory structure
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 规范的根本
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 同级判定 (横向)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 同级判定 (横向)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 同语义层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 同被消费方式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 同生命周期
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 收纳触发器 (纵向 — 何时进一步分级)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 收纳触发器 (纵向 — 何时进一步分级)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 数量阈值
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 命名前缀重复
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 共同消费方
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 语义聚合
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 抽象层级跨越
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 子目录命名约定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 子目录命名约定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 _ 前缀 (内部 / 元 / 特殊语义)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 业务子目录命名
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#421-services-5-bucket-2026-05-02-j-dogfood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2.1 services/ 下 5 个 bucket 语义 (2026-05-02 立 J 管线 dogfood 时澄清)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-service-vs-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 service vs domain 边界 (用户原话提的边界澄清)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 反模式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五、 反模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 全平铺反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 过度多级反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 命名不统一反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 边界不明反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-misc-utils-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 misc / utils / helpers 反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 命名空间套娃反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 单文件混入目录组反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 跟现有目录结构的对应
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 不变量 (永远的硬约束)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八、 修订协议
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九、 跟其他规范的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification_invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspace_isolation_and_test_discrimination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/llm_infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/self_narrative_three_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 规范的根本
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 同级判定 (横向)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 同级判定 (横向)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 同语义层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 同被消费方式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 同生命周期
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 收纳触发器 (纵向 — 何时进一步分级)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 收纳触发器 (纵向 — 何时进一步分级)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 数量阈值
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 命名前缀重复
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 共同消费方
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 语义聚合
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 抽象层级跨越
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 子目录命名约定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 子目录命名约定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 _ 前缀 (内部 / 元 / 特殊语义)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 业务子目录命名
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#421-services-5-bucket-2026-05-02-j-dogfood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2.1 services/ 下 5 个 bucket 语义 (2026-05-02 立 J 管线 dogfood 时澄清)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-service-vs-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 service vs domain 边界 (用户原话提的边界澄清)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 反模式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五、 反模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 全平铺反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 过度多级反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 命名不统一反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 边界不明反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-misc-utils-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 misc / utils / helpers 反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 命名空间套娃反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 单文件混入目录组反模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 跟现有目录结构的对应
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 不变量 (永远的硬约束)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八、 修订协议
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九、 跟其他规范的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- [OMNI] origin=ai-ide domain=docs/standards/_global ts=2026-05-01T00:00:00Z type=standard status=active agent=ai-ide-current -->
+<!-- [OMNI] summary="目录结构规范, 立同级判定 / 收纳触发器 / 命名约定 / 反模式, 让目录组织有判定标准而不是凭感觉" -->
+<!-- [OMNI] why="项目目录长期凭感觉组织 (services 38 个平铺) 边界不明, 立规范让'什么应同级 / 什么应收起来 / 什么时候多级化' 都有可判定的特征" -->
+<!-- [OMNI] tags=directory,organization,naming,layering,foundation -->
+<!-- [OMNI] material_id="material:standards.global.directory_organization_rules.md" -->
+
+<h1 id="_1">目录结构规范<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<h2 id="_2">一、 规范的根本<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>目录是<strong>分类工具</strong>, 不是<strong>命名空间</strong>. 把目录当成命名空间用就会出现:</p>
+<ul>
+<li>一层平铺塞太多东西 (例如 38 个 service 平铺), 找东西靠 grep 不靠目录</li>
+<li>同级里混了不同语义层级的内容 (例如 service 跟 domain 平铺), 概念边界糊</li>
+<li>目录名重复语义 (例如 <code>services/agent/agent.py</code>), 命名空间套娃没意义</li>
+</ul>
+<p>正确的目录组织: <strong>每一级目录回答一个清晰的语义问题</strong>. 进到子目录意味着"语义层级缩小一档" — 例如 <code>services/_core/</code> 缩到核心层服务, <code>services/_core/agent/</code> 进一步缩到具体一个核心服务. 不缩窄的目录 (例如 <code>misc/</code> / <code>utils/</code> / <code>helpers/</code>) 是反模式.</p>
+<h2 id="_3">二、 同级判定 (横向)<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>两个目录或文件应该平铺在同一级当且仅当它们满足全部三条:</p>
+<h3 id="21">2.1 同语义层级<a class="headerlink" href="#21" title="Permanent link">&para;</a></h3>
+<p>平铺的元素必须在同一抽象层级. 反例:</p>
+<ul>
+<li><code>services/</code> 跟 <code>services/agent/</code> 平铺 (一个是分类目录, 一个是具体服务) — 错</li>
+<li>单个 service 跟一组 service 子目录混在 <code>services/</code> 里 — 错</li>
+</ul>
+<p>判定办法: 站在外部看, "这两个东西"的角色 / 颗粒度 / 生命周期是不是同一档?</p>
+<h3 id="22">2.2 同被消费方式<a class="headerlink" href="#22" title="Permanent link">&para;</a></h3>
+<p>平铺的元素被外部访问 / 引用 / import 的模式应当类似. 反例:</p>
+<ul>
+<li><code>services/</code> 装的全是 worker 业务代码, 但中间混进一份 <code>services/runtime_test_builder.py</code> 单文件 — 单文件跟整目录不是同消费方式</li>
+</ul>
+<h3 id="23">2.3 同生命周期<a class="headerlink" href="#23" title="Permanent link">&para;</a></h3>
+<p>平铺的元素的"创建 / 修订 / 归档" 频率应当接近. 反例:</p>
+<ul>
+<li>长期稳定的核心层 service (<code>agent</code> / <code>guardian</code>) 跟实验性 service (<code>absorption_runtime_test</code> / <code>code_runtime_test</code>) 平铺 — 生命周期不同, 应当分到不同子目录 (<code>_core/</code> 跟 <code>_experimental/</code> 等)</li>
+</ul>
+<h2 id="_4">三、 收纳触发器 (纵向 — 何时进一步分级)<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>平铺到一定程度后, 下面的特征任一出现就触发<strong>收到子目录</strong>:</p>
+<h3 id="31">3.1 数量阈值<a class="headerlink" href="#31" title="Permanent link">&para;</a></h3>
+<p>同级元素数量:</p>
+<ul>
+<li>≤ 7 个: 平铺合理 (符合人类短期记忆 7±2 的认知容量)</li>
+<li>8-15 个: 开始考虑分组, 看其他触发器</li>
+<li>≥ 16 个: <strong>必收子目录</strong> (或者 grep 替代浏览)</li>
+</ul>
+<p>当前 <code>services/</code> 38 个明显超阈值.</p>
+<h3 id="32">3.2 命名前缀重复<a class="headerlink" href="#32" title="Permanent link">&para;</a></h3>
+<p>N 个元素带相同前缀, 触发收子目录. 例如:</p>
+<ul>
+<li><code>repo_absorption / repo_architect / repo_exporter / repo_learner</code> → 收 <code>_learning/repo/</code> 子目录</li>
+<li><code>kb_ingestion_agent / kb_multi_agent</code> → 收 <code>_learning/kb/</code></li>
+<li><code>hypothesis / hypothesis_library</code> → 收 <code>_learning/hypothesis/</code></li>
+<li><code>absorption_runtime_test / code_runtime_test / runtime_test_builder</code> → 收 <code>_utility/runtime_test/</code></li>
+</ul>
+<p>收完后子目录里的元素<strong>去掉前缀</strong>: <code>repo_absorption</code> → <code>_learning/repo/absorption</code>. 前缀已经在父目录体现, 不重复.</p>
+<h3 id="33">3.3 共同消费方<a class="headerlink" href="#33" title="Permanent link">&para;</a></h3>
+<p>N 个元素被同一类消费方调用, 触发收子目录:</p>
+<ul>
+<li>例如 <code>docauthor / report_author / publish_pipeline / privacy_publish / publishing_commons</code> 都是发布 / 文档生成相关 → 收 <code>_authoring/</code> 子目录</li>
+</ul>
+<h3 id="34">3.4 语义聚合<a class="headerlink" href="#34" title="Permanent link">&para;</a></h3>
+<p>N 个元素属于同一语义类别 (即使前缀不同), 触发收子目录:</p>
+<ul>
+<li>例如 <code>agent / guardian / registry / repair / selftest / evolution</code> 都是核心系统类服务 → 收 <code>_core/</code> 子目录</li>
+</ul>
+<h3 id="35">3.5 抽象层级跨越<a class="headerlink" href="#35" title="Permanent link">&para;</a></h3>
+<p>同级里出现明显跨抽象层级的元素, 触发<strong>抽离</strong>:</p>
+<ul>
+<li>例如 <code>services/agent/</code> (抽象 agent 框架) 跟 <code>services/personal_site/</code> (具体业务网站) 不在同抽象层级 — <code>personal_site</code> 应当抽离到 <code>domains/personal_site/</code> 或类似业务区</li>
+</ul>
+<h2 id="_5">四、 子目录命名约定<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<h3 id="41-_">4.1 _ 前缀 (内部 / 元 / 特殊语义)<a class="headerlink" href="#41-_" title="Permanent link">&para;</a></h3>
+<p>下划线前缀的子目录有约定语义, <strong>不当业务子目录用</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>前缀</th>
+<th>语义</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_global/</code></td>
+<td>跨概念跨业务的全局规范 / 工具</td>
+<td><code>docs/standards/_global/</code></td>
+</tr>
+<tr>
+<td><code>_meta/</code></td>
+<td>关于本目录或本类内容的元信息</td>
+<td><code>docs/standards/_meta/standards-index.yaml</code></td>
+</tr>
+<tr>
+<td><code>_core/</code></td>
+<td>核心层 (区别于业务层)</td>
+<td><code>services/_core/</code> (核心系统服务)</td>
+</tr>
+<tr>
+<td><code>_archive/</code></td>
+<td>历史档案, 不再活跃但保留</td>
+<td><code>docs/plans/_archive/</code></td>
+</tr>
+<tr>
+<td><code>_graveyard/</code></td>
+<td>已废弃, 不让 import / 引用</td>
+<td><code>src/omnicompany/_graveyard/</code></td>
+</tr>
+<tr>
+<td>~~<code>_infra/</code>~~</td>
+<td>(2026-05-15 撤) plans/ 跨服务的中间层, 已替换为主题区单轴 + <code>omnicompany-</code> 前缀</td>
+<td>—</td>
+</tr>
+<tr>
+<td>~~<code>_cross/</code>~~</td>
+<td>(2026-05-15 撤) plans/ 跨多 package 中间层, 已撤; 新模型取主导一个主题区, 多 package 时按改动量取最大</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>_domain_specific/</code></td>
+<td>特定 domain 的子内容</td>
+<td><code>docs/standards/_domain_specific/demogame/</code></td>
+</tr>
+<tr>
+<td><code>_experimental/</code></td>
+<td>实验性 / 临时, 可能废弃</td>
+<td><code>services/_experimental/</code></td>
+</tr>
+</tbody>
+</table>
+<p>~~<code>_scratch/</code>~~ — <strong>2026-05-02 撤规范</strong>. 跟 <code>.omni/sandbox/drafts/</code> 功能重叠 (都是注册前临时草稿区), 但 sandbox 有明确 lifecycle (drafts → check → promote / archive) 而 _scratch 是松散临时. 用户拍板归并: 临时工作走 <code>.omni/sandbox/drafts/</code>, 不立 <code>_scratch/</code>. 详 auto-memory <code>feedback_no_dir_creation_without_approval</code>.</p>
+<p>下划线前缀的目录在排序时排在前面 (lexicographic), 自然区别于业务子目录.</p>
+<h3 id="42">4.2 业务子目录命名<a class="headerlink" href="#42" title="Permanent link">&para;</a></h3>
+<p>不带下划线的子目录是业务类目录 (跟系统类区分):</p>
+<ul>
+<li>用单数英文蛇形 (<code>agent</code>, <code>guardian</code>, 不是 <code>agents</code> / <code>Guardian</code>)</li>
+<li>短名 (3-15 字符), 反映本子目录装什么</li>
+<li>跟父目录语义有继承关系 (子目录是父目录的细化, 不是平行概念)</li>
+</ul>
+<h3 id="421-services-5-bucket-2026-05-02-j-dogfood">4.2.1 services/ 下 5 个 bucket 语义 (2026-05-02 立 J 管线 dogfood 时澄清)<a class="headerlink" href="#421-services-5-bucket-2026-05-02-j-dogfood" title="Permanent link">&para;</a></h3>
+<p><code>src/omnicompany/packages/services/</code> 下当前 5 个 <code>_</code> 前缀 bucket, 收纳边界:</p>
+<table>
+<thead>
+<tr>
+<th>bucket</th>
+<th>语义</th>
+<th>收什么</th>
+<th>不收什么</th>
+<th>现有范例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_core/</code></td>
+<td>跨 bucket 共用<strong>抽象 + 设施</strong> (Lib 形态)</td>
+<td>agent/hook/tool/team 抽象 · registry · protection · identity · configurable · meta_io 等基础设施</td>
+<td>业务跑数据的 pipeline 不收 (跑数据归 <code>_diagnosis/</code>)</td>
+<td>identity, registry, agent, configurable, meta_io, omnicompany, protection</td>
+</tr>
+<tr>
+<td><code>_diagnosis/</code></td>
+<td>检查 / 审计 / 治理执行类</td>
+<td>扫问题出报告 (doctor) · 清遗留文件 (cleanup_bot) · 规则审计 (lap_auditor) · 治理执行 pipeline (mass_materialization)</td>
+<td>不收纯抽象 (归 <code>_core/</code>) · 不收创作 (归 <code>_authoring/</code>)</td>
+<td>cleanup_bot, doctor, domain_scout, lap_auditor, mass_materialization (待 promote)</td>
+</tr>
+<tr>
+<td><code>_authoring/</code></td>
+<td>创作 / 写作类</td>
+<td>designer · writer · publisher · 文档生成 pipeline</td>
+<td>不收"读出报告" 类 (归 <code>_diagnosis/</code>)</td>
+<td>designer 等</td>
+</tr>
+<tr>
+<td><code>_learning/</code></td>
+<td>学习 / 归纳类</td>
+<td>absorption (从 trace 学) · hypothesis (假设管理) · knowledge (知识库) · trace_induction</td>
+<td>不收"先验规则" 类 (归 <code>_core/</code>)</td>
+<td>absorption, hypothesis, knowledge, repo, trace_induction</td>
+</tr>
+<tr>
+<td><code>_utility/</code></td>
+<td>通用工具 / helper</td>
+<td>跨服务 helper · conversion · adapter</td>
+<td>不要变成 <code>misc/</code> 万能桶 (5.5 反模式)</td>
+<td>(按需补)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>判定流程 (新 service 该归哪个 bucket)</strong>:</p>
+<ol>
+<li>这 service 是 <strong>lib (无 pipeline)</strong>? → <code>_core/</code></li>
+<li>这 service 是 <strong>扫 / 审 / 治理执行</strong>? → <code>_diagnosis/</code></li>
+<li>这 service 是 <strong>创作 / 写</strong>? → <code>_authoring/</code></li>
+<li>这 service 是 <strong>学 / 归纳</strong>? → <code>_learning/</code></li>
+<li>跨服务<strong>可复用 helper</strong>? → <code>_utility/</code></li>
+<li><strong>都不像</strong> → 报告给用户, 不擅自立新 bucket (违反不变量第 8 条)</li>
+</ol>
+<p><strong>新 service 声明</strong>: 在 <code>_&lt;bucket&gt;/&lt;service&gt;/.omni/manifest.yaml</code> 声明 <code>parent_bucket: _&lt;bucket&gt;</code>, 跟规范对齐. <code>omni sandbox promote --target=...</code> 用本规范判定 target 路径合法性, 不合规直接拦.</p>
+<h3 id="43-service-vs-domain">4.3 service vs domain 边界 (用户原话提的边界澄清)<a class="headerlink" href="#43-service-vs-domain" title="Permanent link">&para;</a></h3>
+<p>这是判 <code>services/</code> vs <code>domains/</code> 顶层的硬规则:</p>
+<ul>
+<li><strong>service</strong>: 抽象框架 / 跨业务复用 / 给系统跑业务用. 例如 agent / guardian / registry / docauthor / csv_to_md (csv 是通用格式, 跨业务用)</li>
+<li><strong>domain</strong>: 具体业务领域 / 私域 / 不跨业务. 例如 demogame (具体游戏) / voxelcraft (具体 mod) / personal_site (个人站, 私域) / business_explorer (具体业务探索, 跟 demogame 关联)</li>
+</ul>
+<p>判定办法 (按用户原话"核心层和具体业务私域的区别"):</p>
+<ul>
+<li>这个东西的代码可能被另一个不同的业务复用吗? 是 → service. 不是 → domain.</li>
+<li>这个东西的 material schema 含具体业务实体名 (demogame.season_book / voxelcraft.entity_spec) 吗? 是 → domain. 不是 → service.</li>
+<li>这个东西的产出是给具体某个客户 / 项目 / 业务用的吗? 是 → domain. 通用 → service.</li>
+</ul>
+<h2 id="_6">五、 反模式<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h3 id="51">5.1 全平铺反模式<a class="headerlink" href="#51" title="Permanent link">&para;</a></h3>
+<p>特征: 同级目录数量 ≥ 16 + 没有任何收子目录的尝试.
+后果: 找东西靠 grep, 目录失去分类作用.
+例: 当前 <code>services/</code> (38 个平铺), 当前 <code>docs/plans/</code> 修订前 (73 份平铺).</p>
+<h3 id="52">5.2 过度多级反模式<a class="headerlink" href="#52" title="Permanent link">&para;</a></h3>
+<p>特征: 进到第 5 级以上才能找到具体内容.
+后果: 路径长, 引用麻烦, 修改时打字错误率高.
+判定: 一份内容的路径深度 (从项目根到文件) 超过 6 级 → 过度.
+反模式例子: <code>src/omnicompany/packages/services/_authoring/docs/internal/style_guide.md</code> (6 级 packages 之下还层层嵌套).</p>
+<h3 id="53">5.3 命名不统一反模式<a class="headerlink" href="#53" title="Permanent link">&para;</a></h3>
+<p>特征: 同级目录混不同命名风格 (复数 / 单数 / camelCase / 蛇形 / 中划线).
+例: <code>services/csv_to_md</code> (蛇形) 跟 <code>services/asset-library</code> (中划线) 同时存在 — 选一种风格统一.</p>
+<h3 id="54">5.4 边界不明反模式<a class="headerlink" href="#54" title="Permanent link">&para;</a></h3>
+<p>特征: 同级元素属于不同抽象层级 (service 跟 domain 混 / 框架跟实例混).
+例: 当前 <code>services/personal_site/</code> 是具体业务私域不是框架 service, 应当挪到 <code>domains/personal_site/</code>.</p>
+<h3 id="55-misc-utils-helpers">5.5 misc / utils / helpers 反模式<a class="headerlink" href="#55-misc-utils-helpers" title="Permanent link">&para;</a></h3>
+<p>特征: 子目录名是 <code>misc / utils / helpers / common</code> 这种"放不下的东西" 都塞这里.
+后果: 反"语义层级缩小一档" 原则, 这些目录不缩窄反而扩张.
+修法: 强迫重新分类 — 这里面装的内容到底是什么? 按真语义另立子目录, 不要 misc.</p>
+<h3 id="56">5.6 命名空间套娃反模式<a class="headerlink" href="#56" title="Permanent link">&para;</a></h3>
+<p>特征: 子目录名跟父目录名字面重复.
+例: <code>services/agent/agent.py</code> (agent 套娃 — 既是父目录名又是文件名).
+修法: 子文件改名反映其在父目录里的具体角色 (<code>services/agent/loop.py</code> 就好).</p>
+<h3 id="57">5.7 单文件混入目录组反模式<a class="headerlink" href="#57" title="Permanent link">&para;</a></h3>
+<p>特征: 一组目录里混进一份单文件 (不是目录).
+例: <code>services/</code> 里大部分是 service 子目录, 但混进 <code>services/runtime_test_builder.py</code> 单文件.
+修法: 单文件抽到 <code>services/_utility/</code> 或归到对应 service 子目录.</p>
+<h2 id="_7">六、 跟现有目录结构的对应<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>本规范立后, omnicompany 项目里几个已经按规范多级化的实例:</p>
+<ul>
+<li><code>docs/standards/</code>: _global / concepts / cli / protocol / _meta / _domain_specific 6 子目录, 25 份规范分类</li>
+<li><code>docs/plans/</code>: _infra / _cross / domain/demogame / domain/voxelcraft / _archive 5 子目录, 73 份 plan 分类</li>
+<li><code>src/omnicompany/_graveyard/primitives/</code>: 旧 primitives 归档区, 含原 DESIGN.md + <strong>init</strong>.py.archived</li>
+</ul>
+<p>待按规范多级化的:</p>
+<ul>
+<li><code>src/omnicompany/packages/services/</code>: 38 个平铺 (本规范立后下一步处理)</li>
+<li><code>src/omnicompany/packages/domains/</code>: 4 个平铺 (数量 OK 但要看 service / domain 边界澄清后是否新增)</li>
+</ul>
+<h2 id="_8">七、 不变量 (永远的硬约束)<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>无论怎么重排, 下面的规则永远不破:</p>
+<ol>
+<li>单文件 .py 不跟整目录平铺 (5.7 反模式)</li>
+<li>子目录跟父目录字面重名 (5.6 反模式)</li>
+<li>路径深度 (从项目根到文件) ≤ 6 级 (5.2 过度多级)</li>
+<li>_前缀的目录不当业务子目录用 (4.1 约定)</li>
+<li>service 跟 domain 边界判定按 4.3 (服务跨业务 vs 业务私域)</li>
+<li>每个目录回答一个清晰的语义问题 (一、 根本)</li>
+<li><strong>新目录创建经审批</strong> — AI IDE / agent 不擅自新建目录, 必须先经用户批准 (跨项目铁律 2026-05-02 立, 详 auto-memory <code>feedback_no_dir_creation_without_approval</code>)</li>
+<li><strong>不擅自立新 bucket</strong> — <code>services/</code> 下 <code>_authoring / _core / _diagnosis / _learning / _utility</code> 5 个 bucket 是固定清单, 新 bucket 必先改本规范 §4.2.1 加范围 + 用户批准</li>
+</ol>
+<h2 id="_9">八、 修订协议<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<p>修订本规范时:</p>
+<ol>
+<li>改之前先看本规范当前怎么定义"修订"</li>
+<li>改完跑一次现有目录结构的 audit, 看有没有新违反的</li>
+<li>audit 报告进 <code>docs/plans/&lt;日期&gt;DIRECTORY-RESTRUCTURE/plan.md</code></li>
+<li>修订日期跟 OmniMark <code>ts</code> 字段同步</li>
+</ol>
+<h2 id="_10">九、 跟其他规范的关系<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>_global/distributed-docs.md</code> 立六域结构 + 内容类型矩阵 — 本规范是"目录形态" 层, distributed-docs 是"内容归属" 层, 不冲突</li>
+<li><code>concepts/template.md</code> §一 三层分类 — AI 控制体系 / 文档体系 / 元模板. 本规范的 <code>_core/</code> / <code>_authoring/</code> / 等是这三层的物理目录组织</li>
+<li><code>cli/sandbox.md</code> 沙盒规范 — <code>.omni/sandbox/</code> 是临时草稿唯一位置 (2026-05-02 撤掉 <code>_scratch/</code> 后归并)</li>
+<li><code>_global/single_source_thin_wrap.md</code> 唯一源 + 薄包装铁律 — 跟本规范 <code>templates/&lt;kind&gt;/</code> (源) 跟 <code>.claude/skills/&lt;X&gt;/SKILL.md</code> (薄包装) 的关系一致</li>
+<li><code>concepts/plan.md</code> plan 目录规范 — 本规范是父级, plan 规范是子规范的具体化</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2287 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../user-action-driven-testing/">
+      
+      
+        <link rel="next" href="../workspace_isolation_and_test_discrimination/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Verification invariants - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#invariants-w6w7playeragent" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Verification invariants
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../directory_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 核心问题
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 核心问题">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-w6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 反模式 (现 W6 实例)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 正模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-invariant-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 新 invariant schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-verify_method-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. verify_method 4 种
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. verify_method 4 种">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-dom_assertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 dom_assertion (最便宜最可靠)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-pixel_diff_threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 pixel_diff_threshold (中等)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-vision_llm_simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 vision_llm_simple (中贵, 现有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-vision_llm_compare_to_baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 vision_llm_compare_to_baseline (最贵)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. invariants 撰写守则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. invariants 撰写守则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 必含反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 数值化优先
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 锚到 baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-cosmetic-functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 区分 cosmetic / functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 路径可达 ≠ 判别力
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 总览验收
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 应用到既有 worker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 应用到既有 worker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-visual_acceptance_gate-w6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 visual_acceptance_gate (W6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-player_agent-playeragent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 player_agent (PlayerAgent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-w7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 后续 W7 (战斗联调验收)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 一句话总览
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspace_isolation_and_test_discrimination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/llm_infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/self_narrative_three_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 核心问题
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 核心问题">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-w6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 反模式 (现 W6 实例)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 正模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-invariant-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 新 invariant schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-verify_method-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. verify_method 4 种
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. verify_method 4 种">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-dom_assertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 dom_assertion (最便宜最可靠)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-pixel_diff_threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 pixel_diff_threshold (中等)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-vision_llm_simple" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 vision_llm_simple (中贵, 现有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-vision_llm_compare_to_baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 vision_llm_compare_to_baseline (最贵)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. invariants 撰写守则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. invariants 撰写守则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 必含反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 数值化优先
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 锚到 baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-cosmetic-functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 区分 cosmetic / functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 路径可达 ≠ 判别力
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 总览验收
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 应用到既有 worker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 应用到既有 worker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-visual_acceptance_gate-w6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 visual_acceptance_gate (W6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-player_agent-playeragent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 player_agent (PlayerAgent)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-w7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 后续 W7 (战斗联调验收)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 一句话总览
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- [OMNI] origin=claude-code domain=docs/standards ts=2026-04-30T17:00:00Z type=standard -->
+<!-- [OMNI] material_id="material:standards.global.verification_invariants_gradient_schema.md" -->
+
+<h1 id="invariants-w6w7playeragent">标准 · 验证 invariants (W6/W7/PlayerAgent 通用)<a class="headerlink" href="#invariants-w6w7playeragent" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>立档触发: 2026-04-30 L1 看 a 块 demo 实物后明示 — W6 PASS 但实际界面糟糕, vision LLM 漏检. invariants 写得太松导致"PASS"严重失真. 此标准跨 worker 通用 (visual_acceptance_gate / player_agent / 后续 W7 等).</p>
+<p>配套: <code>feedback_validation_calibration_red_green_gradient.md</code> (验证管线必带敏感性铁律) / <code>feedback_connected_is_not_discriminating.md</code> (连接 ≠ 判别力).</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 核心问题<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
+<h3 id="11-w6">1.1 反模式 (现 W6 实例)<a class="headerlink" href="#11-w6" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">invariant</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;标题</span><span class="nv"> </span><span class="s">&#39;选择威胁等级&#39;</span><span class="nv"> </span><span class="s">在屏幕上显示,</span><span class="nv"> </span><span class="s">字号大,</span><span class="nv"> </span><span class="s">颜色明亮可见&quot;</span>
+<span class="w">  </span><span class="nt">expected</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass</span>
+</code></pre></div>
+<p><strong>为什么失败</strong>:
+- vision LLM 永远答 "pass" — 任何字号, 任何对比度的标题都"看得见"
+- 不区分 demo vs hifi baseline / vs 真 demogame 的差距
+- 没有梯度, 好/一般/差 都一个 PASS
+- <strong>没有判别力</strong> = 没有验证</p>
+<p>实测后果: a 块 demo 跟用户列出的真 demogame (剑与远征:启程) 差距巨大 (没用 backend 真 cellmap / 商店按钮浮动 / 倒计时空跑 / 棋盘看不见棋子 / 等 15 项), W6 4/4 PASS, 严重误导.</p>
+<h3 id="12">1.2 正模式<a class="headerlink" href="#12" title="Permanent link">&para;</a></h3>
+<p>每条 invariant 必须能区分至少:
+- <strong>绝对错</strong> (red, fail) — 当前实物某些状态确定不通过
+- <strong>基本对</strong> (green, pass) — 当前实物某些状态确定通过
+- <strong>梯度</strong> (gradient A/B/C/F) — 区分"好/一般/差/严重差"</p>
+<p>测试: invariant 的"反例"是否存在? 如果想不出反例就 fail, 这条 invariant 没价值.</p>
+<hr />
+<h2 id="2-invariant-schema">2. 新 invariant schema<a class="headerlink" href="#2-invariant-schema" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>{
+  &quot;invariant_id&quot;: &quot;S2-battlefield-cellmap&quot;,  // 屏 + 项 unique
+  &quot;describe&quot;: &quot;棋盘必须用 backend /api/battlefield 拉的 demogame cellmap (~45 tiles, 含 banned/block 过渡), 不是 hand-rolled 8x4 死格&quot;,
+
+  // 三档敏感性 — 必填
+  &quot;red_check&quot;: &quot;如果是 8x4 等距矩阵, 没看到 banned 灰格 / block 物体 → fail (说明没接 backend)&quot;,
+  &quot;green_check&quot;: &quot;tiles 数 ≥ 30 + 含 ≥ 1 个 banned 格 + self/oppo 不对称 → pass&quot;,
+  &quot;gradient&quot;: {
+    &quot;A&quot;: &quot;tiles ≥ 40 + 跟 hifi baseline 元素位置偏差 &lt;10%&quot;,
+    &quot;B&quot;: &quot;tiles ≥ 30 + 含 banned&quot;,
+    &quot;C&quot;: &quot;tiles ≥ 20&quot;,
+    &quot;F&quot;: &quot;8x4 死格 / tiles &lt; 20&quot;
+  },
+
+  // 验证方法 — 调度具体怎么验
+  &quot;verify_method&quot;: &quot;vision_llm_compare_to_baseline&quot;,  // 见 §3
+  &quot;baseline_path&quot;: &quot;designs/06-hifi-final/main_board_prepare.baseline.png&quot;,
+  &quot;real_demogame_path&quot;: &quot;scratch/W7_real_demogame_baseline/main_board_prepare.png&quot;,  // 可选
+
+  // 严重度 — 这条若 fail 算什么级别
+  &quot;severity_if_fail&quot;: &quot;blocker&quot;  // blocker | major | minor | cosmetic
+}
+</code></pre></div>
+<p>每条 invariant 必填: <code>invariant_id</code> / <code>describe</code> / <code>red_check</code> / <code>green_check</code> / <code>verify_method</code> / <code>severity_if_fail</code>. <code>gradient</code> / <code>baseline_path</code> 可选 (但视觉类强烈建议加).</p>
+<hr />
+<h2 id="3-verify_method-4">3. verify_method 4 种<a class="headerlink" href="#3-verify_method-4" title="Permanent link">&para;</a></h2>
+<p>混合用. 越靠后越贵, dom_assertion 优先.</p>
+<h3 id="31-dom_assertion">3.1 <code>dom_assertion</code> (最便宜最可靠)<a class="headerlink" href="#31-dom_assertion" title="Permanent link">&para;</a></h3>
+<p>playwright 直接 query selector + 数 elements / 取 textContent 验.</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// invariant: &quot;棋盘 tile 数 ≥ 30&quot;</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">tileCount</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">page</span><span class="p">.</span><span class="nx">locator</span><span class="p">(</span><span class="s1">&#39;.battlefield .hex&#39;</span><span class="p">).</span><span class="nx">count</span><span class="p">();</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">tileCount</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">30</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">result</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;fail&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">evidence</span><span class="o">:</span><span class="w"> </span><span class="sb">`only </span><span class="si">${</span><span class="nx">tileCount</span><span class="si">}</span><span class="sb"> hexes`</span><span class="w"> </span><span class="p">};</span>
+<span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">result</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;pass&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">evidence</span><span class="o">:</span><span class="w"> </span><span class="sb">`</span><span class="si">${</span><span class="nx">tileCount</span><span class="si">}</span><span class="sb"> hexes`</span><span class="w"> </span><span class="p">};</span>
+</code></pre></div>
+<p>适合: 数量 / 文案 / 类名存在 / 属性值类 invariants.</p>
+<h3 id="32-pixel_diff_threshold">3.2 <code>pixel_diff_threshold</code> (中等)<a class="headerlink" href="#32-pixel_diff_threshold" title="Permanent link">&para;</a></h3>
+<p>Python <code>omnicompany/scripts/visual_diff.py</code> 用 Pillow + numpy 算 SSIM (Structural Similarity), 阈值给 verdict.</p>
+<div class="highlight"><pre><span></span><code><span class="n">score</span> <span class="o">=</span> <span class="n">compute_ssim</span><span class="p">(</span><span class="n">actual_png</span><span class="p">,</span> <span class="n">baseline_png</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">score</span> <span class="o">&gt;=</span> <span class="mf">0.85</span><span class="p">:</span> <span class="k">return</span> <span class="s1">&#39;pass&#39;</span>
+<span class="k">elif</span> <span class="n">score</span> <span class="o">&gt;=</span> <span class="mf">0.70</span><span class="p">:</span> <span class="k">return</span> <span class="s1">&#39;partial&#39;</span>
+<span class="k">else</span><span class="p">:</span> <span class="k">return</span> <span class="s1">&#39;fail&#39;</span>
+</code></pre></div>
+<p>适合: "实物跟 baseline 像不像" 类 invariants. <strong>快, 可重现, 数值化</strong>.</p>
+<h3 id="33-vision_llm_simple">3.3 <code>vision_llm_simple</code> (中贵, 现有)<a class="headerlink" href="#33-vision_llm_simple" title="Permanent link">&para;</a></h3>
+<p>vision LLM 单图 + 问题 → pass/fail. 跟现 W6 同.</p>
+<h3 id="34-vision_llm_compare_to_baseline">3.4 <code>vision_llm_compare_to_baseline</code> (最贵)<a class="headerlink" href="#34-vision_llm_compare_to_baseline" title="Permanent link">&para;</a></h3>
+<p>vision LLM 看 2 张图 (实物 + baseline) + 答相似度 + pass/fail. 用于 pixel_diff 解释不了的"风格"差距.</p>
+<hr />
+<h2 id="4-invariants">4. invariants 撰写守则<a class="headerlink" href="#4-invariants" title="Permanent link">&para;</a></h2>
+<h3 id="41">4.1 必含反例<a class="headerlink" href="#41" title="Permanent link">&para;</a></h3>
+<p>写 invariant 前自问: "这条 invariant 的 fail 例子是什么?". 想不出就别写.</p>
+<p>例:
+- ❌ "标题 '选择威胁等级' 显示" — 反例?(任何标题都过)
+- ✅ "标题文字精确匹配 spec '选择威胁等级' 字符串" — 反例: 文案 "选择难度", "选择关卡" 都 fail</p>
+<h3 id="42">4.2 数值化优先<a class="headerlink" href="#42" title="Permanent link">&para;</a></h3>
+<p>能数就别问. 模糊形容词 ("字号大", "颜色明亮", "对比度够") 不是 invariant 是描述.</p>
+<p>例:
+- ❌ "字号大" — 多大算大?
+- ✅ "标题 font-size ≥ 18px (CSS computed)" — dom_assertion</p>
+<h3 id="43-baseline">4.3 锚到 baseline<a class="headerlink" href="#43-baseline" title="Permanent link">&para;</a></h3>
+<p>视觉类 invariants 必须有 baseline (hifi-final / 真 demogame 截图) 作锚. 不锚到具体图就空谈.</p>
+<p>例:
+- ❌ "棋盘视觉合理"
+- ✅ "棋盘截图跟 designs/06-hifi-final/main_board_prepare.baseline.png SSIM ≥ 0.75"</p>
+<h3 id="44-cosmetic-functional">4.4 区分 cosmetic / functional<a class="headerlink" href="#44-cosmetic-functional" title="Permanent link">&para;</a></h3>
+<p><code>severity_if_fail</code> 必填. cosmetic 类 fail 不阻 verdict, blocker 类 fail 直接 fail整屏.</p>
+<p>档:
+- <strong>blocker</strong>: 功能不可用 (按钮点不响应 / iframe 加载失败 / 棋盘空白)
+- <strong>major</strong>: 跟真目标差距大 (棋盘没 cellmap / 商店按钮位置错)
+- <strong>minor</strong>: 视觉细节欠 (文案小错 / icon 缺)
+- <strong>cosmetic</strong>: 装饰类 (颜色偏 / 边距偏)</p>
+<h3 id="45">4.5 路径可达 ≠ 判别力<a class="headerlink" href="#45" title="Permanent link">&para;</a></h3>
+<p>connected ≠ discriminating. invariant 跑通不代表它在 pass/fail 之间真有区分.</p>
+<p>写完每条 invariant, 真去做"红绿试": 故意喂错的实物 (改动让该 invariant 应 fail), 看真 fail 不. 不 fail 就废.</p>
+<hr />
+<h2 id="5">5. 总览验收<a class="headerlink" href="#5" title="Permanent link">&para;</a></h2>
+<p>整屏 verdict 派生规则:
+- 任一 invariant <code>severity_if_fail=blocker</code> 且 <code>result=fail</code> → 屏 verdict = <code>fail</code>
+- ≥ 1 项 major fail → <code>partial</code>
+- 仅 minor/cosmetic fail → <code>pass_with_caveats</code>
+- 全 pass → <code>pass</code></p>
+<p>总览 verdict (跨 4-6 屏):
+- 任一屏 <code>fail</code> → 总 <code>fail</code>
+- ≥ 2 屏 <code>partial</code> → 总 <code>partial</code>
+- 否则 → 总 <code>pass</code></p>
+<hr />
+<h2 id="6-worker">6. 应用到既有 worker<a class="headerlink" href="#6-worker" title="Permanent link">&para;</a></h2>
+<h3 id="61-visual_acceptance_gate-w6">6.1 visual_acceptance_gate (W6)<a class="headerlink" href="#61-visual_acceptance_gate-w6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>现有 invariants 重写按 §2 schema</li>
+<li>加 verify_method 调度 (dom / pixel / vision)</li>
+<li>详见 plans/[2026-04-30]VERIFICATION-INVARIANTS-UPGRADE/road.md phase β</li>
+</ul>
+<h3 id="62-player_agent-playeragent">6.2 player_agent (PlayerAgent)<a class="headerlink" href="#62-player_agent-playeragent" title="Permanent link">&para;</a></h3>
+<ul>
+<li>prompt 加 "对照 baseline 严验" 一节</li>
+<li>加 compare_to_baseline 工具调用</li>
+<li>issue.severity 用 §4.4 4 档</li>
+</ul>
+<h3 id="63-w7">6.3 后续 W7 (战斗联调验收)<a class="headerlink" href="#63-w7" title="Permanent link">&para;</a></h3>
+<ul>
+<li>战斗 iframe 视觉验, invariants 含: hp 真变化 / 单位真在动 / events 时间轴 ≥ N 条</li>
+<li>都按本标准 schema 写</li>
+</ul>
+<hr />
+<h2 id="7">7. 一句话总览<a class="headerlink" href="#7" title="Permanent link">&para;</a></h2>
+<p>invariants 必须有判别力 (red/green/gradient 三档敏感) + verify_method 多档 (dom/pixel/vision) + 锚到 baseline + severity 分级. 不满足这些就不是 invariants 是地板. 当前 W6 全是地板.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

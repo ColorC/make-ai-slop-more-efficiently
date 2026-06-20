@@ -1,0 +1,2556 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../material/">
+      
+      
+        <link rel="next" href="../project_index/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Plan - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/verification_invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/workspace_isolation_and_test_discrimination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/llm_infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#plan_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 plan 是什么
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 跟 dashboard 的接通
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 跟 dashboard 的接通">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-wikilink-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 wikilink 引用语法 (dashboard 已支持)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-markdown-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 markdown 高级特性 (dashboard 已支持)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-plan-wikilink-entity-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 plan 规范扩展的 wikilink entity (规范定义, dashboard 按规范实装)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan-frontmatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 plan 头部必备字段 (唯一 frontmatter, 含绑定块)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 plan 头部必备字段 (唯一 frontmatter, 含绑定块)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-bindingworkspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 binding.workspace (必填, 单值)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-bindingpackages-0-n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 binding.packages (0-N 个, 推荐有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-bindingtargets-0-n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 binding.targets (0-N 个, 推荐有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-applicable_standards-0-n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 applicable_standards (0-N 个, 自动 + 手补)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-expected_completion-ttl_days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 expected_completion + ttl_days
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 防债务 / 防偏移 / 防遗忘 三件事
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 防债务 / 防偏移 / 防遗忘 三件事">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 防债务 — 收尾时强制审实施过程产生的债务
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 防偏移 — 执行过程中检测实际行为偏离计划
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 防遗忘 — 计划关键部分在 agent 上下文中持续可用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 plan 八节固定结构 (沿用)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compact-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 compact summary 时机的扩展节
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 plan 目录树 (规范权威定义)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八、 standards 目录树 (规范权威定义)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九、 实例化协议跟模板的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十、 反模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十一、 跟其他规范的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十二、 这份规范的版本演进
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/self_narrative_three_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#plan_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 plan 是什么
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 跟 dashboard 的接通
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 跟 dashboard 的接通">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-wikilink-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 wikilink 引用语法 (dashboard 已支持)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-markdown-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 markdown 高级特性 (dashboard 已支持)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-plan-wikilink-entity-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 plan 规范扩展的 wikilink entity (规范定义, dashboard 按规范实装)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan-frontmatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 plan 头部必备字段 (唯一 frontmatter, 含绑定块)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 plan 头部必备字段 (唯一 frontmatter, 含绑定块)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-bindingworkspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 binding.workspace (必填, 单值)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-bindingpackages-0-n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 binding.packages (0-N 个, 推荐有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-bindingtargets-0-n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 binding.targets (0-N 个, 推荐有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-applicable_standards-0-n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 applicable_standards (0-N 个, 自动 + 手补)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-expected_completion-ttl_days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 expected_completion + ttl_days
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 防债务 / 防偏移 / 防遗忘 三件事
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 防债务 / 防偏移 / 防遗忘 三件事">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 防债务 — 收尾时强制审实施过程产生的债务
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 防偏移 — 执行过程中检测实际行为偏离计划
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 防遗忘 — 计划关键部分在 agent 上下文中持续可用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 plan 八节固定结构 (沿用)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compact-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 compact summary 时机的扩展节
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 plan 目录树 (规范权威定义)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八、 standards 目录树 (规范权威定义)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九、 实例化协议跟模板的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十、 反模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十一、 跟其他规范的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十二、 这份规范的版本演进
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- [OMNI] origin=ai-ide domain=docs/standards ts=2026-05-01T00:00:00Z type=standard status=active agent=ai-ide-bd9cde92 -->
+<!-- [OMNI] summary="plan 规范, 锁定目标 / 工作区 / 工作规范, 防债务偏移遗忘, 基于 dashboard markdown wikilink 体系" -->
+<!-- [OMNI] why="plan 自身规范一直在演进, 现在 dashboard markdown 跟 wikilink 已实装, plan 规范要落到这套实装上, 让每份 plan 都显式锚定到目标 / 工作区 / 适用规范, 不再悬浮" -->
+<!-- [OMNI] tags=plan,standard,wikilink,binding,dashboard-integration,foundation -->
+<!-- [OMNI] material_id="material:standards.concepts.plan_lifecycle_and_wikilink_binding.md" -->
+
+<h1 id="plan">plan 规范<a class="headerlink" href="#plan" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>跟 <a href="../../protocol/plan_template/"><code>protocol/plan_template.md</code></a> 关系</strong>: 本文是 concept 层 (plan 概念是什么 + 接 dashboard wikilink 体系); plan_template 是 protocol 层 (plan.md 文件章节硬下限). 两份规范层次不同, 互补不矛盾, 改任一份前必同步看另一份 (元规范 <code>standards_meta.md</code> 第 1 条).</p>
+</blockquote>
+<h2 id="plan_1">一、 plan 是什么<a class="headerlink" href="#plan_1" title="Permanent link">&para;</a></h2>
+<p>plan 是跨日跨阶段的过程记录文档. 它<strong>不是</strong>永久概念约束 (那是 standard 跟 template 干的事), 也<strong>不是</strong>实施代码 (那是 worker / agent / tool 干的事). plan 装的是"现在为什么开始做这件事 / 拆成几段做 / 怎么算做完 / 风险在哪 / 做完归档到哪". 一份 plan 是一个<strong>有边界、有终点、有归属</strong>的过程记录, 不是无限拖的项目.</p>
+<p>按概念分类, plan 归在 omnicompany 的"文档体系" (跟人类交互的, src 外部) 下面, 跟 report / DESIGN 平行 (DESIGN 归 team 一部分, 不独立). 所有面向人类阅读跟 dashboard 浏览的过程文档都按 plan 规范走.</p>
+<h2 id="dashboard">二、 跟 dashboard 的接通<a class="headerlink" href="#dashboard" title="Permanent link">&para;</a></h2>
+<p>dashboard 已实装 obsidian 风格的 wikilink 跟 markdown 渲染, plan 规范完全建立在这套基础上.</p>
+<h3 id="21-wikilink-dashboard">2.1 wikilink 引用语法 (dashboard 已支持)<a class="headerlink" href="#21-wikilink-dashboard" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>语法</th>
+<th>用途</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[[plan:TOPIC-CODE]]</code></td>
+<td>跨 plan 引用</td>
+<td><code>[[plan:OMNICOMPANY-CLI-PHASE3]]</code></td>
+</tr>
+<tr>
+<td><code>[[worker:worker_name]]</code></td>
+<td>引用一个工人</td>
+<td><code>[[worker:hygiene_scan]]</code></td>
+</tr>
+<tr>
+<td><code>[[material:domain.name]]</code></td>
+<td>引用一份材料</td>
+<td><code>[[material:demogame.xlsm-formula-map]]</code></td>
+</tr>
+<tr>
+<td><code>[[team:team_name]]</code></td>
+<td>引用一个团队</td>
+<td><code>[[team:csv_to_md]]</code></td>
+</tr>
+<tr>
+<td><code>[[trace:trace_id]]</code></td>
+<td>引用一次运行 trace</td>
+<td><code>[[trace:01KP5VHW]]</code></td>
+</tr>
+<tr>
+<td><code>[[session:session_id]]</code></td>
+<td>引用一个 session</td>
+<td><code>[[session:bd9cde92]]</code></td>
+</tr>
+<tr>
+<td><code>[[node:node_id]]</code></td>
+<td>引用一个节点</td>
+<td><code>[[node:extract_step]]</code></td>
+</tr>
+<tr>
+<td><code>[[note:any_note_id]]</code></td>
+<td>引用一份散文笔记</td>
+<td><code>[[note:debugging_log]]</code></td>
+</tr>
+<tr>
+<td><code>[[task:task_id]]</code></td>
+<td>引用一个任务</td>
+<td><code>[[task:T-2026-05-01-01]]</code></td>
+</tr>
+<tr>
+<td><code>[[name]]</code></td>
+<td>默认 note 类型 (无前缀)</td>
+<td><code>[[README]]</code></td>
+</tr>
+<tr>
+<td><code>[[type:id\|别名]]</code></td>
+<td>带显示别名</td>
+<td><code>[[worker:foo\|FooWorker 启动器]]</code></td>
+</tr>
+<tr>
+<td><code>[[type:id#heading]]</code></td>
+<td>带 heading 锚点</td>
+<td><code>[[plan:CLI-PHASE3#§5]]</code></td>
+</tr>
+<tr>
+<td><code>[[omni://type/id]]</code></td>
+<td>完整协议 (跟短写等价)</td>
+<td><code>[[omni://plan/CLI-PHASE3]]</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-markdown-dashboard">2.2 markdown 高级特性 (dashboard 已支持)<a class="headerlink" href="#22-markdown-dashboard" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>callouts</strong> (obsidian 风格): <code>&gt; [!note] 标题</code> / <code>&gt; [!warning]</code> / <code>&gt; [!tip]</code> / 等. 渲染成彩色提示框</li>
+<li><strong>mermaid 代码块</strong>: 用 <code>```mermaid</code> 围栏直接画图, 阶段拆分 / 假设树推荐用 mermaid 而不是 ASCII 表格</li>
+<li><strong>GFM</strong>: 表格 / 任务列表 / 删除线 / 自动链接</li>
+<li><strong>KaTeX 数学</strong>: <code>$x^2$</code> 行内 / <code>$$x^2$$</code> 块级</li>
+</ul>
+<h3 id="23-plan-wikilink-entity-dashboard">2.3 plan 规范扩展的 wikilink entity (规范定义, dashboard 按规范实装)<a class="headerlink" href="#23-plan-wikilink-entity-dashboard" title="Permanent link">&para;</a></h3>
+<p>plan 规范在 dashboard 已实装的 entity 之上扩展三类, dashboard 实装跟进本规范:</p>
+<table>
+<thead>
+<tr>
+<th>语法</th>
+<th>用途</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[[standard:&lt;分类&gt;/&lt;name&gt;]]</code></td>
+<td>引用一份规范</td>
+<td><code>[[standard:concepts/material]]</code></td>
+</tr>
+<tr>
+<td><code>[[workspace:&lt;path&gt;]]</code></td>
+<td>引用一个工作区</td>
+<td><code>[[workspace:omnicompany/data/_workspaces/csv_to_md/job1]]</code></td>
+</tr>
+<tr>
+<td><code>[[package:&lt;type&gt;/&lt;name&gt;]]</code></td>
+<td>引用一个 package</td>
+<td><code>[[package:service/guardian]]</code> / <code>[[package:domain/demogame]]</code> / <code>[[package:core/cli]]</code></td>
+</tr>
+</tbody>
+</table>
+<p>dashboard 当前不识别这三类 wikilink, 渲染成 plain text 但仍可读. dashboard 后续按本规范加对应 entity handler (类型 / 跳转 / hover 预览), 现存按本规范写的 plan 自动激活功能, 不需要回头改文件.</p>
+<p><strong>规范先行, 实装跟进</strong> — plan 内文一律用 wikilink, 不用普通 markdown 链接 (除非链外部 URL).</p>
+<h2 id="plan-frontmatter">三、 plan 头部必备字段 (唯一 frontmatter, 含绑定块)<a class="headerlink" href="#plan-frontmatter" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>2026-06-13 修订</strong> (用户裁决"规范冲突以新的为准, 保持唯一体系"): 此前并存三套头部模式
+(本节旧版"OmniMark 后第二个 yaml 块, 代码没接" / 存量全用的顶部平铺字段 / plan_template
+无 frontmatter 示例)。统一为: <strong>文件顶部唯一一个 yaml frontmatter</strong>, 平铺字段与绑定块
+同居一块 — 这正是 dashboard 解析器 (controlplane/plans.py <code>parse_plan_frontmatter</code>)
+唯一读取的位置, 嵌套的 binding 等新字段原样透传, 不需要第二个块。</p>
+</blockquote>
+<p>plan.md 结构: <strong>顶部 frontmatter → OmniMark v3 头注释 → §1 主题正文</strong>。frontmatter 字段:</p>
+<div class="highlight"><pre><span></span><code><span class="nn">---</span>
+<span class="c1"># ── 平铺字段 (dashboard 列表/看板直接消费; 存量 plan 已全用) ──</span>
+<span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;计划标题&gt;</span>
+<span class="nt">date</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;&lt;YYYY-MM-DD&gt;&#39;</span><span class="w">                              </span><span class="c1"># 立计划日</span>
+<span class="nt">project</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;project_id&gt;</span><span class="w">                             </span><span class="c1"># 可选, 跨 plan 关联到项目 (归属以 plan_governance 覆盖表优先)</span>
+<span class="nt">work_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;refactor|infra-convergence|...&gt;</span>
+<span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;active|done|paused&gt;</span>
+<span class="nt">phase</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;当前阶段名&gt;</span><span class="w">                                </span><span class="c1"># 可选</span>
+<span class="nt">standards</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">                                     </span><span class="c1"># 可选, 旧字段, 新写法用下面 applicable_standards</span>
+<span class="nt">exit_criteria</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;退出条件 1&gt;</span>
+<span class="c1"># ── 绑定块 (锚定目标/工作区/规范的核心机制) ──</span>
+<span class="nt">binding</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">workspace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;项目相对路径或绝对路径&gt;</span><span class="w">             </span><span class="c1"># 必填, 单值</span>
+<span class="w">  </span><span class="nt">packages</span><span class="p">:</span><span class="w">                                       </span><span class="c1"># 0-N 个, 按 service / domain / 等分类</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service:guardian</span>
+<span class="w">  </span><span class="nt">targets</span><span class="p">:</span><span class="w">                                        </span><span class="c1"># 0-N 个, plan 直接动到的具体实体</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">team:omnicompany_cli_phase3</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">material:omnicompany.identity_record</span>
+<span class="nt">applicable_standards</span><span class="p">:</span><span class="w">                             </span><span class="c1"># 0-N 个, 推导出来 + 手补</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">standards/concepts/material.md</span>
+<span class="nt">expected_completion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;YYYY-MM-DD&gt;</span><span class="w">                 </span><span class="c1"># 推荐, 预期完成日 (跟 §2 起止日一致)</span>
+<span class="nt">ttl_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span><span class="w">                                   </span><span class="c1"># 可选, 填写后守护按此扫超期 (推荐 30-90)</span>
+<span class="nn">---</span>
+</code></pre></div>
+<p>存量 plan 只有平铺字段、无 binding 块 — 不违规, 下次实质性更新时补 binding。新立 plan 必带 binding.workspace。</p>
+<h3 id="31-bindingworkspace">3.1 binding.workspace (必填, 单值)<a class="headerlink" href="#31-bindingworkspace" title="Permanent link">&para;</a></h3>
+<p>plan 必须显式绑定一个 workspace. workspace 是 plan 实施过程中所有写盘动作的隔离边界 — 跑代码 / 落数据 / 改文件都在这个 workspace 内.</p>
+<p>填法:</p>
+<ul>
+<li>项目相对路径: <code>omnicompany/</code> (整个 omnicompany 项目根, 适合跨服务大改)</li>
+<li>子目录: <code>omnicompany/src/omnicompany/packages/services/guardian/</code> (单服务包改动)</li>
+<li>独立 workspace: <code>omnicompany/data/_workspaces/&lt;team&gt;/&lt;job&gt;/</code> (一次 team 跑独立工作区)</li>
+</ul>
+<p><strong>漏填后果</strong>: 跑代码时不知道工作区边界 — 跨 plan 写盘互相污染, 守护扫到大量"身份不明的 workspace 写入". 这违反 workspace_isolation_and_test_discrimination 第一条铁律.</p>
+<h3 id="32-bindingpackages-0-n">3.2 binding.packages (0-N 个, 推荐有)<a class="headerlink" href="#32-bindingpackages-0-n" title="Permanent link">&para;</a></h3>
+<p>plan 触及的 package 列表. 每条带前缀区分 package 类型: <code>service:&lt;name&gt;</code> / <code>domain:&lt;name&gt;</code> / <code>core:&lt;name&gt;</code> (核心层) / <code>protocol:&lt;name&gt;</code> (协议层).</p>
+<p>填法举例:</p>
+<ul>
+<li>单服务包改动: <code>service:guardian</code></li>
+<li>跨服务: <code>service:guardian</code> + <code>service:omnicompany</code></li>
+<li>业务领域改动: <code>domain:demogame</code></li>
+<li>核心层改动: <code>core:cli</code> + <code>core:bus</code></li>
+<li>跨业务跨核心: 多条都列</li>
+</ul>
+<p><strong>为什么有这字段</strong>: 让 plan 自动应用对应 package 的 standards (例如 <code>service:guardian</code> 自动应用 service 类规范). 不显式绑 package 的 plan, 守护不知道这份 plan 该按哪些规范审.</p>
+<h3 id="33-bindingtargets-0-n">3.3 binding.targets (0-N 个, 推荐有)<a class="headerlink" href="#33-bindingtargets-0-n" title="Permanent link">&para;</a></h3>
+<p>plan 直接动到的具体实体. 用 dashboard wikilink 已支持的 entity type 前缀:</p>
+<ul>
+<li><code>team:&lt;name&gt;</code> / <code>worker:&lt;name&gt;</code> / <code>material:&lt;id&gt;</code> / <code>agent:&lt;name&gt;</code> / <code>hook:&lt;name&gt;</code> / <code>tool:&lt;name&gt;</code> / <code>plan:&lt;topic&gt;</code> (引用其他 plan)</li>
+</ul>
+<p>填法举例 (一份 CLI 实装 plan):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">targets</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">team:omnicompany_cli_phase3</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">worker:register_identity</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">worker:register_material</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">material:omnicompany.identity_record</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">material:omnicompany.write_credential</span>
+</code></pre></div>
+<p><strong>为什么有这字段</strong>: dashboard 渲染 plan 时, 自动给 targets 里每个实体生成跳转链接, 让人读 plan 时直接点进对应实体的 view.</p>
+<h3 id="34-applicable_standards-0-n">3.4 applicable_standards (0-N 个, 自动 + 手补)<a class="headerlink" href="#34-applicable_standards-0-n" title="Permanent link">&para;</a></h3>
+<p>plan 自动应用的 standards 列表. 推导规则:</p>
+<ul>
+<li>binding.targets 含 <code>material:*</code> → 自动加 <code>standards/concepts/material.md</code></li>
+<li>binding.targets 含 <code>worker:*</code> → 自动加 <code>standards/concepts/worker.md</code></li>
+<li>binding.targets 含 <code>team:*</code> → 自动加 <code>standards/concepts/team.md</code></li>
+<li>同上对 agent / hook / tool / data / template</li>
+<li>binding.packages 含 <code>core:cli</code> → 自动加 <code>standards/cli/omnicompany_cli.md</code></li>
+<li>任何 plan 都自动加 <code>standards/_global/code.md</code> 跟 <code>standards/_global/llm_first.md</code></li>
+</ul>
+<p>调用方可以<strong>手动加</strong>额外 standards (例如 <code>standards/protocol/design_md_template.md</code> 当 plan 涉及多份 DESIGN.md 时).</p>
+<p><strong>为什么有这字段</strong>: plan 实施过程中, 守护跟 lint 引擎按 applicable_standards 列表选校验规则. 不在列表里的规范不查, 在列表里的全查. 这让 plan 跟规范的关系<strong>显式</strong>而不是隐式.</p>
+<h3 id="35-expected_completion-ttl_days">3.5 expected_completion + ttl_days<a class="headerlink" href="#35-expected_completion-ttl_days" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>expected_completion</strong>: 预期完成日 ISO 8601, 跟 §2 起止日字段值一致 (冗余但显式让 dashboard 能直接读).</li>
+<li><strong>ttl_days</strong> (可选): 整数, 填写后守护按此扫超期. 推荐值 30-90. 个人开发者排期不固定时可不填, 守护仅在字段存在时才扫.</li>
+</ul>
+<h2 id="_1">四、 防债务 / 防偏移 / 防遗忘 三件事<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<h3 id="41">4.1 防债务 — 收尾时强制审实施过程产生的债务<a class="headerlink" href="#41" title="Permanent link">&para;</a></h3>
+<p>plan 收尾 (status 改 completed 之前) 必走"债务审议":</p>
+<ol>
+<li>实施过程中累积的债务列入 §7 风险段 (或独立 §15 债务清单段)</li>
+<li>每项债务标注: 债务类型 (代码 / 文档 / 测试 / 配置) + 严重度 (blocker / major / minor) + 跟进 plan id (如有)</li>
+<li>没有"待补"的开放项 — 每项债务要么标"已解决", 要么"已新立 plan 接手 (链接 [[plan:NEW-TOPIC]])", 要么"接受作为永久债务并归档"</li>
+</ol>
+<p>dashboard 在 plan view 里显示债务清单, 让 plan 之间的债务流转可见.</p>
+<h3 id="42">4.2 防偏移 — 执行过程中检测实际行为偏离计划<a class="headerlink" href="#42" title="Permanent link">&para;</a></h3>
+<p>偏移是 agent 长程自主运行中最常见的问题. 偏移不是指 plan 文档本身被改了, 而是<strong>执行中的实际行为</strong>跟计划定义的退出条件、执行方法论、执行步骤产生了严重出入.</p>
+<p><strong>偏移检测的锚点</strong> (agent 执行中应周期性自查):</p>
+<ol>
+<li><strong>退出条件对齐</strong>: 当前正在做的事, 是否仍在朝 plan 定义的退出条件/验收标准推进? 还是已经在解决计划未定义的问题?</li>
+<li><strong>方法论对齐</strong>: 实际采用的方式, 是否符合 plan 路线图约定的阶段拆分和执行方式? 还是已经绕开了计划路径在走别的路?</li>
+<li><strong>步骤对齐</strong>: 当前执行的步骤, 是否在 plan 路线图的某个阶段内? 还是已经做了计划没提到的事?</li>
+</ol>
+<p><strong>偏移发生时的处置</strong>:</p>
+<ul>
+<li><strong>轻度偏移</strong> (在做计划内的事, 但顺序或细节有调整): 记录到决策日志, 继续执行</li>
+<li><strong>中度偏移</strong> (在做计划边缘的事, 退出条件仍可达): 暂停, 向用户报告偏移情况, 等用户决定是继续还是回到原路径</li>
+<li><strong>重度偏移</strong> (实际行为跟退出条件已经无关): 立即停止当前执行, 向用户报告. 如果新方向有价值, 新立 plan 承接, 旧 plan 按实际完成度收尾</li>
+</ul>
+<p><strong>文档层面的大改</strong> (主题/起止/输出整体变更) 也仍然要求新立 plan, 不许偷改方向:</p>
+<ol>
+<li>旧 plan 标 status=deprecated, OmniMark 头加替代指针 (例如 <code>replaced_by: plan:NEW-TOPIC</code>)</li>
+<li>新立 plan, 头部含 <code>replaces: [plan:OLD-TOPIC]</code> 指回旧的</li>
+<li>不许修旧 plan 假装从一开始就是新方向 (历史不可追溯, 失败教训丢失)</li>
+</ol>
+<h3 id="43-agent">4.3 防遗忘 — 计划关键部分在 agent 上下文中持续可用<a class="headerlink" href="#43-agent" title="Permanent link">&para;</a></h3>
+<p>遗忘不是指自然时间上"忘了还有这个 plan", 而是 agent 在 compact / 新 session 后, 计划的关键部分不再在上下文中, 导致执行脱锚.</p>
+<p><strong>plan 必须定义"核心摘要"</strong> — 一段足够短但信息完整的文本, 包含:</p>
+<ol>
+<li><strong>退出条件</strong>: 这个计划做到什么程度算完 (从验收标准提炼)</li>
+<li><strong>当前阶段</strong>: 路线图中正在执行哪个阶段, 该阶段的关键产物是什么</li>
+<li><strong>执行约束</strong>: 不能做什么 / 必须遵守什么方法论 (从风险和假设提炼)</li>
+</ol>
+<p><strong>载入机制</strong>:</p>
+<ul>
+<li>plan 绑定 session 时, 核心摘要自动注入 system-reminder (当前已实现 plan 头部摘要注入)</li>
+<li>compact 发生后, 核心摘要作为恢复上下文的第一优先载入项</li>
+<li>agent 可通过命令 (如 <code>omni plan show &lt;id&gt;</code>) 随时重新载入完整 plan 内容</li>
+</ul>
+<p><strong>核心摘要的维护</strong>: 每个阶段切换时更新"当前阶段"部分. 核心摘要放在 plan 目录下独立文件 <code>brief.md</code>, 而非嵌在 plan.md 正文中 (见分文件规则).</p>
+<blockquote>
+<p><strong>注</strong>: 旧版本的"防遗忘"定义为 ttl_days 自然时间过期守护机制. ttl_days 字段保留为<strong>可选</strong> (个人开发者排期不固定, 强制过期提醒无意义), 有需要时填写, 守护仅在字段存在时才扫.</p>
+</blockquote>
+<h2 id="plan_2">五、 plan 八节固定结构 (沿用)<a class="headerlink" href="#plan_2" title="Permanent link">&para;</a></h2>
+<p>§1 主题 / §2 起止日期 / §3 参与方 / §4 关联材料 (上游 + 输出) / §5 阶段拆分 / §6 收尾条件 / §7 风险 / §8 收尾归档位置.</p>
+<p>每节内文允许用 wikilink 引用其他实体. 推荐用 mermaid 块画阶段拆分图跟假设树 (在 compact summary 时机才必填的 §11).</p>
+<p>具体填法见 <code>omnicompany/templates/plan/向导.md</code> (plan 模板的填空指引).</p>
+<h2 id="compact-summary">六、 compact summary 时机的扩展节<a class="headerlink" href="#compact-summary" title="Permanent link">&para;</a></h2>
+<p>§9 工作性假设 / §10 验证情况 + 验证背后的假设 / §11 假设树 / §12 假设验证情况 + 一句话总览 / §13 实施情况 (实验日志 + 数据库证明).</p>
+<p>这五节<strong>只在 trigger 时机</strong> (compact 前 / 用户要求总结 / 开新 team / 验证收尾) 必填. 普通 plan 编辑可省.</p>
+<p>完整规程见 <code>standards/protocol/l2_session_summary_protocol.md</code>.</p>
+<h2 id="plan_3">七、 plan 目录树 (规范权威定义)<a class="headerlink" href="#plan_3" title="Permanent link">&para;</a></h2>
+<p>plan 按 binding.packages 分类落到下面目录结构. <strong>本节定义的结构是规范权威, 现存平铺是历史债务跟规范不一致 = 现存内容要按规范迁移, 不是规范让步</strong>.</p>
+<div class="highlight"><pre><span></span><code>omnicompany/docs/plans/
+  _infra/                                   # 没绑 package 的基础设施 plan
+    [2026-05-01]OMNICOMPANY-CLI-PHASE3/
+      plan.md
+      compact_summary_*.md
+  _cross/                                   # 跨多 package 的 plan
+    [2026-04-25]NAMING-MIGRATION/
+      plan.md
+  service/&lt;service_name&gt;/                   # 单 service 绑定的 plan
+    guardian/
+      [2026-04-28]GUARDIAN-RULE-EXPANSION/
+        plan.md
+    omnicompany/
+      [2026-05-08]REGISTRY-IMPLEMENTATION/
+        plan.md
+  domain/&lt;domain_name&gt;/                     # 单 domain 绑定的 plan
+    demogame/
+      [2026-04-26]SEASON-BOOK-RESOLVER/
+        plan.md
+    voxelcraft/
+      [2026-04-25]NORTH-STAR-ROADMAP/
+        plan.md
+  _archive/                                 # 完成 + 冷静期 (2-4 周) 后归档
+    &lt;按上面同结构镜像&gt;
+</code></pre></div>
+<p>主题代号沿用大写蛇形 + 不挂版本号 (跟现有规则一致).</p>
+<h2 id="standards">八、 standards 目录树 (规范权威定义)<a class="headerlink" href="#standards" title="Permanent link">&para;</a></h2>
+<p>standards 按 applicability 分类落到下面目录结构, 让 plan 的 applicable_standards 字段引用路径稳定. <strong>本节定义的结构是规范权威, 现存平铺要按规范迁移</strong>:</p>
+<div class="highlight"><pre><span></span><code>omnicompany/docs/standards/
+  _global/                                  # 跨概念跨业务的全局规范
+    code.md
+    llm_first.md
+    counterexample_ledger.md
+    distributed-docs.md
+    terminology.md
+    verification_invariants.md
+    workspace_isolation_and_test_discrimination.md
+    information_sufficiency.md
+  concepts/                                 # 八种基础概念规范
+    material.md
+    worker.md
+    team.md
+    agent.md                                # 新立, 当前没单独
+    hook.md                                 # 新立
+    tool.md                                 # 新立
+    data.md                                 # 新立
+    doc.md                                  # 新立, 含 plan / report / DESIGN 三种
+    template.md
+  cli/                                      # CLI 跟设施层规范
+    omnicompany_cli.md
+    sandbox.md
+    omni-header.md
+  protocol/                                 # 协议层 / 跨 session 规范
+    l2_session_summary_protocol.md
+    design_md_template.md                   # 注意: 后续合并到 concepts/team.md 因为 DESIGN 归 team
+  _meta/                                    # 规范本身的元规范
+    standards-index.yaml
+</code></pre></div>
+<p>迁移由本规范配套的 todo 第 3 步"概念分类 + 目录迁移"做, 用全文 grep + sed / Python 脚本批量改引用. plan 跟 standards 两份目录树同期迁, 不分两次. 迁完之后整个项目里引用 plan / standards 的位置全部按本规范的新路径走.</p>
+<h2 id="_2">九、 实例化协议跟模板的关系<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>plan 实例化按 <code>omnicompany/templates/plan/</code> 模板四件套走. 当前 plan 模板的骨架.md 已含 §1-§8 + §9-§13 节, 但 binding 块跟新目录结构还没体现, 阶段六 (todo 第 6 项 — 模板范本升级) 同步加上.</p>
+<p>实例化命令 (阶段三 CLI 实装的事): <code>omni new plan --topic=TOPIC-CODE --bind-workspace=&lt;path&gt; --bind-package=&lt;list&gt; --bind-targets=&lt;list&gt;</code>. CLI 自动:</p>
+<ol>
+<li>推导 applicable_standards (按 targets / packages 类型)</li>
+<li>决定目标目录 (按 packages 是否单一 / 跨多 / 没绑分别走 service/domain/_cross/_infra)</li>
+<li>拷骨架 + 填头部绑定块 + 显示向导</li>
+</ol>
+<h2 id="_3">十、 反模式<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>下面这些做法在新规范下确认会引发问题:</p>
+<ul>
+<li><strong>plan 没 binding.workspace 字段</strong>: 跑实施时不知道工作区边界, 跨 plan 互相污染. 守护扫到必报.</li>
+<li><strong>plan 引用其他实体不用 wikilink</strong>: 例如 §4 关联材料里写 "csv_to_md 服务包的 ParsedRows 材料", 不写 <code>[[material:csv_to_md.parsed_rows]]</code>. dashboard 没法跳转 + 自动检测引用失效困难. 守护扫到给 warn.</li>
+<li><strong>plan 跨度超过 3 个月</strong>: 那是项目不是计划, 应当拆. 阶段拆分 ≤ 8 个的判定是辅助 (能拆 ≤ 8 个阶段就算 plan 范围, 拆不下就是项目).</li>
+<li><strong>plan 收尾不走债务审议</strong>: 直接改 status=completed 而不审实施过程产生的债务. 后续接手的人不知道遗留, 重复踩坑.</li>
+<li><strong>plan 主题/起止/输出大改还是同一份 plan</strong>: 历史不可追溯, 失败教训丢失. 必新立替代 plan, 旧的 deprecated.</li>
+<li><strong>plan 头部 binding.targets 跟 §4 关联材料对不上</strong>: 头部声明的目标跟正文里实际写的关联材料不一致, 头部就成了装饰, 失去锚定意义.</li>
+<li><strong>plan 落到 docs/plans/ 平铺不进 _infra/_cross/service/<x>/ 子目录</strong>: 跟新目录结构不一致. 大量 plan 平铺一层不可读.</li>
+<li><strong>standards 引用用绝对路径 + 没用 applicable_standards 字段</strong>: 改 standards 目录路径时 plan 引用失效. 用 applicable_standards 列表 + 路径以 <code>standards/&lt;分类&gt;/</code> 开头能让批量替换更可控.</li>
+<li><strong>ttl_days 填超长 (例如 365)</strong>: 如果选择填 ttl_days, 不要填无意义的大数. 超过 3 个月的 plan 应当拆成多个.</li>
+</ul>
+<h2 id="_4">十一、 跟其他规范的关系<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>跟 distributed-docs.md</strong>: distributed-docs 立六域结构, plan 在"过程记录" 域. 本规范是 plan 这一类内容的具体规则, 不矛盾.</li>
+<li><strong>跟 omni-header.md</strong>: plan 头部 OmniMark v3 五字段必填, 位于顶部 frontmatter 之后、正文之前. 不冲突.</li>
+<li><strong>跟 l2_session_summary_protocol.md</strong>: l2 协议立 8 项 checklist, 本规范的 §9-§13 五节是这 8 项的具体落到 plan 章节里. 一一对应.</li>
+<li><strong>跟 worker / material / team 规范</strong>: applicable_standards 自动推导逻辑跟这三份规范挂钩 — targets 含哪种类型就拉哪份规范进来.</li>
+<li><strong>跟 template.md</strong>: plan 是 template 系统的一种 kind, 走 template 标准的实例化协议. 现在 plan 模板独立 kind, 阶段六 (概念分类) 改成 doc 下的子 kind.</li>
+</ul>
+<h2 id="_5">十二、 这份规范的版本演进<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<ul>
+<li>2026-05-01 立 v1: 含 binding 块 + 三防机制 + 新目录结构 + dashboard wikilink 接通</li>
+<li>2026-06-13 修订 v1.1: 头部三套模式统一为顶部唯一 frontmatter (平铺字段 + binding 同居一块, 解析器已接);
+  本文件确立为 plan 唯一权威, plan_template.md 降为 protocol 层模板细则</li>
+</ul>
+<p>后续修订:</p>
+<ul>
+<li>概念分类做完后, 本规范合并到 <code>standards/concepts/doc.md</code> 下作 plan 子 kind 节. 旧路径 <code>standards/concepts/plan.md</code> 留 stub 指向新位置.</li>
+<li>omnicompany CLI 注册中心实装后, <code>omni new plan</code> 命令按本规范第九节实例化协议接通.</li>
+<li>dashboard 按本规范第 2.3 节扩展的三类 wikilink (standard / workspace / package) 加 entity handler 后, 现存按本规范写的 plan 自动激活功能 (跳转 / hover / 类型识别) — 本规范不需要回头改, dashboard 实装跟规范同语义即可.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

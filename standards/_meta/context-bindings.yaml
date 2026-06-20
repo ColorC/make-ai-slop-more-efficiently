@@ -1,0 +1,176 @@
+# [OMNI] origin=codex domain=standards/_meta ts=2026-05-17T00:00:00Z type=manifest status=draft
+# [OMNI] summary="分布式渐进上下文绑定索引 v0.1 - project/path/kind/topic 到 standards/templates/project docs 的机器可读绑定"
+# [OMNI] why="OmniChat/CLI/external worker 需要平台无关的上下文选择入口, 不能依赖 Codex/Claude 私有规则文件"
+# [OMNI] tags=context,binding,standards,template,plan,dogfood
+# [OMNI] material_id="material:standards.meta.context_bindings_manifest.yaml"
+
+version: 1
+schema_note: >
+  Profiles are additive. A profile may match by always/project/path/kind/topic.
+  The resolver emits existing file paths only; missing paths are reported as skipped.
+
+profiles:
+  - id: omnicompany.base-distributed-docs
+    priority: 100
+    description: "任何 omnicompany 文档/规范/模板/注册工作都需要的基础上下文。"
+    applies:
+      always: true
+    include:
+      standards:
+        - docs/standards/protocol/progressive_context.md
+        - docs/standards/_global/distributed-docs.md
+        - docs/standards/_global/standards_meta.md
+        - docs/standards/_global/terminology.md
+      registries:
+        - docs/standards/_meta/standards-index.yaml
+        - docs/standards/_meta/context-bindings.yaml
+
+  - id: omnicompany.plan-authoring
+    priority: 90
+    description: "涉及 plan/frontmatter/binding/brief 的上下文。"
+    applies:
+      kinds: [plan, plan_md]
+      path_match:
+        - docs/plans/**/plan.md
+        - docs/plans/**/brief.md
+      trigger_keywords: [plan, active plan, brief, binding, 计划, 上下文, compact]
+    include:
+      standards:
+        - docs/standards/concepts/plan.md
+        - docs/standards/protocol/plan_template.md
+      templates:
+        - templates/plan/注册件.yaml
+        - templates/plan/向导.md
+        - templates/plan/骨架.md
+
+  - id: omnicompany.material-authoring
+    priority: 80
+    description: "涉及新 material/schema/material standard 的上下文。"
+    applies:
+      kinds: [material, format, standard_md]
+      path_match:
+        - src/omnicompany/**/formats.py
+        - src/omnicompany/**/materials.py
+        - docs/standards/_domain_specific/**/*.md
+      trigger_keywords: [material, format, schema, standard, 规范, 材料]
+    include:
+      standards:
+        - docs/standards/concepts/material.md
+        - docs/standards/concepts/template.md
+      templates:
+        - templates/material/注册件.yaml
+        - templates/material/向导.md
+        - templates/material/骨架.py
+
+  - id: omnicompany.review-authoring
+    priority: 80
+    description: "涉及审阅材料形态/提交/审阅格式的上下文(双保证 prompt 半边)。"
+    applies:
+      kinds: [material, standard_md]
+      path_match:
+        - src/omnicompany/**/formats.py
+        - src/omnicompany/dashboard/boss_sight/reviewstage/**/*.py
+        - src/omnicompany/cli/commands/boss_sight.py
+        - docs/standards/review/**/*.md
+        - "**/demo-tours.ts"
+      trigger_keywords: [审阅, reviewable, 审阅材料, webgame-spec, 引导演示, 文件树 diff, review material, 推送, curated]
+    include:
+      standards:
+        - docs/standards/protocol/review_report_form_association.md
+        - docs/standards/review/审阅与推送规范.md
+        - docs/standards/review/引导演示材料规范.md
+        - docs/standards/review/spec报告材料规范.md
+      templates:
+        - docs/standards/review/templates/引导演示.tour.md
+        - docs/standards/review/templates/spec报告.md
+        - docs/standards/review/templates/reviewable.导览.md
+
+  - id: omnicompany.worker-authoring
+    priority: 80
+    description: "涉及 worker/router/agent worker 定义的上下文。"
+    applies:
+      kinds: [worker, router, worker_doc, llm_call, agent]
+      path_match:
+        - src/omnicompany/**/workers/**/*.py
+        - src/omnicompany/**/routers/**/*.py
+        - src/omnicompany/**/routers.py
+      trigger_keywords: [worker, router, agent, 工人, 子agent, 子代理, subagent, claude-code, Claude Code, omni worker]
+    include:
+      standards:
+        - docs/standards/concepts/worker.md
+        - docs/standards/concepts/material.md
+        - docs/standards/concepts/agent_first.md
+        - docs/standards/concepts/agent_tools.md
+        - docs/standards/_global/llm_first.md
+        - docs/standards/cli/claude_code_subagent_worker.md
+      templates:
+        - templates/worker/注册件.yaml
+        - templates/worker/向导.md
+        - templates/worker/骨架.py
+        - templates/agent/注册件.yaml
+        - templates/agent/向导.md
+
+  - id: omnicompany.registry-and-indexing
+    priority: 70
+    description: "涉及可索引性、注册中心、lookup/register 的上下文。"
+    applies:
+      trigger_keywords: [register, registry, lookup, index, indexed, 索引, 注册, 可索引]
+      path_match:
+        - src/omnicompany/cli/commands/registration.py
+        - docs/standards/_meta/*.yaml
+        - templates/**/注册件.yaml
+    include:
+      standards:
+        - docs/standards/cli/registration.md
+        - docs/standards/cli/omni-header.md
+        - docs/standards/_global/tags_and_wikilinks.md
+      implementation:
+        - src/omnicompany/cli/commands/registration.py
+
+  - id: voxelcraft.project-base
+    priority: 95
+    description: "voxelcraft/MC 公司项目上下文。"
+    applies:
+      projects: [voxelcraft]
+      path_match:
+        - docs/plans/voxelcraft/**
+        - src/omnicompany/packages/domains/voxelcraft/**
+        - docs/standards/_domain_specific/voxelcraft/**
+      trigger_keywords: [voxelcraft, mc, minecraft, demo, material, worker]
+    include:
+      project_docs:
+        - docs/plans/voxelcraft/project.md
+        - src/omnicompany/packages/domains/voxelcraft/DESIGN.md
+        - src/omnicompany/packages/domains/voxelcraft/.omni/manifest.yaml
+        - src/omnicompany/packages/domains/voxelcraft/.omni/workspace.yaml
+
+  - id: voxelcraft.mc-pipeline-plan
+    priority: 100
+    description: "当前 MC 公司混合产线计划上下文。"
+    applies:
+      projects: [voxelcraft]
+      trigger_keywords: [mc pipeline, mc company, mc 公司, 产线, dogfood]
+    include:
+      plans:
+        - docs/plans/voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE/plan.md
+        - docs/plans/voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE/brief.md
+        - docs/plans/voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE/audit.md
+
+  - id: voxelcraft.material-standard-authoring
+    priority: 90
+    description: "为 voxelcraft 新建 domain-specific material/stage standard 时的上下文。"
+    applies:
+      projects: [voxelcraft]
+      kinds: [material, standard_md]
+      path_match:
+        - docs/standards/_domain_specific/voxelcraft/**
+      trigger_keywords: [material standard, stage standard, 反规范, 骨架, 阶段性]
+    include:
+      standards:
+        - docs/standards/_domain_specific/demogame/demogame_ux_rule_schema.md
+        - docs/standards/_domain_specific/demogame/production_ref_rules.md
+        - docs/standards/_domain_specific/demogame/semantic_builder_rules.md
+      templates:
+        - templates/material/注册件.yaml
+        - templates/template/注册件.yaml
+        - templates/template/向导.md

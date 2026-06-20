@@ -1,0 +1,2686 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../template/">
+      
+      
+        <link rel="next" href="../workspace/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Worker 健康标准 - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#worker" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Worker 健康标准
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/verification_invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/workspace_isolation_and_test_discrimination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/llm_infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        术语
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核心原则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="核心原则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-single-semantic-responsibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 1 · 单一语义 (Single Semantic Responsibility)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-statelessness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 2 · 无状态 (Statelessness)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-design-before-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 3 · 设计先于实现 (Design Before Code)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 4 · 信息源正面枚举, 不靠 LLM 自省
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        标准项
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="标准项">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        元数据
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语义纯度
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实现质量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设计与预算
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查优先级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 A · 节点设计单表 (18 项)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 B · 信息源清单 (按节点类型, 起点参考)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 C · 上下文注入通道 (按首选序)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="附录 C · 上下文注入通道 (按首选序)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#r-18-worker-2026-04-20-patch-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-18 · Worker 粒度原则（2026-04-20 Patch-1 · 硬规则）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-19-agent-worker-team-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-19 · Agent Worker = 迷你 team（对外单 Worker, 内部三件套）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-20-llm-worker-agent-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-20 · LLM Worker → Agent Worker 升级规则
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-21-diagnosis-agent-worker-material" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-21 · Diagnosis Agent Worker 变体（质疑上游 material）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-22-workspace-writer-worker-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-22 · Workspace Writer Worker（写 workspace 唯一合法入口）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-23-workerrun-verdictoutput-2026-04-20-patch-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-23 · Worker.run() verdict.output 平铺约定（2026-04-20 Patch-6 · 硬规则）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-24-format_in_mode-2026-04-20-patch-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-24 · FORMAT_IN_MODE 显式声明（2026-04-20 Patch-9 · 硬规则）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-25-job-2026-04-20-patch-8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-25 · 子 job 发起（2026-04-20 Patch-8）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-18r-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式（R-18~R-25 相关）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/self_narrative_three_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        术语
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核心原则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="核心原则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-single-semantic-responsibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 1 · 单一语义 (Single Semantic Responsibility)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-statelessness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 2 · 无状态 (Statelessness)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-design-before-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 3 · 设计先于实现 (Design Before Code)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-llm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        原则 4 · 信息源正面枚举, 不靠 LLM 自省
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        标准项
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="标准项">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        元数据
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        语义纯度
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实现质量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设计与预算
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查优先级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 A · 节点设计单表 (18 项)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 B · 信息源清单 (按节点类型, 起点参考)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 C · 上下文注入通道 (按首选序)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="附录 C · 上下文注入通道 (按首选序)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#r-18-worker-2026-04-20-patch-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-18 · Worker 粒度原则（2026-04-20 Patch-1 · 硬规则）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-19-agent-worker-team-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-19 · Agent Worker = 迷你 team（对外单 Worker, 内部三件套）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-20-llm-worker-agent-worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-20 · LLM Worker → Agent Worker 升级规则
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-21-diagnosis-agent-worker-material" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-21 · Diagnosis Agent Worker 变体（质疑上游 material）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-22-workspace-writer-worker-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-22 · Workspace Writer Worker（写 workspace 唯一合法入口）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-23-workerrun-verdictoutput-2026-04-20-patch-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-23 · Worker.run() verdict.output 平铺约定（2026-04-20 Patch-6 · 硬规则）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-24-format_in_mode-2026-04-20-patch-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-24 · FORMAT_IN_MODE 显式声明（2026-04-20 Patch-9 · 硬规则）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-25-job-2026-04-20-patch-8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R-25 · 子 job 发起（2026-04-20 Patch-8）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#r-18r-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式（R-18~R-25 相关）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="worker">Worker 健康标准<a class="headerlink" href="#worker" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>必要不充分</strong>: 不满足一定有问题, 满足不一定没问题.
+强制度: <code>[MUST]</code> / <code>[SHOULD]</code> / <code>[MAY]</code></p>
+<p>代码参考: <code>src/omnicompany/runtime/routing/router.py</code>（protocol 层 Python 类名 <code>Router</code>）
+设计参考: <code>.claude/skills/omnicompany-dev/SKILL.md</code> §3, §5</p>
+</blockquote>
+<hr />
+<h2 id="_1">术语<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>本规范主体叙述用 <strong>Worker</strong> 表达数据转换执行单元。<code>Router</code> 是 protocol 层的 Python 类名, 在本规范中等同于 Worker — 仅代码引用 / class 继承场景保留 <code>Router</code> 名字。</p>
+<p>下文条款（R-01~R-22）的 "Router" 字样请读作 Worker; "节点" 字样同理。完整对照见 <a href="../../_global/terminology/"><code>terminology.md §6</code></a>。</p>
+<hr />
+<h2 id="_2">核心原则<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<h3 id="1-single-semantic-responsibility">原则 1 · 单一语义 (Single Semantic Responsibility)<a class="headerlink" href="#1-single-semantic-responsibility" title="Permanent link">&para;</a></h3>
+<p>一个 Router 只做<strong>一件语义上的事</strong>. 判断"一件还是多件"的三个信号:</p>
+<ol>
+<li>
+<p><strong>分步骤</strong>: run() 内有 step A → step B, 各自产生有独立含义的中间结果.
+   例: 先"分析信息来源"(产出: 来源分类表) → 再"生成解析代码"(产出: Python 脚本).
+   来源分类表本身有独立消费价值 → 应拆.</p>
+</li>
+<li>
+<p><strong>分情况</strong>: <code>if data['type'] == 'A' ... elif 'B'</code>, 不同分支做语义不同的操作.
+   同质批处理 (for item in items: 对每个 item 做同样的事) 不算.</p>
+</li>
+<li>
+<p><strong>有意义中间产物</strong>: run() 中途产生可被其他节点独立消费的数据结构
+   (表格配置规律、API 调用请求体、结构化分析报告).
+   不作为 Format 输出而被内部消化 = 可观测性损失.</p>
+</li>
+</ol>
+<p><strong>允许的内循环</strong>: 对 N 个同类 item 做相同操作的 for 循环不需要拆.</p>
+<h3 id="2-statelessness">原则 2 · 无状态 (Statelessness)<a class="headerlink" href="#2-statelessness" title="Permanent link">&para;</a></h3>
+<p>Router 是 <code>input → Verdict</code> 的纯函数. 不持有跨调用可见的状态.
+Pipeline Runner 可能在重试、并行、回跳时多次调用同一实例, 有状态 = 行为不可预测.</p>
+<h3 id="3-design-before-code">原则 3 · 设计先于实现 (Design Before Code)<a class="headerlink" href="#3-design-before-code" title="Permanent link">&para;</a></h3>
+<p>任何 Router 写代码前必须先填 §A 的 18 项设计单表. 填不出来 = 设计未完成 = 禁止开工.</p>
+<h3 id="4-llm">原则 4 · 信息源正面枚举, 不靠 LLM 自省<a class="headerlink" href="#4-llm" title="Permanent link">&para;</a></h3>
+<p>LLM 几乎从不主动承认"我信息不够", 会直接硬做并幻觉.
+每个 LLM Router 的信息源必须在设计时正面枚举 (§B), 运行时通过 Format 字段预加载 / Tool 拉取 / AgentNodeLoop 探索 三条通道注入 (§C).</p>
+<hr />
+<h2 id="_3">标准项<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<h3 id="_4">元数据<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p><strong>R-01</strong> <code>[MUST]</code> <strong>DESCRIPTION ≥ 50 字符</strong></p>
+<p>已有执行: Guardian OMNI-020</p>
+<p><strong>R-02</strong> <code>[MUST]</code> <strong>FORMAT_IN 和 FORMAT_OUT 都已声明</strong></p>
+<p>已有执行: Guardian OMNI-020</p>
+<h3 id="_5">语义纯度<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p><strong>R-03</strong> <code>[MUST]</code> <strong>run() 内不混合不同含义的 LLM 调用</strong> (原则 1)</p>
+<p>多次 LLM 调用仅当是同一种语义操作的重复 (如对 N 个 item 分别调用) 时才合法.
+先"分析"再"生成" = 两种不同含义 = 应拆成两个 Router.</p>
+<p><strong>R-04</strong> <code>[MUST]</code> <strong>LLM 调用使用统一 LLMClient</strong></p>
+<p>不直接 <code>import openai / anthropic / requests</code>. 必须通过 <code>runtime.llm.LLMClient</code>.
+原因: InfoAudit 审计 / 模型统一 / 调用计数 / 错误重试策略.</p>
+<p><strong>R-05</strong> <code>[MUST]</code> <strong>Verdict 覆盖 PASS 和 FAIL</strong></p>
+<p>只返回 PASS 的 Router = 永远不失败 = 下游无法对失败做反应 = HAPPY PATH ONLY.
+例外: 确定性数据组装器 (ContextRouter 类), 其失败 = 抛异常.</p>
+<p><strong>R-06</strong> <code>[MUST]</code> <strong>不直接写文件</strong></p>
+<p>run() 内不应有 <code>open('w')</code> / <code>Path.write_text</code> / <code>shutil.copy</code>. 走 <code>guarded_write.write_file()</code>.
+已有执行: Guardian OMNI-013</p>
+<h3 id="_6">实现质量<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p><strong>R-07</strong> <code>[SHOULD]</code> <strong>无跨调用状态</strong> (原则 2)</p>
+<p>run() 方法内不应有 <code>self.xxx = value</code> 形式的赋值 (除 self._logger 等工具属性).
+特别禁止: <code>self.cache</code>, <code>self.last_result</code>, <code>self.counter</code>.</p>
+<p><strong>R-08</strong> <code>[SHOULD]</code> <strong>有意义中间产物作为 Format 输出</strong> (原则 1 信号 3)</p>
+<p><strong>R-09</strong> <code>[MAY]</code> <strong>实现 summarize_input() 或 summarize_output()</strong></p>
+<p>为 trace-view 和 dashboard 提供人类可读摘要.</p>
+<p><strong>R-10</strong> <code>[SHOULD]</code> <strong>run() ≤ 80 行</strong></p>
+<p>超过 80 行大概率包含多个语义步骤, 应审视是否拆分.</p>
+<p><strong>R-11</strong> <code>[MUST]</code> <strong>不硬编 model 名和 max_tokens</strong></p>
+<p><code>model="gpt-4-turbo"</code> / <code>max_tokens=16384</code> 不应写死在 Router 源码.
+策略配置走 LLMClient 的 role 配置或 <code>build_bindings(config)</code> 传入.
+硬编后果: 换模型要改 Router 代码, Router 变成配置和逻辑纠缠的泥潭.</p>
+<p><strong>R-12</strong> <code>[MUST]</code> <strong>不泄漏 LLM 协议细节</strong></p>
+<p>不在 Router 里自己 iter <code>block.type == "tool_use"</code> 或 <code>resp.choices[0].message.tool_calls</code>.
+这是 LLMClient 基础设施的职责, Router 只看统一的结构化返回.</p>
+<p><strong>R-13</strong> <code>[MUST]</code> <strong>确定性 Router confidence = 1.0</strong></p>
+<p>RULE 类 Router (编译检查 / schema 校验 / 确定性转换) 的 Verdict.confidence 必须为 1.0.</p>
+<p><strong>R-14</strong> <code>[MUST]</code> <strong>diagnosis 写明判定依据</strong></p>
+<p>"处理成功" / "处理完成" 是废话. diagnosis 必须说清楚<strong>具体判定了什么、结果如何</strong>.
+例: "三层编译检查通过: py_compile OK, import OK, PipelineChecker 0 errors"</p>
+<p><strong>R-15</strong> <code>[SHOULD]</code> <strong>granted_tags 贴合实际验证</strong></p>
+<p>如果本 Router 验证了某个语义维度, 必须在 Verdict 中 grant 对应 tag.
+不贴 tag = 下游 required_tags 检查永远不过, 或者下游误以为没人验证过.</p>
+<p><strong>R-16</strong> <code>[SHOULD]</code> <strong>通用规则沉淀为 Tool</strong></p>
+<p>Router 内的"Python 源码清理" / "从 LLM 响应提代码块" / "JSON schema 验证" 等
+与当前业务无关的通用能力, 必须沉淀为 <code>runtime/tools/</code> 下的独立 Tool.
+锁死在某个 Router 里 = 复用性灾难.</p>
+<p><strong>R-17</strong> <code>[MUST]</code> <strong>语义异常也是路由</strong></p>
+<p>业务失败优先用 <code>VerdictKind.FAIL</code> + diagnosis, 让 pipeline runner 触发 FAIL 路由.
+抛异常是可以接受的 — pipeline runner 会捕获并路由到错误处理分支.
+但如果异常是<strong>可预见的业务情况</strong> (如输入缺字段、LLM 返回不合法), 用 Verdict 比抛异常更好:
+Verdict 携带 diagnosis 和 output, 下游修复节点能读到具体失败原因.</p>
+<h3 id="_7">设计与预算<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p><strong>R-18</strong> <code>[MUST]</code> <strong>写代码前填完 18 项设计单表</strong> (原则 3)</p>
+<p>见附录 A. 填不出来的项 = 设计未完成 = 禁止开工.
+特别重要的项: context_sources / hallucination_risks / verification_binding / output_token_budget.</p>
+<p><strong>R-19</strong> <code>[MUST]</code> <strong>输出规模已评估, 超预算有拆分策略</strong></p>
+<p>拆分的本质是<strong>保持 LLM 注意力专注和任务可执行性</strong>, 不是硬截断.
+绝对不能因拆分而牺牲信息完整度和交互便利性.</p>
+<p>估算公式 (参考): <code>预估行数 × 15 token/行</code> 或 <code>字符数 / 3.5</code>.
+经验安全线: 单次非流式 ~4000 token, 流式 ~8000 token.</p>
+<p>超出时的拆分策略 (选最适合的, 不是硬截断):
+- SCATTER 拆分 (天然可切 N 个独立子任务)
+- 骨架→填肉两步 (层次结构产物)
+- 分页 PARTIAL 回跳 (长度不定的列表)
+- 输入削减 + 多轮 merge (输入大产物也大)</p>
+<p><strong>严禁硬截断</strong> — 截断 = 信息丢失, 是最差的"策略".</p>
+<p><strong>R-20</strong> <code>[MUST]</code> <strong>信息源正面枚举</strong> (原则 4)</p>
+<p>每个 SOFT Router 的设计必须列出它需要的信息源, 并对照 §B 的节点类型清单逐项检查.
+不预测万能清单, 但"显而易见必要的"不能缺.</p>
+<hr />
+<h2 id="_8">反模式<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>名称</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RA-01</td>
+<td>多语义 LLM</td>
+<td>一个 run() 里 2+ 次不同含义的 LLM 调用</td>
+</tr>
+<tr>
+<td>RA-02</td>
+<td>类型分流器</td>
+<td><code>if data['type'] == 'A' ... elif 'B'</code> 式分流</td>
+</tr>
+<tr>
+<td>RA-03</td>
+<td>越权写入</td>
+<td>run() 里 <code>open('w')</code> 不经 guarded_write</td>
+</tr>
+<tr>
+<td>RA-04</td>
+<td>有状态 Router</td>
+<td>self.cache / self.last_result 等跨调用状态</td>
+</tr>
+<tr>
+<td>RA-05</td>
+<td>吞异常假通过</td>
+<td><code>except Exception: return Verdict(PASS)</code></td>
+</tr>
+<tr>
+<td>RA-06</td>
+<td>中间产物内消化</td>
+<td>有价值的中间数据不输出到 Verdict</td>
+</tr>
+<tr>
+<td>RA-07</td>
+<td>硬编模型</td>
+<td><code>model="gpt-4"</code> 写死在 Router 里</td>
+</tr>
+<tr>
+<td>RA-08</td>
+<td>协议泄漏</td>
+<td>自己 iter <code>block.type == "tool_use"</code></td>
+</tr>
+<tr>
+<td>RA-09</td>
+<td>废话 diagnosis</td>
+<td><code>diagnosis="处理完成"</code></td>
+</tr>
+<tr>
+<td>RA-10</td>
+<td>system prompt 当 changelog</td>
+<td>堆积"LLM 常犯错误"禁令代替真源码注入</td>
+</tr>
+<tr>
+<td>RA-11</td>
+<td>通用逻辑锁死</td>
+<td>JSON schema 校验 / Python 清理等通用能力写死在某个 Router 里</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_9">检查优先级<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<ol>
+<li>R-01 → R-02 → R-04 → R-06 → R-11 → R-12 → R-05 → R-13 → R-07 → R-17 → R-10  <strong>— 确定性, 秒级</strong></li>
+<li>R-03 → R-08 → R-14 → R-15 → R-16  <strong>— AST + LLM, 分钟级</strong></li>
+<li>R-18 → R-19 → R-20  <strong>— 设计审计, 人工 + LLM</strong></li>
+</ol>
+<hr />
+<h2 id="a-18">附录 A · 节点设计单表 (18 项)<a class="headerlink" href="#a-18" title="Permanent link">&para;</a></h2>
+<p>每个 Router 写代码前必须填完. 详细填写指南见 SKILL.md §3.1.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>字段</th>
+<th>填写要求</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>node_id</td>
+<td>snake_case, 与 PipelineSpec 一致</td>
+</tr>
+<tr>
+<td>2</td>
+<td>purpose</td>
+<td>动宾结构, ≤30 字</td>
+</tr>
+<tr>
+<td>3</td>
+<td>kind</td>
+<td>TRANSFORMER / ANCHOR / SCATTER</td>
+</tr>
+<tr>
+<td>4</td>
+<td>validator_kind</td>
+<td>HARD / SOFT / N/A (ANCHOR only)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>format_in</td>
+<td>每个在 formats.py 已定义; 支持 list[str] 多入</td>
+</tr>
+<tr>
+<td>6</td>
+<td>format_out</td>
+<td>单 str; 验证节点通常 format_in == format_out</td>
+</tr>
+<tr>
+<td>7</td>
+<td>required_upstream_tags</td>
+<td>进入前必须已有的 granted_tags</td>
+</tr>
+<tr>
+<td>8</td>
+<td>granted_tags_on_pass</td>
+<td>PASS 时贴的新 tag</td>
+</tr>
+<tr>
+<td>9</td>
+<td>output_token_budget</td>
+<td>公式: 预估行数 × 15; &gt;4k 看字段 10</td>
+</tr>
+<tr>
+<td>10</td>
+<td>scale_strategy</td>
+<td>超预算怎么办 (SCATTER / 骨架填肉 / 分页 / 削减 merge)</td>
+</tr>
+<tr>
+<td>11</td>
+<td>context_sources</td>
+<td>对照 §B 逐项勾选</td>
+</tr>
+<tr>
+<td>12</td>
+<td>context_delivery</td>
+<td>三条通道: Format预加载 / Tool拉取 / AgentNodeLoop</td>
+</tr>
+<tr>
+<td>13</td>
+<td>hallucination_risks</td>
+<td><strong>具体字段</strong>, 每条对应信息源缓解措施</td>
+</tr>
+<tr>
+<td>14</td>
+<td>verification_binding</td>
+<td>下游谁 HARD 校验本节点产出</td>
+</tr>
+<tr>
+<td>15</td>
+<td>pass_route</td>
+<td>NEXT / EMIT</td>
+</tr>
+<tr>
+<td>16</td>
+<td>fail_route</td>
+<td>RETRY max=N / JUMP / EMIT</td>
+</tr>
+<tr>
+<td>17</td>
+<td>partial_route</td>
+<td>反馈回路去哪</td>
+</tr>
+<tr>
+<td>18</td>
+<td>~~maturity~~</td>
+<td>(已废弃, 健康程度由运行/诊断记录直接判断, 不用枚举标注)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="b">附录 B · 信息源清单 (按节点类型, 起点参考)<a class="headerlink" href="#b" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>不是"必须全部满足"的验收清单, 是"写新节点时首先检查"的启发列表.
+观察到 fallback_triggers 反复指向某类缺失时, 再沉淀为静态注入.</p>
+</blockquote>
+<p><strong>代码生成类</strong>: 目标基类真源码签名 / 同类已有参考范本 / 依赖 API 构造参数 / import 路径规范 / 依赖 dataclass 字段 / 语言版本约束</p>
+<p><strong>NL 解析类</strong>: 输出 schema + 枚举值 / ≥3 个 few-shot + 反例 / 领域术语表 / 歧义消解规则 / 拒绝条件</p>
+<p><strong>审计/检查类</strong>: 被审对象完整源码 / 每条规则的可执行判定条件 / 已知豁免清单 / 严重性分级 / 误报历史</p>
+<p><strong>修复类</strong>: 原始代码完整 / 失败报告(定位到行) / 类似问题历史修复 patch / 修复边界 / 验证回路入口</p>
+<p><strong>决策/路由类</strong>: 每分支历史案例 / 无效分支排除理由 / iteration 计数 / 各分支下游节点</p>
+<p><strong>探索发现类</strong>: 搜索边界 / 成功终止条件 / 失败终止条件 / 输出结构约束</p>
+<h2 id="c">附录 C · 上下文注入通道 (按首选序)<a class="headerlink" href="#c" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Format 字段预加载</strong> (首选) — 上游 Transformer 用 inspect/Read 预加载到 format_in 字段. 确定性、可观测、可缓存. <strong>绝对禁止用 system prompt 教导替代真源码注入</strong> (RA-10).</p>
+</li>
+<li>
+<p><strong>Tool / Read 拉取</strong> (次选) — 量大时节点内部用 Tool 拉取. 多一次 I/O, 省上游 Transformer 复杂度.</p>
+</li>
+<li>
+<p><strong>AgentNodeLoop 动态探索</strong> (最后手段) — 无法预先枚举时才用. token 消耗大、结果不稳定. 成熟后必须冷凝回通道 1.</p>
+</li>
+<li>
+<p><strong>info_audit + UniversalFallbackLoop</strong> (运行时补救) — LLM 调用时自动报 missing_info, runner 规则化判断是否触发兜底. 不是设计时通道, 是运行时安全网.</p>
+</li>
+</ol>
+<hr />
+<h3 id="r-18-worker-2026-04-20-patch-1">R-18 · Worker 粒度原则（2026-04-20 Patch-1 · 硬规则）<a class="headerlink" href="#r-18-worker-2026-04-20-patch-1" title="Permanent link">&para;</a></h3>
+<p><strong>粒度 = 完整职责 + FORMAT 边界 + 独立测试价值</strong>。<strong>不是"每个函数一个 Worker"</strong>。</p>
+<p>判定自问（写新 Worker 前）:
+1. 有<strong>明确 FORMAT_IN / FORMAT_OUT 边界</strong>吗？边界模糊 → 合并到上下游
+2. 单独写 <strong>Worker 级集成测试</strong>有价值吗？没价值 → 它只是内部函数, 不该独立 Worker
+3. 再拆会变清晰还是更碎？更碎 → 停拆</p>
+<p><strong>合法模式</strong>: Worker 内部保留<strong>纯函数库</strong>（如 guardian 的 <code>rules/*.py</code> 14 条规则, 被 <code>RuleEngineWorker</code> 单体调用）。这是内部实现选择, 不上升为 Worker 粒度。</p>
+<h3 id="r-19-agent-worker-team-worker">R-19 · Agent Worker = 迷你 team（对外单 Worker, 内部三件套）<a class="headerlink" href="#r-19-agent-worker-team-worker" title="Permanent link">&para;</a></h3>
+<p><strong>Agent Worker</strong> 是一种特殊 Worker 子类, 内部由<strong>三种子 Worker</strong> 组成迷你 team：</p>
+<div class="highlight"><pre><span></span><code>Agent Worker (FORMAT_IN / FORMAT_OUT 一套)
+  ├── Context Script Worker    — 准备 / 压缩 / 组装上下文（无 LLM）
+  ├── LLM Worker               — 调 LLM 产生响应（单次或循环）
+  └── Tool Script Worker (N)   — 执行工具调用（read / grep / run / workspace 访问）
+共享: 迷你 stock（内部 material 流转, 不外泄）
+</code></pre></div>
+<p><strong>对外表现</strong>: 单个 Worker（声明一套 FORMAT_IN / FORMAT_OUT）。外部订阅图看它就是一个节点。</p>
+<p><strong>内部机制</strong>:
+- 收到 FORMAT_IN 后, 先激活 Context Script Worker 准备初始上下文
+- LLM Worker 消费上下文产生 response（含 tool call 列表）
+- 若有 tool call → Tool Script Worker 激活, 产出 tool_result material（写回迷你 stock）
+- LLM Worker 再次激活消费 tool_result, 直到产出最终 answer
+- Context 再组装 → 产出 FORMAT_OUT 对外</p>
+<p><strong>与旧 <code>runtime/agent/agent_node_loop.py</code> 的映射</strong>: 旧单体 AgentNodeLoop 内部的 while 循环 = Agent Worker 的迷你 team + 内部订阅激活。行为等价, 结构更纯。</p>
+<h3 id="r-20-llm-worker-agent-worker">R-20 · LLM Worker → Agent Worker 升级规则<a class="headerlink" href="#r-20-llm-worker-agent-worker" title="Permanent link">&para;</a></h3>
+<p><strong>默认</strong>: 当 LLM Worker 不确定需要哪些 material（初始 material 难穷举的情况）, <strong>升级为 Agent Worker</strong>, 开放相关 workspace 供其 Tool Script Worker 自由读取。</p>
+<p><strong>判定场景</strong>（符合即升级）:
+- material 需求随 LLM 推理动态变化
+- 预先枚举 material 将导致 FORMAT_IN schema 膨胀（&gt;10 字段）
+- 上游 material 内容量超过单次 LLM context 一半</p>
+<p><strong>不升级的场景</strong>:
+- 明确需求: 单条或固定组 material 即足够（典型: 模板填充 / 分类）
+- 确定性包装: 把 LLM 输出套 schema 转发（可能不需要 LLM, 用 rule 即可）</p>
+<h3 id="r-21-diagnosis-agent-worker-material">R-21 · Diagnosis Agent Worker 变体（质疑上游 material）<a class="headerlink" href="#r-21-diagnosis-agent-worker-material" title="Permanent link">&para;</a></h3>
+<p><strong>Diagnosis Agent Worker</strong> 是 Agent Worker 的特殊子类, <strong>内置对上游 material 的质疑能力</strong>。</p>
+<p><strong>用途</strong>: 当 Worker 拿不到需要的 material, 或发现上游 material 不对时, <strong>沿 trace 往上查</strong>。<strong>尽量少归因于模型幻觉</strong>。</p>
+<p><strong>核心原则</strong>（硬规则）:
+- 不确定 LLM 是否真错时, <strong>优先替换为 Diagnosis Agent Worker</strong> 重试
+- Diagnosis Agent Worker 有额外工具: <code>trace_back_tool</code>（查 material 上游 producer + 其输入） / <code>material_assertion_tool</code>（对 material 内容提出假设验证）
+- 其输出 FORMAT_OUT 可能是 <code>diagnosis.material_dispute</code>（质疑上游）或正常 FORMAT_OUT（成功产出）</p>
+<p><strong>诊断结果处理</strong>:
+- <code>material_dispute</code> → 路由到 validator worker → 可能发新 job 修复上游
+- 正常产出 → 说明原 LLM Worker 是被<strong>劣质 material 拖累</strong>, 非模型幻觉</p>
+<h3 id="r-22-workspace-writer-worker-workspace">R-22 · Workspace Writer Worker（写 workspace 唯一合法入口）<a class="headerlink" href="#r-22-workspace-writer-worker-workspace" title="Permanent link">&para;</a></h3>
+<p><strong>所有对 workspace 的写入必须经过 WorkspaceWriterWorker 子类</strong>。直接 <code>Path.write_text</code> / <code>open("w")</code> 写入 workspace 路径 = 违反。</p>
+<ul>
+<li>FORMAT_IN: <code>workspace.write_request</code>（含 workspace_id / relpath / content / hash）</li>
+<li>FORMAT_OUT: <code>workspace_file_stock.persisted</code>（sink material, 含落盘确认）</li>
+<li>内部用 <code>core.guarded_write.write_file</code>（对齐 OMNI-013）</li>
+</ul>
+<p>详见 <a href="../team/"><code>team.md</code> omnicompany 扩展 · P-14 Workspace 定义</a>。</p>
+<h3 id="r-23-workerrun-verdictoutput-2026-04-20-patch-6">R-23 · Worker.run() verdict.output 平铺约定（2026-04-20 Patch-6 · 硬规则）<a class="headerlink" href="#r-23-workerrun-verdictoutput-2026-04-20-patch-6" title="Permanent link">&para;</a></h3>
+<p><strong>硬规则</strong>: <code>verdict.output</code> 是 <code>FORMAT_OUT</code> 对应 Format 的 <strong>payload 本体</strong>（平铺字段 dict）, 不是 <code>{format_id: payload}</code> 嵌套。</p>
+<p><strong>为什么</strong>: Protocol 层 <code>FORMAT_OUT: str</code>（单 Format）, PipelineRunner 和 MaterialDispatcher 都按此约定消费 output。嵌套形式混淆上下游约定。</p>
+<p><strong>反模式</strong>（RA-16）:
+<div class="highlight"><pre><span></span><code><span class="c1"># ✗ 错误: 嵌套包装</span>
+<span class="n">FORMAT_OUT</span> <span class="o">=</span> <span class="s2">&quot;guardian.file_context_set&quot;</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_data</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Verdict</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="n">PASS</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;guardian.file_context_set&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;files&quot;</span><span class="p">:</span> <span class="p">[</span><span class="o">...</span><span class="p">]}})</span>
+</code></pre></div></p>
+<p><strong>正确</strong>:
+<div class="highlight"><pre><span></span><code><span class="c1"># ✓ 正确: 平铺 payload</span>
+<span class="n">FORMAT_OUT</span> <span class="o">=</span> <span class="s2">&quot;guardian.file_context_set&quot;</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_data</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Verdict</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="n">PASS</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;files&quot;</span><span class="p">:</span> <span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="s2">&quot;scan_ts&quot;</span><span class="p">:</span> <span class="o">...</span><span class="p">})</span>
+</code></pre></div></p>
+<p><strong>溯源</strong>: 2026-04-20 Team 2 selftest 过 <code>MaterialDispatcher</code> 时 Guardian Workers 嵌套 output 被暴露, 修正后 79 → 85 passed。</p>
+<hr />
+<h3 id="r-24-format_in_mode-2026-04-20-patch-9">R-24 · FORMAT_IN_MODE 显式声明（2026-04-20 Patch-9 · 硬规则）<a class="headerlink" href="#r-24-format_in_mode-2026-04-20-patch-9" title="Permanent link">&para;</a></h3>
+<p>当 <code>FORMAT_IN = list[str]</code> 时, <strong>必须显式声明 <code>FORMAT_IN_MODE</code></strong>:</p>
+<ul>
+<li><code>"and"</code> (默认) · <strong>composite fan-in</strong>: 所有 FORMAT_IN 都到齐才激活 (典型: workflow_factory 多入节点 / guardian module_explorer)</li>
+<li><code>"or"</code> · <strong>alternative</strong>: 任一 FORMAT_IN 到达即激活 (典型: Agent Team 的 ContextScript 订阅 <code>agent.request</code> OR <code>agent.tool_result</code>)</li>
+</ul>
+<p><strong>为什么是 MUST</strong>: 历史上 <code>list[str]</code> 隐含 AND 语义（workflow_factory composite 用法）, 但 Agent Team 需 OR 语义, <strong>无明文声明则歧义</strong>。MaterialDispatcher 按 <code>FORMAT_IN_MODE</code> 决定累计策略。</p>
+<hr />
+<h3 id="r-25-job-2026-04-20-patch-8">R-25 · 子 job 发起（2026-04-20 Patch-8）<a class="headerlink" href="#r-25-job-2026-04-20-patch-8" title="Permanent link">&para;</a></h3>
+<p>Worker 产出 <code>verdict.output</code> 带特殊字段 <code>_emit_as_new_job: True</code> 时, dispatcher <strong>用新 trace_id (新 job_id)</strong> 发布对应 event, 并记录 <code>payload._parent_job_id = 当前 job_id</code>。</p>
+<p><strong>用法</strong>:
+- <strong>Agent Team 新一轮循环</strong> (tool_result 触发, parent = 上轮 job) — R-19 主要场景
+- <strong>Validator 发起新 job</strong> (上轮 material 不合格触发补救, Q1.C)
+- <strong>外部代理委托</strong> (Worker 显式要求子 job 处理)</p>
+<p><strong>约定</strong>:
+- 触发事件 <code>_parent_job_id</code> 字段记录链 (Q4 诊断追溯用)
+- 子 job 内 worker 的 Q1 "每 job 单次激活" 重新计数 (不同 trace_id → 不同激活 key)
+- 终止由子 job 内产 sink material 决定, 不阻塞父 job</p>
+<hr />
+<h3 id="r-18r-25">反模式（R-18~R-25 相关）<a class="headerlink" href="#r-18r-25" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>名称</th>
+<th>描述</th>
+<th>后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RA-12</td>
+<td>过度 Worker 化</td>
+<td>违反 R-18, 每函数一个 Worker</td>
+<td>样板爆炸 + O(F×R) 激活次数 + 破坏批处理简洁</td>
+</tr>
+<tr>
+<td>RA-13</td>
+<td>Agent Worker 假单体</td>
+<td>声称 Agent Worker 但内部无 Context/LLM/Tool 三件套分离, 仍是 while 循环</td>
+<td>不符 R-19, 失去可观测/可替换/可 diagnose 能力</td>
+</tr>
+<tr>
+<td>RA-14</td>
+<td>草率归因 LLM 幻觉</td>
+<td>遇到 LLM Worker 输出异常, 不沿 trace 查上游 material, 直接加 retry / 换模型 / 加 prompt 约束</td>
+<td>根因没查, 修表面</td>
+</tr>
+<tr>
+<td>RA-15</td>
+<td>绕 Workspace Writer 写文件</td>
+<td>违反 R-22, 业务 Worker 直接写 workspace 文件</td>
+<td>审计断链 / 无 hash / 无 sink material 记录</td>
+</tr>
+<tr>
+<td>RA-16</td>
+<td>verdict.output 嵌套</td>
+<td>违反 R-23, output = <code>{format_id: payload}</code> 嵌套而非平铺</td>
+<td>PipelineRunner / MaterialDispatcher 消费错乱, Team 2 selftest 暴露</td>
+</tr>
+<tr>
+<td>RA-17</td>
+<td>FORMAT_IN list 无 MODE</td>
+<td>违反 R-24, <code>FORMAT_IN = list[str]</code> 不显式声明 AND/OR</td>
+<td>未来 dispatcher 语义变化时 worker 行为错乱</td>
+</tr>
+<tr>
+<td>RA-18</td>
+<td>Worker 内部 while 循环持状态</td>
+<td>违反 R-07 Statelessness + R-25, 应用 <code>_emit_as_new_job</code> 让 dispatcher 驱动循环</td>
+<td>无法 replay / 不可观测 / 阶段 D AgentNodeLoop 替换后更痛苦</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

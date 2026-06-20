@@ -1,0 +1,388 @@
+# [OMNI] origin=claude-code domain=standards ts=2026-04-18T00:00:00Z type=manifest status=active
+# [OMNI] material_id="material:standards.meta.standards_index_routing_manifest.yaml"
+# 标准库索引 — SemanticAuditor 路由依据
+#
+# 目的：把"某类 artifact 应该用哪些 standards 的哪些节审" 变成机器可读。
+# SemanticAuditor 的 StandardMatcherRouter 读本文件决定审谁取什么。
+# 规范演化时更新本文件；新增 standards 必须同步加一条。
+#
+# artifact 类型 (kind)：
+#   worker          — Router/Worker .py 文件（含子类定义, omnicompany 新名 = Worker）
+#   worker_doc      — knowledge/routers/**/*.md (过渡期保留 routers 路径)
+#   material        — Material 定义 .md 或 formats.py（omnicompany 新名 = Material）
+#   llm_call        — 任何含 LLM 调用的 .py 或 AgentNodeLoop 定义
+#   team            — pipeline.py / team 定义（omnicompany 新名 = Team）
+#   design_md       — DESIGN.md
+#   plan_md         — docs/plans/*/plan.md
+#   standard_md     — docs/standards/*.md（meta，用于规范自审）
+#   theory_md       — docs/theory/*.md
+#   template        — omnicompany/templates/<kind>/{范本,骨架,向导,注册件}.{md,py,yaml}
+#                     基础概念模板四件套, 教学示范代码 + 抽象诠释 + 注册时校验项
+#   sandbox_md      — .omni/sandbox/** 沙盒目录下的草案文件 (待审 / 待迁移到正式区)
+#   cli_doc         — omnicompany CLI 相关规范文档跟实装代码
+#   ai_ide_workflow — AI IDE 写入前必走的注册 / 沙盒 / 反思流程相关材料
+#
+# excerpt_strategy：
+#   full            — 整份标准喂给 LLM（小/核心规范）
+#   section         — 只喂 key_sections 列出的 ## 二级标题块
+#
+# path_match：glob 模式，支持多个（OR）；命中 → 该 standard 适用。
+
+standards:
+
+  - id: PROGRESSIVE-CONTEXT-KIND-AUTHORING
+    file: docs/standards/protocol/progressive_context.md
+    applies_to: [worker, llm_call, team, material]
+    path_match:
+      - "src/omnicompany/**/routers/**/*.py"
+      - "src/omnicompany/**/routers.py"
+      - "src/omnicompany/**/workers/**/*.py"
+      - "src/omnicompany/**/pipeline.py"
+      - "src/omnicompany/**/knowledge/formats/**/*.md"
+    excerpt_strategy: full
+
+  - id: STANDARD-WORKER
+    file: docs/standards/concepts/worker.md
+    applies_to: [worker, worker_doc, llm_call]
+    path_match:
+      - "src/omnicompany/**/routers/**/*.py"
+      - "src/omnicompany/**/routers.py"
+      - "src/omnicompany/**/workers/**/*.py"
+      - "src/omnicompany/**/knowledge/routers/**/*.md"
+    excerpt_strategy: full
+
+  - id: STANDARD-MATERIAL
+    file: docs/standards/concepts/material.md
+    applies_to: [material]
+    path_match:
+      - "src/omnicompany/**/knowledge/formats/**/*.md"
+      - "src/omnicompany/**/formats.py"
+    excerpt_strategy: full
+
+  - id: STANDARD-TEAM
+    file: docs/standards/concepts/team.md
+    applies_to: [team]
+    path_match:
+      - "src/omnicompany/**/pipeline.py"
+    excerpt_strategy: full
+
+  - id: LLM-FIRST
+    file: docs/standards/_global/llm_first.md
+    applies_to: [llm_call, router]
+    path_match:
+      - "src/omnicompany/**/routers/**/*.py"
+      - "src/omnicompany/**/routers.py"
+      - "src/omnicompany/**/agent/**/*.py"
+    excerpt_strategy: full
+
+  - id: COUNTEREXAMPLE-LEDGER
+    file: docs/standards/_global/counterexample_ledger.md
+    applies_to: [llm_call, router]
+    path_match:
+      - "src/omnicompany/**/*.py"
+    excerpt_strategy: full
+
+  - id: INFO-SUFFICIENCY
+    file: docs/standards/_global/information_sufficiency.md
+    applies_to: [llm_call, router]
+    path_match:
+      - "src/omnicompany/**/routers/**/*.py"
+      - "src/omnicompany/**/routers.py"
+      - "src/omnicompany/**/agent/**/*.py"
+    excerpt_strategy: section
+    key_sections:
+      - "## 一、问题根源"
+      - "## 二、三层防御体系"
+      - "## 三、节点信息规范（扩展 FORMAT 标准）"
+      - "## 七、核心认知：降维与符号完备性（2026-04-14 补）"
+
+  - id: AGENT-TOOLS
+    file: docs/standards/concepts/agent_tools.md
+    applies_to: [llm_call]
+    path_match:
+      - "src/omnicompany/**/agent/**/*.py"
+      - "src/omnicompany/packages/services/agent/**/*.py"
+    excerpt_strategy: full
+
+  - id: CODE
+    file: docs/standards/_global/code.md
+    applies_to: [router, llm_call, pipeline]
+    path_match:
+      - "src/omnicompany/**/*.py"
+    excerpt_strategy: full
+
+  - id: OMNI-HEADER
+    file: docs/standards/cli/omni-header.md
+    applies_to: [design_md, format, router_doc, plan_md, standard_md, theory_md]
+    path_match:
+      - "**/DESIGN.md"
+      - "src/omnicompany/**/knowledge/**/*.md"
+      - "docs/plans/**/plan.md"
+      - "docs/standards/**/*.md"
+      - "docs/theory/**/*.md"
+    excerpt_strategy: full
+
+  # 自我叙事三件套 — DESIGN/README/SKILL 的现行权威 (2026-06-13 用户裁决"冲突以新为准")
+  - id: SELF-NARRATIVE-THREE-FILES
+    file: docs/standards/protocol/self_narrative_three_files.md
+    applies_to: [design_md, readme_md, skill_md]
+    path_match:
+      - "**/DESIGN.md"
+      - "src/omnicompany/**/README.md"
+      - "src/omnicompany/**/SKILL.md"
+    excerpt_strategy: full
+
+  # DESIGN.md 模板细则 — 从属于 SELF-NARRATIVE-THREE-FILES, 冲突时以三件套为准
+  - id: DESIGN-MD-TEMPLATE
+    file: docs/standards/protocol/design_md_template.md
+    applies_to: [design_md]
+    path_match:
+      - "**/DESIGN.md"
+    excerpt_strategy: full
+
+  - id: DISTRIBUTED-DOCS
+    file: docs/standards/_global/distributed-docs.md
+    applies_to: [design_md, plan_md, standard_md, theory_md]
+    path_match:
+      - "**/DESIGN.md"
+      - "docs/**/*.md"
+    excerpt_strategy: section
+    key_sections:
+      - "## 三、内容类型矩阵（权威清单）"
+      - "## 四、放置规则（目录白名单）"
+      - "## 六、尺寸与拆分触发器"
+
+  - id: TERMINOLOGY
+    file: docs/standards/_global/terminology.md
+    applies_to: [worker, worker_doc, material, team, design_md, plan_md, standard_md, theory_md, llm_call]
+    path_match:
+      - "src/omnicompany/**/*.py"
+      - "src/omnicompany/**/*.md"
+      - "docs/**/*.md"
+    excerpt_strategy: full
+
+  - id: WORKSPACE-ISOLATION-AND-TEST-DISCRIMINATION
+    file: docs/standards/_global/workspace_isolation_and_test_discrimination.md
+    applies_to: [worker, team, llm_call, design_md]
+    path_match:
+      - "src/omnicompany/**/run.py"
+      - "src/omnicompany/**/workers/**/*.py"
+      - "src/omnicompany/**/pipeline.py"
+      - "**/DESIGN.md"
+    excerpt_strategy: full
+
+  - id: STANDARD-TEMPLATE
+    file: docs/standards/concepts/template.md
+    applies_to: [template]
+    path_match:
+      - "omnicompany/templates/**/范本.*"
+      - "omnicompany/templates/**/骨架.*"
+      - "omnicompany/templates/**/向导.md"
+      - "omnicompany/templates/**/注册件.yaml"
+      - "templates/**/范本.*"
+      - "templates/**/骨架.*"
+      - "templates/**/向导.md"
+      - "templates/**/注册件.yaml"
+    excerpt_strategy: full
+
+  - id: STANDARD-SANDBOX
+    file: docs/standards/cli/sandbox.md
+    applies_to: [sandbox_md, ai_ide_workflow]
+    path_match:
+      - ".omni/sandbox/**/*.md"
+      - ".omni/sandbox/**/*.py"
+      - ".omni/sandbox/**/*.yaml"
+    excerpt_strategy: full
+
+  - id: STANDARD-OMNICOMPANY-CLI
+    file: docs/standards/cli/omnicompany_cli.md
+    applies_to: [cli_doc, ai_ide_workflow]
+    path_match:
+      - "src/omnicompany/cli/**/*.py"
+    excerpt_strategy: full
+
+  - id: STANDARD-CLAUDE-CODE-SUBAGENT-WORKER
+    file: docs/standards/cli/claude_code_subagent_worker.md
+    applies_to: [cli_doc, llm_call, plan_md]
+    path_match:
+      - "docs/standards/cli/claude_code_subagent_worker.md"
+      - ".claude/skills/omni-claude-worker/SKILL.md"
+      - "src/omnicompany/cli/commands/worker.py"
+      - "tests/cli/test_worker_command.py"
+      - "docs/plans/**/worker-specs/**/*.md"
+      - "docs/plans/**/specs/**/*.md"
+    excerpt_strategy: full
+
+  # plan 唯一权威规范 (2026-06-13 起; plan_template.md 为其 protocol 层模板细则)
+  - id: STANDARD-PLAN
+    file: docs/standards/concepts/plan.md
+    applies_to: [plan_md, doc]
+    path_match:
+      - "docs/plans/**/plan.md"
+      - "docs/plans/**/compact_summary_*.md"
+    excerpt_strategy: full
+
+  # plan 模板细则 — 从属于 STANDARD-PLAN, 冲突时以 concepts/plan.md 为准
+  - id: PLAN-TEMPLATE
+    file: docs/standards/protocol/plan_template.md
+    applies_to: [plan_md]
+    path_match:
+      - "docs/plans/**/plan.md"
+    excerpt_strategy: full
+
+  # 核心设施统一/唯一权威收束 — 方向在 authority-confirmation.md, 执行门禁在 autonomous-execution-rules.md
+  - id: AUTHORITY-CONVERGENCE
+    file: docs/plans/agent-framework/[2026-06-13]LLM-CALL-UNIFICATION/authority-confirmation.md
+    applies_to: [plan_md, standard_md, template, cli_doc]
+    path_match:
+      - "docs/plans/agent-framework/[2026-06-13]LLM-CALL-UNIFICATION/*.md"
+      - "docs/standards/**/*.md"
+      - "templates/**/*.md"
+      - "src/omnicompany/packages/services/_core/guardian/{README,DESIGN,SKILL}.md"
+    excerpt_strategy: full
+
+  # PROJECT_INDEX.md 契约 (2026-06-13 立 — 此前契约只活在代码常量, 缺权威文档)
+  - id: STANDARD-PROJECT-INDEX
+    file: docs/standards/concepts/project_index.md
+    applies_to: [doc]
+    path_match:
+      - "**/PROJECT_INDEX.md"
+    excerpt_strategy: full
+
+  - id: PROGRESSIVE-CONTEXT
+    file: docs/standards/protocol/progressive_context.md
+    applies_to: [plan_md, standard_md, template, context_binding, cli_doc]
+    path_match:
+      - "docs/plans/**/plan.md"
+      - "docs/plans/**/brief.md"
+      - "docs/standards/_meta/context-bindings.yaml"
+      - "docs/standards/protocol/progressive_context.md"
+      - "src/omnicompany/cli/commands/context.py"
+      - "src/omnicompany/dashboard/ccdaemon/**/*.py"
+    excerpt_strategy: full
+
+  - id: STANDARD-WORKSPACE
+    file: docs/standards/concepts/workspace.md
+    applies_to: [worker, team, llm_call]
+    path_match:
+      - "src/omnicompany/**/workers/**/*.py"
+      - "src/omnicompany/**/agents/**/*.py"
+      - "src/omnicompany/**/run.py"
+    excerpt_strategy: full
+
+  - id: STANDARD-AGENT-FIRST
+    file: docs/standards/concepts/agent_first.md
+    applies_to: [llm_call, agent]
+    path_match:
+      - "src/omnicompany/**/agents/**/*.py"
+      - "src/omnicompany/packages/services/agent/**/*.py"
+    excerpt_strategy: full
+
+  - id: VERIFICATION-INVARIANTS
+    file: docs/standards/_global/verification_invariants.md
+    applies_to: [worker, team, llm_call, design_md, plan_md]
+    path_match:
+      - "src/omnicompany/**/workers/**/*.py"
+      - "**/DESIGN.md"
+      - "docs/plans/**/plan.md"
+      - "omnicompany/templates/**/注册件.yaml"
+    excerpt_strategy: full
+
+  # 审阅材料形态规范簇 (2026-06-13) — material 类型驱动审阅格式, 双保证(设施+prompt)。
+  # 总则 = REVIEW-REPORT-FORM-ASSOCIATION; webgame-spec 为首个主体类型实例。
+  - id: REVIEW-REPORT-FORM-ASSOCIATION
+    file: docs/standards/protocol/review_report_form_association.md
+    applies_to: [material, standard_md]
+    path_match:
+      - "src/omnicompany/**/formats.py"
+      - "src/omnicompany/dashboard/boss_sight/reviewstage/**/*.py"
+      - "docs/standards/review/**/*.md"
+      - "docs/standards/protocol/review_report_form_association.md"
+    excerpt_strategy: full
+
+  - id: REVIEW-PUSH-CURATION
+    file: docs/standards/review/审阅与推送规范.md
+    applies_to: [material, standard_md]
+    path_match:
+      - "src/omnicompany/**/formats.py"
+      - "src/omnicompany/dashboard/boss_sight/reviewstage/**/*.py"
+      - "src/omnicompany/cli/commands/boss_sight.py"
+      - "docs/standards/review/**/*.md"
+    excerpt_strategy: full
+
+  - id: REVIEW-GUIDED-DEMO
+    file: docs/standards/review/引导演示材料规范.md
+    applies_to: [material, standard_md]
+    path_match:
+      - "docs/standards/review/引导演示材料规范.md"
+      - "**/demo-tours.ts"
+      - "**/ops-run-demo-tour.mjs"
+    excerpt_strategy: full
+
+  - id: REVIEW-SPEC-REPORT
+    file: docs/standards/review/spec报告材料规范.md
+    applies_to: [material, standard_md]
+    path_match:
+      - "docs/standards/review/spec报告材料规范.md"
+    excerpt_strategy: full
+
+# ─── kind 推断规则（StandardMatcherRouter 用） ─────────────────
+# 顺序评估，首条匹配即生效。
+kind_inference:
+  - kind: material
+    match:
+      - "src/omnicompany/**/knowledge/formats/**/*.md"
+      - "src/omnicompany/**/formats.py"
+
+  - kind: worker_doc
+    match:
+      - "src/omnicompany/**/knowledge/routers/**/*.md"
+
+  - kind: team
+    match:
+      - "src/omnicompany/**/pipeline.py"
+
+  - kind: worker
+    match:
+      - "src/omnicompany/**/routers/**/*.py"
+      - "src/omnicompany/**/routers.py"
+      - "src/omnicompany/**/workers/**/*.py"
+
+  - kind: llm_call
+    match:
+      - "src/omnicompany/**/agent/**/*.py"
+      - "src/omnicompany/packages/services/agent/**/*.py"
+
+  - kind: design_md
+    match:
+      - "**/DESIGN.md"
+
+  - kind: plan_md
+    match:
+      - "docs/plans/**/plan.md"
+
+  - kind: standard_md
+    match:
+      - "docs/standards/**/*.md"
+
+  - kind: plan_md
+    match:
+      - "docs/plans/**/plan.md"     # 含主题区 + omnicompany- 元区 + _archive
+
+  - kind: theory_md
+    match:
+      - "docs/theory/**/*.md"
+
+  - kind: template
+    match:
+      - "omnicompany/templates/**/*"
+      - "templates/**/*"
+
+  - kind: sandbox_md
+    match:
+      - ".omni/sandbox/**/*"
+
+  - kind: context_binding
+    match:
+      - "docs/standards/_meta/context-bindings.yaml"
+      - "src/omnicompany/cli/commands/context.py"

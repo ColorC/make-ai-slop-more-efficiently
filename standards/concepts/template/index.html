@@ -1,0 +1,3530 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../team/">
+      
+      
+        <link rel="next" href="../worker/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Template - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Template
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/verification_invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/workspace_isolation_and_test_discrimination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/llm_infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#omnicompany" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 概念三层分类 (omnicompany 概念体系的根)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、 概念三层分类 (omnicompany 概念体系的根)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ai-src" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        层一 · AI 控制体系 (src 内, 跑业务的)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        层二 · 文档体系 (src 外, 跟人类交互的)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        层三 · 元模板 (产生上面两层的母模具)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三层对应表 (跟协议层 + SKILL 实施层)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 模板是什么
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 模板的核心价值
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 模板的核心价值">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 1: 骨架让使用者快速建立标准化内容
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 2: 链接到规范和现存代码, 帮助使用者理解内容
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 3: checklist 和向导防止使用者犯错
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 4: 用案例诠释抽象概念, 让"道理清楚但不知道怎么做"变成"具体长这样"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 设计材料 / 工人 / 团队等抽象 kind 时要回答的灵魂问题
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 设计材料 / 工人 / 团队等抽象 kind 时要回答的灵魂问题">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        能帮诊断吗?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        能给人类看和改吗?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        能让计算机运行 / 解析 / 生成吗?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多维度价值评估
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 跟其他概念的边界
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 跟其他概念的边界">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与材料
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与规范
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与实例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与沙盒里的 guides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#omnicompany-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与 omnicompany CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#designmd-manifestyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与 DESIGN.md / manifest.yaml / 反例账本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概念三层对应 (回查根定义见 §一)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 模板的字段
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五、 模板的字段">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        元信息块
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概念定义
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        范本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        骨架
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        向导
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注册件接口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式列表
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        代码案例链接 (核心价值字段)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        抽象概念诠释 (核心价值字段)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 命名规范
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="六、 命名规范">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        命名迁移 (新名优先)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 位置规范
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八、 实例化协议
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="八、 实例化协议">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kind_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第一步: 选定目标 kind 和子变体 (如有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第二步: 复制骨架到目标位置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第三步: 提示填空 + 显示向导
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第四步: 自检 + 注册中心校验
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第五步: 注册到中心 + 转正式区
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实例化时的工作区隔离
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九、 模板的生命周期
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="九、 模板的生命周期">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        创建
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        修订
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实例升级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证不变量三档判别力
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        归档
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        版本管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十、 反模式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="十、 反模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板里塞具体业务字段
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 范本是过期代码
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 只有范本没有骨架
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 向导写成手册不是清单
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板自己没有文件头
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_46" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 用文件名挂版本号
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_47" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板修订时不改规范
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_48" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板覆盖太广或太窄
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 注册件接口跟实际 CLI 行为脱钩
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_49" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十一、 元模板 (满分参照)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_50" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十二、 跟现存设施的接通点
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/self_narrative_three_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#omnicompany" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 概念三层分类 (omnicompany 概念体系的根)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、 概念三层分类 (omnicompany 概念体系的根)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ai-src" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        层一 · AI 控制体系 (src 内, 跑业务的)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#src" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        层二 · 文档体系 (src 外, 跟人类交互的)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        层三 · 元模板 (产生上面两层的母模具)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三层对应表 (跟协议层 + SKILL 实施层)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 模板是什么
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 模板的核心价值
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 模板的核心价值">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 1: 骨架让使用者快速建立标准化内容
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 2: 链接到规范和现存代码, 帮助使用者理解内容
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 3: checklist 和向导防止使用者犯错
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        作用 4: 用案例诠释抽象概念, 让"道理清楚但不知道怎么做"变成"具体长这样"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 设计材料 / 工人 / 团队等抽象 kind 时要回答的灵魂问题
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 设计材料 / 工人 / 团队等抽象 kind 时要回答的灵魂问题">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        能帮诊断吗?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        能给人类看和改吗?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        能让计算机运行 / 解析 / 生成吗?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        多维度价值评估
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 跟其他概念的边界
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 跟其他概念的边界">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与材料
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与规范
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与实例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与沙盒里的 guides
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#omnicompany-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与 omnicompany CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#designmd-manifestyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板与 DESIGN.md / manifest.yaml / 反例账本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概念三层对应 (回查根定义见 §一)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 模板的字段
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五、 模板的字段">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        元信息块
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概念定义
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        范本
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        骨架
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        向导
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注册件接口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式列表
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        代码案例链接 (核心价值字段)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        抽象概念诠释 (核心价值字段)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 命名规范
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="六、 命名规范">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        命名迁移 (新名优先)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 位置规范
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八、 实例化协议
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="八、 实例化协议">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kind_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第一步: 选定目标 kind 和子变体 (如有)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第二步: 复制骨架到目标位置
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第三步: 提示填空 + 显示向导
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第四步: 自检 + 注册中心校验
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第五步: 注册到中心 + 转正式区
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实例化时的工作区隔离
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九、 模板的生命周期
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="九、 模板的生命周期">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        创建
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        修订
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实例升级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证不变量三档判别力
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        归档
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        版本管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十、 反模式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="十、 反模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板里塞具体业务字段
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 范本是过期代码
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 只有范本没有骨架
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 向导写成手册不是清单
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板自己没有文件头
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_46" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 用文件名挂版本号
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_47" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板修订时不改规范
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_48" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 模板覆盖太广或太窄
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反模式: 注册件接口跟实际 CLI 行为脱钩
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_49" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十一、 元模板 (满分参照)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_50" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十二、 跟现存设施的接通点
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- [OMNI] origin=ai-ide domain=omnicompany/standards ts=2026-05-01T00:00:00Z type=doc status=active agent=ai-ide-bd9cde92 -->
+<!-- [OMNI] summary="模板标准, 定义模板自身的字段/生命周期/实例化协议/跟其他概念的边界" -->
+<!-- [OMNI] why="omnicompany 概念三层分类 (AI 控制体系 / 文档体系 / 元模板) 都要靠模板才能产出合规实例, 模板本身的协议不立清, 上层模板都立不准" -->
+<!-- [OMNI] tags=template,standard,foundation,registry,omnicompany -->
+<!-- [OMNI] material_id="material:standards.concepts.template_meta_layer_classification.md" -->
+
+<h1 id="_1">模板标准<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<h2 id="omnicompany">一、 概念三层分类 (omnicompany 概念体系的根)<a class="headerlink" href="#omnicompany" title="Permanent link">&para;</a></h2>
+<p>omnicompany 项目里所有概念按职责跟落地位置分三层. 模板系统按这三层分别提供模板, 不是平铺八种 kind:</p>
+<h3 id="ai-src">层一 · AI 控制体系 (src 内, 跑业务的)<a class="headerlink" href="#ai-src" title="Permanent link">&para;</a></h3>
+<p>src 内部跑 AI 控制系统的六种核心概念:</p>
+<ul>
+<li><strong>agent</strong> — 含 LLM 调用 + 工具调用 + AgentNodeLoop 动态探索的 worker 子类型</li>
+<li><strong>hook</strong> — 接外部信号产 source material, 不调 LLM 不改状态不做决策</li>
+<li><strong>tool</strong> — 执行确定性操作 (读 / 写 / 跑命令 / 调 API), 不调 LLM 不做决策</li>
+<li><strong>material</strong> — Format 协议层的纯数据, worker 间通信介质</li>
+<li><strong>team</strong> — worker 拓扑组合, 含 pipeline.py + 多个 worker.py + DESIGN.md + .omni/manifest.yaml 等多文件结构</li>
+<li><strong>worker</strong> — Node 协议层, 业务逻辑执行者</li>
+</ul>
+<p>这层概念在协议层对应六元原语 (Hook / Tool / Node / Format), 落到 <code>src/omnicompany/packages/services/&lt;service&gt;/</code> 跟 <code>src/omnicompany/packages/domains/&lt;domain&gt;/</code>. 模板放在 <code>templates/&lt;kind&gt;/</code>, 范本是文件夹结构 (因为真实例就是多文件).</p>
+<h3 id="src">层二 · 文档体系 (src 外, 跟人类交互的)<a class="headerlink" href="#src" title="Permanent link">&para;</a></h3>
+<p>跟人类交互 / 给人读 / 让人审议的两种文档:</p>
+<ul>
+<li><strong>data</strong> — material 落盘后的物理形态, 含 sidecar v1.1 元数据. 落到 <code>data/services/</code> / <code>data/domains/</code> / <code>data/_workspaces/</code> 等</li>
+<li><strong>doc</strong> — 人读的散文档, 含三种子类:</li>
+<li><strong>plan</strong> — 跨日跨阶段过程记录, 落 <code>docs/plans/&lt;package_path&gt;/[date]TOPIC/plan.md</code> (按本规范定义的目录结构)</li>
+<li><strong>report</strong> — 跨阶段总结报告, 落 <code>docs/reports/&lt;category&gt;/</code></li>
+<li><strong>DESIGN</strong> — 服务包级别的设计文档, 归 team 一部分 (不独立成 kind), 落 <code>src/omnicompany/packages/&lt;service&gt;/DESIGN.md</code></li>
+</ul>
+<p>DESIGN 在物理位置上就近 team (在 service 包内), 但语义上是"team 的设计文档". 修订 team 时一并修订 DESIGN.</p>
+<h3 id="_2">层三 · 元模板 (产生上面两层的母模具)<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>template</strong> — 元概念, 用来定义"上面两层每种 kind 的模板长什么样" 的模板. 自身递归三级停 (元模板 → kind 模板 → 实例)</li>
+</ul>
+<h3 id="skill">三层对应表 (跟协议层 + SKILL 实施层)<a class="headerlink" href="#skill" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>omnicompany 概念</th>
+<th>协议层原语</th>
+<th>SKILL 实施层</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一 (AI 控制体系)</td>
+<td>agent</td>
+<td>Node (含 LLM 子类型)</td>
+<td>§1 / §3 / §3.4 / §6</td>
+</tr>
+<tr>
+<td>一</td>
+<td>hook</td>
+<td>Hook (只观测)</td>
+<td>§1 / §5</td>
+</tr>
+<tr>
+<td>一</td>
+<td>tool</td>
+<td>Tool (只执行)</td>
+<td>§1 / §6</td>
+</tr>
+<tr>
+<td>一</td>
+<td>material</td>
+<td>Format (纯数据)</td>
+<td>§2 / §3.1</td>
+</tr>
+<tr>
+<td>一</td>
+<td>team</td>
+<td>Node 拓扑组合</td>
+<td>§4</td>
+</tr>
+<tr>
+<td>一</td>
+<td>worker</td>
+<td>Node</td>
+<td>§1 / §3 (19 项)</td>
+</tr>
+<tr>
+<td>二 (文档体系)</td>
+<td>data</td>
+<td>Format 落盘 + sidecar</td>
+<td>§2 落盘表达 / P-14~P-17</td>
+</tr>
+<tr>
+<td>二</td>
+<td>plan (doc 子类)</td>
+<td>Format (markdown)</td>
+<td>§0 调研 + §11 落档</td>
+</tr>
+<tr>
+<td>二</td>
+<td>report (doc 子类)</td>
+<td>Format (markdown)</td>
+<td>§11 落档</td>
+</tr>
+<tr>
+<td>二</td>
+<td>DESIGN (team 一部分)</td>
+<td>Format (markdown)</td>
+<td>跟 team 同生命周期</td>
+</tr>
+<tr>
+<td>三 (元模板)</td>
+<td>template</td>
+<td>Format (递归元层)</td>
+<td>§2 / §3</td>
+</tr>
+</tbody>
+</table>
+<p>不在用户层概念里但协议层有的两个原语 (Signal / Intent), 不立顶级模板:
+- <strong>Signal</strong> — 节点内部传值用, 跨调用不持久, 不需要顶级模板
+- <strong>Intent</strong> — 用户意图描述, 落到 doc / agent system_prompt 等具体材料里, 不另立基础概念</p>
+<h2 id="_3">二、 模板是什么<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>模板是一份<strong>用来产出某一类材料实例</strong>的成品规约。它装四样东西:</p>
+<ul>
+<li><strong>范本</strong> — 一份字段全部填好、可以直接被人读懂的完整例子 (复杂 kind 是文件夹结构, 含真实多文件)</li>
+<li><strong>骨架</strong> — 一份字段位置都留好、值未填的填写表</li>
+<li><strong>向导</strong> — 跟骨架配套的填写指引, 每个字段为什么填、怎么填、漏填的后果</li>
+<li><strong>注册件接口</strong> — 实例化时 omnicompany CLI 怎么调用、校验时跑哪些规则、注册中心要登记哪些信息</li>
+</ul>
+<p><strong>模板本身就是材料</strong>。它有自己的文件头、自己的命名规则、自己的位置规则、自己的生命周期, 跟任何一份普通材料一样在系统里被注册和管理。它不是悬在系统外面的"参考资料"。</p>
+<h2 id="_4">二、 模板的核心价值<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>模板的存在不是为了"装四样东西的形式合规", 是为了<strong>让使用者真正能理解和做出合格的实例</strong>。具体作用四件:</p>
+<h3 id="1">作用 1: 骨架让使用者快速建立标准化内容<a class="headerlink" href="#1" title="Permanent link">&para;</a></h3>
+<p>直接复制骨架就有了合格起点。不用每次新建实例时重新想"应该有哪些字段、字段顺序怎样、必填什么"。骨架是"已经走过一次坑的人沉淀下来的最小起点"。</p>
+<h3 id="2">作用 2: 链接到规范和现存代码, 帮助使用者理解内容<a class="headerlink" href="#2" title="Permanent link">&para;</a></h3>
+<p>模板里必须带两类链接:</p>
+<ul>
+<li><strong>规范链接</strong> — 链回 <code>docs/standards/&lt;kind&gt;.md</code>, 让使用者从模板返回去查权威定义</li>
+<li><strong>代码链接</strong> — 链回现存代码里这种 kind 的真实合格实例 (具体路径), 让使用者直接读现成的"看代码就懂"</li>
+</ul>
+<p>只有规范链接不够。规范是文字描述, 抽象概念使用者读完仍然不知道"具体长什么样"。代码链接给的是真东西, 一眼看穿。</p>
+<h3 id="3-checklist">作用 3: checklist 和向导防止使用者犯错<a class="headerlink" href="#3-checklist" title="Permanent link">&para;</a></h3>
+<p>向导一字段一节回答四问题, 注册件含可执行的 checks 列表, 整体检查项填完后再走一遍。这三层让使用者在不同阶段都能自检, 不让漏字段、不让填错、不让位置不对、不让头不齐这些常见错误漏过去。</p>
+<h3 id="4">作用 4: 用案例诠释抽象概念, 让"道理清楚但不知道怎么做"变成"具体长这样"<a class="headerlink" href="#4" title="Permanent link">&para;</a></h3>
+<p>这是模板最重要的作用, 也是规范无法替代的。规范说"按价值拆分"、"单一语义责任"、"先需求产物不按接线" — 这些都是抽象原则, 使用者读完知道"道理对", 但不知道"我手上这份具体内容到底应该怎么按这些原则做"。</p>
+<p>模板必须<strong>用现存代码里的具体案例诠释每条抽象原则</strong>。例如材料模板里讲"按价值拆分"时, 不能只复述规范, 要列:</p>
+<blockquote>
+<p>"人类可读价值的体现": 现存材料 <code>demogame.table-understanding-doc</code> 之所以独立成 material, 是因为团队 lead 要在 trace-view 里一眼看出表的语义 — 链接 <code>&lt;具体路径&gt;</code>
+"调试价值的体现": 现存材料 <code>voxelcraft.compile_report</code> 之所以独立, 是因为 jar 编译失败时不光要知道"失败了", 还要看 javac 的具体错误行 — 链接 <code>&lt;具体路径&gt;</code>
+"反例 (不该拆的)": 某中间产物只在节点内部存在, 对外无任何调试/复用/人类可读价值 — 这种应当藏在节点里走 Signal, 不开新 material</p>
+</blockquote>
+<p>这才是"诠释抽象概念"的正确形态 — 不再是抽象解释, 是真把现存代码里的具体例子+链接+解释为什么这样体现某个抽象原则。读完使用者能立刻把抽象原则映射到自己手上的内容上。</p>
+<h2 id="kind">三、 设计材料 / 工人 / 团队等抽象 kind 时要回答的灵魂问题<a class="headerlink" href="#kind" title="Permanent link">&para;</a></h2>
+<p>这一节是给材料模板、工人模板、团队模板等含大量抽象概念的 kind 模板<strong>专门</strong>设的一节, 不适用于纯形式 kind (例如 plan / hook 这种字段相对固定的)。</p>
+<p>设置一份新材料 / 新工人 / 新团队时, 系统会把它存起来 / 注册起来 / 跑起来, 但<strong>存起来有什么用</strong>? 灵魂问题三条:</p>
+<h3 id="_5">能帮诊断吗?<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>这份材料 (或工人产出 / 团队跑) 出问题时, 它本身能不能成为诊断线索? 在 trace 里看到这份材料能不能说出"哦, 这一步的输入是这样, 所以下一步出错的原因可能是 X"? 如果答案是"看不出来", 这份材料的字段设计就缺了诊断维度。</p>
+<h3 id="_6">能给人类看和改吗?<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>人类需要这份材料时 (例如调试 / 审议 / 修订), 能不能直接打开看懂? 看完能不能直接改? 改完能不能塞回去? 如果材料是机器编码格式 (例如打包成 binary 或 schema 复杂的嵌套 JSON), 人类介入成本就高, 应该考虑拆出一份给人看的版本。</p>
+<h3 id="_7">能让计算机运行 / 解析 / 生成吗?<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>机器需要这份材料时 (例如下游工人消费 / 守护扫描 / 检索召回), 能不能直接 parse? schema 能不能用 jsonschema validate? 字段语义能不能用 LLM 自动抽取? 如果材料是纯散文 markdown 没结构化字段, 机器消费成本就高, 应该考虑加结构化层。</p>
+<h3 id="_8">多维度价值评估<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<p>回答完三个灵魂问题, 一份材料 / 工人 / 团队的设计可以从五个维度评估:</p>
+<ul>
+<li><strong>人类易用性</strong>: 人能看懂、能改、能用?</li>
+<li><strong>人类工作流程中的存在性 (和已有工作可对比性)</strong>: 这份材料对应人类已有的工作物吗? (例如配表对应已有的 xlsx, 设计文档对应已有的 .md) 让人能"啊这就是我以前的 X", 而不是要从零理解一个新概念</li>
+<li><strong>内部内容语义一致性</strong>: 这一份内部多个字段是不是描述同一件事? 还是混了不同语义? (例如把 schema + diff + 规则证据三种语义混进同一份就违反一致性)</li>
+<li><strong>和其他 material 的重复度</strong>: 内容和操作性都一样就没必要新开。但人操作 vs 机器操作不一样 — 人改的 .md 跟机器读的 .json 即使内容能映射, 也可以独立存在 (人和机器的访问模式不同)</li>
+<li><strong>计算机可操作度</strong>: 计算机能 parse / 运行 / 检查这份材料吗?</li>
+</ul>
+<p>模板的"案例诠释抽象概念"那一节, 应当用现存材料 / 工人 / 团队作具体例子, 一条一条说清楚这五个维度怎么体现。</p>
+<h2 id="_9">四、 跟其他概念的边界<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<h3 id="_10">模板与材料<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<p>模板是材料的一种, 用 <code>kind=template</code> 区分。任何材料标准里讲的字段、命名、注册、生命周期约束, 模板都一样要守。</p>
+<p>模板跟"模板的目标材料"不是同一份东西。一份 <code>template.worker</code> 模板说的是"工人这种材料应该长什么样", 不是某个具体工人。一份具体工人是按 <code>template.worker</code> 实例化产出的另一份独立材料。</p>
+<h3 id="_11">模板与规范<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<p>规范 (<code>docs/standards/&lt;kind&gt;.md</code>) 描述某种材料<strong>应该满足什么</strong>, 是文字描述。
+模板 (<code>omnicompany/templates/&lt;kind&gt;/</code>) 描述某种材料<strong>长什么样</strong>, 是可以直接复制和填写的成品。</p>
+<p>规范是判断依据, 模板是产出工具。两者必须一致 — 模板的范本不能违反对应规范, 否则系统出现"按模板做就对, 按规范做就错"的矛盾。模板修订必须先改规范、再同步模板; 反过来不允许。</p>
+<h3 id="_12">模板与实例<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<p>一份模板对应零到多份实例。实例是按模板新建的、字段已经填好的具体材料。</p>
+<p>实例不是模板的复制 — 实例填空时可能补充模板没有的字段 (在向导允许的范围内), 也可能产生跟模板范本完全不同的具体值。模板只约束"骨架结构 + 必填字段 + 命名规则 + 位置规则", 不约束实例的具体内容。</p>
+<h3 id="guides">模板与沙盒里的 guides<a class="headerlink" href="#guides" title="Permanent link">&para;</a></h3>
+<p>沙盒目录的 <code>guides/</code> 子目录里放的是<strong>规范副本</strong>, 不是模板。规范副本是从 <code>docs/standards/</code> 拷过来的只读复制, 让沙盒里的写入者不切目录就能查规范。</p>
+<p>模板本体在 <code>omnicompany/templates/&lt;kind&gt;/</code>, 跟规范并列。沙盒的 <code>guides/</code> 不存模板本体, 但可以软链或拷贝过来作便利。</p>
+<h3 id="omnicompany-cli">模板与 omnicompany CLI<a class="headerlink" href="#omnicompany-cli" title="Permanent link">&para;</a></h3>
+<p>CLI 的 <code>omni new &lt;kind&gt;</code> 命令实例化模板。CLI 读模板的注册件接口决定要校验什么、要塞什么文件头、要往哪个目录写。模板修订后 CLI 自动用新模板, 不需要重启或者同步配置。</p>
+<h3 id="designmd-manifestyaml">模板与 DESIGN.md / manifest.yaml / 反例账本<a class="headerlink" href="#designmd-manifestyaml" title="Permanent link">&para;</a></h3>
+<p>立一种新概念时, 模板四件套不是唯一辅助产出物, 还有几份配套设施级文件应当一并落:</p>
+<ul>
+<li><strong>DESIGN.md</strong> (放在 <code>src/omnicompany/packages/&lt;服务&gt;/DESIGN.md</code>): 七节硬结构 (状态 / 核心目的 / 核心接口 / 架构决策 / 数据流 / 已知局限 / 参考资料)。模板讲"长什么样", DESIGN.md 讲"这个具体服务的设计是什么样"。两者各管一面。</li>
+<li><strong><code>.omni/manifest.yaml</code></strong> (放在 <code>src/omnicompany/packages/&lt;服务&gt;/.omni/manifest.yaml</code>): 服务包的依赖契约和材料清单。模板实例化产出真材料后, manifest 把这些材料登记到服务包的"输入/输出/中间"清单。</li>
+<li><strong>反例账本 <code>data/services/&lt;服务&gt;/counterexamples/&lt;rule_id&gt;.jsonl</code></strong>: 死规则的在线监测账本。每份模板的注册件里 <code>checks</code> 段产出的检查规则, 一旦触发就要落账; 出 1 条反例触发反思, ≥ 3 条触发规则降级。这是死规则的安全网, 不是可选项。</li>
+</ul>
+<p>立新概念时的工作清单: 先立规范 → 再立模板 → 实例化时同步建 DESIGN.md 跟 manifest.yaml → 模板的 checks 跑起来后开反例账本。前后顺序不要颠倒。</p>
+<h3 id="_13">概念三层对应 (回查根定义见 §一)<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<p>任何一份具体 kind 的模板, 概念定义那一节必须显式给出"这种 kind 在三层分类里的位置 + 协议层原语 + SKILL 实施层步骤". 完整对应表在本规范 §一 三层分类节. 否则模板跟协议层脱钩, 实例化产出的实例不知道自己是什么原语, 守护跟下游消费方都不知道边界.</p>
+<h2 id="_14">五、 模板的字段<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
+<p>每份模板包含九项内容, 都是必有的, 不允许省略其中任何一项。</p>
+<p>前七项是结构性字段 (实例化时被消费), 后两项 (代码案例链接 / 抽象概念诠释) 是<strong>核心价值字段</strong> — 没有这两项, 模板就退化成"形式合规的空壳", 失去了"诠释抽象概念让使用者真懂"的核心作用。</p>
+<h3 id="_15">元信息块<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<p>模板自己的 OmniMark 头, 跟任何材料一样。<code>type=template</code>, <code>domain=omnicompany/templates/&lt;目标 kind&gt;</code>, <code>summary</code> 一句话讲这份模板是给哪种材料用的, <code>why</code> 讲这份模板存在的语义理由 (为什么需要这种概念有专门的模板), <code>tags</code> 至少含 <code>template</code> 和目标 kind 名 (例如 <code>template,worker,foundation</code>)。</p>
+<h3 id="_16">概念定义<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
+<p>跟模板配套的"这种材料是什么"的一句到三句话定义。这一节不是规范的复制, 是给打开模板的人一个最快速的"这是干嘛的"提示。详细定义回查规范。</p>
+<h3 id="_17">范本<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<p>至少一份完整的真实例子。"完整"意思是所有字段都填好, 没有任何 placeholder。"真实"意思是字段值是这种材料在系统里真会出现的形态, 不是 <code>foo</code> / <code>bar</code> 这种占位词。</p>
+<p>如果这种材料有显著不同的子类型 (例如工人有简单大语言模型工人 / 不带大语言模型工人 / 智能体三档), 范本应当一档一份, 不混在一起。</p>
+<p>范本应当是 "如果一个外部审阅者只看这份范本, 不看任何其他文档, 就能立刻知道这种材料应该长什么样" 的水平。这是范本的硬质量门槛。</p>
+<h3 id="_18">骨架<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<p>跟范本结构对应的空填写表。所有需要填的字段位置都留好, 值是 <code>&lt;...&gt;</code> 形式的 placeholder, placeholder 里写<strong>这个字段要填什么语义内容</strong>, 不是写字段类型 (例如不是 <code>&lt;string&gt;</code> 而是 <code>&lt;这个工人接收的输入材料的 ID&gt;</code>)。</p>
+<p>骨架的字段顺序应当跟范本完全一致。没有可选字段的概念 — 实例化时所有骨架字段都必须被填, 哪怕填"无"或者"暂无"。</p>
+<h3 id="_19">向导<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
+<p>跟骨架配套的填写指引, 一字段一节, 每节回答四个问题:</p>
+<ol>
+<li><strong>这个字段是干嘛的</strong> — 一句话语义</li>
+<li><strong>怎么填</strong> — 取值范围 / 命名规则 / 引用其他材料的方式</li>
+<li><strong>不填或填错的后果</strong> — 跑不通会怎样, 守护会怎么报警, 下游会出什么问题</li>
+<li><strong>完成检查项</strong> — 一两条自检清单 (例如"已经在注册中心登记了对应的输入材料 ID 吗?")</li>
+</ol>
+<p>向导的总体长度跟模板覆盖的字段数挂钩 — 字段越多向导越长, 不要为了短而省字段说明。但单个字段的解释不要超过半页, 超了说明这个字段太复杂, 应当拆。</p>
+<h3 id="_20">注册件接口<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h3>
+<p>一份机器可读 (YAML) 的描述, 给 omnicompany CLI 用。包含:</p>
+<ul>
+<li><strong>实例命名规则</strong>: 实例文件名应该长什么样 (正则或者描述性规则)</li>
+<li><strong>实例位置规则</strong>: 实例应该放到哪个目录 (项目相对路径, 含 <code>&lt;&gt;</code> placeholder 让 CLI 替换)</li>
+<li><strong>必填字段清单</strong>: 跟骨架对齐, CLI 校验时用</li>
+<li><strong>校验规则 (<code>checks</code>)</strong>: 实例要通过哪些检查才算合规 (例如"工人必须声明 FORMAT_IN 和 FORMAT_OUT", 引用对应规范条款)</li>
+<li><strong>OmniMark 头默认值</strong>: 实例化时自动填什么 origin / type / tags 等</li>
+<li><strong>反例账本配置 (<code>counterexample_ledger</code>)</strong>: 实例化产出的实例里, 任何死规则触发都要走反例账本机制。注册件里声明账本路径模式 (例如 <code>data/services/&lt;服务&gt;/counterexamples/&lt;rule_id&gt;.jsonl</code>)、触发反思的反例阈值 (默认 1 条触发反思 / 3 条触发规则降级)、必有的 rule_trace 字段集 (rule_id / rule_version / trigger_context / rule_output / timestamp)。这一项是<strong>必有</strong>, 不允许空着 — 死规则没有反例账本就是裸奔</li>
+<li><strong>验证不变量 (<code>invariants</code>)</strong>: 实例的红绿测试基线不只列样本路径, 还要列每条不变量的 <code>red_check</code> (绝对错应不通过) / <code>green_check</code> (最简对应通过) / <code>gradient</code> (做得 A/B/C/F 四档区分) / <code>verify_method</code> (dom_assertion / pixel_diff / vision_llm_simple / vision_llm_compare 等具体判定法) / <code>severity_if_fail</code> (blocker / major / minor / cosmetic)。验证不带不变量声明就是没分辨力的验证</li>
+<li><strong>关联标准 (<code>related_standards</code>)</strong>: 列对应规范文件路径, 让模板修订时同步知道改哪份规范, 让 SemanticAuditor 能从模板回查规范</li>
+<li><strong>standards-index 同步检查</strong>: 注册件应当声明自己在 <code>docs/standards/_meta/standards-index.yaml</code> 里的 path_match 项, 让索引文件跟模板自动一致</li>
+</ul>
+<h3 id="_21">反模式列表<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
+<p>跟这种材料绑死的常见反模式 (从规范复制, 让模板内自检也能跑)。这一节是为了让模板的使用者<strong>不用切到规范文档</strong>就能立刻知道哪些做法是错的。</p>
+<h3 id="_22">代码案例链接 (核心价值字段)<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
+<p>每份模板必须列出<strong>至少 5 份现存代码里这种 kind 的真实合格实例</strong>, 给项目相对路径或绝对路径作链接。</p>
+<p>为什么是 5 份: 1-2 份不够覆盖变体差异, 看的人会以为某种特例就是通例; 5 份能跨越主要使用场景, 让看的人通过对比真实例子建立"这种 kind 的常态分布感"。</p>
+<p>每条链接要带:
+- <strong>路径</strong>: 项目相对路径 (例如 <code>src/omnicompany/packages/services/csv_to_md/workers/extract_worker.py</code>)
+- <strong>诠释维度</strong>: 这份案例主要诠释了什么 (例如"诠释了 worker 的 R-19 智能体子类型" / "诠释了 material 的 F-15 声明即消费")
+- <strong>看点提示</strong>: 一句话告诉读者打开这份代码后该看哪一段 (例如"看 ContextScript / LLM / Tool 三件套的 if 分支, 那是 R-19 的字面体现")</p>
+<p>代码案例链接是<strong>活的</strong> — 链接的代码被废弃 / 重构 / 迁移时, 模板要同步更新链接。模板修订时这一项是必查项, 不能让链接腐烂成"指向不存在的路径"。</p>
+<h3 id="_23">抽象概念诠释 (核心价值字段)<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
+<p>模板必须<strong>显式列出对应规范里的抽象原则</strong>, 每条原则用至少一份案例真诠释。</p>
+<p>什么算"抽象原则": 规范里那些"应该满足 X" 但 X 本身不是机器可校验、需要人类判断的条款。例如:</p>
+<ul>
+<li>材料规范的"按价值拆分": 价值有四类 (人类可读 / 调试 / 复用 / 检查薄弱性), 哪类多重才该拆? 规范不给数字门槛, 只能用案例诠释</li>
+<li>工人规范的"单一语义责任": 一件语义还是两件? 用案例对比"应当合并的两步"和"应当拆分的两步"才能讲清</li>
+<li>团队规范的"先需求产物不按接线": 规范说反对接线思维但什么样的设计算"先需求产物"? 用一个真实团队的演化过程作案例</li>
+<li>智能体规范的"工具自由度高 + 三位一体": 引导/规范/安全网三层边界怎么把握? 用 business_explorer 7 工具反例 vs bash + 必要包装的正例对比</li>
+</ul>
+<p>诠释的形式 (硬规则):</p>
+<blockquote>
+<p><strong>抽象原则名</strong> (来自规范第 X 条 / 链接到具体段落)
+<strong>规范原话</strong> (一句到三句话引用)
+<strong>正面案例 N 份</strong> (各自附路径 + 一段话讲为什么这份代码是这条原则的字面体现)
+<strong>反面案例至少 1 份</strong> (附路径 + 一段话讲为什么这份代码违反这条原则, 应当怎么改)
+<strong>判断准则</strong> (从案例对比里抽出来的, 给将来面临类似选择的使用者: "如果你手上的内容含 X 特征, 倾向走 A 路径; 含 Y 特征, 倾向走 B 路径")</p>
+</blockquote>
+<p>每条抽象原则的诠释<strong>长度不限</strong>, 因为这一节就是给抽象概念落地用的, 关键是真把案例搞透。短的诠释 (一两句) 没用; 真长的诠释 (跨几个案例对比 + 判断准则) 才有价值。</p>
+<p>不是所有 kind 都需要这一节: 形式相对固定的 kind (例如 plan / hook 这种字段相对枚举的) 可以只有 1-2 条抽象概念诠释或者干脆这一节空着 (但要在注册件.yaml 显式声明 <code>abstract_concepts_explained: []</code> 表示已审视过没需要诠释的抽象点)。</p>
+<p>含大量抽象概念的 kind (材料 / 工人 / 团队 / 智能体) 这一节必须丰满, 否则模板就是空壳, 实例化产出的实例会因为使用者读不懂抽象原则而频繁违规。</p>
+<h2 id="_24">六、 命名规范<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h2>
+<p>模板的目录命名: <code>&lt;kind&gt;/</code> 在 <code>omnicompany/templates/</code> 下面。<code>kind</code> 用单数英文 (因为目录名要稳定, 不跟着语言切换), 跟材料 kind 系统对齐 (<code>worker</code> / <code>material</code> / <code>team</code> / <code>agent</code> / <code>hook</code> / <code>tool</code> / <code>data</code> / <code>plan</code> / <code>template</code>)。</p>
+<p>注意 <code>template/</code> 也是模板系统的一部分 — 模板自己的模板 (元模板)。这是个递归点, 三级以上递归没意义, 元模板就是模板的模板就停。</p>
+<p>模板内部文件命名:
+- <code>范本.&lt;目标扩展&gt;</code> (例如 <code>范本.py</code> 给工人模板, <code>范本.md</code> 给计划模板)
+- <code>骨架.&lt;目标扩展&gt;</code>
+- <code>向导.md</code>
+- <code>注册件.yaml</code></p>
+<p>如果一份模板有子类型分档变体 (例如工人有三档), 用子目录:
+- <code>&lt;kind&gt;/&lt;变体&gt;/范本.&lt;扩展&gt;</code> (例如 <code>worker/simple_llm/范本.py</code>)
+- <code>&lt;kind&gt;/&lt;变体&gt;/骨架.&lt;扩展&gt;</code>
+- <code>&lt;kind&gt;/&lt;变体&gt;/向导.md</code>
+- <code>&lt;kind&gt;/&lt;变体&gt;/注册件.yaml</code></p>
+<p>不允许在文件名里挂版本号 (<code>范本_v2.py</code> 是禁的)。版本通过 OmniMark 头的 <code>ts</code> + git history 管。</p>
+<h3 id="_25">命名迁移 (新名优先)<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
+<p>新建模板跟新立实例都按 omnicompany 当前命名: 材料 (Material) / 工人 (Worker) / 团队 (Team) / 仓库 (Stock) / 部门 (Department) / OmniCompany. 旧名 (Format / Router / Pipeline / EventBus / 项目顶层 omnicompany) 仅在协议层旧 import 路径里保留, 业务层模板和实例都用新名。<code>docs/standards/_global/terminology.md</code> 记完整对照。模板范本里 <code>from omnicompany.protocol.format import Format</code> 这种是协议层旧名 grandfathered, 不传染业务层。</p>
+<h2 id="_26">七、 位置规范<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h2>
+<p>所有模板落在 <code>omnicompany/templates/</code> 下面, 跟规范 (<code>docs/standards/</code>) 平行。理由是模板是规范的"产出工具版", 在文档区里跟规范同根最合理。不放代码区 — 模板不是代码, 实例化时被 CLI 复制到代码区, 模板本身不参与运行时。</p>
+<p>不允许把模板放在沙盒、归档区、或者各服务包内部。沙盒的 <code>guides/</code> 是规范副本不是模板; 各服务包内部要新概念时, 仍走 <code>omnicompany/templates/&lt;kind&gt;/</code> 找模板, 不允许服务包自己造模板。</p>
+<p>如果系统将来需要某种领域特化模板 (例如 demogame 业务有自己的工人变体), 在 <code>omnicompany/templates/&lt;kind&gt;/&lt;领域&gt;/</code> 子目录里加, 不另起根目录。</p>
+<h2 id="_27">八、 实例化协议<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h2>
+<p>实例化是从模板产出一份具体实例的标准流程。CLI 走这套协议, AI IDE 和用户也走同样协议 (不允许绕过)。</p>
+<h3 id="kind_1">第一步: 选定目标 kind 和子变体 (如有)<a class="headerlink" href="#kind_1" title="Permanent link">&para;</a></h3>
+<p>调用方告诉 CLI 要做哪种概念的实例。<code>omni new worker --variant=simple_llm</code> 选择工人的简单大语言模型变体。CLI 在 <code>omnicompany/templates/worker/simple_llm/</code> 找模板。</p>
+<h3 id="_28">第二步: 复制骨架到目标位置<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h3>
+<p>CLI 读 <code>骨架.&lt;扩展&gt;</code> 和 <code>注册件.yaml</code> 的位置规则, 把骨架复制到目标位置 (例如 <code>src/omnicompany/packages/services/foo/workers/bar_worker.py</code>)。骨架文件里所有 placeholder 都还在 (留给填空)。</p>
+<p>CLI 在骨架顶部插入 OmniMark 头 (按注册件接口规定的默认值生成, summary / why / tags 暂时填占位字符串等填空时被覆盖)。</p>
+<h3 id="_29">第三步: 提示填空 + 显示向导<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h3>
+<p>CLI 把骨架文件路径返回给调用方, 同时把 <code>向导.md</code> 内容显示出来 (或者打开编辑器同时显示两份)。调用方按向导填骨架的 placeholder。</p>
+<p>向导建议的填写顺序:从结构性字段 (id / 输入材料 / 输出材料) 开始, 到行为性字段 (run 方法 / 校验逻辑) 结束。这样早期发现结构错误省后期返工。</p>
+<h3 id="_30">第四步: 自检 + 注册中心校验<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h3>
+<p>填空完成后, 调用方调 <code>omni sandbox check --content=&lt;填好的实例路径&gt; --kind=&lt;kind&gt;</code>, CLI 按 <code>注册件.yaml</code> 的校验规则跑全套检查。检查项包括:</p>
+<ul>
+<li>所有必填字段是否填了 (没有残留的 <code>&lt;...&gt;</code> placeholder)</li>
+<li>字段值是否符合命名规则</li>
+<li>文件位置是否符合位置规则</li>
+<li>引用其他材料的字段 (例如 FORMAT_IN) 是否真存在</li>
+<li>文件头五字段 (type / origin / summary / why / tags) 是否齐全</li>
+<li>跟规范条款的对接点是否都过</li>
+</ul>
+<p>不通过时给具体哪一条没过, 调用方修了再跑。通过才能进下一步。</p>
+<h3 id="_31">第五步: 注册到中心 + 转正式区<a class="headerlink" href="#_31" title="Permanent link">&para;</a></h3>
+<p>调用方调 <code>omni register material --kind=&lt;kind&gt; --path=&lt;目标路径&gt;</code> 拿写入凭据, 然后或者调 <code>omni write</code> 让 CLI 写, 或者调用方自己写但带凭据。</p>
+<p>CLI 把这一份实例登记到注册中心 (在 <code>&lt;workspace&gt;/.omni/registrations/</code> 下面记一条), 关联回模板 (用了哪份模板的哪个变体), 关联 session ID 和身份 token。</p>
+<p>注册成功之后这份实例就是合规的"在册材料", 防修改锁开启后受保护、被巡检覆盖。</p>
+<h3 id="_32">实例化时的工作区隔离<a class="headerlink" href="#_32" title="Permanent link">&para;</a></h3>
+<p>实例化产出的实例如果会引发后续运行 (例如新建一个工人, 后续会跑这个工人产数据), 调用方应当走工作区隔离 — 每次 run 用 git worktree / cp -r / 容器作独立工作区, 禁硬编码路径常量, 避免跨 run 污染。这条铁律在 <code>docs/standards/_global/workspace_isolation_and_test_discrimination.md</code> 第一条立, 任何模板的实例化都应当遵守。模板的注册件接口可以在 <code>instance_runtime</code> 字段声明这种 kind 实例的工作区隔离要求。</p>
+<h2 id="_33">九、 模板的生命周期<a class="headerlink" href="#_33" title="Permanent link">&para;</a></h2>
+<h3 id="_34">创建<a class="headerlink" href="#_34" title="Permanent link">&para;</a></h3>
+<p>新增一种概念时, 由 AI IDE 或用户人手写一份模板。流程跟普通材料注册一样 — 在沙盒 <code>drafts/</code> 写出范本+骨架+向导+注册件, 自检 (<code>omni sandbox check --kind=template</code>) 通过后转到 <code>omnicompany/templates/&lt;kind&gt;/</code>, 注册中心登记。</p>
+<p>新增模板必须同时新增对应规范 (<code>docs/standards/&lt;kind&gt;.md</code>)。规范先, 模板后。如果规范不存在直接想做模板, 要么先补规范, 要么这个 kind 还不该立。</p>
+<h3 id="_35">修订<a class="headerlink" href="#_35" title="Permanent link">&para;</a></h3>
+<p>模板的字段、范本、向导、注册件随系统进化需要修订。修订流程:</p>
+<ol>
+<li>先改对应规范 (<code>docs/standards/&lt;kind&gt;.md</code>), 让规范变化先稳定</li>
+<li>再改模板的对应部分 (范本 / 骨架 / 向导 / 注册件)</li>
+<li>跑 <code>omni template lint &lt;kind&gt;</code> 自检模板自身是不是合规</li>
+<li>注册中心更新模板的 OmniMark <code>ts</code> 字段标记修订时间</li>
+<li>已经按旧模板产出的实例<strong>不自动迁移</strong>, 留给后续的 "实例升级" 阶段统一处理</li>
+</ol>
+<p>允许小修小补 (例如向导里加一句话、修个错别字) 不算修订, 直接改即可。结构性变化 (字段增减、必填变可选、校验规则修改) 才算修订。</p>
+<h3 id="_36">实例升级<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h3>
+<p>模板修订后, 旧实例可能不达新模板的标准。处理这种情况的两条路:</p>
+<ul>
+<li><strong>被动升级</strong>: 守护巡检发现旧实例不合规时报警, 由人或 agent 在沙盒里改一份合规版本走 promote 替换。适合修订小、影响小的场景。</li>
+<li><strong>主动升级</strong>: omnicompany CLI 提供 <code>omni template upgrade --kind=&lt;kind&gt;</code> 命令, 扫所有用旧模板生成的实例, 按新模板自动更新可以自动更新的字段 (例如新增可选字段填默认值), 不能自动的留给人。适合修订大、影响广的场景。</li>
+</ul>
+<p>主动升级是 omnicompany CLI 阶段三之后的功能, 当前不强制实装, 但应当在 CLI 规范里留口子。</p>
+<h3 id="_37">验证不变量三档判别力<a class="headerlink" href="#_37" title="Permanent link">&para;</a></h3>
+<p>修订模板时, 升级后的模板要带得动<strong>有判别力的验证基线</strong>, 不只是有红绿样本。判别力三层 (按 <code>docs/standards/_global/workspace_isolation_and_test_discrimination.md</code> 跟 <code>docs/standards/_global/verification_invariants.md</code>):</p>
+<ul>
+<li><strong>绝对门 (red_check)</strong>: 一份明显错的实例, 验证基线必须不通过. 通过了 = 验证基线没分辨力, 修订无效</li>
+<li><strong>绝对门 (green_check)</strong>: 一份最简对的实例, 验证基线必须通过. 不通过 = 验证基线过严或者错位</li>
+<li><strong>梯度区分 (gradient A/B/C/F)</strong>: 一系列做得"很好 / 不错 / 勉强 / 不达标"的实例, 验证基线给出有差异的反馈. 全 PASS 或全 FAIL = 没梯度</li>
+</ul>
+<p>模板修订前后都要跑判别力自检 — 修订前的旧模板有判别力, 修订后的新模板必须至少同等判别力, 否则修订就是退化。这条检查应当固化在 <code>omni template lint</code> 命令里。</p>
+<h3 id="_38">归档<a class="headerlink" href="#_38" title="Permanent link">&para;</a></h3>
+<p>某种概念被弃用时 (例如某种工人变体不再需要), 模板进入归档状态。流程:</p>
+<ol>
+<li>修改模板的 OmniMark 头 <code>status=deprecated</code>, 加一行注释指向替代方案</li>
+<li>模板<strong>不立即删</strong>, 保留在 <code>omnicompany/templates/&lt;kind&gt;/&lt;变体&gt;/</code> 让历史实例还能查</li>
+<li>CLI 的 <code>omni new</code> 不再为弃用变体提供实例化, 但 <code>omni template show</code> 仍能展示</li>
+<li>归档保留期由系统配置决定 (推荐至少一年, 因为已有实例可能还在跑)</li>
+<li>保留期过后, 模板和所有引用它的实例 (如还有) 一起进入归档区</li>
+</ol>
+<h3 id="_39">版本管理<a class="headerlink" href="#_39" title="Permanent link">&para;</a></h3>
+<p>模板没有显式版本号字段。每次修订只改 OmniMark <code>ts</code> 字段标记修订时间。"版本"通过 git history 完整可追溯。</p>
+<p>如果某次修订对外行为产生不兼容变化, 应当拆成新的变体 (在 <code>omnicompany/templates/&lt;kind&gt;/&lt;新变体&gt;/</code>), 而不是把旧变体改坏。两个变体并存, 由调用方在 <code>omni new --variant=</code> 选。</p>
+<h2 id="_40">十、 反模式<a class="headerlink" href="#_40" title="Permanent link">&para;</a></h2>
+<p>下面列举模板设计或实例化中确认会引发后续问题的做法。这一节是给写模板和审模板的人作 checklist 的, 不是给实例化使用者看的 (实例化使用者看自己 kind 的反模式列表即可)。</p>
+<h3 id="_41">反模式: 模板里塞具体业务字段<a class="headerlink" href="#_41" title="Permanent link">&para;</a></h3>
+<p>模板应当是 kind 通用的, 跨业务可复用。如果工人模板的范本带着 demogame 业务的具体字段名 (<code>SeasonBookHonor</code>, <code>TavernCreationPool</code> 之类), 这份模板就锁死在 demogame, 不能给 voxelcraft / narrative 用。</p>
+<p>正确做法: 范本用通用占位 (<code>Foo</code> / <code>Bar</code> / <code>Baz</code>) 但语义明确 (<code>InputDocument</code> / <code>OutputSummary</code>); 子变体可以贴近某种使用场景但不带业务实体名。</p>
+<h3 id="_42">反模式: 范本是过期代码<a class="headerlink" href="#_42" title="Permanent link">&para;</a></h3>
+<p>范本必须是当下系统里<strong>真会出现</strong>的形态。如果范本里有 <code>from omnicompany.runtime.deprecated_module import *</code> 这种过期 import, 实例化出来的实例从一出生就是历史包袱。</p>
+<p>正确做法: 修订模板时, 范本一并审, 跟现存代码风格保持一致。每年至少一次模板范本审计 (走 omnicompany agent 跑批量, 不走 AI IDE 手做)。</p>
+<h3 id="_43">反模式: 只有范本没有骨架<a class="headerlink" href="#_43" title="Permanent link">&para;</a></h3>
+<p>骨架是给"会填空但不知道字段哪里有 placeholder"的使用者用的。光有范本时, 使用者读完不知道哪些字段是必须自己填、哪些是可以照抄, 容易把范本里的具体值当成模板默认值带进实例。</p>
+<p>正确做法: 范本和骨架并列存在, 骨架的 placeholder 跟范本的具体值一一对应, 让使用者一眼看出"哪里是我必须填的"。</p>
+<h3 id="_44">反模式: 向导写成手册不是清单<a class="headerlink" href="#_44" title="Permanent link">&para;</a></h3>
+<p>向导的目的是辅助填空, 不是教学。如果向导每个字段都展开成几页解释、加上历史背景、加上反模式枚举、加上跨概念跳转, 使用者读完已经忘了自己要填什么。</p>
+<p>正确做法: 向导每个字段一节, 一节回答四个问题 (干嘛/怎么填/不填后果/检查项), 总长度在使用者能一次读完的范围内 (经验值: 普通 kind 的向导不超过 800 字)。详细背景去规范里查, 不重复在向导里。</p>
+<h3 id="_45">反模式: 模板自己没有文件头<a class="headerlink" href="#_45" title="Permanent link">&para;</a></h3>
+<p>模板自己也是材料, 自己也要有 OmniMark 头。否则违反"一切材料化"的根本要求, 模板系统自身就不合规。</p>
+<p>正确做法: 模板的范本 / 骨架 / 向导 / 注册件四个文件每份都有 OmniMark 头, 头里 <code>type=template</code> 标识自己是模板而不是被它产出的实例。</p>
+<h3 id="_46">反模式: 用文件名挂版本号<a class="headerlink" href="#_46" title="Permanent link">&para;</a></h3>
+<p><code>worker_template_v2.md</code> 这种命名违反"版本不进文件名"铁律。两个变体并存时该建子目录, 不该建版本后缀的文件。</p>
+<p>正确做法: 子目录区分变体, OmniMark 头 <code>ts</code> 字段记修订时间, git history 看完整变更。</p>
+<h3 id="_47">反模式: 模板修订时不改规范<a class="headerlink" href="#_47" title="Permanent link">&para;</a></h3>
+<p>模板和规范必须一致。如果改模板时绕过规范 (因为改规范要审而改模板不需要), 久了模板和规范会漂移, 出现"按模板做就对, 按规范做就错"的矛盾。</p>
+<p>正确做法: 修订流程硬规则 — 改规范在前, 改模板在后, 反过来不允许。CLI 的 <code>omni template lint</code> 应当包含"模板跟规范一致性"检查作硬门槛。</p>
+<h3 id="_48">反模式: 模板覆盖太广或太窄<a class="headerlink" href="#_48" title="Permanent link">&para;</a></h3>
+<p>太广: 一份模板想覆盖所有可能的工人形态 (简单 / 复杂 / 智能体 / 特殊变种), 字段无限多, 大部分实例填一半字段空着。
+太窄: 每个具体业务的工人都做一份模板, 模板数量爆炸, 维护不动。</p>
+<p>正确做法: 模板按"对外行为有显著区别 + 跨业务复用"拆变体。工人变体三档 (简单大语言模型 / 不带大语言模型 / 智能体) 是合理粒度, 因为这三档的字段集差异大且各自跨业务复用。</p>
+<h3 id="cli">反模式: 注册件接口跟实际 CLI 行为脱钩<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
+<p>注册件接口里写"必填字段是 A, B, C", 但 CLI 实际只检查 A — 实例化产出的实例 B 和 C 字段总是空, 系统出现"模板说要填的, 实际没人填"的失效状态。</p>
+<p>正确做法: 注册件接口和 CLI 实装严格绑定, 任何接口字段变化必须同步 CLI 实装代码, CLI 自检模板 (<code>omni template lint</code>) 时把"实装是否覆盖所有声明字段"作硬检查。</p>
+<h2 id="_49">十一、 元模板 (满分参照)<a class="headerlink" href="#_49" title="Permanent link">&para;</a></h2>
+<p>这份标准定义的"模板", 自己也有一份"模板的模板"作元模板存在, 已经真做出来落在 <code>omnicompany/templates/template/</code>:</p>
+<div class="highlight"><pre><span></span><code>omnicompany/templates/template/
+  范本.md       — 一份完整模板长什么样的具体示范, 用 plan 作教学例子
+  骨架.md       — 给将来新建一种 kind 时复制用的空填表
+  向导.md       — 跟骨架配套的填写指引, 一字段一节
+  注册件.yaml   — 给 omnicompany CLI 实例化新 kind 模板时用的配置
+</code></pre></div>
+<p>元模板四件套自身合规 OmniMark v3, type=template, agent 字段跟创建 session 关联。</p>
+<p><strong>这份元模板就是"满分模板长什么样"的活参照</strong> — 不是抽象描述什么是满分, 是真把四件套做出来让人看。新建任何一种 kind 的模板时, 应当对照元模板的细致度做, 不是只达"合格线"。</p>
+<p>元模板的存在是模板系统自洽的保证 — 模板系统包含产出模板自己的能力, 不依赖任何外部"模板的模板生产机制"。元模板递归三级停 (元模板 → 模板 → 实例), 不做"元元模板"。</p>
+<h2 id="_50">十二、 跟现存设施的接通点<a class="headerlink" href="#_50" title="Permanent link">&para;</a></h2>
+<p>文件头层 (OmniMark v3): 模板的四个文件 (范本/骨架/向导/注册件) 都用 v3 头, type=template, agent 字段跟当前 session 关联。</p>
+<p>身份层 (session 持久化): 实例化模板时, CLI 调 <code>current_writer_identity()</code> 拿写入者 ID, 写到实例的 OmniMark 头里。模板自身被修订时同样关联 session。</p>
+<p>沙盒层: 新写模板要先在沙盒 <code>drafts/</code> 起草, 走 <code>omni sandbox check --kind=template</code> 自检 (元模板会被引用作检查依据), 通过后 promote 到 <code>omnicompany/templates/&lt;kind&gt;/</code>。</p>
+<p>罚单层: 发现绕过模板系统直接产出材料 (例如手写一份不走 <code>omni new</code> 的工人) 时, 守护按对应 kind 规范判断是否合规; 不合规走 TOMBSTONE 路径, 没收到 <code>.omni/quarantine/</code>, 在原位提醒"要走模板系统"。</p>
+<p>注册中心: 每份模板有自己的注册项 (kind=template, sub-kind=worker/material/etc 表示是给哪种实例用的); 每份按模板生成的实例的注册项里关联回它用了哪份模板的哪个变体的哪个 ts 版本。</p>
+<p>CLI 命令: <code>omni new &lt;kind&gt;</code> (实例化) / <code>omni template list</code> (列模板) / <code>omni template show &lt;kind&gt;</code> (展示) / <code>omni template lint &lt;kind&gt;</code> (自检) / <code>omni template upgrade --kind=&lt;kind&gt;</code> (主动实例升级, 阶段三后)。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

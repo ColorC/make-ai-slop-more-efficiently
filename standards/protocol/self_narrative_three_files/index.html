@@ -1,0 +1,3136 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../progressive_context/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Self narrative three files - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#readme-design-skill" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Self narrative three files
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/verification_invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/workspace_isolation_and_test_discrimination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/llm_infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一 · 这套规范是什么
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一 · 这套规范是什么">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟用户三反例的对应
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二 · 三件边界细则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二 · 三件边界细则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 README 管什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 DESIGN 管什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 SKILL 管什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 三件交叉的判断
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三 · 递归 + 指针式构成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三 · 递归 + 指针式构成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 三件适用所有层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 指针式构成 (核心)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 私域到 domain 即止
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 自给自足
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四 · README 模板
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四 · README 模板">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 节结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 项目根级 README 的特殊位置
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五 · DESIGN 模板 (从七节缩窄)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五 · DESIGN 模板 (从七节缩窄)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 跟现行七节模板的关系
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 节结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六 · SKILL 模板
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="六 · SKILL 模板">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-claudeskills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 跟现行 .claude/skills/ 形态的关系
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 节结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七 · 工作流约束 — 改前改后校对画像 + 模板必用
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="七 · 工作流约束 — 改前改后校对画像 + 模板必用">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 改前必读
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 改后必校对
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 模板必用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 漂移信号 (改后未校对画像的征兆)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八 · 现有零件迁移说明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="八 · 现有零件迁移说明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-docsreadmemd-vs-readmemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 docs/README.md vs 项目根 README.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-designmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 DESIGN.md 七节的拆分迁移
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-claudeskills-vs-skillmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 .claude/skills/ vs 各模块 SKILL.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guardian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九 · Guardian 检测规则 (建议, 留待后续)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十 · 一句话总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 A · 业界范式速记
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b-omnicompany" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 B · 三件套层级展开样例 (omnicompany 项目根)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一 · 这套规范是什么
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一 · 这套规范是什么">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟用户三反例的对应
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二 · 三件边界细则
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二 · 三件边界细则">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 README 管什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 DESIGN 管什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 SKILL 管什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 三件交叉的判断
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三 · 递归 + 指针式构成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三 · 递归 + 指针式构成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 三件适用所有层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 指针式构成 (核心)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 私域到 domain 即止
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 自给自足
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四 · README 模板
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四 · README 模板">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 节结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 项目根级 README 的特殊位置
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五 · DESIGN 模板 (从七节缩窄)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="五 · DESIGN 模板 (从七节缩窄)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 跟现行七节模板的关系
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 节结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六 · SKILL 模板
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="六 · SKILL 模板">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-claudeskills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 跟现行 .claude/skills/ 形态的关系
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 节结构
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 反例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七 · 工作流约束 — 改前改后校对画像 + 模板必用
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="七 · 工作流约束 — 改前改后校对画像 + 模板必用">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 改前必读
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 改后必校对
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 模板必用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 漂移信号 (改后未校对画像的征兆)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        八 · 现有零件迁移说明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="八 · 现有零件迁移说明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-docsreadmemd-vs-readmemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 docs/README.md vs 项目根 README.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-designmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 DESIGN.md 七节的拆分迁移
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-claudeskills-vs-skillmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 .claude/skills/ vs 各模块 SKILL.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guardian" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        九 · Guardian 检测规则 (建议, 留待后续)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        十 · 一句话总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 A · 业界范式速记
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b-omnicompany" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        附录 B · 三件套层级展开样例 (omnicompany 项目根)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- [OMNI] origin=ai-ide domain=standards/protocol ts=2026-05-04T09:00:00Z type=doc status=active agent=ai-ide -->
+<!-- [OMNI] summary="自我叙事三件套规范 — README + DESIGN + SKILL 各管一段, 递归适用所有层级 (项目根/domain/service/package). 父级指针式引用子级不复制" -->
+<!-- [OMNI] why="DESIGN 七节模板把目的+构成+操作手册混在一起, 触发用户三反例 (重复/模糊/错乱). 拆成三件后边界清晰, 业界范式 (Diataxis/ADR/Good Docs) 已成熟可借鉴" -->
+<!-- [OMNI] tags=standards,self-narrative,template,readme,design,skill,diataxis -->
+<!-- [OMNI] material_id="material:standards.protocol.self_narrative_three_files.md" -->
+
+<h1 id="readme-design-skill">自我叙事三件套规范 · README + DESIGN + SKILL<a class="headerlink" href="#readme-design-skill" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>立 2026-05-04. 取代旧 design_md_template.md 的总叙事职能.
+<strong>2026-06-13 起为 DESIGN/README/SKILL 的现行唯一权威</strong>（用户裁决"规范冲突以新的为准"）:
+DESIGN 必需节为六节（核心目的归 README）, Guardian OMNI-034c / docauthor / distributed-docs
+/ design_md_template.md（降为本规范的模板细则）已全部对齐。</p>
+</blockquote>
+<hr />
+<h2 id="_1">一 · 这套规范是什么<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>omnicompany 的任何层级 (项目根 / domain / service / package) 都通过<strong>三个文件</strong>讲清自己的自我叙事:</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>段</th>
+<th>回答</th>
+<th>业界对应</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>README</strong></td>
+<td>设计目的</td>
+<td>我<strong>为什么</strong>存在? 语境 / 目的 / 规划</td>
+<td><a href="https://diataxis.fr/">Diataxis · Explanation</a></td>
+</tr>
+<tr>
+<td><strong>DESIGN</strong></td>
+<td>构成</td>
+<td>我<strong>是什么</strong>组成的? 内容 / 构成 / 架构</td>
+<td><a href="https://diataxis.fr/">Diataxis · Reference</a> + <a href="https://adr.github.io/">ADR / MADR</a></td>
+</tr>
+<tr>
+<td><strong>SKILL</strong></td>
+<td>能做+入口</td>
+<td>我<strong>怎么用</strong>? 可适用范围 / 操作手册</td>
+<td><a href="https://diataxis.fr/">Diataxis · How-to guides</a></td>
+</tr>
+</tbody>
+</table>
+<p>三件递归适用 — 每个层级都有自己一套, 形态一致, 内容深度递减, 父级到子级<strong>指针式引用不复制</strong>.</p>
+<h3 id="_2">跟用户三反例的对应<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>不重复</strong>: 三文件各管一段, 同一事实只一个权威源, 别处只引用</li>
+<li><strong>不模糊</strong>: 找什么知道去哪 (目的→README / 构成→DESIGN / 用法→SKILL)</li>
+<li><strong>不错乱</strong>: 每层自管自身, 父级到下一层就停 (私域不暴露到父级)</li>
+</ul>
+<hr />
+<h2 id="_3">二 · 三件边界细则<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<h3 id="21-readme">2.1 README 管什么<a class="headerlink" href="#21-readme" title="Permanent link">&para;</a></h3>
+<p><strong>管</strong>:
+- 这一层是什么 (一句话定位)
+- 解决什么问题 / 不解决什么问题
+- 设计目的 + 当下能认知的最终目标
+- 规划 / 路线图 / 里程碑
+- 构成: <strong>指针指向</strong>子模块的 README (不复制子模块认知)</p>
+<p><strong>不管</strong>:
+- 详细 API 接口 (那是 DESIGN)
+- 详细架构决策 (那是 DESIGN)
+- 详细操作步骤 (那是 SKILL)</p>
+<p><strong>风格</strong>: 叙事 / 友好 / 强动词. 类比 <a href="https://www.thegooddocsproject.dev/template/readme">The Good Docs Project README guide</a>: "项目第一印象, 决定读者是否继续往下读".</p>
+<h3 id="22-design">2.2 DESIGN 管什么<a class="headerlink" href="#22-design" title="Permanent link">&para;</a></h3>
+<p><strong>管</strong>:
+- 对外接口清单 (API / Material / Worker / Team)
+- 架构决策 (D1 / D2 / ... ADR 风格, 含决策上下文跟取舍)
+- 数据流 / 拓扑
+- 内部模块清单 (指针指向子模块的 DESIGN)
+- 已知局限 (架构层面)</p>
+<p><strong>不管</strong>:
+- 设计目的 (在 README)
+- 用户怎么用 (在 SKILL)
+- 业务私有逻辑细节 (在子模块的 DESIGN, 父级只指针)</p>
+<p><strong>风格</strong>: 严谨 / 结构化 / 可定位. 类比 <a href="https://www.industrialempathy.com/posts/design-docs-at-google/">Google Design Docs</a>: "高层实施策略 + 关键设计决策 + 取舍".</p>
+<h3 id="23-skill">2.3 SKILL 管什么<a class="headerlink" href="#23-skill" title="Permanent link">&para;</a></h3>
+<p><strong>管</strong>:
+- 可适用范围 (什么场景用 / 什么场景不用)
+- 前置条件 (用之前需要什么)
+- 操作步骤 (1-2-3-4-5 顺序, 任务导向)
+- 验证 (怎么知道做对了)
+- 故障排查 (常见错 + 修)
+- 入口指针 (CLI 命令 / API 调用 / 子模块 SKILL)</p>
+<p><strong>不管</strong>:
+- 设计目的 (在 README)
+- 内部架构 (在 DESIGN)</p>
+<p><strong>风格</strong>: 操作 / 步骤化 / 写给最 inexperienced 用户. 类比 <a href="https://diataxis.fr/how-to-guides/">Diataxis 任务导向 how-to guides</a>: "用户带着具体目标进, 帮 ta 达成".</p>
+<h3 id="24">2.4 三件交叉的判断<a class="headerlink" href="#24" title="Permanent link">&para;</a></h3>
+<p>不知道某段内容写哪里时, 问三个问题:</p>
+<ol>
+<li>这段是在解释<strong>为什么</strong>这层存在? → README</li>
+<li>这段是在描述<strong>架构是什么样</strong>? → DESIGN</li>
+<li>这段是在告诉读者<strong>怎么用</strong>? → SKILL</li>
+</ol>
+<p>如果一段同时回答多个问题 — 拆开. 如果觉得拆不开 — 八成是回答错层 (实际只回答一件, 但混进了别件的细节, 把别件细节剥离即可).</p>
+<hr />
+<h2 id="_4">三 · 递归 + 指针式构成<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h3 id="31">3.1 三件适用所有层级<a class="headerlink" href="#31" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>项目根/
+├── README.md        语境/目的/规划. 构成段指向 → 各 domain 的 README
+├── DESIGN.md        架构. 内部清单指向 → 各 domain 的 DESIGN
+└── SKILL.md         操作总入口. 指针指向 → 各 domain 的 SKILL
+
+packages/domains/&lt;X&gt;/
+├── README.md        domain 自身的语境/目的. 构成段指向 → 各 service 的 README
+├── DESIGN.md        domain 架构. 内部清单指向 → 各 service 的 DESIGN
+└── SKILL.md         domain 操作手册. 指针指向 → 各 service 的 SKILL
+
+packages/services/&lt;Y&gt;/
+├── README.md        service 的语境/目的
+├── DESIGN.md        service 架构 (七节, 见 §五)
+└── SKILL.md         service 操作手册 (CLI / Material 入口 / 验证)
+
+packages/services/&lt;Y&gt;/&lt;package&gt;/
+├── README.md        package 的语境/目的 (可选, 简单 package 可省, 用 OmniMark 头 summary 顶替)
+├── DESIGN.md        package 架构 (可选, 同上)
+└── SKILL.md         package 操作手册 (可选, 同上)
+</code></pre></div>
+<h3 id="32">3.2 指针式构成 (核心)<a class="headerlink" href="#32" title="Permanent link">&para;</a></h3>
+<p>父级的"构成"段 / "内部清单"段 / "入口指针"段是 <strong>超链接式声明</strong>, 不复制子级内容. 例子:</p>
+<p>✓ 正确 (项目根 README 的构成段):
+<div class="highlight"><pre><span></span><code><span class="gu">## 构成</span>
+
+omnicompany 由以下 domain 组成 (各自有独立的 README/DESIGN/SKILL):
+
+<span class="k">-</span><span class="w"> </span>packages/domains/demogame/ — 游戏数据自动配置 SDK
+<span class="k">-</span><span class="w"> </span>packages/domains/voxelcraft/ — Minecraft Java mod 自动开发
+<span class="k">-</span><span class="w"> </span>packages/services/_core/ — 核心层服务 (registry / guardian / runtime)
+<span class="k">-</span><span class="w"> </span>...
+</code></pre></div></p>
+<p>✗ 错误 (项目根 README 替子级写认知):
+<div class="highlight"><pre><span></span><code><span class="gu">## 构成</span>
+
+demogame domain 提供赛季手册 / 装饰抽奖 / 商店等 13 张表的自动配置生成,
+通过 ResolverAgent 推断字段语义, 通过 BenchmarkValidator 校验输出...
+</code></pre></div></p>
+<p>为什么错? 父级在替 demogame 复制 demogame 内部认知. 这是用户三反例之一 (重复 → 拼图碎片化, 哪份才是权威搞不清).</p>
+<h3 id="33-domain">3.3 私域到 domain 即止<a class="headerlink" href="#33-domain" title="Permanent link">&para;</a></h3>
+<p>父级 (项目根) 的叙事在引用到 domain 这一级时停止. domain 内部具体业务规则 (例: demogame 的赛季 N 经济配置 / voxelcraft 的方块定义) <strong>不暴露到项目根</strong>叙事里. 想看 → 点 domain 的 README 进去, domain 自管.</p>
+<p>如果 domain 自己没建三件 → 那是 domain 的责任, 不是父级的责任. 父级不替补.</p>
+<h3 id="34">3.4 自给自足<a class="headerlink" href="#34" title="Permanent link">&para;</a></h3>
+<p>每层三件必须自己有内容. 点进 domain 如果 README 是空的 → domain 没履行自我叙事职责, 而不是"父级有信息但漏写". 检测机制: Guardian 扫"指针指向的目标是否有内容" (留待第二阶段做).</p>
+<hr />
+<h2 id="readme">四 · README 模板<a class="headerlink" href="#readme" title="Permanent link">&para;</a></h2>
+<h3 id="41">4.1 节结构<a class="headerlink" href="#41" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>&lt;!-- [OMNI] origin=&lt;origin&gt; domain=&lt;domain&gt; ts=&lt;ISO8601&gt; type=doc status=active --&gt;
+&lt;!-- [OMNI] summary=&quot;...&quot; --&gt;
+&lt;!-- [OMNI] why=&quot;...&quot; --&gt;
+&lt;!-- [OMNI] tags=readme,&lt;scope&gt;,... --&gt;
+
+<span class="gh"># &lt;模块名&gt;</span>
+
+<span class="k">&gt; </span><span class="ge">一句话定位 (≤ 30 字, 强动词开头)</span>
+
+<span class="gu">## 这是什么</span>
+
+&lt;2-3 段叙事, 回答: 我是什么 / 在系统里扮演什么角色&gt;
+&lt;不写实现细节, 不写架构, 不写具体怎么用&gt;
+
+<span class="gu">## 解决什么 / 不解决什么</span>
+
+<span class="gs">**解决**</span>:
+<span class="k">-</span><span class="w"> </span>&lt;问题 1&gt;
+<span class="k">-</span><span class="w"> </span>&lt;问题 2&gt;
+
+<span class="gs">**不解决**</span>:
+<span class="k">-</span><span class="w"> </span>&lt;边界外的事 1, 这是给读者明确&quot;我不是干这个的&quot;&gt;
+<span class="k">-</span><span class="w"> </span>&lt;边界外的事 2&gt;
+
+<span class="gu">## 设计目的与最终目标</span>
+
+&lt;段落形式. 回答: 为什么要做这个 / 当下能认知的最终目标 (会随认知更新, 不假装一锤定音)&gt;
+
+<span class="gu">## 规划</span>
+
+&lt;里程碑或当前阶段. 当前 / 下一步 / 远景三层. 跟 docs/PROGRESS.md 的对应段保持一致, 不是替代它&gt;
+
+<span class="gu">## 构成</span>
+
+&lt;指针式列表, 指向子模块的 README. 每条 1 行, 不展开&gt;
+
+<span class="k">-</span><span class="w"> </span>[<span class="nt">&lt;子模块 1 名&gt;</span>](<span class="na">&lt;子模块路径&gt;/README.md</span>) — &lt;一句话说子模块管什么&gt;
+<span class="k">-</span><span class="w"> </span>[<span class="nt">&lt;子模块 2 名&gt;</span>](<span class="na">&lt;子模块路径&gt;/README.md</span>) — &lt;一句话&gt;
+<span class="k">-</span><span class="w"> </span>...
+
+<span class="gu">## 想了解更多</span>
+
+<span class="k">-</span><span class="w"> </span>架构 → 看 DESIGN.md
+<span class="k">-</span><span class="w"> </span>怎么用 → 看 SKILL.md
+<span class="k">-</span><span class="w"> </span>&lt;可选: 跨层级的关键参考&gt;
+</code></pre></div>
+<h3 id="42">4.2 反例<a class="headerlink" href="#42" title="Permanent link">&para;</a></h3>
+<p>✗ README 写架构决策 (那是 DESIGN)
+✗ README 写 CLI 命令清单 (那是 SKILL)
+✗ README 在"构成"段把子模块的设计目的复制过来 (违反指针式)</p>
+<h3 id="43-readme">4.3 项目根级 README 的特殊位置<a class="headerlink" href="#43-readme" title="Permanent link">&para;</a></h3>
+<p>仓库根 README.md 是<strong>整个项目第一接触点</strong> (GitHub 默认渲染). 写法可适度调整:
+- 加项目徽章 / 安装快速开始 (常见 GitHub 习惯)
+- "构成"段指向 docs/ 跟 packages/ 入口
+- 在结尾贴常用文档链接表 (PROGRESS / 控制结构 / standards 入口)</p>
+<hr />
+<h2 id="design">五 · DESIGN 模板 (从七节缩窄)<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
+<h3 id="51">5.1 跟现行七节模板的关系<a class="headerlink" href="#51" title="Permanent link">&para;</a></h3>
+<p>现行 design_md_template.md 七节: 状态 / 核心目的 / 核心接口 / 架构决策 / 数据流-拓扑 / 已知局限 / 参考资料 + 可选第 8 节 接收意愿.</p>
+<p>新规范下 DESIGN 范围收窄:
+- "核心目的" 段 → <strong>抽到 README</strong> (这是设计目的, 不是构成)
+- "状态" 段 → 留 DESIGN (status=skeleton/design/active/deprecated 仍归 DESIGN, 是构成的元信息)
+- 其余 (核心接口 / 架构决策 / 数据流-拓扑 / 已知局限 / 参考资料) → DESIGN 自管
+- "接收意愿" → 是构成段的扩展 (我能吸收什么主题), 留 DESIGN</p>
+<p>迁移期: 旧 DESIGN.md 不立即改, 跟存量回填一起做 (后续 plan).</p>
+<h3 id="52">5.2 节结构<a class="headerlink" href="#52" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>&lt;!-- [OMNI] origin=&lt;origin&gt; domain=&lt;domain&gt; ts=&lt;ISO8601&gt; type=doc status=&lt;skeleton|design|active|deprecated&gt; --&gt;
+&lt;!-- [OMNI] summary=&quot;...&quot; --&gt;
+&lt;!-- [OMNI] why=&quot;...&quot; --&gt;
+&lt;!-- [OMNI] tags=design,&lt;scope&gt;,... --&gt;
+
+<span class="gh"># &lt;模块名&gt; · 设计文档</span>
+
+<span class="k">&gt; </span><span class="ge">设计目的请看 [README.md](README.md). 怎么用请看 SKILL.md.</span>
+
+<span class="gu">## 状态</span>
+<span class="k">-</span><span class="w"> </span><span class="gs">**版本**</span>: V&lt;n&gt;
+<span class="k">-</span><span class="w"> </span><span class="gs">**成熟度**</span>: skeleton | design | active | deprecated
+<span class="k">-</span><span class="w"> </span><span class="gs">**下一步**</span>: &lt;1 行最紧迫的下一步&gt;
+
+<span class="gu">## 核心接口</span>
+
+&lt;对外暴露的关键类/函数/Material/Worker/Team. 列表形式, 含源码链接&gt;
+
+例:
+<span class="k">-</span><span class="w"> </span><span class="sb">`PipelineRunner.run(initial_input)`</span> — 跑一份 team
+<span class="k">-</span><span class="w"> </span><span class="sb">`MANIFEST_REQUEST`</span> Material — <span class="sb">`{target_service_path: str}`</span>
+<span class="k">-</span><span class="w"> </span>...
+
+<span class="gu">## 架构决策</span>
+
+<span class="gu">### D1 — &lt;决策标题 ≤ 20 字&gt;</span>
+
+<span class="gs">**决策**</span>: &lt;做了什么&gt;
+
+<span class="gs">**理由**</span>: &lt;为什么这么做, 考虑过什么替代&gt;
+
+<span class="gs">**取舍**</span>: &lt;得到什么, 放弃什么&gt;
+
+<span class="gu">### D2 — &lt;决策标题&gt;</span>
+...
+
+<span class="gu">## 数据流 / 拓扑</span>
+
+&lt;输入→处理→输出. 或关键组件协作图. ASCII art 可接受&gt;
+
+<span class="gu">## 内部构成</span>
+
+&lt;指针式列表, 指向子模块的 DESIGN. 跟 README 构成段对称, 但这里是技术性指针&gt;
+
+<span class="k">-</span><span class="w"> </span>[<span class="nt">&lt;子模块 1&gt;</span>](<span class="na">&lt;路径&gt;/DESIGN.md</span>) — &lt;一句话说技术职责&gt;
+<span class="k">-</span><span class="w"> </span>...
+
+<span class="gu">## 已知局限</span>
+
+<span class="k">1.</span> <span class="gs">**&lt;局限标题&gt;**</span> — &lt;现状 + 未来升级路径&gt;
+<span class="k">2.</span> ...
+
+<span class="gu">## 接收意愿 (可选, 基础设施模块建议填)</span>
+
+&lt;格式参考 现行规范 §九. welcome_themes / hard_constraints / soft_preferences / maturity_preference&gt;
+
+<span class="gu">## 参考资料</span>
+
+<span class="k">-</span><span class="w"> </span>&lt;源码路径 / 关联 plans / 外部链接&gt;
+</code></pre></div>
+<h3 id="53">5.3 反例<a class="headerlink" href="#53" title="Permanent link">&para;</a></h3>
+<p>✗ DESIGN 写"为什么要做这个" 长篇大论 (那是 README)
+✗ DESIGN 写"怎么调用 CLI" 步骤 (那是 SKILL)
+✗ DESIGN 在"内部构成" 段把子模块架构复制过来 (违反指针式)</p>
+<hr />
+<h2 id="skill">六 · SKILL 模板<a class="headerlink" href="#skill" title="Permanent link">&para;</a></h2>
+<h3 id="61-claudeskills">6.1 跟现行 .claude/skills/ 形态的关系<a class="headerlink" href="#61-claudeskills" title="Permanent link">&para;</a></h3>
+<p>现有 .claude/skills/omnicompany-dev/SKILL.md 是 <strong>Claude Code skill 框架</strong>的产物, 用于 AI IDE 调起. 它有 YAML frontmatter (name / description / user-invocable / disable-model-invocation / argument-hint) + 内容.</p>
+<p><strong>新规范下 SKILL.md 是更广义的"操作手册"</strong> — 不只是给 Claude Code 调起, 也给:
+- 人类用户读
+- 其他 agent (非 Claude Code) 读
+- 自动化工具 (CLI 帮助 / 文档生成器) 消费</p>
+<p>形态: 保留现有 frontmatter (向后兼容 Claude Code skill), 但内容结构按新规范.</p>
+<h3 id="62">6.2 节结构<a class="headerlink" href="#62" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>---
+name: &lt;module-name&gt;
+description: &lt;一句话, 让 AI 决定何时调起这个 skill 的依据&gt;
+user-invocable: true | false
+disable-model-invocation: false
+<span class="gu">argument-hint: &quot;&lt;可选, CLI 风格参数提示&gt;&quot;</span>
+<span class="gu">---</span>
+
+&lt;!-- [OMNI] origin=&lt;origin&gt; domain=&lt;domain&gt; ts=&lt;ISO8601&gt; type=doc status=active --&gt;
+&lt;!-- [OMNI] summary=&quot;...&quot; --&gt;
+&lt;!-- [OMNI] why=&quot;...&quot; --&gt;
+&lt;!-- [OMNI] tags=skill,&lt;scope&gt;,... --&gt;
+
+<span class="gh"># &lt;模块名&gt; · 操作手册</span>
+
+<span class="k">&gt; </span><span class="ge">设计目的请看 [README.md](README.md). 内部架构请看 DESIGN.md.</span>
+
+<span class="gu">## 适用范围</span>
+
+<span class="gs">**用我**</span>: &lt;什么场景适合用这个模块&gt;
+<span class="gs">**不用我**</span>: &lt;什么场景应该用别的, 指向别的 SKILL&gt;
+
+<span class="gu">## 前置条件</span>
+
+&lt;用之前需要什么. 例: omni session 已绑 / G2 索引已 build / xxx service 已注册&gt;
+
+<span class="gu">## 操作步骤</span>
+
+<span class="gu">### 场景 A: &lt;最常见操作&gt;</span>
+
+<span class="k">1.</span> &lt;步骤 1, 包含具体命令 / 代码片段&gt;
+<span class="k">2.</span> &lt;步骤 2&gt;
+<span class="k">3.</span> &lt;验证: 怎么知道做对了&gt;
+
+<span class="gu">### 场景 B: &lt;次常见操作&gt;</span>
+...
+
+<span class="gu">## 入口清单</span>
+
+&lt;指针式 — CLI 命令 / API / 子模块 SKILL&gt;
+
+| 入口 | 用途 | 详细 |
+|---|---|---|
+| <span class="sb">`omni xxx &lt;args&gt;`</span> | &lt;用途一句话&gt; | &lt;链接到详细帮助&gt; |
+| <span class="sb">`&lt;API 函数&gt;`</span> | &lt;用途&gt; | &lt;链接到 DESIGN 对应接口段&gt; |
+| [<span class="nt">子模块 SKILL</span>](<span class="na">&lt;子路径&gt;/SKILL.md</span>) | &lt;子模块负责什么操作&gt; | (递归指针) |
+
+<span class="gu">## 故障排查</span>
+
+| 现象 | 可能原因 | 怎么修 |
+|---|---|---|
+| &lt;报错信息 / 异常表现&gt; | &lt;根因&gt; | &lt;步骤&gt; |
+| ... | ... | ... |
+
+<span class="gu">## 想了解更多</span>
+
+<span class="k">-</span><span class="w"> </span>设计目的 → [<span class="nt">README.md</span>](<span class="na">README.md</span>)
+<span class="k">-</span><span class="w"> </span>内部架构 → DESIGN.md
+<span class="k">-</span><span class="w"> </span>相关规范 → &lt;跨层级 standards 链接&gt;
+</code></pre></div>
+<h3 id="63">6.3 反例<a class="headerlink" href="#63" title="Permanent link">&para;</a></h3>
+<p>✗ SKILL 写架构决策 (那是 DESIGN)
+✗ SKILL 解释"为什么这么设计" 长篇 (那是 README)
+✗ SKILL 写"未来可能扩展" 远景 (那是 README 的规划段)</p>
+<hr />
+<h2 id="_5">七 · 工作流约束 — 改前改后校对画像 + 模板必用<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>2026-05-04 用户立. 这是三件套规范的执行配套, 没三件套也没"画像可校对".</p>
+</blockquote>
+<h3 id="71">7.1 改前必读<a class="headerlink" href="#71" title="Permanent link">&para;</a></h3>
+<p>任何对 service / domain / 模块内文件 (<code>.py</code> / <code>.yaml</code> / <code>.md</code> / 配置 / 入口) 的改动, <strong>改前必读相关 README + DESIGN + SKILL</strong> (即"画像"). 没读过画像就动手 = 盲改, 大概率漂移.</p>
+<table>
+<thead>
+<tr>
+<th>改什么</th>
+<th>必读什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>service 内 <code>.py</code> 文件</td>
+<td>该 service 的 DESIGN (架构) + SKILL (操作影响)</td>
+</tr>
+<tr>
+<td>service 配置 (<code>manifest.yaml</code> / <code>formats.py</code> / Worker 列表)</td>
+<td>DESIGN + 可能 README</td>
+</tr>
+<tr>
+<td>service 入口 (<code>run.py</code> / <code>pipeline.py</code> / <code>team.py</code>)</td>
+<td>三件全读</td>
+</tr>
+<tr>
+<td>跨 service 改动</td>
+<td>涉及的所有 service 的 README + DESIGN + 顶层 archmap.yaml</td>
+</tr>
+</tbody>
+</table>
+<h3 id="72">7.2 改后必校对<a class="headerlink" href="#72" title="Permanent link">&para;</a></h3>
+<p>改完后, <strong>校对画像跟现实是否还一致, 不一致就更新画像</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>改了什么</th>
+<th>必更新什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>加 Worker / Material / Team</td>
+<td>DESIGN 的"核心接口"段 + SKILL "入口清单"段</td>
+</tr>
+<tr>
+<td>加 CLI 命令</td>
+<td>SKILL 入口表 + 故障排查 (如有新坑)</td>
+</tr>
+<tr>
+<td>改架构决策</td>
+<td>DESIGN 加新决策 <code>### D-N</code>, 不复用旧 D 编号</td>
+</tr>
+<tr>
+<td>改设计目的或远景</td>
+<td>README "设计目的与最终目标" 或"规划" 段</td>
+</tr>
+<tr>
+<td>改命名 / 路径</td>
+<td>跨文件 cross-reference 链接全扫一遍</td>
+</tr>
+</tbody>
+</table>
+<p><strong>反例</strong>: 改完代码不改画像 = 画像跟现实漂移, 下次有人按画像理解会撞错. 这条规范是为防漂移, 跟 CORE-SELF-STABILITY 第二阶段 漂移检测之间有过渡价值 (人工自查 → 后续 Guardian 自动检测).</p>
+<h3 id="73">7.3 模板必用<a class="headerlink" href="#73" title="Permanent link">&para;</a></h3>
+<p>新建 README / DESIGN / SKILL <strong>必从本文档 §四 / §五 / §六 模板 cp 起手</strong>, 不从零写, 不从原 DESIGN.md 改写.</p>
+<ul>
+<li>cp 模板节结构 → 填具体内容</li>
+<li>节结构不动 (后续 Guardian 类规则会校验)</li>
+<li>不熟悉某节 → 留 <code>&lt;!-- TBD: 此节尚未填充 --&gt;</code> 标记 + <code>status=skeleton</code>, 不省略</li>
+<li><strong>反例</strong>: 2026-05-04 做 4 份 service 样例 (registry/docauthor/doctor/guardian) 时<strong>没严格用模板</strong>, 各份格式略有差异 (SKILL 故障排查表行数不一 / 命令清单格式有差) — 这正好命中"不重复" 反例之一. 此规范为防再发生.</li>
+</ul>
+<h3 id="74">7.4 漂移信号 (改后未校对画像的征兆)<a class="headerlink" href="#74" title="Permanent link">&para;</a></h3>
+<p>撞上以下任一 → 立即更新画像, 不带病往前走:</p>
+<ul>
+<li>画像里的"30 Worker" 跟实际 Worker 数对不上</li>
+<li>SKILL 入口清单里的命令实际跑不通或参数变了</li>
+<li>DESIGN 数据流 ASCII art 跟现行 Team 拓扑不符</li>
+<li>跨服务 cross-reference 链接 404</li>
+<li>远景段提的"下一步" 早已完成或已跳过</li>
+<li>README 一句话定位跟代码实际职责对不上</li>
+</ul>
+<hr />
+<h2 id="_6">八 · 现有零件迁移说明<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h3 id="71-docsreadmemd-vs-readmemd">7.1 docs/README.md vs 项目根 README.md<a class="headerlink" href="#71-docsreadmemd-vs-readmemd" title="Permanent link">&para;</a></h3>
+<ul>
+<li>docs/README.md — 当前是 docs/ 目录索引, 保留. <strong>它不是项目根 README</strong>.</li>
+<li>项目根 (仓库根) README.md — <strong>当前缺</strong>, 待建. 按本规范 §四写.</li>
+</ul>
+<p>不混淆: docs/README 给 docs 内导航, 项目根 README 给项目自身叙事.</p>
+<h3 id="72-designmd">7.2 DESIGN.md 七节的拆分迁移<a class="headerlink" href="#72-designmd" title="Permanent link">&para;</a></h3>
+<p>存量 DESIGN.md (例: <a href="../../../src/omnicompany/packages/services/_authoring/docauthor/DESIGN.md">packages/services/_authoring/docauthor/DESIGN.md</a>) 按以下顺序迁移:</p>
+<ol>
+<li><strong>抽"核心目的" 段</strong> → 新建同目录 README.md</li>
+<li><strong>DESIGN 留下</strong>: 状态 / 核心接口 / 架构决策 / 数据流-拓扑 / 内部构成 (新加) / 已知局限 / 接收意愿 / 参考资料</li>
+<li><strong>新建 SKILL.md</strong> — 写怎么用这个 service</li>
+</ol>
+<p>迁移不要求一次性完成, 跟存量补齐一起分批跑.</p>
+<h3 id="73-claudeskills-vs-skillmd">7.3 .claude/skills/ vs 各模块 SKILL.md<a class="headerlink" href="#73-claudeskills-vs-skillmd" title="Permanent link">&para;</a></h3>
+<ul>
+<li>.claude/skills/omnicompany-dev/SKILL.md / omnicompany-use/SKILL.md — Claude Code 顶层 skill 入口, 保留, 它们是用户调起 omnicompany 的"门面 skill"</li>
+<li>各 module 的 SKILL.md — 是该 module 的"操作手册", 由门面 skill 在恰当时引导用户跳转</li>
+</ul>
+<p>不替代关系, 是层级关系: 门面 skill 在顶层提示用户"做 X 看 module Y 的 SKILL", module Y 的 SKILL 有具体操作手册.</p>
+<hr />
+<h2 id="guardian">九 · Guardian 检测规则 (建议, 留待后续)<a class="headerlink" href="#guardian" title="Permanent link">&para;</a></h2>
+<p>第一阶段不立即加, 留作第二阶段 (诊断+分析能力上线时一起):</p>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>检查项</th>
+<th>Severity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(待定)</td>
+<td>项目根 / domain / service 缺三件之一 (active 状态)</td>
+<td>MEDIUM</td>
+</tr>
+<tr>
+<td>(待定)</td>
+<td>README "构成" 段 / DESIGN "内部构成" 段含子模块认知复制 (启发式 LLM 检测)</td>
+<td>LOW</td>
+</tr>
+<tr>
+<td>(待定)</td>
+<td>三件之间的指针失效 (链接 404)</td>
+<td>HIGH</td>
+</tr>
+<tr>
+<td>(待定)</td>
+<td>DESIGN 含"为什么" 长段落 (应在 README)</td>
+<td>LOW (LLM 启发式)</td>
+</tr>
+</tbody>
+</table>
+<p>具体规则跟 OMNI 编号待第二阶段定. 当前 OMNI-034 (DESIGN 七节齐全) 在迁移期保留, 迁移完成后升级.</p>
+<hr />
+<h2 id="_7">十 · 一句话总结<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p><strong>自我叙事三件套 = README 写为什么 + DESIGN 写组成 + SKILL 写怎么用. 每层 (项目根/domain/service/package) 都自管自身三件, 父级到子级指针式引用不复制. 三反例 (重复/模糊/错乱) 0 命中</strong>.</p>
+<hr />
+<h2 id="a">附录 A · 业界范式速记<a class="headerlink" href="#a" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>范式</th>
+<th>来源</th>
+<th>跟我们对应</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Diataxis</strong></td>
+<td><a href="https://diataxis.fr/">Daniele Procida</a></td>
+<td>四象限 (Tutorials/How-to/Reference/Explanation), 我们 README=Explanation / DESIGN=Reference / SKILL=How-to (Tutorials 不要, 项目内部用不上)</td>
+</tr>
+<tr>
+<td><strong>ADR / MADR</strong></td>
+<td><a href="https://adr.github.io/">adr.github.io</a></td>
+<td>架构决策记录, DESIGN 的"架构决策" 段直接套 ADR 风格 (D1/D2/...)</td>
+</tr>
+<tr>
+<td><strong>Google Design Docs</strong></td>
+<td><a href="https://www.industrialempathy.com/posts/design-docs-at-google/">industrialempathy.com</a></td>
+<td>高层实施策略 + 关键设计决策 + 取舍, 跟 DESIGN 对齐</td>
+</tr>
+<tr>
+<td><strong>The Good Docs Project</strong></td>
+<td><a href="https://www.thegooddocsproject.dev/template/readme">thegooddocsproject.dev</a></td>
+<td>README 模板范式, "项目第一印象" / 友好语气 / 强动词</td>
+</tr>
+<tr>
+<td><strong>Operations Manual</strong></td>
+<td>业界共识</td>
+<td>SKILL 风格参考 — 步骤化 / 写给最 inexperienced 用户 / 含故障排查</td>
+</tr>
+</tbody>
+</table>
+<h2 id="b-omnicompany">附录 B · 三件套层级展开样例 (omnicompany 项目根)<a class="headerlink" href="#b-omnicompany" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>omnicompany/                    ← 仓库根
+├── README.md                   ← 项目根叙事 (待建)
+├── DESIGN.md                   ← 项目根架构 (待建, 现有 docs/ARCHITECTURE.md 是雏形)
+├── SKILL.md                    ← 项目根操作总入口 (待建)
+├── docs/
+│   ├── README.md               ← docs 目录索引 (现有, 保留, 不是项目根 README)
+│   └── ...
+├── packages/
+│   ├── domains/demogame/
+│   │   ├── README.md           ← demogame domain 叙事 (待建)
+│   │   ├── DESIGN.md           ← demogame domain 架构 (待建)
+│   │   └── SKILL.md            ← demogame 操作手册 (待建)
+│   └── services/_core/registry/
+│       ├── README.md           ← registry service 叙事 (待建)
+│       ├── DESIGN.md           ← registry 架构 (现有, 七节, 待按 §5.2 收窄)
+│       └── SKILL.md            ← registry 操作手册 (待建)
+</code></pre></div>
+<h2 id="sources">Sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://diataxis.fr/">Diataxis Documentation Framework — Daniele Procida</a></li>
+<li><a href="https://adr.github.io/">Architectural Decision Records (ADR)</a></li>
+<li><a href="https://adr.github.io/madr/">MADR — Markdown Architectural Decision Records</a></li>
+<li><a href="https://www.industrialempathy.com/posts/design-docs-at-google/">Design Docs at Google — Malte Ubl</a></li>
+<li><a href="https://www.thegooddocsproject.dev/template/readme">The Good Docs Project · README template guide</a></li>
+<li><a href="https://diataxis.fr/how-to-guides/">Diataxis · How-to guides</a></li>
+<li><a href="https://docs.cloud.google.com/architecture/architecture-decision-records">Architecture Decision Records overview · Google Cloud</a></li>
+<li><a href="https://gitbook.com/docs/guides/docs-best-practices/documentation-structure-tips">GitBook · How to structure technical documentation</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

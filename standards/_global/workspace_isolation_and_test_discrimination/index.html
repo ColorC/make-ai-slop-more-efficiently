@@ -1,0 +1,2333 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../verification_invariants/">
+      
+      
+        <link rel="next" href="../../cli/identity/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Workspace isolation and test discrimination - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#workspace-isolation-test-discrimination" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Workspace isolation and test discrimination
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../directory_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification_invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一 · 问题来源 (为什么需要这两条)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#i-workspace-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二 · 铁律 I · 状态隔离 (Workspace Isolation)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二 · 铁律 I · 状态隔离 (Workspace Isolation)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        定义
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实现形式 (三选一, 视基础设施选择)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        硬规则
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-worktree-2026-04-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例: 主目录未提交 source 反污染 worktree (2026-04-25 实测)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-mineflayer-username-16-2026-04-25-4h" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例 2: mineflayer username 超 16 字符 (2026-04-25 实测 · 4h 坑)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxelcraft-walk-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例 (voxelcraft Walk 2/3 实测)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        违反检测
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ii-test-discrimination-tdd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三 · 铁律 II · 测试判别力 (Test Discrimination · TDD 式)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三 · 铁律 II · 测试判别力 (Test Discrimination · TDD 式)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        定义
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tdd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TDD 式实现
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-04-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        测试结果是色谱不是二分 (2026-04-25 用户明示)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probe-tier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        测试强度分级 (probe 三 tier, 越深越强)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxelcraft-walk-23_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例 (voxelcraft Walk 2/3 实测)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        违反检测
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxelcraft-2026-04-24-2026-04-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        voxelcraft 参考实装 (2026-04-24 ~ 2026-04-25 完成)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四 · 两条铁律的相互关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五 · 与其他 standards 的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六 · 实施优先级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七 · 参考材料
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/llm_infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/self_narrative_three_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一 · 问题来源 (为什么需要这两条)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#i-workspace-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二 · 铁律 I · 状态隔离 (Workspace Isolation)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二 · 铁律 I · 状态隔离 (Workspace Isolation)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        定义
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实现形式 (三选一, 视基础设施选择)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        硬规则
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-worktree-2026-04-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例: 主目录未提交 source 反污染 worktree (2026-04-25 实测)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-mineflayer-username-16-2026-04-25-4h" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例 2: mineflayer username 超 16 字符 (2026-04-25 实测 · 4h 坑)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxelcraft-walk-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例 (voxelcraft Walk 2/3 实测)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        违反检测
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ii-test-discrimination-tdd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三 · 铁律 II · 测试判别力 (Test Discrimination · TDD 式)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三 · 铁律 II · 测试判别力 (Test Discrimination · TDD 式)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        定义
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tdd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TDD 式实现
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-04-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        测试结果是色谱不是二分 (2026-04-25 用户明示)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#probe-tier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        测试强度分级 (probe 三 tier, 越深越强)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxelcraft-walk-23_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反例 (voxelcraft Walk 2/3 实测)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        违反检测
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxelcraft-2026-04-24-2026-04-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        voxelcraft 参考实装 (2026-04-24 ~ 2026-04-25 完成)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四 · 两条铁律的相互关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#standards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五 · 与其他 standards 的关系
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六 · 实施优先级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七 · 参考材料
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- [OMNI] origin=claude-code domain=docs/standards ts=2026-04-24T00:00:00Z type=standard status=active -->
+<!-- [OMNI] material_id="material:standards.global.workspace_isolation_test_discrimination.md" -->
+
+<h1 id="workspace-isolation-test-discrimination">软件工作区两条控制论铁律 · Workspace Isolation + Test Discrimination<a class="headerlink" href="#workspace-isolation-test-discrimination" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>立档时间</strong>: 2026-04-24 · 由 voxelcraft Walk 2/3 实战踩出 · L1 明示"控制论铁律"级别</p>
+<p><strong>适用范围</strong>: 跨所有 omnicompany 子系统 · 凡涉及<strong>生成产物 + 运行验证</strong>的 pipeline/agent 工作流, 都受本文两条铁律约束. 不是建议, 是默认配置项.</p>
+</blockquote>
+<hr />
+<h2 id="_1">一 · 问题来源 (为什么需要这两条)<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>任何"生成 → 验证"型 pipeline (voxelcraft mod 生成 · data 管线 · 代码重构 agent · 配表自动化 · ...) 都会面对两类底层问题, 若不<strong>结构性解决</strong>必然反复踩:</p>
+<p><strong>问题 A · 状态污染 (State Pollution)</strong>: 多次 run 共享同一个 workspace 目录时, 前一次 run 留下的状态 (文件 / 数据库 / 运行时持久化 NBT / 缓存 / lock) 影响下一次 run 的语义. 症状: "本地好使提交挂" · "单跑过了批量跑不过" · "昨天过了今天不过". 手动加 cleanup 只是<strong>补丁</strong>, 补不完.</p>
+<p><strong>问题 B · 伪通过 (False Positive Tests)</strong>: 验证用的测试只查"过程信号" (如 log 字符串出现), 不查"效果真达成". LLM/代码产生的错误实现可能<strong>既产正确信号又产错误效果</strong>, 测试会放行. 症状: "测试绿但线上爆" · "审计发现一直是假通过".</p>
+<p>这两类问题<strong>不是靠经验增长消掉</strong>, 是<strong>靠架构规定消掉</strong>. 本文定铁律.</p>
+<hr />
+<h2 id="i-workspace-isolation">二 · 铁律 I · 状态隔离 (Workspace Isolation)<a class="headerlink" href="#i-workspace-isolation" title="Permanent link">&para;</a></h2>
+<h3 id="_2">定义<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<p><strong>每个 agent run / pipeline invocation / 生成单元 的文件系统工作区必须是独立的</strong>. 不允许多个 run 共写同一个目录.</p>
+<h3 id="_3">实现形式 (三选一, 视基础设施选择)<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>形式</th>
+<th>怎么隔</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>git worktree</strong></td>
+<td><code>git worktree add &lt;path&gt; HEAD</code></td>
+<td>目标 repo 是 git · Walk 3+ <strong>首选</strong></td>
+</tr>
+<tr>
+<td><strong>目录 cp -r / rsync</strong></td>
+<td>每 run 完整拷一份基线</td>
+<td>非 git repo</td>
+</tr>
+<tr>
+<td><strong>ephemeral container</strong></td>
+<td>Docker / LXC / chroot</td>
+<td>需要进程隔离 + 文件隔离</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">硬规则<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Worker 代码里禁止写死 workspace 路径常量</strong> (例如 <code>_ETERNAL_WAR_ROOT = "E:/..."</code>). 必须参数化为 <code>working_root</code>, 由 orchestrator (run.py) 注入.</li>
+<li><strong>一 run 一 root</strong> · run 开始建, 归档后释放 · run 期间任何 Worker 都只读/写<strong>该 root 下</strong>.</li>
+<li><strong>禁止 Worker 之间靠共享目录通信</strong>. Worker 间数据流走 Material (Format), 不走文件系统隐式依赖.</li>
+<li><strong>持久化状态 (DB / ops.json / playerdata / cache) 是 workspace 的一部分</strong>, 必须进隔离边界.</li>
+</ol>
+<h3 id="source-worktree-2026-04-25">反例: 主目录未提交 source 反污染 worktree (2026-04-25 实测)<a class="headerlink" href="#source-worktree-2026-04-25" title="Permanent link">&para;</a></h3>
+<p><strong>症状</strong>: redstub_e2e 跑时 mineflayer 报 <code>Failed to decode packet 'serverbound/minecraft:hello'</code> 100% 复现, 但单独跑 connect_only / clean build 都 OK. 控制变量长链调查 (build 工具链/source 注入/pre-RCON/dig_at vs connect_only) 都没复现.</p>
+<p><strong>真根因</strong>: 主目录 eternal-war 有 <strong>20 个未提交修改</strong> (开发期 WIP + 04-24 17:07 旧脚本直接写 main 的残留). worktree 用 cp -r 拷贝, 把这些<strong>未提交的脏 source</strong> 也带进 worktree, 与 baseline 偏离. 具体哪一字节触发 mineflayer hello 解码错误 — 没追到, 因为这是状态混合的副作用而非清晰因果.</p>
+<p><strong>修法</strong>: commit 主目录所有未提交合法改动作为 baseline (4 commits), worktree cp 后变成 known-good. 所有控制变量实验在 baseline 上重跑全 OK.</p>
+<p><strong>预防 (硬规则)</strong>: 凡是用 worktree / cp -r / rsync 做隔离的 pipeline, <strong>必须先 git status 主目录确认干净</strong>, 否则隔离假象 (你以为 worktree 独立, 实际带着主目录的脏状态偏离). orchestrator 启动时应自检 baseline 是否干净, 不干净要么报错要么 commit 后再跑.</p>
+<p><strong>已落实</strong>: <code>voxelcraft/common/workspace_context.py::_assert_baseline_clean</code> · worktree 创建前 git status 检查, 脏状态直接 raise. opt-out: <code>voxelcraft_ALLOW_DIRTY_BASELINE=1</code>.</p>
+<h3 id="2-mineflayer-username-16-2026-04-25-4h">反例 2: mineflayer username 超 16 字符 (2026-04-25 实测 · 4h 坑)<a class="headerlink" href="#2-mineflayer-username-16-2026-04-25-4h" title="Permanent link">&para;</a></h3>
+<p><strong>症状</strong>: voxelcraft redstub_e2e 跑 mineflayer dig_at probe 报 <code>Failed to decode packet 'serverbound/minecraft:hello'</code> 100% 复现. 各种环境/build/source 控制都没复现.</p>
+<p><strong>真根因</strong>: redstub_e2e 用 <code>f"probebot_{int(time.time())}"</code> 作 username (= <code>probebot_1777094882</code> 19-20 字符), MC 1.21 LoginStart packet username 字段 max <strong>16 字符</strong>, server 端 netty decoder 抛 DecoderException, server 通用日志只显示 "Failed to decode packet 'serverbound/minecraft:hello'" — 看似协议层错误, 实际是 username 长度超限.</p>
+<p><strong>判别力盲区</strong>: server 错误信息<strong>没明示</strong> username 长度违规. 调试时容易误判成 protocol 不兼容 / build 工具链漂移 / mod 干扰. 控制变量法 (5 轮: build/source/pre-RCON/action/uname) 才把变量收敛到 username 字符长度.</p>
+<p><strong>修法 (已落)</strong>:
+1. <code>_probe_bot_action</code> 加 username 长度 guard, 超 16 截断 + warn
+2. <code>redstub_e2e</code> 改用 <code>pb_&lt;HHMMSS&gt;</code> (9 字符)
+3. 单测 <code>bot_username_smoke_test.py</code> 防退化</p>
+<p><strong>预防 (硬规则)</strong>: 凡是协议有"软上限/硬上限"字段, <strong>client 库不报错时 server 报错</strong>的常见模式, 必须<strong>用边界值压一遍</strong>. probe 库要主动校验, 不能"原样发出去看 server 错回来" — 因 server 的错误信息往往是聚合后的笼统 "decode failed", 失去定位价值.</p>
+<h3 id="voxelcraft-walk-23">反例 (voxelcraft Walk 2/3 实测)<a class="headerlink" href="#voxelcraft-walk-23" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Walk 2 · <code>pioneer_gift</code> 第 2 次 probe 失败: ProbeBot 同名 + 同 playerdata, attachment persistent=true 保留了第 1 次的"已激活"状态, 第 2 次 probe 以为机制不工作.</li>
+<li><strong>错误补丁</strong>: 换 username 每 run. 头疼医头.</li>
+<li>
+<p><strong>铁律做法</strong>: 新 workspace = 新 world = 新 playerdata, 根本没状态可漏.</p>
+</li>
+<li>
+<p>Walk 2 · <code>mechanism/*.java</code> cleanup · 加代码 _cleanup_prior_mechanism_files + 剥 EternalWarMod register 行 · 逻辑越积越复杂.</p>
+</li>
+<li><strong>错误补丁</strong>: 更多 cleanup 函数.</li>
+<li><strong>铁律做法</strong>: worktree 天然是白纸, cleanup 函数<strong>全部删掉</strong>.</li>
+</ul>
+<h3 id="_5">违反检测<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>每个新建的 Worker / pipeline orchestrator 必须在 DESIGN.md §架构决策 声明自己的 workspace 隔离形式. TeamChecker / design_validator 检测到硬编码路径常量即报警.</p>
+<hr />
+<h2 id="ii-test-discrimination-tdd">三 · 铁律 II · 测试判别力 (Test Discrimination · TDD 式)<a class="headerlink" href="#ii-test-discrimination-tdd" title="Permanent link">&para;</a></h2>
+<h3 id="_6">定义<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p><strong>验证产物的测试, 必须先证明它能区分"对的"和"错的", 才能用它作 gate</strong>. 没证明判别力的测试 = 装饰, 不算 gate.</p>
+<h3 id="tdd">TDD 式实现<a class="headerlink" href="#tdd" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>先写测试 (包含 probe 的 effect 检查, 不是只看信号)</strong></li>
+<li><strong>红验证</strong>: 喂一个"已知不正确" 的 stub / minimal broken impl → 测试必须 FAIL. 若 stub 也过 → 测试无判别力, 不能用.</li>
+<li><strong>绿验证</strong>: 喂一个"已知正确" 的 stub / minimal working impl → 测试必须 PASS.</li>
+<li><strong>红绿都做过再生成真代码</strong>: 然后把实际 LLM / 开发者产出喂进同一测试. 此时 pass/fail 才有意义.</li>
+</ol>
+<h3 id="2026-04-25">测试结果是色谱不是二分 (2026-04-25 用户明示)<a class="headerlink" href="#2026-04-25" title="Permanent link">&para;</a></h3>
+<p><strong>色谱 ≠ 测试粒度</strong>. 色谱指的是: <strong>凡有测试, 必有从"完全失败"到"最简成功"再到"完整成功"的渐变光谱</strong>. 对 LLM 产物尤其重要 — LLM 失败的语义梯度大, 二分 PASS/FAIL 信息量不足.</p>
+<p>典型色谱 (以 voxelcraft mechanism <code>/placeblock</code> 为例, 由浅入深排):
+1. <strong>编译都过不了</strong> (语法错 / import 错)
+2. <strong>编译过但机制没注册</strong> (调用漏挂到 onInitialize)
+3. <strong>机制注册了但 log 关键字写错</strong> (tier2 失败)
+4. <strong>log 对了但效果没生效</strong> (tier3 失败 · 我们抓到的)
+5. <strong>效果生效但参数错位</strong> (坐标偏 1 / 异常被吞 / try-catch 错位 / 部分参数错)
+6. <strong>基本对但有副作用</strong> (额外动了别的状态 / 资源没释放 / 性能极差)
+7. <strong>完全正确</strong></p>
+<p><strong>判别力测试不能只造端点</strong>. 端点对照只证明 "极端绿/极端红能区分", 中间档才能反推:
+- LLM 产出的真实质量梯度 (落在哪一档)
+- prompt 还需要哪些约束
+- probe 是否在某些中间档有"假通过"或"假失败"</p>
+<p><strong>进阶建议</strong>: 红绿对照只是色谱的最弱形态. 完整色谱测试要造 ≥ 4 个梯度档位, 验证 probe 输出的判决与实际质量档位<strong>单调对应</strong>. 否则 probe 只是二分类器, 信息量低.</p>
+<p>voxelcraft 当前色谱状态 (2026-04-25 已补): <strong>5 档真 E2E 验证 probe 单调对应</strong>:
+- 脚本 <code>scripts/voxelcraft_tier3_color_spectrum_e2e.py</code> 跑 5 档 stub: not_registered (档2) / wrong_log_keyword (档3) / log_no_setblock (档4) / wrong_coords (档5) / correct (档7)
+- 真编 5 jar + 真 MC server + RCON probe · <strong>5/5 单调对应</strong> · 无假通过/假失败
+- <strong>关键观测 · 档 5 (wrong_coords)</strong>: log 对 + 真 setBlock 但偏 1 格. tier2 PASS (log 命中), tier3 真查 <code>execute if block X Y Z diamond_ore</code> → Test failed (因为 X,Y,Z 是 air, 方块在 X+1,Y,Z). 这是"做对一半"型 bug 的典型代表, 工程实践最常见
+- 档 1 (compile fail) 由 Compiler 守门, 不在本测试 · 档 6 (副作用) 列入已知盲区, 需 tier4/observability 才能抓</p>
+<p>进阶: 这个色谱跑一次需 ~3min, 不入 daily smoke. 但<strong>任何 probe 重构后必跑</strong>作为回归. 已加单测 <code>tests/domains/voxelcraft/mechanism/color_spectrum_smoke_test.py</code> 守 stub 模板的字串完整性 (静态), 真色谱 E2E 由 <code>scripts/</code> 下脚本人工触发.</p>
+<h3 id="probe-tier">测试强度分级 (probe 三 tier, 越深越强)<a class="headerlink" href="#probe-tier" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>tier</th>
+<th>查什么</th>
+<th>能抓什么</th>
+<th>抓不到什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 · 协议固有</td>
+<td>系统协议保证的固定字段 (如 MC /summon 响应 "Summoned new" · HTTP 200)</td>
+<td>"code 完全没注册/没跑起来"</td>
+<td>代码跑起来但行为错</td>
+</tr>
+<tr>
+<td>2 · 期望子串</td>
+<td>LLM / 开发者约定的 log 字符串</td>
+<td>"该 log 的分支没走"</td>
+<td>"走了但返回码错"</td>
+</tr>
+<tr>
+<td>3 · <strong>效果状态检查</strong></td>
+<td><strong>对目标系统状态的直接查询</strong> (e.g. <code>/execute if block X Y Z diamond_ore</code> 确认方块真没被破坏; HTTP 登录后 session 存在; DB 新行真插入了)</td>
+<td><strong>业务逻辑是否真生效</strong></td>
+<td>极端并发 / 分布式幻觉 (需 tier4 · observability)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>铁律要求</strong>: probe 必须<strong>至少</strong>含 tier 1. 对返回码敏感 / 状态修改型机制, <strong>必须</strong>含 tier 3.</p>
+<h3 id="voxelcraft-walk-23_1">反例 (voxelcraft Walk 2/3 实测)<a class="headerlink" href="#voxelcraft-walk-23_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Walk 2 · <code>diamond_gate</code> (advancement_gated) probe 通过 <code>[diamond_gate]</code> log 字串匹配 approved=True. 但 LLM 若产"log 了但 return true" 的 bug, log 照样 fire, probe 仍 approved=True — <strong>假通过</strong>.</li>
+<li><strong>错误补丁</strong>: 把 log 字串设得更具体. 无效.</li>
+<li>
+<p><strong>铁律做法</strong>: probe 加 tier 3 · dig 后 RCON <strong>bare</strong> <code>execute if block &lt;pos&gt; minecraft:diamond_ore</code> 返回 <code>Test passed</code> 才算 approved (方块真没被破坏). <strong>注</strong>: <code>run say FOO</code> 不会 echo 到 RCON, 必须用 bare execute 拿 Test passed/failed (2026-04-24 经验校准).</p>
+</li>
+<li>
+<p>Walk 2 · <code>gaia_blessing</code> 第 1 次运行 build 通过, bot dig 后 server NPE 崩 · probe 没查 runtime exception.</p>
+</li>
+<li><strong>铁律做法</strong>: probe 加 tier 3 · 跑完扫 log 是否含 "java.lang.*Exception" / "Caused by:" 模式.</li>
+</ul>
+<h3 id="_7">违反检测<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<p>Designer/Engineer 产的 probe spec 必须声明 tier1 + (tier2 可选) + tier3 (若适用). 没有 tier 3 的返回码敏感机制, LoadChecker 发 Verdict.FAIL 前置拦, 不让进 Compiler 阶段.</p>
+<h3 id="voxelcraft-2026-04-24-2026-04-25">voxelcraft 参考实装 (2026-04-24 ~ 2026-04-25 完成)<a class="headerlink" href="#voxelcraft-2026-04-24-2026-04-25" title="Permanent link">&para;</a></h3>
+<ul>
+<li>核心模块 <code>packages/domains/voxelcraft/common/probe_effects.py</code> · <code>run_effect_checks(specs, *, rcon_send) -&gt; (bool, list[str])</code></li>
+<li>schema: <code>effect_checks: list[{type: "rcon_query", cmd, expected_contains, expected_not_contains, note}]</code></li>
+<li>已注入 4 处 probe: <code>_probe_log_scan</code> / <code>_probe_rcon_command</code> / <code>_probe_bot_action</code> / <code>_probe_entity_summon</code></li>
+<li>Designer prompt 写有 5 类典型范例 (advancement_gated / attack_cancel / counter / item_give / entity_spawn)</li>
+<li><strong>RCON 响应格式经验校准</strong>: <code>/execute if block ...</code> <strong>bare</strong> (不带 <code>run say</code>) · 条件成立返 <code>Test passed</code>, 不成立返 <code>Test failed</code> · <code>run say FOO</code> 不 echo 到 RCON (见 <code>scripts/voxelcraft_tier3_rcon_format_calibration.py</code>)</li>
+<li><strong>判别力自证 · mock 级</strong>: 8 个集成测试 <code>tests/domains/voxelcraft/common/probe_tier3_integration_test.py</code> 断言 tier2 被 log 欺骗时 tier3 抓到 bypass</li>
+<li><strong>判别力自证 · 真 E2E 级</strong> (2026-04-25): <code>scripts/voxelcraft_tier3_placeblock_e2e.py</code> 造 <code>/placeblock</code> 命令两变体, green 真 setBlockState, red 只 log 不 set · 跑真 gradle build (23s green + 11s red) + 真 MC 1.21.1 server + RCON probe · <strong>green tier2+tier3 双 PASS · red tier2 被 log 骗过但 tier3 真 MC 查方块 <code>execute if block</code> 返 <code>Test failed</code> 抓到 bypass · matched=False</strong> · 非 mock 的铁律 II 落地</li>
+<li>16 unit + 8 integration + 1 真 E2E = <strong>24 test + 1 E2E 三层色谱齐全 (mock → build → real server)</strong></li>
+<li><strong>完整闭环 · LLM 自填 tier3 + 全链 E2E</strong> (2026-04-25): <code>scripts/voxelcraft_tier3_designer_prompt_eval.py</code> 5 题 matrix 8/8 过 · <code>scripts/voxelcraft_tier3_fullpipeline_e2e.py</code> 真 LLM Designer+Engineer+Compiler+LoadChecker 全链 91s 跑通, LLM 自己产 <code>effect_checks: [{execute if block ..., Test passed, note: "Verify diamond_ore actually placed at target coords"}]</code>, approved=True, tier3 真 MC 返 Test passed</li>
+</ul>
+<p>其他子系统落两铁律时应复用同一 <code>run_effect_checks</code> 模式 (接注入的 rcon_send 或等价 query hook).</p>
+<hr />
+<h2 id="_8">四 · 两条铁律的相互关系<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>铁律 I (隔离) 处理 "<strong>同一套测试跑多次, 结果应一致</strong>" — state 不泄漏就可重复.
+铁律 II (判别力) 处理 "<strong>测试通过, 代码就真的对</strong>" — 测试不放假正.</p>
+<p>两条缺一不可:
+- 只 I 不 II: 每次 run 干净, 但测试太弱, 错代码也过.
+- 只 II 不 I: 测试严格, 但前一次 run 的状态串扰, 导致后一次测试偶发 FAIL/PASS (flaky).
+- I + II: run 可重复 + 结果可信. 这是<strong>可以发布可以验证</strong>的起点.</p>
+<hr />
+<h2 id="standards">五 · 与其他 standards 的关系<a class="headerlink" href="#standards" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>workspace.md</strong> (旧): 描述 <code>.omni/workspace.yaml</code> 的 path 约束, 偏权限 · 不涉及 run-per-run 隔离.</li>
+<li><strong>agent_first.md</strong>: 信息库先行 · 是本文铁律 II tier3 的前置条件 (Designer 要知道如何写 effect check).</li>
+<li><strong>information_sufficiency.md</strong>: 节点输入充分性 · 本文铁律 II 是"输出验证"的对称面.</li>
+<li><strong>llm_first.md</strong>: LLM 能力铁律 · 不覆盖本文两条.</li>
+</ul>
+<p>本文是<strong>新增</strong>的横切规范, 不替换任何现有规范.</p>
+<hr />
+<h2 id="_9">六 · 实施优先级<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<p>按<strong>已暴露问题数量</strong> 排:
+1. voxelcraft (3 路径已跑) · Walk 3 立即补两条 · 做为试点 ← 2026-04-24 起
+2. demogame 配表管线 · 状态污染问题同样存在 (xlsm 共享) · Walk 后置
+3. config_service agent · 尚未成熟, 设计期即内嵌两条</p>
+<p>每个子系统在 DESIGN.md §架构决策 必须有一节明示如何落两条铁律.</p>
+<hr />
+<h2 id="_10">七 · 参考材料<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<ul>
+<li>voxelcraft Walk 2 mechanism audit · <a href="../plans/[2026-04-24]voxelcraft-MECHANISM-WALK-2/handoff_2026-04-24.md">docs/plans/[2026-04-24]voxelcraft-MECHANISM-WALK-2/handoff_2026-04-24.md</a> · 首次把问题结构化暴露</li>
+<li>TDD 本源 · Kent Beck, "Test-Driven Development By Example" (2002) · 红-绿-重构三步</li>
+<li>git-worktree(1) 官方 man · <code>https://git-scm.com/docs/git-worktree</code></li>
+<li>MSFT xUnit.net 文档 · test isolation 章节</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2275 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。">
+      
+      
+      
+      
+        <link rel="prev" href="../identity/">
+      
+      
+        <link rel="next" href="../lock/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Llm infrastructure - Make AI Slop More Efficiently</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#llm" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-header__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Make AI Slop More Efficiently
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Llm infrastructure
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Make AI Slop More Efficiently" class="md-nav__button md-logo" aria-label="Make AI Slop More Efficiently" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Make AI Slop More Efficiently
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ColorC/make-ai-slop-more-efficiently" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Make AI Slop More Efficiently
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARCHITECTURE
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Standards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+     global
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+     global
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/agent_prompt_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Prompt 设计规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/concepts_three_layers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts three layers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/counterexample_ledger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    反例账本 · 死规则在线监测
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/cross-end-board-consistency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross end board consistency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_cleanliness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目录清洁度守则
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/directory_structure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Directory structure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/dot_claude_vs_dot_omni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dot claude vs dot omni
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/llm_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM 优先与语境完整性
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/single_source_thin_wrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Single source thin wrap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/terminology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Terminology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/test-pyramid/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test pyramid
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/user-action-driven-testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User action driven testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/verification_invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../_global/workspace_isolation_and_test_discrimination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace isolation and test discrimination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cli
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Llm infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 这层是干嘛的
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 现有设施
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 现有设施">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python 接口层 (3 个)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配套子模块
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        审计层
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboard-api-2026-05-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard API (本规范同期加, 2026-05-02)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 调用约定 (业务侧)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 调用约定 (业务侧)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#router" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推荐路径 (Router 化)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型铁律 (cross-project)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 跟主要设施联动
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 跟主要设施联动">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#g1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 G1 身份模块
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#g2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 G2 注册中心
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#g4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 G4 锁
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cc_wrapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 cc_wrapper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 反模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 演进 (留下一阶段)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 实施引用
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lock
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../omni-header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Omni header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sandbox/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sandbox
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent-First · 方法论
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/agent_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Node Loop 工具接口规范
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/material/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Material 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/project_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/team/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Team 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/worker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Worker 健康标准
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspace · Package 边界与 bus 读写范围
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Protocol
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/plan_template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/progressive_context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progressive context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/self_narrative_three_files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self narrative three files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、 这层是干嘛的
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、 现有设施
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、 现有设施">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python 接口层 (3 个)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配套子模块
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        审计层
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboard-api-2026-05-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard API (本规范同期加, 2026-05-02)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、 调用约定 (业务侧)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、 调用约定 (业务侧)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#router" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推荐路径 (Router 化)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cross-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型铁律 (cross-project)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、 跟主要设施联动
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、 跟主要设施联动">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#g1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 G1 身份模块
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#g2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 G2 注册中心
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#g4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 G4 锁
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cc_wrapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        跟 cc_wrapper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        五、 反模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        六、 演进 (留下一阶段)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        七、 实施引用
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- [OMNI] origin=ai-ide domain=omnicompany/standards ts=2026-05-02T06:00:00Z type=doc status=active agent=ai-ide-current -->
+<!-- [OMNI] summary="LLM 基础设施现状盘点 + 入口约定 - omni llm CLI / LLMClient / LLMCallRouter / dashboard API" -->
+<!-- [OMNI] why="用户原始需求 3.5: LLM 基础设施夹实. 本规范盘点已有设施 + 入口约定 + 演进路线" -->
+<!-- [OMNI] tags=cli,llm,infrastructure,standard -->
+<!-- [OMNI] material_id="material:standards.llm_infrastructure.spec.md" -->
+
+<h1 id="llm">LLM 基础设施<a class="headerlink" href="#llm" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>状态</strong>: 现状盘点 + 规范 v2 (2026-06-13)
+<strong>关联实装</strong>: <code>runtime/llm/</code> + <code>services/_core/agent/routers/llm_call.py</code> + <code>services/_core/omnicompany/llm_client.py</code> + <code>cli/commands/llm_audit.py</code> + <code>dashboard/llm_api.py</code>
+<strong>统一权威</strong>: authority-confirmation.md 定方向, autonomous-execution-rules.md 定长程门禁; 本文件只记录 LLM 设施分散入口, 不另立第二套权威。</p>
+</blockquote>
+<h2 id="_1">一、 这层是干嘛的<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>omnicompany 内部所有 LLM 调用走统一接口, 自动落审计记录. 业务侧不直接 import openai / anthropic SDK, 走本地包装层.</p>
+<p>设计目标:
+- 单一入口: 底层 <code>LLMClient</code>, 单次结构化 <code>runtime/llm/structured.py::call_json</code>, 批量 <code>runtime/llm/batch.py</code>, 多轮 agent <code>LLMCallRouter/AgentNodeLoop</code>
+- 强制审计: 每次调用落 <code>data/_runtime/llm_audit/&lt;YYYY-MM-DD&gt;/&lt;trace_id&gt;.jsonl</code>
+- 跨厂支持: qwen / deepseek / claude 等多厂商 LLM 走同一接口
+- 跟 G1 联动: 调用必带 trace_id, 跟 session 身份链关联
+- 跟 dashboard 联动: 调用记录 + 成本统计 web 端可看</p>
+<h2 id="_2">二、 现有设施<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<h3 id="python-3">Python 接口层 (3 个)<a class="headerlink" href="#python-3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>接口</th>
+<th>位置</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLMClient</code></td>
+<td><code>runtime/llm/llm.py</code></td>
+<td>底层 client + ModelRegistry, 只在基础设施层直接用</td>
+</tr>
+<tr>
+<td><code>call_json()</code></td>
+<td><code>runtime/llm/structured.py</code></td>
+<td>唯一单次结构化 JSON 调用面, schema 校验 + 纠错重试</td>
+</tr>
+<tr>
+<td><code>BatchLLMRunner</code></td>
+<td><code>runtime/llm/batch.py</code></td>
+<td>唯一批量 LLM 执行面, 并发 / 失败隔离 / 中间产物 / 续跑</td>
+</tr>
+<tr>
+<td><code>LLMCallRouter</code></td>
+<td><code>services/_core/agent/routers/llm_call.py:107</code></td>
+<td>Router 化的 LLM 调用, 走 EventBus 落 agent.llm-request / agent.llm-response 事件</td>
+</tr>
+</tbody>
+</table>
+<p>业务侧推荐: 单次固定 schema 走 <code>runtime/llm/structured.py::call_json</code>; 批量跑同类单次任务走 <code>runtime/llm/batch.py</code>; 多轮工具循环走 <code>LLMCallRouter/AgentNodeLoop</code>. 直接用 <code>LLMClient</code> 仅限底层设施. 业务<strong>不直接 import openai/anthropic</strong>, 也不再新建部门私有 <code>call_json</code> / 线程池 / 续跑轮子.</p>
+<h3 id="_3">配套子模块<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>子模块</th>
+<th>位置</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>compression_summary.py</code></td>
+<td><code>runtime/llm/</code></td>
+<td>上下文压缩 (跟 ContextCompactRouter 联动)</td>
+</tr>
+<tr>
+<td><code>embedding_client.py</code></td>
+<td><code>runtime/llm/</code></td>
+<td>向量化</td>
+</tr>
+<tr>
+<td><code>vision.py</code></td>
+<td><code>runtime/llm/</code></td>
+<td>视觉 LLM (qwen3-vl-flash 等)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">审计层<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>每次 LLM 调用 (走任一上述接口) 落审计记录到:</p>
+<div class="highlight"><pre><span></span><code>data/_runtime/llm_audit/&lt;YYYY-MM-DD&gt;/&lt;trace_id&gt;.jsonl
+</code></pre></div>
+<p>字段含: <code>trace_id</code> / <code>pipeline</code> / <code>node</code> / <code>model</code> / <code>prompt</code> / <code>response</code> / <code>ts</code> / <code>duration_ms</code> 等.</p>
+<p>跟 G1 身份链联动: <code>trace_id</code> 跟 <code>cc_session_active.json</code> 一致, 反查从 session → LLM 调用历史.</p>
+<h3 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>omni llm audit</code></td>
+<td>调用记录列表查询 (按 trace_id / pipeline / node / grep / since 过滤)</td>
+</tr>
+<tr>
+<td><code>omni llm audit --trace-id=&lt;&gt;</code></td>
+<td>单 session 全部 LLM 调用</td>
+</tr>
+<tr>
+<td><code>omni pipeline-llm</code></td>
+<td>(扩展) pipeline 级 LLM 统计</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dashboard-api-2026-05-02">dashboard API (本规范同期加, 2026-05-02)<a class="headerlink" href="#dashboard-api-2026-05-02" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>端点</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /api/v2/llm/audit</code></td>
+<td>调用记录列表 (跟 omni llm audit 同源)</td>
+</tr>
+<tr>
+<td><code>GET /api/v2/llm/audit/{trace_id}</code></td>
+<td>单 trace_id 全部 LLM 调用</td>
+</tr>
+<tr>
+<td><code>GET /api/v2/llm/stats</code></td>
+<td>调用统计 (count / by-model / by-pipeline / 字符总数)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_5">三、 调用约定 (业务侧)<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<h3 id="router">推荐路径 (Router 化)<a class="headerlink" href="#router" title="Permanent link">&para;</a></h3>
+<p>业务 worker 写 LLM 调用走 <code>LLMCallRouter</code> 子类:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">omnicompany.packages.services._core.agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLMCallRouter</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyLLMWorker</span><span class="p">(</span><span class="o">...</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build_llm_call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">bus</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">LLMCallRouter</span><span class="p">(</span>
+            <span class="n">model</span><span class="o">=</span><span class="s2">&quot;qwen-3.6-plus&quot;</span><span class="p">,</span>   <span class="c1"># 铁律 1: 默认模型</span>
+            <span class="n">tools_spec</span><span class="o">=...</span><span class="p">,</span>
+            <span class="n">retry</span><span class="o">=...</span><span class="p">,</span>
+            <span class="n">bus</span><span class="o">=</span><span class="n">bus</span><span class="p">,</span>
+            <span class="n">caller_prefix</span><span class="o">=</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div>
+<p>简单一次性调用:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">omnicompany.packages.services._core.omnicompany</span><span class="w"> </span><span class="kn">import</span> <span class="n">call_llm_json</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">call_llm_json</span><span class="p">(</span>
+    <span class="n">prompt</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+    <span class="n">schema</span><span class="o">=</span><span class="p">{</span><span class="o">...</span><span class="p">},</span>
+    <span class="n">model</span><span class="o">=</span><span class="s2">&quot;qwen-3.6-plus&quot;</span><span class="p">,</span>
+    <span class="n">trace_id</span><span class="o">=</span><span class="n">trace_id</span><span class="p">,</span>    <span class="c1"># 跟 G1 联动</span>
+<span class="p">)</span>
+</code></pre></div>
+<h3 id="cross-project">模型铁律 (cross-project)<a class="headerlink" href="#cross-project" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>默认模型 <code>qwen-3.6-plus</code></strong> (CLAUDE.md 铁律 1)</li>
+<li>别的模型要单独申请 + 跟用户报告</li>
+<li>visual 任务用 <code>qwen3-vl-flash</code></li>
+<li>LLM 调用预算上限 <code>max_turns=1000</code> (铁律 B 预算宽松)</li>
+<li>LLM 调用必带 trace_id (没 trace_id → fallback 到 <code>cc_unknown_&lt;ts&gt;</code>, 但会 warn)</li>
+</ul>
+<h2 id="_6">四、 跟主要设施联动<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h3 id="g1">跟 G1 身份模块<a class="headerlink" href="#g1" title="Permanent link">&para;</a></h3>
+<p>LLM 调用 trace_id 来自当前 session (<code>current_session_meta()</code>). 一份 session → 多次 LLM 调用 → 一份 jsonl. dashboard <code>/api/v2/llm/audit/{trace_id}</code> 反查同 session 全部调用.</p>
+<h3 id="g2">跟 G2 注册中心<a class="headerlink" href="#g2" title="Permanent link">&para;</a></h3>
+<p>LLM 调用本身不在注册中心 (太频繁). 但用 LLM 的 worker / agent 实体在注册中心, 通过 entity_id 反查"这个 worker 调过 LLM 多少次".</p>
+<h3 id="g4">跟 G4 锁<a class="headerlink" href="#g4" title="Permanent link">&para;</a></h3>
+<p>LLM 调用不被锁拦 (锁拦的是文件写入, LLM 是函数调用). 但 LLM 产生的内容如果走 Edit/Write 落到 watched 路径, 仍然会被 G4 PreToolUse hook 拦截.</p>
+<h3 id="cc_wrapper">跟 cc_wrapper<a class="headerlink" href="#cc_wrapper" title="Permanent link">&para;</a></h3>
+<p>cc_wrapper hooks/trace.py 已经把 Claude Code 的工具调用 (Edit/Write) 落 SQLite event bus. LLM 审计走另一份 jsonl (因为 LLM 调用频率高 + payload 大, 不进 SQLite). 两份审计源共用 trace_id 关联.</p>
+<h2 id="_7">五、 反模式<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p><strong>业务直接 import openai / anthropic</strong> — 绕开本地包装层, 没 trace_id, 没审计, 跨厂切换困难. 走 <code>LLMCallRouter</code> / <code>call_llm_json</code>.</p>
+<p><strong>LLM 调用不带 trace_id</strong> — fallback <code>cc_unknown_&lt;ts&gt;</code>, 但反查时关联不到 session. 业务必显式传.</p>
+<p><strong>用 <code>qwen-3.6-plus</code> 之外的模型不报告</strong> — 铁律 1 违规. 用前显式跟用户拍板.</p>
+<p><strong>多 LLM 客户端各跑一份审计</strong> — 应该所有调用走同一个审计入口. 本规范的三个 Python 接口 (<code>LLMClient</code> / <code>call_llm_json</code> / <code>LLMCallRouter</code>) 都走同一份 audit_root.</p>
+<p><strong>审计文件直接编辑</strong> — 审计是只追加的事实记录. 不改不删 (除非归档过期文件).</p>
+<h2 id="_8">六、 演进 (留下一阶段)<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>成本统计</strong>: 现 stats 只算字符数, 应当跟厂商定价表联动算 USD/CNY 成本</li>
+<li><strong>prompt 模板管理</strong>: prompt 散在各 worker 代码里 (跟 agent v2 把 prompt 提到 .md 文件类似), 应当所有业务 worker 的 prompt 统一移到 <code>&lt;service&gt;/prompts/&lt;worker&gt;.md</code></li>
+<li><strong>retry / fallback 策略</strong>: 现 <code>LLMCallRouter</code> 有 retry 配置, 但跨厂 fallback 没标准化 (例 qwen 挂自动切 deepseek)</li>
+<li><strong>rate limiting</strong>: 当前没全局速率控制. agent loop 高并发时可能触发厂商 quota</li>
+<li><strong>embedding 索引</strong>: <code>embedding_client.py</code> 在但没业务广泛用. 后续做 RAG / 知识库时启用</li>
+<li><strong>dashboard 显示</strong>: 加 LLM 调用 timeline + 模型分布饼图 (现 stats API 已就绪, 等 frontend)</li>
+</ul>
+<h2 id="_9">七、 实施引用<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>omnicompany/src/omnicompany/runtime/llm/llm.py</code> - LLMClient 底层</li>
+<li><code>omnicompany/src/omnicompany/runtime/llm/compression_summary.py</code> - 上下文压缩</li>
+<li><code>omnicompany/src/omnicompany/runtime/llm/embedding_client.py</code> - 向量化</li>
+<li><code>omnicompany/src/omnicompany/runtime/llm/vision.py</code> - 视觉 LLM</li>
+<li><code>omnicompany/src/omnicompany/packages/services/_core/omnicompany/llm_client.py</code> - call_llm_json 高层</li>
+<li><code>omnicompany/src/omnicompany/packages/services/_core/agent/routers/llm_call.py</code> - LLMCallRouter</li>
+<li><code>omnicompany/src/omnicompany/cli/commands/llm_audit.py</code> - omni llm audit CLI</li>
+<li><code>omnicompany/src/omnicompany/dashboard/llm_api.py</code> - dashboard 只读 API (本规范同期加)</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
