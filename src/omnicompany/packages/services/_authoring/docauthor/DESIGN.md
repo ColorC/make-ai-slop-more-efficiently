@@ -104,7 +104,7 @@ docauthor.review-verdict (kind.internal)
 
 ## 参考资料
 - 上游 plan: [`docs/plans/diagnosis/[2026-04-25]AUTO-DOCAUTHOR-WORKER/plan.md`](../../../../../../docs/plans/diagnosis/%5B2026-04-25%5DAUTO-DOCAUTHOR-WORKER/plan.md)
-- 规范权威 (Author 可见): [`docs/standards/_global/distributed-docs.md`](../../../../../../docs/standards/_global/distributed-docs.md)
+- 规范权威 (Author 可见): `docs/standards/_global/distributed-docs.md`
 - 合法公开范例 (Author 可见): `_core/guardian/.omni/manifest.yaml` · [`_core/guardian/DESIGN.md`](../../_core/guardian/DESIGN.md)
 - 运行时框架: [`_core/omnicompany/worker.py`](../../_core/omnicompany/worker.py) · [`_core/omnicompany/material_dispatcher.py`](../../_core/omnicompany/material_dispatcher.py)
 - 总线实现: [`bus/sqlite.py`](../../../../bus/sqlite.py)

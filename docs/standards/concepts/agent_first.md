@@ -204,4 +204,4 @@ prompt 含:
 
 业务侧立新 agent **优先走 ConfigurableAgent** (一行 SPEC 全配置驱动, 不写 Python 业务代码), 例外才直接继承 `AgentNodeLoop` (复杂自定义 PromptBuilder / ExtractResult 等场景, `SPEC.allow_custom_code=True` 显式标).
 
-详见 agent 概念规范 + [ConfigurableAgent 范本](../../../templates/agent/范本.py) + [单源 + 薄包装](../_global/single_source_thin_wrap.md).
+详见 agent 概念规范 + [ConfigurableAgent 范本](../../../templates/agent/范本.py) + 单源 + 薄包装.

@@ -30,7 +30,7 @@ disable-model-invocation: false
 **不用我**:
 - 跑 Team / 调度 Worker → 找 [runtime/exec/PipelineRunner](../../../../runtime/exec/)
 - 看 Worker 输出对不对 → 找 [doctor service](../../doctor/)
-- 注册新实体 (写) → 用 [omni register](../../../../../../docs/standards/cli/registration.md), 不是 omni registry
+- 注册新实体 (写) → 用 omni register, 不是 omni registry
 - 查 Format/Worker 内部实现 → 直接读源码或 grep
 
 ## 前置条件
@@ -127,6 +127,6 @@ omni registry mark-strict <entity_id> --unmark   # 取消标
 
 - 设计目的 → [README.md](README.md)
 - 内部架构 → [DESIGN.md](DESIGN.md)
-- 注册体系规范 (写入侧) → [docs/standards/cli/registration.md](../../../../../../docs/standards/cli/registration.md)
+- 注册体系规范 (写入侧) → docs/standards/cli/registration.md
 - G2 索引来由 → [docs/plans/guardian/[2026-05-04]CORE-SELF-STABILITY/plan.md](../../../../../docs/plans/guardian/%5B2026-05-04%5DCORE-SELF-STABILITY/plan.md)
 - 命名跟概念 → [terminology.md](../../../../../../docs/standards/_global/terminology.md)

@@ -68,6 +68,6 @@ docauthor 是 omnicompany 的**文档作者 service**. 当用户/AI IDE 新建�
 - 架构 → [DESIGN.md](DESIGN.md)
 - 操作手册 → [SKILL.md](SKILL.md)
 - 上游 plan → [docs/plans/[2026-04-25]AUTO-DOCAUTHOR-WORKER/plan.md](../../../../../docs/plans/%5B2026-04-25%5DAUTO-DOCAUTHOR-WORKER/plan.md)
-- 文档规范权威 → [docs/standards/distributed-docs.md](../../../../../../docs/standards/_global/distributed-docs.md)
+- 文档规范权威 → docs/standards/distributed-docs.md
 - 自我叙事三件套规范 → [docs/standards/protocol/self_narrative_three_files.md](../../../../../../docs/standards/protocol/self_narrative_three_files.md)
 - 项目根叙事 → [../../../../../README.md](../../../../../../README.md)

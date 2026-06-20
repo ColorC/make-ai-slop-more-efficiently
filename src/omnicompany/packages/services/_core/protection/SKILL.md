@@ -43,7 +43,7 @@ omni lock scan
 |---|---|
 | `omni lock status / open / close / scan` | 锁管理 |
 
-详细 CLI: [docs/standards/cli/lock.md](../../../../../../docs/standards/cli/lock.md)
+详细 CLI: docs/standards/cli/lock.md
 
 ## 故障排查
 
@@ -55,5 +55,5 @@ omni lock scan
 ## 想了解更多
 
 - [README.md](README.md) / [DESIGN.md](DESIGN.md)
-- omni lock CLI → [docs/standards/cli/lock.md](../../../../../../docs/standards/cli/lock.md)
+- omni lock CLI → docs/standards/cli/lock.md
 - 自稳计划 → [docs/plans/guardian/[2026-05-04]CORE-SELF-STABILITY/plan.md](../../../../../docs/plans/guardian/%5B2026-05-04%5DCORE-SELF-STABILITY/plan.md)

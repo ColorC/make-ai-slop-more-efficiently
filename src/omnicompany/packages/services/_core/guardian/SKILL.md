@@ -33,7 +33,7 @@ disable-model-invocation: false
 **不用我**:
 - 想做运行时诊断 (Format/Worker/Team 健康) → 找 [doctor service](../../_diagnosis/doctor/)
 - 想自动修代码 → 找 [services/repair/](../../) (guardian 主要 warn, 修是 repair 的事)
-- 想注册新实体 → 找 [register CLI](../../../../../../docs/standards/cli/registration.md), 不是 guardian
+- 想注册新实体 → 找 register CLI, 不是 guardian
 
 ## 前置条件
 

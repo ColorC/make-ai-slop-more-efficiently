@@ -36,7 +36,7 @@ disable-model-invocation: false
 - omnicompany 已装 (`omni --help` 确认)
 - target service 路径合法 (在 `packages/services/(_*/)?<svc>/` 或 `packages/domains/<dom>/<pkg>/` 形态)
 - 跑 LLM Worker 需 `THE_COMPANY_API_KEY` 已配 (qwen-3.6-plus 走 the_company 聚合 API)
-- skeleton 类目标在 [docs/standards/distributed-docs.md](../../../../../../docs/standards/_global/distributed-docs.md) 所列合法位置
+- skeleton 类目标在 docs/standards/distributed-docs.md 所列合法位置
 
 ## 操作步骤
 
@@ -126,6 +126,6 @@ omni docauthor issues --target=packages/services/_core/registry
 
 - 设计目的 → [README.md](README.md)
 - 内部架构 → [DESIGN.md](DESIGN.md)
-- 文档规范权威 → [docs/standards/distributed-docs.md](../../../../../../docs/standards/_global/distributed-docs.md)
+- 文档规范权威 → docs/standards/distributed-docs.md
 - 自我叙事三件套规范 → [docs/standards/protocol/self_narrative_three_files.md](../../../../../../docs/standards/protocol/self_narrative_three_files.md)
 - 上游 plan + 金标样本 → [docs/plans/[2026-04-25]AUTO-DOCAUTHOR-WORKER/](../../../../../docs/plans/%5B2026-04-25%5DAUTO-DOCAUTHOR-WORKER/)

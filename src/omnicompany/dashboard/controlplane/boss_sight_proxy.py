@@ -116,6 +116,21 @@ async def reviewstage_stream_proxy(client_ws: WebSocket) -> None:
                 pass
 
 
+# 共享 httpx 客户端: 原来每个代理请求都新建 AsyncClient(含创建 SSL context, 很贵, stackdump 抓到)。
+# 复用单例 + keep-alive 连接池, 对齐 app.py 里 walker/vilo 代理写法。
+_proxy_client: "httpx.AsyncClient | None" = None
+
+
+def _get_proxy_client() -> httpx.AsyncClient:
+    global _proxy_client
+    if _proxy_client is None:
+        _proxy_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, read=120.0),
+            limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
+        )
+    return _proxy_client
+
+
 # ── HTTP 透传 (catch-all) ──────────────────────────────────────────────
 @boss_sight_proxy_router.api_route(
     "/{path:path}",
@@ -126,19 +141,19 @@ async def http_proxy(path: str, request: Request) -> Response:
     target = f"{base}/api/boss-sight/{path}"
     body = await request.body()
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=120.0)) as client:
-        try:
-            upstream = await client.request(
-                method=request.method,
-                url=target,
-                headers=_filter_headers(dict(request.headers)),
-                params=request.query_params,
-                content=body,
-            )
-        except httpx.ConnectError as e:
-            raise HTTPException(status_code=503, detail=f"ccdaemon unreachable: {e}")
-        except httpx.HTTPError as e:
-            raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {e}")
+    client = _get_proxy_client()
+    try:
+        upstream = await client.request(
+            method=request.method,
+            url=target,
+            headers=_filter_headers(dict(request.headers)),
+            params=request.query_params,
+            content=body,
+        )
+    except httpx.ConnectError as e:
+        raise HTTPException(status_code=503, detail=f"ccdaemon unreachable: {e}")
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {e}")
 
     return Response(
         content=upstream.content,

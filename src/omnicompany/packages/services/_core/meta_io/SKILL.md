@@ -41,7 +41,7 @@ from omnicompany.packages.services._core.meta_io.state_check import check_before
 
 | 入口 | 用途 |
 |---|---|
-| `omni meta-io ...` | CLI (具体子命令见 [docs/standards/cli/meta_io.md](../../../../../../docs/standards/cli/meta_io.md)) |
+| `omni meta-io ...` | CLI (具体子命令见 docs/standards/cli/meta_io.md) |
 | `register_tool` / `audit` / `state_check` (Python) | 库调用 |
 
 ## 故障排查
@@ -53,5 +53,5 @@ from omnicompany.packages.services._core.meta_io.state_check import check_before
 ## 想了解更多
 
 - [README.md](README.md) / [DESIGN.md](DESIGN.md)
-- CLI → [docs/standards/cli/meta_io.md](../../../../../../docs/standards/cli/meta_io.md)
+- CLI → docs/standards/cli/meta_io.md
 - agent ToolDispatch → [../agent/README.md](../agent/README.md)

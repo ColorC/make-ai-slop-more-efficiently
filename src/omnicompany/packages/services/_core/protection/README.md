@@ -5,7 +5,7 @@
 
 # protection · omni 锁机制内核
 
-> [omni lock](../../../../../../docs/standards/cli/lock.md) 主动防御 service 内核. 含 handlers (锁开关处理) + policy (策略) + scanner (无身份扫描). PHASE3 第四段实装.
+> omni lock 主动防御 service 内核. 含 handlers (锁开关处理) + policy (策略) + scanner (无身份扫描). PHASE3 第四段实装.
 
 ## 这是什么
 
@@ -36,5 +36,5 @@ protection 是 omnicompany 的**锁机制 service 内核**. omni lock open/close
 ## 想了解更多
 
 - [DESIGN.md](DESIGN.md) / [SKILL.md](SKILL.md)
-- omni lock CLI → [docs/standards/cli/lock.md](../../../../../../docs/standards/cli/lock.md)
+- omni lock CLI → docs/standards/cli/lock.md
 - 自稳计划 → [docs/plans/guardian/[2026-05-04]CORE-SELF-STABILITY/plan.md](../../../../../docs/plans/guardian/%5B2026-05-04%5DCORE-SELF-STABILITY/plan.md)

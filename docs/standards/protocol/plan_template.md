@@ -8,7 +8,7 @@
 
 > **权威**: [`concepts/plan.md`](../concepts/plan.md)（2026-06-13 起 plan 唯一权威规范, 用户裁决"冲突以新为准"）——本文件是其 protocol 层**模板细则**（plan.md 章节硬下限），冲突时以 concepts/plan.md 为准
 > **头部字段**: 按 concepts/plan.md §三 — 文件顶部唯一 yaml frontmatter（平铺字段 + binding 块同居一块），之后才是 OmniMark 头注释. 改本文件前必同步看 concepts/plan.md 是否一致 (元规范第 1 条违例自查)
-> **相关**: [`distributed-docs.md`](../_global/distributed-docs.md) (位置), [`design_md_template.md`](design_md_template.md) (DESIGN 模板), [doctor 计划型诊断](../../../src/omnicompany/packages/services/_diagnosis/doctor/DESIGN.md), [`standards_meta.md`](../_global/standards_meta.md) (立规范的元规范)
+> **相关**: `distributed-docs.md` (位置), [`design_md_template.md`](design_md_template.md) (DESIGN 模板), [doctor 计划型诊断](../../../src/omnicompany/packages/services/_diagnosis/doctor/DESIGN.md), `standards_meta.md` (立规范的元规范)
 > **位置**: `docs/plans/<topic>/[YYYY-MM-DD]<plan-name>/plan.md`
 > **设施统一计划**: 若计划目标是消灭二重权威/统一核心设施, 必须补 `authority-confirmation.md` 与 `autonomous-execution-rules.md` 两个同目录文件; 当前样例见 authority-confirmation.md / autonomous-execution-rules.md。
 
@@ -233,11 +233,11 @@ PlanDiagnosticAgent 看这些点判 finding:
 
 合规样本: [`docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/samples/sample_compliant_plan_exemplar_library.md`](../../plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/samples/sample_compliant_plan_exemplar_library.md)
 
-> 跟元规范 v1 ([`standards_meta.md`](../_global/standards_meta.md)) 第 2 条配套立的真合规样本. 本样本逐条符合本模板 (一-七节齐 + OMNI 头齐 + 产物清单 + 静态/动态验收 + 三档处置), **修本模板前必同步改样本**, 不一致是本模板出问题信号.
+> 跟元规范 v1 (`standards_meta.md`) 第 2 条配套立的真合规样本. 本样本逐条符合本模板 (一-七节齐 + OMNI 头齐 + 产物清单 + 静态/动态验收 + 三档处置), **修本模板前必同步改样本**, 不一致是本模板出问题信号.
 
 > 注: 本模板 2026-05-05 立, 历史 plan.md 可能不全合本模板 (如 `本计划自己 plan.md`). PlanDiagnosticAgent 看历史 plan 时按 finding 标差异, 不阻断不重写历史.
 
-> **历史教训** (元规范触发): 本模板 v1 立时 §五 错指"本计划用的 plan.md" 作合格例, 实测它不合规 (PlanDiagnosticAgent dogfood 找 6 处 finding). 这促成元规范 v1 把"必有真合规样本" 上升为立规范者硬底线. 见 [`standards_meta.md` §五 反例](../_global/standards_meta.md).
+> **历史教训** (元规范触发): 本模板 v1 立时 §五 错指"本计划用的 plan.md" 作合格例, 实测它不合规 (PlanDiagnosticAgent dogfood 找 6 处 finding). 这促成元规范 v1 把"必有真合规样本" 上升为立规范者硬底线. 见 `standards_meta.md` §五 反例.
 
 ---
 

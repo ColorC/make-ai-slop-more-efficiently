@@ -72,4 +72,4 @@ ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单
 - 关联计划: [`docs/plans/dashboard/[2026-05-09]DASHBOARD-DOGFOOD-RESILIENCE/plan.md`](../../../../docs/plans/dashboard/[2026-05-09]DASHBOARD-DOGFOOD-RESILIENCE/plan.md)
 - 协议依赖: [`docs/plans/dashboard/[2026-05-03]CC-PLAN-SESSION-CONTEXT/plan.md`](../../../../docs/plans/dashboard/[2026-05-03]CC-PLAN-SESSION-CONTEXT/plan.md) (active_plan 绑定 / cc_sessions.json schema)
 - 兄弟包依赖: [`controlplane/DESIGN.md`](../controlplane/DESIGN.md) (反向代理协议 / cc_proxy.py)
-- 关联规范: [`docs/standards/cli/cc_wrapper_hooks.md`](../../../../docs/standards/cli/cc_wrapper_hooks.md)
+- 关联规范: `docs/standards/cli/cc_wrapper_hooks.md`

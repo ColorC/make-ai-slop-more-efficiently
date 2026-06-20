@@ -6,7 +6,7 @@
 
 # plan 规范
 
-> **跟 [`protocol/plan_template.md`](../protocol/plan_template.md) 关系**: 本文是 concept 层 (plan 概念是什么 + 接 dashboard wikilink 体系); plan_template 是 protocol 层 (plan.md 文件章节硬下限). 两份规范层次不同, 互补不矛盾, 改任一份前必同步看另一份 (元规范 [`standards_meta.md`](../_global/standards_meta.md) 第 1 条).
+> **跟 [`protocol/plan_template.md`](../protocol/plan_template.md) 关系**: 本文是 concept 层 (plan 概念是什么 + 接 dashboard wikilink 体系); plan_template 是 protocol 层 (plan.md 文件章节硬下限). 两份规范层次不同, 互补不矛盾, 改任一份前必同步看另一份 (元规范 `standards_meta.md` 第 1 条).
 
 ## 一、 plan 是什么
 

@@ -99,4 +99,4 @@ report = result.outputs["selftest.health-report"]
 - 设计目的 → [README.md](README.md)
 - 内部架构 (D1-D5 决策 / 4 Worker 数据流) → [DESIGN.md](DESIGN.md)
 - 跟 doctor / guardian / lap_auditor / semantic_auditor 关系 → 项目根 [README.md `## 构成`](../../../../../../README.md)
-- LLM 连通性配置 → [docs/standards/cli/llm_infrastructure.md](../../../../../../docs/standards/cli/llm_infrastructure.md)
+- LLM 连通性配置 → docs/standards/cli/llm_infrastructure.md

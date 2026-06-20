@@ -46,7 +46,7 @@ omni register identity --kind=ai-ide --name=...
 | `omni session bind --trace-id=...` | 绑 session |
 | `omni register identity --kind=... --name=...` | 注册身份 + 凭据 |
 
-详细 CLI 标准: [docs/standards/cli/identity.md](../../../../../../docs/standards/cli/identity.md)
+详细 CLI 标准: docs/standards/cli/identity.md
 
 ## 故障排查
 
@@ -59,4 +59,4 @@ omni register identity --kind=ai-ide --name=...
 ## 想了解更多
 
 - [README.md](README.md) / [DESIGN.md](DESIGN.md)
-- CLI 标准 → [docs/standards/cli/identity.md](../../../../../../docs/standards/cli/identity.md)
+- CLI 标准 → docs/standards/cli/identity.md

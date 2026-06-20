@@ -33,30 +33,6 @@ try:
 except Exception:  # noqa: BLE001 — 隐藏窗口尽力而为, 失败不该挡 dashboard 启动
     pass
 
-# 临时诊断: OMNI_DASH_STACKDUMP=1 时, 后台线程定期把所有线程栈写盘, 用于定位 CPU 占用源。
-if os.environ.get("OMNI_DASH_STACKDUMP"):
-    import sys as _sys
-    import threading as _thr
-    import time as _t
-    import traceback as _tb
-
-    def _stackdump_loop() -> None:
-        _t.sleep(8)
-        path = Path(__file__).resolve().parents[3] / "data" / "_stackdump.log"
-        for _ in range(5):
-            chunks = ["\n===== dump @ %.1f =====" % _t.time()]
-            for tid, frame in _sys._current_frames().items():
-                chunks.append("--- thread %s ---" % tid)
-                chunks.append("".join(_tb.format_stack(frame)))
-            try:
-                with open(path, "a", encoding="utf-8") as fh:
-                    fh.write("\n".join(chunks))
-            except OSError:
-                pass
-            _t.sleep(2.5)
-
-    _thr.Thread(target=_stackdump_loop, name="stackdump", daemon=True).start()
-
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware

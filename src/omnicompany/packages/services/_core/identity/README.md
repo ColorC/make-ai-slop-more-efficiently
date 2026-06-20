@@ -5,7 +5,7 @@
 
 # identity · omni 身份解析
 
-> omni session 身份解析 + 写入凭据签发. 跟 [omni who / whoami / session CLI](../../../../../../docs/standards/cli/identity.md) 配套, 是 CLI-PHASE3 注册体系的身份部分.
+> omni session 身份解析 + 写入凭据签发. 跟 omni who / whoami / session CLI 配套, 是 CLI-PHASE3 注册体系的身份部分.
 
 ## 这是什么
 
@@ -14,7 +14,7 @@ identity 是 omnicompany 的**身份解析跟写入凭据 service**. 跟 registe
 ## 解决什么 / 不解决什么
 
 **解决**: 当前 session 身份解析 (omni who) / 跨 compact 身份持久 (omni session bind) / 写入凭据签发 (data/services/registry/credentials/<id>.json).
-**不解决**: 业务级权限 (那是 [protection lock](../protection/) 跟 [guardian](../guardian/) 的事); 注册体系本身 (那是 [registration CLI](../../../../../../docs/standards/cli/registration.md)).
+**不解决**: 业务级权限 (那是 [protection lock](../protection/) 跟 [guardian](../guardian/) 的事); 注册体系本身 (那是 registration CLI).
 
 ## 设计目的与最终目标
 
@@ -35,5 +35,5 @@ identity 是 omnicompany 的**身份解析跟写入凭据 service**. 跟 registe
 ## 想了解更多
 
 - [DESIGN.md](DESIGN.md) / [SKILL.md](SKILL.md)
-- CLI omni who / whoami / session → [docs/standards/cli/identity.md](../../../../../../docs/standards/cli/identity.md)
-- 注册体系 → [docs/standards/cli/registration.md](../../../../../../docs/standards/cli/registration.md)
+- CLI omni who / whoami / session → docs/standards/cli/identity.md
+- 注册体系 → docs/standards/cli/registration.md
