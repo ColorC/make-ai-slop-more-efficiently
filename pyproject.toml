@@ -78,6 +78,7 @@ target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
-# CI 阻断只看真 bug（语法错误 / 未定义名）。海量 cosmetic（unused-import / f-string
-# 占位符等）尚未清理，留作 good-first-issue 渐进收敛，不阻断构建。
-select = ["E9", "F63", "F7", "F82"]
+# CI 阻断只看真 bug（语法错误 / pyflakes 错误类）。undefined-name（F82）因 ruff 对
+# 字符串前向引用注解误报而未纳入；海量 cosmetic（unused-import / f-string 占位符等）
+# 尚未清理，留作 good-first-issue 渐进收敛，不阻断构建。
+select = ["E9", "F63", "F7"]
