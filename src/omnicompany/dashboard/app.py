@@ -11,9 +11,12 @@ controlplane/ 子模块. 本文件 ≤ 100 行 (lifespan + 路由装载 + 静态
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import logging
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -50,10 +53,18 @@ _STATIC_DIR = _DASHBOARD_ROOT / "static"
 # 这是"生产缺口"的补丁: vite dev 有代理, 但用户实际看的是后端 serve 的构建版, 故后端也要代理。
 _WALKER_GAME_UPSTREAM = os.environ.get("OMNI_WALKER_GAME_URL", "http://127.0.0.1:5176").rstrip("/")
 _VILO_DEMO_UPSTREAM = os.environ.get("OMNI_VILO_DEMO_URL", "http://127.0.0.1:8892").rstrip("/")
+# 叙事工作室 narrative_studio(:8330)同源反向代理目标 —— 让审阅 iframe 与 dashboard 同源,
+# 圈选/快照能读到内容;strip 前缀 + 转发全方法(落地层编辑写回 wiki 走 POST/PUT/DELETE)。
+_NARRATIVE_STUDIO_UPSTREAM = os.environ.get("OMNI_NARRATIVE_STUDIO_URL", "http://127.0.0.1:8330").rstrip("/")
+# voxelcraft 资产库只读浏览 API(:8331)同源反向代理目标 —— 项目级资产审阅视图后端半边,
+# 仅 api/*(page_retired), 让审阅前端与 dashboard 同源读到库数据/预览。
+_voxelcraft_ASSETS_UPSTREAM = os.environ.get("OMNI_voxelcraft_ASSETS_URL", "http://127.0.0.1:8331").rstrip("/")
 # 共享、带连接池/keep-alive 的 httpx 客户端 —— vite dev 把页面拆成几百个小模块逐个请求,
 # 若每个请求新建 client(无 keep-alive)会慢到十几秒; 共享池后回到 ~1-2s。懒建, shutdown 关。
 _walker_client: "httpx.AsyncClient | None" = None
 _vilo_demo_client: "httpx.AsyncClient | None" = None
+_narrative_client: "httpx.AsyncClient | None" = None
+_voxelcraft_assets_client: "httpx.AsyncClient | None" = None
 
 
 def _get_walker_client() -> "httpx.AsyncClient":
@@ -76,6 +87,165 @@ def _get_vilo_demo_client() -> "httpx.AsyncClient":
             limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
         )
     return _vilo_demo_client
+
+
+def _get_narrative_client() -> "httpx.AsyncClient":
+    global _narrative_client
+    if _narrative_client is None:
+        _narrative_client = httpx.AsyncClient(
+            base_url=_NARRATIVE_STUDIO_UPSTREAM,
+            timeout=30.0,
+            limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
+        )
+    return _narrative_client
+
+
+def _get_voxelcraft_assets_client() -> "httpx.AsyncClient":
+    global _voxelcraft_assets_client
+    if _voxelcraft_assets_client is None:
+        _voxelcraft_assets_client = httpx.AsyncClient(
+            base_url=_voxelcraft_ASSETS_UPSTREAM,
+            timeout=30.0,
+            limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
+        )
+    return _voxelcraft_assets_client
+
+
+# ── 网页审阅托管中心: 懒启动注册表 ─────────────────────────────────────────────
+# 审阅 iframe 打开某 app 的 live_url 时, 若其后端没在跑, 由本进程按标准命令把它拉起来
+# (无窗口——subprocess.Popen 已被上面的 _subprocess_hide 全局加 CREATE_NO_WINDOW),
+# 探活就绪后再代理。这样"应用意外关闭→点开审阅材料→自动按标准方式启动并打开"。
+# 参考 AIWorkSpace app 中心 ports.json 的 lazy-spawn 范式(ready_path 探活 / 点击才起)。
+_REPO_ROOT = _DASHBOARD_ROOT.parents[2]  # .../omnicompany
+_WS_ROOT = _REPO_ROOT.parent             # .../WindowsWorkspace(webworks 等是 omnicompany 的同级)
+
+_HOSTED_APPS: "dict[str, dict]" = {
+    "narrative-studio": {
+        # v2 四期 D7(DEC-2026-07-05-025/030): 网页壳已退役, 本条目只作为"叙事内容引擎"的
+        # 启动配置存在(api/* 反代的数据通路), 不再是托管中心的页面条目(page_retired)。
+        "name": "叙事内容引擎(narrative-studio, 仅 API)",
+        "page_retired": True,
+        "upstream": _NARRATIVE_STUDIO_UPSTREAM,
+        "ready_path": "/api/project",
+        "start": [sys.executable, "-m", "omnicompany.packages.narrative_studio",
+                  "serve", "--port", "8330"],
+        "cwd": str(_REPO_ROOT),
+        "env": {"PYTHONPATH": "src"},  # PYTHONPATH 的相对值按仓根解析(见下)
+    },
+    "voxelcraft-assets": {
+        # 项目级资产审阅视图后端(仅 API): 库只读浏览 API, 页面壳由前端半边另做, 本条目
+        # 只作数据通路(api/* 反代)的启动配置存在, 不作托管中心页面条目(page_retired)。
+        "name": "voxelcraft 资产库浏览 API(仅 API)",
+        "page_retired": True,
+        "upstream": _voxelcraft_ASSETS_UPSTREAM,
+        "ready_path": "/api/health",
+        "start": [sys.executable, "-m",
+                  "omnicompany.packages.domains.voxelcraft.content.assets.api",
+                  "serve", "--port", "8331"],
+        "cwd": str(_REPO_ROOT),
+        "env": {"PYTHONPATH": "src"},  # PYTHONPATH 的相对值按仓根解析(见 _ensure_hosted_app)
+    },
+    "walker-game": {
+        "name": "行者无乡 walker-game",
+        "upstream": _WALKER_GAME_UPSTREAM,        # :5176
+        "ready_path": "/walker-game/",             # vite --base /walker-game/
+        "start": "npm run dev:dashboard",          # vite --host 127.0.0.1 --port 5176 --base /walker-game/
+        "shell": True,                              # npm 在 Windows 是 .cmd, 需经 shell
+        "cwd": str(_WS_ROOT / "webworks" / "apps" / "walker-game"),
+        "wait_secs": 60.0,                          # vite 冷启可能慢, 放宽
+    },
+    "vilo-demo": {
+        "name": "Vilo demo (tabletop)",
+        "upstream": _VILO_DEMO_UPSTREAM,           # :8892
+        "ready_path": "/",                          # http.server 根目录列表=200
+        "start": [sys.executable, "-m", "http.server", "8892"],
+        "cwd": str(_WS_ROOT / "webworks"),         # 从 webworks 根起服务
+    },
+}
+
+_host_locks: "dict[str, asyncio.Lock]" = {}
+
+
+async def _host_health_ok(appcfg: dict) -> bool:
+    """轻量探活: ready_path 返回 <500 即视为就绪。"""
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as c:
+            r = await c.get(appcfg["upstream"] + appcfg.get("ready_path", "/"))
+            return r.status_code < 500
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def _ensure_hosted_app(app_id: str, *, wait_secs: float = 30.0) -> bool:
+    """确保托管 app 在跑: 已就绪→True; 没跑→按注册表命令无窗口拉起, 探活至就绪。
+
+    并发安全: 每 app 一把锁, 拿不到锁的请求等首个请求把它拉起来即可。
+    """
+    appcfg = _HOSTED_APPS.get(app_id)
+    if not appcfg:
+        return False
+    if await _host_health_ok(appcfg):
+        return True
+    if not appcfg.get("start"):
+        return False  # 注册了但没给启动命令, 无法托管
+    lock = _host_locks.setdefault(app_id, asyncio.Lock())
+    async with lock:
+        if await _host_health_ok(appcfg):  # 等锁期间别的请求已把它拉起
+            return True
+        env = dict(os.environ)
+        for k, v in appcfg.get("env", {}).items():
+            env[k] = str(_REPO_ROOT / v) if k == "PYTHONPATH" else v
+        try:
+            # Popen 已被 _subprocess_hide 全局 patch 成 CREATE_NO_WINDOW, 不弹控制台。
+            # shell=True 用于 npm 这类 Windows .cmd 命令(start 为字符串)。
+            # Windows 下经 `cmd /c start /b` 分离父子关系: `omni dashboard restart` 用
+            # taskkill /T 按进程树杀, 不分离的话每次重启 dashboard 都连带杀掉托管 app
+            # (2026-07-04 实锤: 工作室被反复误杀 → 下个访问者付 30-60s 冷启动 + 死 502 面板)。
+            start_cmd = appcfg["start"]
+            use_shell = bool(appcfg.get("shell"))
+            if os.name == "nt":
+                if use_shell:
+                    start_cmd = f'start "" /b {start_cmd}'
+                else:
+                    start_cmd = ["cmd.exe", "/d", "/c", "start", "", "/b", *[str(a) for a in start_cmd]]
+            subprocess.Popen(
+                start_cmd, cwd=appcfg.get("cwd"), env=env,
+                shell=use_shell,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("lazy-start failed for hosted app %s", app_id)
+            return False
+        deadline = time.monotonic() + float(appcfg.get("wait_secs", wait_secs))
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.5)
+            if await _host_health_ok(appcfg):
+                logger.info("lazy-started hosted app %s", app_id)
+                return True
+        logger.warning("hosted app %s spawned but not ready in %ss", app_id, wait_secs)
+        return False
+
+
+def _lazy_boot_page(display_name: str) -> Response:
+    """上游未起时给 HTML 导航的自愈页: 立即返回, 每 2s 自动重试, 直到上游就绪。
+
+    以前是同步等 ensure(最长 30-60s)再回 502 —— iframe 拿到 502 就永远停在死页,
+    用户视角"连接无法起效"(2026-07-04 实锤)。现在: 秒回启动页 + 后台拉起 + 自动刷新自愈。
+    """
+    html = (
+        '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="2">'
+        "<style>body{background:#14161a;color:#8b94a3;font:13px 'Segoe UI',sans-serif;"
+        "display:grid;place-items:center;height:100vh;margin:0}"
+        ".spin{width:16px;height:16px;border:2px solid #334155;border-top-color:#6ea8fe;"
+        "border-radius:50%;display:inline-block;vertical-align:-3px;margin-right:8px;"
+        "animation:s .9s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style></head>"
+        f'<body><div><span class="spin"></span>{display_name} 启动中… 本页每 2 秒自动重试</div></body></html>'
+    )
+    return Response(content=html, status_code=200, media_type="text/html; charset=utf-8")
+
+
+def _wants_html(request: Request) -> bool:
+    return request.method == "GET" and "text/html" in (request.headers.get("accept") or "")
 
 
 def _load_domains_on_startup() -> None:
@@ -102,9 +272,28 @@ def _load_domains_on_startup() -> None:
 
 app = FastAPI(title="OmniCompany Dashboard", version="0.3.1")
 
+# CORS: 默认放行 vite dev(5173) + LOFA 安卓端 WebView origin。
+# LOFA(局域网 only)的 Capacitor 壳从 capacitor://localhost / http://localhost 跨源调本机 API
+# (仅当 App 走"打包 SPA"路线; M1 走"WebView 直指 PC URL"为同源, 无需 CORS, 但提前放行无害)。
+# 可用 OMNI_DASHBOARD_CORS_ORIGINS(逗号分隔)覆盖默认。
+_default_cors_origins = [
+    "http://localhost:5173",
+    "http://localhost",
+    "https://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
+    # poof(Tauri v2)悬浮层 webview origin —— 统一捕获从 poof fetch 本机 captures 端点。
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+    "tauri://localhost",
+]
+_cors_env = os.environ.get("OMNI_DASHBOARD_CORS_ORIGINS", "").strip()
+_cors_origins = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()] if _cors_env else _default_cors_origins
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -135,6 +324,8 @@ _CONTROLPLANE_ROUTERS: list[tuple[str, str, str | None]] = [
     ("omnicompany.dashboard.controlplane.cc_proxy",    "cc_proxy_router",    None),  # 自身 /api/cc
     ("omnicompany.dashboard.controlplane.boss_sight_proxy", "boss_sight_proxy_router", None),  # 自身 /api/boss-sight
     ("omnicompany.dashboard.controlplane.registry",    "registry_router",    "/api/v2"),
+    # 探索路径可视化/决策树 ([2026-06-27] 见 controlplane/material_graph.py + EXPLORATION-PATH-VIZ)
+    ("omnicompany.dashboard.controlplane.material_graph", "material_graph_router", "/api/v2"),
     ("omnicompany.dashboard.controlplane.lock",        "lock_router",        "/api/v2"),
     ("omnicompany.dashboard.controlplane.sandbox",     "sandbox_router",     "/api/v2"),
     ("omnicompany.dashboard.controlplane.meta_io",     "meta_io_router",     "/api/v2"),
@@ -147,6 +338,14 @@ _CONTROLPLANE_ROUTERS: list[tuple[str, str, str | None]] = [
     ("omnicompany.dashboard.controlplane.dev_reload",  "dev_reload_router",  "/api"),
     # 项目工作板 ([2026-06-12] 首页重置为项目卡片, 见 controlplane/projects.py)
     ("omnicompany.dashboard.controlplane.projects",    "projects_router",    "/api"),
+    # 技能+管线清单 ([2026-07-06] 项目页「技能」页签, 见 controlplane/skills.py)
+    ("omnicompany.dashboard.controlplane.skills",      "skills_router",      "/api"),
+    # 项目文件目录树 ([2026-07-06] 项目页「文件」页签重做, 见 controlplane/project_fs.py)
+    ("omnicompany.dashboard.controlplane.project_fs",  "project_fs_router",  "/api"),
+    # 统一定时调度「定时任务」视图 ([2026-06-24] 见 controlplane/cron.py)
+    ("omnicompany.dashboard.controlplane.cron",        "cron_router",        "/api"),
+    ("omnicompany.dashboard.controlplane.lan_access",  "lan_access_router",  None),
+    ("omnicompany.dashboard.controlplane.local_services", "local_services_router", None),
     # plan audit 网页端点 ([2026-06-19] 三点菜单「跑 audit」, 见 controlplane/plan_audit_routes.py)
     ("omnicompany.dashboard.controlplane.plan_audit_routes", "plan_audit_router", "/api"),
     ("omnicompany.dashboard.controlplane.nodes",       "nodes_router",       "/api"),
@@ -154,8 +353,14 @@ _CONTROLPLANE_ROUTERS: list[tuple[str, str, str | None]] = [
     ("omnicompany.dashboard.controlplane.health",      "health_router",      "/api"),
     ("omnicompany.dashboard.controlplane.evolution",   "evolution_router",   "/api"),
     ("omnicompany.dashboard.controlplane.semantic",    "semantic_router",    "/api"),
-    # voxelcraft NPC dialog (跨 packages/domains/, 但挂 dashboard 进程上)
-    ("omnicompany.packages.domains.voxelcraft.dialog.route", "voxelcraft_dialog_router", "/api"),
+    # voxelcraft NPC dialog (跨 packages/domains/, 但挂 dashboard 进程上; 1-3 组D 迁 runtime/dialog)
+    ("omnicompany.packages.domains.voxelcraft.runtime.dialog.route", "voxelcraft_dialog_router", "/api"),
+    # LOFA 安卓远程端日志回传 ([2026-06-25] 见 controlplane/android.py)
+    ("omnicompany.dashboard.controlplane.android",     "android_router",     None),
+    # LOFA 实机操作台反代: devview/ws-scrcpy 收进 8210, 对外只一个口 ([2026-06-28] 见 lofa_proxy.py)
+    ("omnicompany.dashboard.controlplane.lofa_proxy",  "lofa_proxy_router",  None),
+    # overlay-shell 笔记 HTTP 桥: 网页/手机端共用桌面 overlay-shell 的 BlockSuite 笔记.
+    ("omnicompany.dashboard.controlplane.overlay_notes",  "overlay_notes_router",  None),
 ]
 
 for _mod_path, _attr, _prefix in _CONTROLPLANE_ROUTERS:
@@ -187,6 +392,13 @@ async def _startup() -> None:
         app.state.ide_session_manager = IDESessionManager(bus)
     except Exception as e:
         logger.warning("IDE bus init failed: %s", e)
+
+    # 预热日常主力托管 app: 别让第一个访问者付 30-60s 冷启动(2026-07-04 实锤)。
+    # 后台任务, 不阻塞 dashboard 启动; 已在跑则 ensure 是零成本探活。
+    try:
+        asyncio.get_running_loop().create_task(_ensure_hosted_app("narrative-studio"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("hosted app prewarm failed: %s", e)
 
 
 @app.on_event("shutdown")
@@ -260,6 +472,22 @@ async def index() -> Response:
     return FileResponse(str(index_html))
 
 
+@app.get("/omni-capture-beacon.js")
+async def omni_capture_beacon() -> Response:
+    """统一捕获信标(根级静态 JS)。index.html 用 <script src="/omni-capture-beacon.js"> 引它,
+    但 dashboard 只 mount 了 /assets 与 /icons, 根级文件没路由 → 之前 404 → 信标永不运行 →
+    surfaces 一直空 → 截图 MD 解析不出 page/target。这里补上路由。"""
+    f = _STATIC_DIR / "omni-capture-beacon.js"
+    if not f.is_file():
+        return Response(status_code=404)
+    # 信标是"活"脚本(随捕获能力升级), 绝不缓存 —— 否则浏览器缓存旧版, 普通刷新拿不到新信标,
+    # 就看不到新增的 content_els/hover 字段(实测踩过: 服务重启了、页面刷了却仍是旧信标)。
+    return FileResponse(
+        str(f), media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"},
+    )
+
+
 @app.get("/chat-standalone")
 async def chat_standalone() -> FileResponse:
     """裸聊天界面 — 同一 SPA bundle, 前端 main.tsx 按 pathname 分流到 ChatStandalone.
@@ -298,14 +526,21 @@ async def walker_game_proxy(request: Request, path: str = "") -> Response:
     try:
         # identity 编码避免上游 gzip 与我们重写 content-length 冲突
         resp = await _get_walker_client().get(upstream, headers={"accept-encoding": "identity"})
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f"walker-game upstream unreachable ({_WALKER_GAME_UPSTREAM}): {exc}. "
-                "在游戏仓库跑 `npm run dev:dashboard` 后重试。"
-            ),
-        )
+    except httpx.RequestError:
+        # 上游没在跑。HTML 导航 → 秒回自愈启动页(同叙事工作室, 见 _lazy_boot_page); 其余阻塞拉起重试。
+        if _wants_html(request):
+            asyncio.get_running_loop().create_task(_ensure_hosted_app("walker-game"))
+            return _lazy_boot_page("行者无乡 walker-game")
+        if await _ensure_hosted_app("walker-game"):
+            try:
+                resp = await _get_walker_client().get(upstream, headers={"accept-encoding": "identity"})
+            except httpx.RequestError as exc2:
+                raise HTTPException(status_code=502, detail=f"walker-game 已尝试启动但仍不可达: {exc2}")
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail="walker-game 启动失败或超时。手动: 在 webworks/apps/walker-game 跑 `npm run dev:dashboard`",
+            )
     drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
     headers = {k: v for k, v in resp.headers.items() if k.lower() not in drop}
     return Response(
@@ -314,6 +549,151 @@ async def walker_game_proxy(request: Request, path: str = "") -> Response:
         headers=headers,
         media_type=resp.headers.get("content-type"),
     )
+
+
+_NARRATIVE_PAGE_RETIRED_HTML = (
+    '<!doctype html><html><head><meta charset="utf-8"><title>已退役</title>'
+    "<style>body{background:#14161a;color:#8b94a3;font:14px 'Segoe UI',sans-serif;"
+    "display:grid;place-items:center;height:100vh;margin:0;text-align:center;line-height:1.8}"
+    "b{color:#cdd6e4}</style></head><body><div>"
+    "<b>叙事工作室页面已退役</b>(统一设计工作室 v2)<br>"
+    "浏览/审阅走驾驶舱: 项目 <b>vilo</b> → <b>阅读视图</b>(材料展示框架·叙事展示区)。<br>"
+    "内容引擎 API(/narrative-studio/api/*)永久保留。"
+    "</div></body></html>"
+)
+
+
+@app.api_route("/narrative-studio", methods=["GET", "POST", "PUT", "DELETE"])
+@app.api_route("/narrative-studio/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def narrative_studio_proxy(request: Request, path: str = "") -> Response:
+    """叙事内容引擎反代(默认 :8330)。
+
+    v2 四期 D7(DEC-2026-07-05-025/030): **页面代理已退役** —— 只保留 api/* 反代
+    (阅读视图叙事渲染器的数据通路, 引擎未跑时自动拉起); 非 api 路径返回 410 指路页。
+    strip 前缀: /narrative-studio/api/x -> /api/x。转发全方法 + 请求体
+    (agent 经 API 做结构化编辑/写回 vilo wiki 的通道不变)。
+    """
+    if not (path == "api" or path.startswith("api/")):
+        return Response(content=_NARRATIVE_PAGE_RETIRED_HTML, status_code=410,
+                        media_type="text/html; charset=utf-8")
+    upstream = f"/{path}" if path else "/"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+    body = await request.body()
+    fwd = {k: v for k, v in request.headers.items()
+           if k.lower() not in {"host", "accept-encoding", "content-length"}}
+    fwd["accept-encoding"] = "identity"
+    try:
+        resp = await _get_narrative_client().request(
+            request.method, upstream, content=body, headers=fwd,
+        )
+    except httpx.RequestError:
+        # 上游没在跑。HTML 导航(iframe/页签首请求)→ 秒回自愈启动页, 后台拉起, 页自刷到就绪;
+        # 其余(API/资源)→ 阻塞拉起后重试一次(老行为)。
+        if _wants_html(request):
+            asyncio.get_running_loop().create_task(_ensure_hosted_app("narrative-studio"))
+            return _lazy_boot_page("叙事工作室")
+        if await _ensure_hosted_app("narrative-studio"):
+            try:
+                resp = await _get_narrative_client().request(
+                    request.method, upstream, content=body, headers=fwd,
+                )
+            except httpx.RequestError as exc2:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"narrative-studio 已尝试启动但仍不可达: {exc2}",
+                )
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "narrative-studio 启动失败或超时。手动: "
+                    "PYTHONPATH=src python -m omnicompany.packages.narrative_studio serve --port 8330"
+                ),
+            )
+    drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in drop}
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        headers=headers,
+        media_type=resp.headers.get("content-type"),
+    )
+
+
+@app.api_route("/voxelcraft-assets", methods=["GET"])
+@app.api_route("/voxelcraft-assets/{path:path}", methods=["GET"])
+async def voxelcraft_assets_proxy(request: Request, path: str = "") -> Response:
+    """voxelcraft 资产库只读 API 反代(默认 :8331), 仅 api/*(page_retired)。
+
+    项目级资产审阅视图的数据通路(库检索/条目/预览), strip 前缀:
+    /voxelcraft-assets/api/x -> /api/x。只读接口, 只转发 GET。上游未起时自动拉起并重试一次。
+    """
+    if not (path == "api" or path.startswith("api/")):
+        return Response(
+            content="voxelcraft-assets 仅提供只读 API(/voxelcraft-assets/api/*), 无页面壳。",
+            status_code=410, media_type="text/plain; charset=utf-8",
+        )
+    upstream = f"/{path}" if path else "/"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+    fwd = {k: v for k, v in request.headers.items()
+           if k.lower() not in {"host", "accept-encoding", "content-length"}}
+    fwd["accept-encoding"] = "identity"
+    try:
+        resp = await _get_voxelcraft_assets_client().get(upstream, headers=fwd)
+    except httpx.RequestError:
+        # 上游没在跑: 托管中心按标准命令无窗口拉起, 就绪后重试一次。
+        if await _ensure_hosted_app("voxelcraft-assets"):
+            try:
+                resp = await _get_voxelcraft_assets_client().get(upstream, headers=fwd)
+            except httpx.RequestError as exc2:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"voxelcraft-assets 已尝试启动但仍不可达: {exc2}",
+                )
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "voxelcraft-assets 启动失败或超时。手动: "
+                    "PYTHONPATH=src python -m "
+                    "omnicompany.packages.domains.voxelcraft.content.assets.api serve --port 8331"
+                ),
+            )
+    drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in drop}
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        headers=headers,
+        media_type=resp.headers.get("content-type"),
+    )
+
+
+@app.get("/api/host/apps")
+async def host_apps() -> "dict":
+    """托管中心: 列已注册 app 及其运行状态(供审阅前端展示卡片/在线点)。"""
+    out = {}
+    for aid, cfg in _HOSTED_APPS.items():
+        if cfg.get("page_retired"):
+            continue  # v2 四期 D7: 页面条目摘除(引擎启动配置保留, 只服务 api/* 反代)
+        out[aid] = {
+            "name": cfg.get("name"),
+            "upstream": cfg.get("upstream"),
+            "running": await _host_health_ok(cfg),
+            "hostable": bool(cfg.get("start")),  # 有启动命令=可被托管中心拉起
+        }
+    return {"apps": out}
+
+
+@app.post("/api/host/{app_id}/start")
+async def host_start(app_id: str) -> "dict":
+    """托管中心: 按标准命令把某 app 拉起(已在跑则直接 True)。点击/前端可调。"""
+    if app_id not in _HOSTED_APPS:
+        raise HTTPException(status_code=404, detail=f"未注册的托管 app: {app_id}")
+    running = await _ensure_hosted_app(app_id)
+    return {"app_id": app_id, "running": running}
 
 
 @app.api_route("/vilo-demo", methods=["GET"])
@@ -340,14 +720,18 @@ async def vilo_demo_proxy(request: Request, path: str = "") -> Response:
         upstream = f"{upstream}?{request.url.query}"
     try:
         resp = await _get_vilo_demo_client().get(upstream, headers={"accept-encoding": "identity"})
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f"Vilo demo upstream unreachable ({_VILO_DEMO_UPSTREAM}): {exc}. "
-                "在 tabletop-simulator 跑 `python -m http.server 8892 --bind 127.0.0.1` 后重试。"
-            ),
-        )
+    except httpx.RequestError:
+        # 上游没在跑: 托管中心从 webworks 根起 http.server, 就绪后重试一次。
+        if await _ensure_hosted_app("vilo-demo"):
+            try:
+                resp = await _get_vilo_demo_client().get(upstream, headers={"accept-encoding": "identity"})
+            except httpx.RequestError as exc2:
+                raise HTTPException(status_code=502, detail=f"Vilo demo 已尝试启动但仍不可达: {exc2}")
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail="Vilo demo 启动失败或超时。手动: 在 webworks 根跑 `python -m http.server 8892`",
+            )
     # 加载链修复(2026-06-15): demo 引擎(ui.js/ui.css/index.js)无版本号, 而 http.server 只发
     # Last-Modified → 浏览器/webview 启发式缓存把旧引擎钉死, "改了看不见"。在代理层根治, 不动源码
     # (index.js 被 walker 的 Vite 共享, 给源码加 ?v= 会破坏它):

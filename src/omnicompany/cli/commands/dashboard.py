@@ -177,9 +177,11 @@ def cmd_dashboard_restart() -> None:
     err_log = open(log_dir / f"live_dashboard_{_DASHBOARD_PORT}.err.log", "ab")
     env = {**os.environ, "PYTHONPATH": str(root / "src"), "OMNI_WORKSPACE_ROOT": str(root)}
     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | getattr(subprocess, "DETACHED_PROCESS", 0) if os.name == "nt" else 0
+    # LOFA: 默认仍 127.0.0.1(不破坏现状); 设 OMNI_DASHBOARD_HOST=0.0.0.0 开放局域网给安卓端。
+    _host = os.environ.get("OMNI_DASHBOARD_HOST", "127.0.0.1")
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "omnicompany.dashboard.app:app",
-         "--host", "127.0.0.1", "--port", str(_DASHBOARD_PORT), "--log-level", "info"],
+         "--host", _host, "--port", str(_DASHBOARD_PORT), "--log-level", "info"],
         cwd=str(root), env=env, stdout=out_log, stderr=err_log,
         creationflags=creationflags, close_fds=True,
         start_new_session=(os.name != "nt"),

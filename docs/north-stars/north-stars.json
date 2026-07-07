@@ -1,0 +1,126 @@
+{
+  "_meta": {
+    "what": "北极星 / 愿望单的唯一权威源。代表某个方向的北极星,或至少下一个阶段的里程碑;它们绝大多数没做完,有的还没开始。",
+    "flow": "本文件(omnicompany 内,权威) → sync-to-site.mjs 同步成 personal-homepage/data/wishlist.md(公开口径) → deploy.sh 推到 colorc.cc。",
+    "rule": "public=false 的条目不进公开站;public=true 的 northstar/detail 已按对外分享边界写(方向级,不含公司/游戏/引擎名与业务数据)。改方向只改本文件,别直接改站上的 wishlist.md。",
+    "updated": "2026-06-21"
+  },
+  "clusters": [
+    { "id": "omnicompany", "title": "omnicompany · 一个人的软件公司", "note": "把要做的事拆成管线、交给 AI 工人按规范跑的自建框架;下面几条是它和它的操作层的远期方向。" },
+    { "id": "narrative", "title": "自动化叙事", "note": "让 AI 按需求尽量独立地写长内容。" },
+    { "id": "games", "title": "游戏 · 同时当训练场", "note": "三个自己的游戏项目,各自是叙事系统和 omnicompany 制作能力的训练场。" },
+    { "id": "daywork", "title": "本职(游戏研发)里想交给 AI 的事", "note": "这几条是我本职工作上想用 AI 啃下来的方向,这里只讲方向、不涉及任何具体项目。" }
+  ],
+  "stars": [
+    {
+      "id": "omni-autopilot",
+      "cluster": "omnicompany",
+      "title": "omnicompany 完全自动化",
+      "kind": "北极星",
+      "status": "在路上",
+      "northstar": "几乎全托管的『真·一人公司』:靠一个人,把开发速度和质量追到前 AI 时代一支大型 web(游戏)开发团队的水平。",
+      "detail": "要点是高度自治、最小监督、长时间跑下来偏移也小。现在从把零散流程收成统一管线设施做起,这条已经在路上。",
+      "public": true
+    },
+    {
+      "id": "omni-true-autopilot",
+      "cluster": "omnicompany",
+      "title": "omnicompany 真·完全自动化",
+      "kind": "北极星(更远)",
+      "status": "打地基",
+      "northstar": "让这套框架有接近人的学习和反思能力,以及『跑多远都不崩』的稳。",
+      "detail": "上一条是把已经知道怎么做的事做熟;这一条要的是 AGI 意义上那种学习能力——会自己沉淀经验、会反思、长链路不漂。现在的假设系统、语义类型系统(LAP)、沉淀学习类管线和各种元管线,都是冲这个去的。",
+      "public": true
+    },
+    {
+      "id": "aios-operating-layer",
+      "cluster": "omnicompany",
+      "title": "aios:一个人最舒适的 AI 操作层",
+      "kind": "北极星",
+      "status": "多次迭代,在路上",
+      "northstar": "把『我』和电脑上一切的距离压到最短:一个随手召出的操作层,让记录、查询、审阅、盯着一堆 AI 干活这些事都最舒适。",
+      "detail": "这条线换过好几次形态:最早是一个统观全局的『老板视角』总控台(BOSS-SIGHT),后来变成项目加多 agent 的驾驶舱(omnidashboard),现在在做按冷门快捷键召出即入口的悬浮层框架(poof / omnidashboard-os)。底下想要的东西一直没变,就是让一个人能舒服地俯瞰和指挥自己所有的 AI 工作。",
+      "public": true
+    },
+    {
+      "id": "auto-narrative",
+      "cluster": "narrative",
+      "title": "自动化叙事系统",
+      "kind": "北极星",
+      "status": "刚延展,还没深试",
+      "northstar": "按需求尽量独立地写完一部长篇小说。",
+      "detail": "长篇自动写作是公认的业界级硬骨头。目前刚开始往这个方向延展,还没真正深入试过。",
+      "public": true
+    },
+    {
+      "id": "walker",
+      "cluster": "games",
+      "title": "行者无乡",
+      "kind": "里程碑",
+      "status": "刚开始",
+      "northstar": "一款机制极复杂的战棋:把时间维度和卡牌循环捏在一起,还要让人在部分构筑下能『无脑玩』也不输,套一个很大的无限流世界观。",
+      "detail": "它同时是叙事系统和 omnicompany web 制作能力的好训练场。目前刚起步。",
+      "public": true
+    },
+    {
+      "id": "vilo",
+      "cluster": "games",
+      "title": "Vilo",
+      "kind": "里程碑",
+      "status": "刚开始",
+      "northstar": "用《苏丹的游戏》《密教模拟器》那类玩法,做一款女主角的恋爱游戏(本身偏一般向)。",
+      "detail": "主要当叙事系统的训练场。刚开始。",
+      "public": true
+    },
+    {
+      "id": "mc-world",
+      "cluster": "games",
+      "title": "生成式『真实世界』游戏",
+      "kind": "北极星",
+      "status": "框架性尝试中",
+      "northstar": "一款主打『真实世界』的生成式游戏:你不在的时候,世界还在自己运转;每个角色都有自己涌现出来的故事。",
+      "detail": "核心是让 LLM 不断生成描述和代码、持续推演这个世界。已经做了不少框架性尝试,还在路上。另外,这套推演引擎很可能本身就是叙事引擎的一种解法。",
+      "public": true
+    },
+    {
+      "id": "daywork-engine-demo",
+      "cluster": "daywork",
+      "title": "AI 直接生成能跑的引擎内真实 demo",
+      "kind": "北极星",
+      "status": "设想",
+      "northstar": "让设计人员直接生成游戏引擎里『全资源、能跑、且和现有系统耦合』的真实 demo,而不是隔靴搔痒的孤立原型。",
+      "detail": "难点在『和现有系统强耦合』:不是另起一个干净沙盒,而是要嵌进真实工程里还能跑起来给人看。",
+      "public": true
+    },
+    {
+      "id": "daywork-auto-config",
+      "cluster": "daywork",
+      "title": "AI 全自动做配置",
+      "kind": "北极星",
+      "status": "设想",
+      "northstar": "把配置工作整个交给 AI——不管是哪一类配置。",
+      "detail": "目标是『任意配置』都能托管,而不是针对某一种配置写死一套脚本。",
+      "public": true
+    },
+    {
+      "id": "daywork-auto-design-doc",
+      "cluster": "daywork",
+      "title": "AI 全自动写设计文档",
+      "kind": "北极星",
+      "status": "设想",
+      "northstar": "让 AI 自动写设计文档,质量逼近真人,还能照顾到舆论反馈和用户画像。",
+      "detail": "难的不是写出字,是写到能用——既贴合真实用户画像,又对得上外部舆论反馈。",
+      "public": true
+    },
+    {
+      "id": "daywork-design-to-component",
+      "cluster": "daywork",
+      "title": "AI 把设计稿自动落地成引擎组件",
+      "kind": "北极星",
+      "status": "设想",
+      "northstar": "让 AI 把设计稿自动转成游戏引擎里可直接用的组件,落地后不用再返工。",
+      "detail": "关键是『不用再改』:从视觉稿到引擎里能直接用的成品组件,中间那段手工返工是真正要消灭的。",
+      "public": true
+    }
+  ]
+}

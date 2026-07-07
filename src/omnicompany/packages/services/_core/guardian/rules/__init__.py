@@ -33,6 +33,13 @@ from .compliance_prevention import RULES as _R070_073  # 合规预防 · 全 nee
 from .manual_evidence_parse import RULES as _R080  # LLM 输出手解反模式 · 2026-04-26
 from .prompt_quality import RULES as _R090  # AI 指令(prompt)反模式 · 2026-04-28 用户立
 from .authority_convergence import RULES as _R093  # 唯一权威收束防漂移 · 2026-06-13
+from .custom_llm_call import RULES as _R094  # 自定义 LLM 调用反模式(裸 claude/codex subprocess)· 2026-06-21 用户立
+from .self_built_agent import RULES as _R095  # 自造 agent 反模式(手搓 ReAct 循环不用统一 AgentNodeLoop)· 2026-06-23 用户立
+from .semantic_tags import RULES as _R096  # 语义标签受控词表(防孤儿标签, 缺失不报)· 2026-06-27 语义文件系统
+from .progress_snapshot import RULES as _R097  # plan.md 正文进度快照(进度归 whatnow)· 2026-06-27 语义空间健康治理结晶
+from .prose_health import RULES as _R098  # 语言治理确定性半(禁用代称/术语变体/已知缩写)· 2026-06-27 commit-time
+from .plan_bindings_guardian import RULES as _R099  # 绑定注册表巡检(缺锚/登记不完整/悬空)· 2026-07-03 overnight-run 第六节
+from .testmap_sync import RULES as _R100  # OMNI-100 (testmap 同步提醒 · 功能点-测试台账完成标准 · 2026-07-03)
 
 # 按 OMNI 编号顺序组装（便于阅读 patrol 日志）
 RULES: list[GuardianRule] = [
@@ -56,6 +63,13 @@ RULES: list[GuardianRule] = [
     *_R080,        # OMNI-080 (LLM 输出 text 手解反模式 · 2026-04-26 用户立 · structured output 强制)
     *_R090,        # OMNI-090/091/092 (AI 指令 prompt 反模式 · 2026-04-28 用户立 · 概念注册 · LLM 复核分类)
     *_R093,        # OMNI-093a-d (唯一权威收束防漂移 · 2026-06-13 LLM-CALL-UNIFICATION)
+    *_R094,        # OMNI-094 (自定义 LLM 调用反模式 · 裸 claude/codex subprocess · 2026-06-21 用户立)
+    *_R095,        # OMNI-095 (自造 agent 反模式 · 手搓 ReAct 循环不用统一 AgentNodeLoop · 2026-06-23 用户立)
+    *_R096,        # OMNI-096 (语义标签受控词表 · 防孤儿标签 · 缺失不报 · 2026-06-27 语义文件系统)
+    *_R097,        # OMNI-097 (plan.md 正文进度快照 · 进度归 whatnow · 2026-06-27 健康治理结晶)
+    *_R098,        # OMNI-098 (语言治理确定性半 · 禁用代称/术语变体/已知缩写 · commit-time · 2026-06-27)
+    *_R099,        # OMNI-099 (绑定注册表巡检 · 缺锚/登记不完整/悬空 · 2026-07-03 overnight-run 第六节)
+    *_R100,        # OMNI-100 (testmap 同步提醒 · 功能点-测试台账完成标准 · 2026-07-03)
 ]
 
 __all__ = [

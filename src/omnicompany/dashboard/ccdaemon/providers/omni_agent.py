@@ -208,7 +208,10 @@ class OmniAgentProvider(BaseProvider):
         if not self._connected or self._agent is None:
             raise RuntimeError("OmniAgentProvider not connected; call connect() first")
 
-        trace_id = str(uuid.uuid4())
+        # 复用调用方下传的 sessionId(同会话跨 turn 稳定 → 历史按它聚合到同一 JSONL);
+        # 没有(新会话首条)才新铸 uuid。这是 D4 落盘恢复历史的前置: 不复用则每 turn 一个
+        # 新 trace_id, 历史散成多文件、刷新只看到最后一 turn。
+        trace_id = (options or {}).get("sessionId") or str(uuid.uuid4())
         self._current_trace = trace_id
 
         # 推 session_created (本 turn 开始)
@@ -242,8 +245,15 @@ class OmniAgentProvider(BaseProvider):
                 # complete NormalizedMessage
                 exit_code = 0 if str(verdict.kind).endswith("PASS") else 1
                 final_output = verdict.output if isinstance(verdict.output, dict) else {}
-                # 把 verdict.output.final_text 也作为最后 text 推 (兜底 turn_end 没推到的)
-                final_text = final_output.get("final_text") or final_output.get("result", "")
+                # 把 verdict 收尾文本作为最后 text 推 (兜底 turn_end 没推到的 / finish 工具回复)。
+                # 注意 key: ExtractResultRouter 默认 output 用 "text"(见 extract_result.py),
+                # finish 工具回复经 loop final_text → extract → output["text"]; 漏读这个 key 会
+                # 导致 agent 回复被静默丢掉(只剩 session_created + complete, 无 text)。
+                final_text = (
+                    final_output.get("final_text")
+                    or final_output.get("text")
+                    or final_output.get("result", "")
+                )
                 if final_text and isinstance(final_text, str):
                     await self._queue.put({
                         "kind": "text",

@@ -66,7 +66,7 @@ pipeline_ci 是 omnicompany 的**管线 CI 审计 service**. 它扫所有含 `ro
   - `BatchAuditorWorker` — 调 ErrorRouteAuditor + PipelineChecker 双检, 聚合 issue
   - `CIGateWorker` — critical_count > 0 → FAIL 阻断 CI
 - 旧名 compat shim → [routers.py](routers.py)
-- 归档 → _archive/routers_legacy.py
+- 归档 → [_archive/routers_legacy.py](_archive/)
 
 技术架构详述见 [DESIGN.md](DESIGN.md), 操作手册见 [SKILL.md](SKILL.md).
 

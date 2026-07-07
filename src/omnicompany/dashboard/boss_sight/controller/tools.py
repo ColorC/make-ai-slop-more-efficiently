@@ -1111,7 +1111,27 @@ class RecordPlanCompletionRouter(SingleToolRouter):
             encoding="utf-8",
         )
         rel = out_path.relative_to(ws).as_posix()
-        return f"plan_completion logged → {rel} (status={status}, {todo_done}/{todo_total})"
+
+        # WORK-REPORT-AND-REVIEW-TYPES #5: plan 完成 → 自动产工作报告物料进审阅台
+        review_note = ""
+        if status == "done":
+            try:
+                from omnicompany.packages.services._core.lifecycle.work_report import (
+                    build_work_report,
+                    submit_versioned_report,
+                )
+                wr = build_work_report(plan_id)
+                body = wr.get("markdown") or (
+                    f"# Plan 完成报告 · {plan_id}\n\n{assessment}\n\n"
+                    f"todo: {todo_done}/{todo_total}\n产物: {produced}\n"
+                )
+                # 版本化: 同 plan 旧报告归档 + 记历史版本, 待审只留最新(不堆积)
+                sub = submit_versioned_report(plan_id, body, title=f"Plan 完成报告: {plan_id}")
+                review_note = (f"; 已自动进审阅 material={sub.get('material_id', '?')}"
+                               f" (第{sub.get('version', 1)}版)") if sub.get("ok") else ""
+            except Exception:  # noqa: BLE001
+                pass
+        return f"plan_completion logged → {rel} (status={status}, {todo_done}/{todo_total}){review_note}"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1659,6 +1679,33 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                     "{\"demo\":..., \"doc\":..., \"filetree_diff\":...}; 兄弟材料用 {\"attached_to\":...}。"
                 ),
             },
+            "project": {
+                "type": "string",
+                "description": (
+                    "Required (except人工快捷创建端点). 项目名录真源=决策库(omni decisions list 查已有,"
+                    "omni decisions record -p <project> 立项)。'unfiled'=未分组。"
+                ),
+            },
+            "track": {
+                "type": "string",
+                "description": "Required. 阶段/轨道名, 如 信息审阅稿/交互审阅稿/工作报告。",
+            },
+            "version": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Required. 版本号(同 version_family 内递增, 从 1 起)。",
+            },
+            "version_family": {
+                "type": "string",
+                "description": "版本族(同一份稿的多版本共 family)。省略则默认=title。",
+            },
+            "links_json": {
+                "type": "string",
+                "description": (
+                    "JSON 对象, 形如 {\"parent\": \"mat_xxx\", \"supersedes\": [\"mat_yyy\"], "
+                    "\"related\": [\"mat_zzz\"]}。值是 material id 或 material id 列表。"
+                ),
+            },
         },
         "required": ["kind", "tier", "title", "source_plan_id"],
     }
@@ -1674,6 +1721,19 @@ class SubmitToReviewstageRouter(SingleToolRouter):
         file_path = args.get("file_path")
         inline = args.get("inline_content")
         annotations_allowed = bool(args.get("annotations_allowed", True))
+        project = args.get("project")
+        track = args.get("track")
+        version = args.get("version")
+        version_family = args.get("version_family")
+        links_json = args.get("links_json")
+        links: dict[str, Any] | None = None
+        if links_json:
+            try:
+                links = json.loads(links_json)
+            except json.JSONDecodeError as e:
+                return f"ERROR: links_json must be a JSON object: {e}"
+            if not isinstance(links, dict):
+                return "ERROR: links_json must be a JSON object"
 
         if not file_path and not inline:
             return "ERROR: must provide file_path or inline_content"
@@ -1734,6 +1794,11 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                 inline_content=used_inline,
                 annotations_allowed=annotations_allowed,
                 extra=extra,
+                project=project,
+                track=track,
+                version=version,
+                version_family=version_family,
+                links=links,
             )
         except ValueError as e:
             return f"ERROR: {e}"

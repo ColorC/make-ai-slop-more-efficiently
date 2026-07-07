@@ -19,7 +19,14 @@ from pathlib import Path
 from typing import Any
 
 NOTE_USES = {"comment", "draft", "llm_input"}
-NOTE_TARGET_KINDS = {"material", "project", "plan", "llm_session", "page_element", "new_object"}
+# material_version / material_link(第二期 A6): 材料轨迹画布上, 评论可以挂在"某个版本"
+# 或"两个材料间的一条连线"上, 不只是挂在材料整体上。
+# - material_version target 形状: {"kind": "material_version", "material_id": X, "version": N}
+# - material_link    target 形状: {"kind": "material_link", "source": mid, "target": mid, "rel": ...}
+NOTE_TARGET_KINDS = {
+    "material", "project", "plan", "llm_session", "page_element", "new_object",
+    "material_version", "material_link",
+}
 FEEDBACK_STATUSES = {"saved", "delivered", "read", "to_todo", "todo_done"}
 
 

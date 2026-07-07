@@ -7,10 +7,17 @@
 
 OMNI-036: new-module-legacy-naming
 
-当前 Q0 阶段：`_NEW_MODULE_WHITELIST` 为空 → 规则实装但不触发任何文件。
-Phase A 开启时由 L1 填入新 module 路径（如 `src/omnicompany/packages/services/omnicompany/`）。
+Phase A 状态（2026-07-03 批4 定性收尾）：**命名迁移主体已完成**。用户 2026-07-03
+校准：此前的"停摆"是边际递减 / 执行方自认到头，而非弃坑——剩余基本无需迁移，
+新代码按约定已用新名，旧代码永久 grandfathered。因此：
+  - 本规则**保持实装**，作为对未来"新名回退"的常驻护栏（不废除）。
+  - `_NEW_MODULE_WHITELIST` 保持为空 **不再是"待办/待 L1 填入"**，而是现实的
+    忠实反映：不存在需要专门圈定并强制轮训的活跃迁移前沿。其他软件的第二波
+    命名随第七批各件顺带做，不在此单列强制。
+  - 若将来某新建 module 需要强制新名护栏，再按需把其路径加进白名单即可（机制在，
+    随时可用），这与"Phase A 是否完成"是两回事。
 
-参考：docs/standards/terminology.md §4 / §五 四把锁（migration plan）
+参考：docs/standards/terminology.md §4 / §4.1 / §13.4 / §13.5（2026-07-03 批4 收尾）
 """
 from __future__ import annotations
 
@@ -19,10 +26,11 @@ import re
 from ._base import FileContext, GuardianRule, _is_external, _not_graveyard
 
 # ══════════════════════════════════════════════════════════════════════
-# 白名单：Phase A 开启时由 L1 填入
+# 白名单：2026-07-03 批4 起, 空 = 迁移主体已完成, 无活跃迁移前沿需强制轮训
+# （不是"待填"）。未来若某新建 module 需新名强制护栏, 按需加入其路径即可。
 # ══════════════════════════════════════════════════════════════════════
 _NEW_MODULE_WHITELIST: tuple[str, ...] = (
-    # 示例（Phase A 开启时替换）:
+    # 需要时把新 module 路径加进来即可, 例:
     # "src/omnicompany/packages/services/omnicompany/",
 )
 

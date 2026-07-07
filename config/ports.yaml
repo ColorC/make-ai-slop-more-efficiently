@@ -1,0 +1,152 @@
+# 本机端口注册表 — 唯一权威源
+# 规矩见 docs/standards/_global/port_management.md; 审计工具 scripts/port_audit.py。
+# 起任何新的常驻监听前: 先查本表 → 登记 → 再占用。未登记端口不得常驻。
+# 给人用的 Web 界面默认不发新端口, 注册成网关路径(见 gateways)。
+
+meta:
+  updated: "2026-07-02"
+  note: 基线来自 2026-07-02 全量普查(omnichat 黑屏事故后立规)。
+
+# ── 网关: 用户唯一需要记住的入口 ────────────────────────────────────────────
+gateways:
+  - port: 12443
+    owner: codeweb
+    service: Caddy 公网单口 HTTPS(/code=serve-web, /=dashboard, LOFA 配置/APK/CA)
+    bind: wildcard          # 有意: LAN/手机入口
+    config: C:/Users/user/codeweb/Caddyfile
+    managed_by: roost-caddy(nssm 服务, 开机自启)
+  - port: 80
+    owner: codeweb
+    service: Caddy http://omni.dev.localhost → dashboard 8210
+    bind: wildcard          # 有意: *.localhost 裸域名入口
+  - port: 2019
+    owner: codeweb
+    service: Caddy admin API(caddy reload 热重载走它)
+    bind: loopback
+  - port: 47823
+    owner: aiworkspace
+    service: AIWorkSpace App Portal(LAN 同事入口, /app/<id>/ 路径反代 + port:auto 懒启动)
+    bind: wildcard          # 有意: 给 LAN 同事
+    registry: d:/P4/main/AIWorkSpace/app/ports.json
+
+# ── 常驻服务(独立端口, 一律回环) ─────────────────────────────────────────────
+services:
+  - port: 8201
+    owner: omnicompany
+    service: ccdaemon
+    bind: loopback
+    started_by: omni-chat 扩展 supervisor
+  - port: 8210
+    owner: omnicompany
+    service: omnidashboard(BOSS SIGHT 驾驶舱)
+    bind: loopback
+    started_by: omni-chat 扩展 supervisor
+    lan_bypass: Caddy 显式 bind 10.3.43.246:8210 反代(旧版 LOFA OTA 过渡, 旧版清零后删)
+  - port: 8230
+    owner: omnicompany
+    service: progressd(计划进度唯一真源)
+    bind: loopback
+  - port: 7348
+    owner: omnicompany
+    service: chatui(收编 CCUI, 人用聊天统一底座)
+    bind: wildcard
+    remediation: 改绑 loopback, LAN 需求走 12443 网关路径
+  - port: 8330
+    owner: omnicompany
+    service: narrative_studio
+    bind: loopback
+    status: reserved        # 迁 dashboard 托管后释放
+  - port: 8331
+    owner: voxelcraft
+    service: voxelcraft 资产库只读浏览 API(项目级资产审阅视图后端)
+    bind: loopback
+    host: dashboard 懒启动托管(_HOSTED_APPS["voxelcraft-assets"], 仅 API, page_retired)
+    gateway: /voxelcraft-assets/api/*(经 8210 dashboard 反代 strip 前缀)
+    started_by: dashboard app.py 反代按需拉起(python -m ...content.assets.api serve --port 8331)
+  - port: 8077
+    owner: webworks
+    service: aigc-lab 审阅台
+    bind: loopback
+  - port: 8893
+    owner: webworks
+    service: aigc-music(自托管 Strudel)
+    bind: wildcard
+    remediation: 改绑 loopback
+  - port: 7078
+    owner: webworks
+    service: personal-homepage feedback-server 本地开发实例(生产在远端 :7070)
+    bind: loopback
+  - port: 8732
+    owner: overlay-shell
+    service: overlay-shell 主进程(Tauri)
+    bind: loopback
+  - port: 8765
+    owner: overlay-shell
+    service: agent-scanner
+    bind: loopback
+  - port: 8781
+    owner: lofa
+    service: ws-scrcpy 实机操作台
+    bind: wildcard
+    remediation: 确认手机浏览器无直连需求后改绑 loopback(有需求则走网关)
+  - port: 9085
+    owner: codeweb
+    service: code serve-web 当前动态内口(keepalive.ps1 渲染进 Caddyfile)
+    bind: loopback
+    proc: code-tunnel
+  # ── voxelcraft 本地游戏口(运行期占用, 非常驻; 阶段一 1-7 登记, 值取自 domains/voxelcraft/common/locations.py) ──
+  - port: 25565
+    owner: voxelcraft
+    service: Minecraft 服务器(eternal-war gradle runServer, 管线跑时起停)
+    bind: loopback
+  - port: 25575
+    owner: voxelcraft
+    service: MC RCON(LoadChecker/combat_test 探针驱动; 管线不并发, 单占)
+    bind: loopback
+  - port: 47766
+    owner: voxelcraft
+    service: bw-camera 视觉探针 sidecar(MC 客户端内 HTTP)
+    bind: loopback
+    remediation: voxelcraft demo_launcher 自起的 dashboard 实例现用 8765, 与 overlay-shell agent-scanner 冲突 —— 1-5 注册 voxelcraft.runtime.demo 时改走 8600-8699 ephemeral 段或复用主 dashboard(8210)
+
+# ── 段位: 新端口从属主段内领号, 存量不强搬 ───────────────────────────────────
+ranges:
+  - { range: 8200-8299, owner: omnicompany, note: 核心设施 }
+  - { range: 8300-8399, owner: omnicompany, note: 独立工作室/审阅类(过渡段, 目标迁 dashboard 路径托管) }
+  - { range: 8600-8699, owner: ephemeral, note: 临时/一次性预览服务, 用完即收, 审计点名过夜者 }
+  - { range: 8730-8769, owner: overlay-shell }
+  - { range: 8770-8799, owner: lofa }
+  - { range: 8800-8899, owner: webworks }
+  - { range: 9080-9099, owner: codeweb, note: serve-web 内部动态口 }
+  - { range: 5173-5199, owner: dev, note: vite dev server, 只许 loopback, 不逐个入册 }
+
+# ── 非我方进程(按进程名忽略, 任意端口) ──────────────────────────────────────
+foreign_procs:
+  - avp            # Kaspersky
+  - klnagent       # Kaspersky NetworkAgent
+  - corplink       # CorpLink VPN
+  - qemu-system    # lofa Android 模拟器(动态口多)
+  - netsimd
+  - adb
+  - sshd
+  - the_companysunflower
+  - sgtool
+  - figma_agent
+  - multica
+  - unity hub
+  - spoolsv
+  - "code.exe"     # VS Code 内部工具口
+
+# ── 非我方常驻(审计忽略, 变更时更新) ────────────────────────────────────────
+known_foreign:
+  - { port: 22, service: sshd }
+  - { port: 5037, service: adb server }
+  - { ports: [2500, 2510, 5554, 5555, 7681, 8554], service: lofa Android 模拟器 qemu/netsimd(工具自管) }
+  - { ports: [11919, 11920, 12219, 12228, 21283], service: the_companysunflowerBX(公司软件) }
+  - { port: 5283, service: 搜狗输入法 SGTool }
+  - { ports: [44950, 44960], service: Figma agent(字体服务) }
+  - { port: 19514, service: multica daemon }
+  - { port: 39000, service: Unity Hub }
+  - { port: 11901, service: spoolsv }
+  - { ports: [2222, 3000, 7860, 8000, 8001, 8766, 9999, 15721], service: WSL 端口转发(svchost relay, 归 WSL 内服务) }
+  - { ports: [135, 139, 445, 1024, 1147, 1801, 2103, 2105, 2107, 5040, 7680, 23130, 23132], service: Windows 系统/杂项 }

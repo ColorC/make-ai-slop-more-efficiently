@@ -496,6 +496,13 @@ async def list_active_sessions(window_sec: int = 600, limit: int = 30) -> dict[s
         agent_digest.schedule_tick(items)
     except Exception:  # noqa: BLE001
         _log.debug("agent_digest attach/schedule skipped", exc_info=True)
+    # 被动收集机器级 agent 注册表(身份/位置/在做啥): 检测到对话在跑就懒触发一次后台 rebuild
+    # (确定性, 不调模型, 节流), 让总控派发路由器的候选清单始终新鲜。
+    try:
+        from omnicompany.dashboard.boss_sight.services import agent_registry
+        agent_registry.schedule_rebuild()
+    except Exception:  # noqa: BLE001
+        _log.debug("agent_registry schedule skipped", exc_info=True)
     return {"count": total, "window_sec": window_sec, "items": items}
 
 

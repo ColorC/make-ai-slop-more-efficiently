@@ -34,11 +34,13 @@ _INDEX_TEMPLATE = """---
 omni_project: {pid}
 name: {name}
 group: {group}
-updated: {today}
+updated: {today}          # 最后核对此 index 与现实一致的日期; 改完内容务必同步(否则系统判 index_stale)
 roots:
   - path: {root}
     note: 主目录
 entry_points: []          # 主要子目录: [{{path, note}}]
+threads: []               # 工作线(项目状态的真源, 别在正文手写"活跃"): [{{name, status, updated, note}}]
+                          #   status ∈ active|done|blocked|parked; updated=该线状态最后核对日(YYYY-MM-DD)
 latest: []                # 最新进展指针(保持实时!): ["YYYY-MM-DD 一句话 + 文档路径"]
 quick_actions: []         # 常用工作选项: [{{label, skill, where, desc}}] skill 可在外部仓但必须在此注册
 links: []                 # [{{label, url}}]
@@ -51,7 +53,8 @@ links: []                 # [{{label, url}}]
 
 ## 当前进展
 
-(最新状态一两句 + 指向权威进度文档。frontmatter.latest 同步维护。)
+(各工作线现状, 与 frontmatter.threads 一致 + 指向权威进度文档。
+ 别写死"活跃/进行中"——是否活跃由系统按真实文件/git 改动算, 这里只写每条线在做什么、卡在哪。)
 
 ## 主要目录
 
@@ -137,7 +140,10 @@ def cmd_project_list(group: str | None, as_json: bool) -> None:
             la = (p.get("last_active") or "")[:16].replace("T", " ")
             qa = len(p.get("quick_actions") or [])
             idx = "✓" if p.get("index_ok") else ("✗" if p.get("index_ok") is False else "-")
-            click.echo(f"  {p['id']:<22} {p.get('name','')}  活跃:{la}  plans:{p.get('plan_count',0)}  动作:{qa}  index:{idx}")
+            thr = p.get("threads") or []
+            tcol = f"  线:{len(thr)}" if thr else ""
+            stale = "  ⚠状态可能过期(index 久未核对)" if p.get("index_stale") else ""
+            click.echo(f"  {p['id']:<22} {p.get('name','')}  活跃:{la}  plans:{p.get('plan_count',0)}  动作:{qa}{tcol}  index:{idx}{stale}")
 
 
 @cmd_project.command("show")
@@ -169,8 +175,8 @@ def cmd_project_remove(project_id: str) -> None:
 @click.option("--all", "check_all", is_flag=True, help="校验全部已注册项目的 index 文件")
 @any_caller
 def cmd_project_index_check(project_id: str | None, check_all: bool) -> None:
-    """校验 index 文件结构(frontmatter 必填键)。"""
-    from omnicompany.core.projects_registry import list_projects, parse_index_file
+    """校验 index 文件: 结构(frontmatter 必填键 + threads)+ 状态可靠性(是否久未核对)。"""
+    from omnicompany.core.projects_registry import enrich_projects, list_projects, parse_index_file
 
     targets = list_projects()
     if not check_all:
@@ -178,13 +184,23 @@ def cmd_project_index_check(project_id: str | None, check_all: bool) -> None:
         if not targets:
             click.echo(json.dumps({"ok": False, "error": f"未注册: {project_id}"}, ensure_ascii=False))
             raise SystemExit(1)
+    enriched = {x.get("id"): x for x in enrich_projects()["projects"]}
     results = []
     for p in targets:
         ip = p.get("index_path")
         r = parse_index_file(ip) if ip else {"ok": False, "error": "未配置 index_path"}
-        results.append({"id": p["id"], "index_path": ip, "ok": r.get("ok"), "error": r.get("error")})
+        e = enriched.get(p["id"], {})
+        results.append({
+            "id": p["id"], "index_path": ip, "ok": r.get("ok"), "error": r.get("error"),
+            "warnings": r.get("warnings") or [],
+            "stale": bool(e.get("index_stale")),
+            "stale_reason": e.get("stale_reason"),
+        })
     bad = [r for r in results if not r["ok"]]
-    click.echo(json.dumps({"ok": not bad, "checked": len(results), "results": results}, ensure_ascii=False, indent=2))
+    stale = [r for r in results if r["stale"]]
+    click.echo(json.dumps(
+        {"ok": not bad, "checked": len(results), "stale": len(stale), "results": results},
+        ensure_ascii=False, indent=2))
     if bad:
         raise SystemExit(1)
 

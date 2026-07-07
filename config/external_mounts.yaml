@@ -1,0 +1,32 @@
+# 外部域挂载登记表 — 独立业务仓挂进 omnicompany 的唯一权威源
+# 规矩见 docs/standards/_global/external-mount-guide.md。
+# 与 config/ports.yaml、config/ledgers.yaml 同一套声明式登记范式:
+#   omnicompany 只通过本表 + 各业务仓根 .omni-mount.yaml 知道"哪个仓暴露了哪些管线",
+#   业务仓的代码/数据/内容真源都留在它自己那里(挂载管线运行数据落业务仓自己的 data/)。
+# 加载入口: src/omnicompany/packages/services/_core/registry/external_mounts.py
+#   discover_external_mounts / register_external_pipelines / list_mounted_repo_roots。
+# 铁律:
+#   - 每个挂载仓必须暴露以 mount_name 命名的唯一顶层包; 管线名必须以 mount_name 开头;
+#     与内部管线重名或未带前缀一律拒绝注册(绝不静默覆盖内部管线)。
+#   - 登记了路径但仓里没有 .omni-mount.yaml → 跳过并警告, 其余挂载不受影响。
+#   - 巡逻(guardian fs_scanner)的散落文件扫描排除本表登记的仓根路径。
+
+meta:
+  updated: "2026-07-04"
+  note: 语义OS重整第七批首件·外部域挂载机制首挂(quant-lab 便宜只读入口)。
+
+mounts:
+  - path: "E:/WindowsWorkspace/quant-lab"
+    owner: quant-lab
+    note: >
+      首挂只暴露并执行便宜的只读入口 quant_lab_mount.status(读最新数据日期与产物健康)。
+      重型日更管线(scripts/auto_pipeline.bat → server/auto_pipeline.py)由 18:00 的
+      Windows 计划任务 quant-lab-daily-pipeline 负责, 只在其 .omni-mount.yaml 里声明、
+      绝不由挂载机制执行(误触发有"假更新"前科)。
+  - path: "E:/WindowsWorkspace/webworks/apps/walker-game"
+    owner: walker-game
+    note: >
+      试点反推批 W4b(2026-07-03)首挂: 纯前端仓, 仓根无可作 mount_name 的顶层包,
+      本次只接 testmaps 键(功能点-测试台账), 不暴露任何 pipelines。testmap.yaml
+      登记 18 个专项 e2e、自动战斗核心契约、G7.6 内容质量门与 vitest 主干功能点;
+      不由挂载机制执行任何 gate(重活留验收阶段另跑)。

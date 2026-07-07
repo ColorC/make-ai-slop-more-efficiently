@@ -17,11 +17,19 @@ from omnicompany.packages.services._core.agent.routers.prompt_builder import Pro
 from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
 )
-from omnicompany.packages.services._learning.hypothesis_library import (
-    UNIVERSAL_HYPOTHESES,
-    PATTERNS,
-    render_for_prompt,
-)
+# hypothesis_library 是隐私排除的可选服务(含 P4 模式, 不进公开白名单): 动态导入,
+# 缺失时降级为空假设集(worker 仍可跑, 只是没有先验假设库注入)
+import importlib as _importlib
+try:
+    _hyplib = _importlib.import_module(
+        "omnicompany.packages.services._learning.hypothesis_library")
+    UNIVERSAL_HYPOTHESES = _hyplib.UNIVERSAL_HYPOTHESES
+    PATTERNS = _hyplib.PATTERNS
+    render_for_prompt = _hyplib.render_for_prompt
+except ModuleNotFoundError:
+    UNIVERSAL_HYPOTHESES, PATTERNS = [], []
+    def render_for_prompt(*_a, **_k):
+        return 
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 

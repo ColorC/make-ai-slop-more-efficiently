@@ -11,7 +11,6 @@ intake(查重门)→ [planner → orchestrator → synthesize → claim_verify] 
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -20,7 +19,7 @@ from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.runtime.routing.router import Router
 
 from .. import library
-from .._paths import REPORTS_ROOT, RUNS_ROOT, ensure_dirs
+from .._paths import RUNS_ROOT, ensure_dirs
 
 
 # ── 节点 1: 入题 + 查重门(拆题交给下游 planner)──────────────────────────
@@ -39,11 +38,6 @@ class TopicIntake(Router):
             return Verdict(kind=VerdictKind.FAIL, output=req, diagnosis="topic 为空")
         topic_norm = library.normalize_topic(topic)
 
-        # dry_run(-i dry_run=1 或 --dry_run): 离线 mock 检索,接到 web.py 认的环境变量(否则该 flag 是死的)
-        dr = req.get("dry_run")
-        if dr is True or (isinstance(dr, str) and dr.strip().lower() in ("1", "true", "yes")):
-            os.environ["OMNI_WEB_SEARCH_DRY_RUN"] = "1"
-
         ensure_dirs()
         run_dir = RUNS_ROOT / ("run_" + datetime.now().strftime("%Y-%m-%dT%H-%M-%S"))
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -54,11 +48,10 @@ class TopicIntake(Router):
                         "existing_record_id": (existing or {}).get("record_id")},
                        ensure_ascii=False, indent=2), encoding="utf-8")
 
-        def _i(key: str, default: int) -> int:
-            try:
-                return int(req.get(key, default) or default)
-            except (TypeError, ValueError):
-                return default
+        try:
+            timeout_s = float(req.get("timeout_s", 900) or 900)
+        except (TypeError, ValueError):
+            timeout_s = 900.0
 
         diag = f"入题 '{topic}'"
         if existing:
@@ -67,9 +60,7 @@ class TopicIntake(Router):
             kind=VerdictKind.PASS,
             output={
                 "topic": topic, "topic_norm": topic_norm, "run_dir": str(run_dir),
-                "existing": existing, "max_results": _i("max_results", 6),
-                "max_rounds": _i("max_rounds", 2), "max_subtopics": _i("max_subtopics", 4),
-                "workers": _i("workers", 4),
+                "existing": existing, "timeout_s": timeout_s,
             },
             diagnosis=diag,
             granted_tags=["domain.research", "stage.intake"],
@@ -88,44 +79,18 @@ class LibraryWrite(Router):
     def run(self, input_data: Any) -> Verdict:
         out = input_data if isinstance(input_data, dict) else {}
         topic = out["topic"]
-        topic_norm = out["topic_norm"]
         run_dir = Path(out["run_dir"])
-        synth = out.get("synthesis") or {}
-        sources = out.get("sources") or []
 
-        record = {
-            "record_id": library.record_id_for(topic_norm),
-            "topic": topic,
-            "topic_norm": topic_norm,
-            "summary": synth.get("summary", ""),
-            "findings": synth.get("findings") or [],
-            "keywords": synth.get("keywords") or [],
-            "aliases": synth.get("aliases") or [],
-            "perspectives_covered": (out.get("coverage") or {}).get("covered") or [],
-            "perspectives_open": synth.get("perspectives_open") or [],
-            "sources": sources,
-            "run_ids": [run_dir.name],
-        }
-        saved, is_dup = library.upsert(record)
-
-        # 落库即投影进统一资产 catalog(研究记录这半永远新鲜,不靠定时;repo 半走每日 cron)
-        try:
-            from .. import catalog
-            catalog.upsert_item({
-                "id": saved["record_id"], "kind": "research_record",
-                "name": saved.get("topic", ""), "path": "",
-                "description": (saved.get("summary") or "")[:300],
-                "aliases": sorted(set((saved.get("aliases") or []) + (saved.get("keywords") or []))),
-                "source_url": "", "tags": ["research_record"],
-                "status": saved.get("status", "active"),
-            })
-        except Exception:
-            pass  # catalog 投影失败不阻断落库
-
-        report_md = library.render_report(saved)
-        (run_dir / "report.md").write_text(report_md, encoding="utf-8")
-        report_path = REPORTS_ROOT / f"{saved['record_id'].replace(':', '_')}.md"
-        report_path.write_text(report_md, encoding="utf-8")
+        # 落库核心三路共用(library.save_research_record): 组装 + upsert + catalog 投影 + 渲 report。
+        saved, is_dup, report_path = library.save_research_record(
+            topic,
+            out.get("synthesis") or {},
+            out.get("sources") or [],
+            coverage=out.get("coverage") or {},
+            run_id=run_dir.name,
+        )
+        # run_dir 内也留一份(单次产物自带)
+        (run_dir / "report.md").write_text(library.render_report(saved), encoding="utf-8")
 
         n_unsup = sum(1 for f in (saved.get("findings") or []) if f.get("support") == "unsupported")
         return Verdict(

@@ -13,8 +13,14 @@ from omnicompany.runtime.routing.router import Router
 
 
 def build_audit_pipeline():
-    """返回 omnikb-audit 的 TeamSpec。"""
-    from omnicompany.packages.services._learning.knowledge.pipeline import build_audit_pipeline as _build
+    """返回 omnikb-audit 的 TeamSpec。
+
+    2026-07-04 修: 原从 .pipeline 导入, 但 pipeline.py 是指向 .team 的
+    deprecated shim(只重导出 build_team/build_pipeline, 从未有 build_audit_pipeline),
+    且 team.py 本身也从未定义过 build_team —— 两层都会 ImportError。真函数在 team.py,
+    直接从那里导入。
+    """
+    from omnicompany.packages.services._learning.knowledge.team import build_audit_pipeline as _build
     return _build()
 
 

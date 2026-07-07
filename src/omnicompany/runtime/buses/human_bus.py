@@ -167,22 +167,47 @@ def _row_get(row: sqlite3.Row, key: str) -> Any:
         return None
 
 
+_INBOX_REPO_ROOT_SEARCH_LIMIT = 10
+
+
+def _find_repo_root_from(start: Path) -> Path:
+    """从 start 起向上走, 找含 src/omnicompany 目录的祖先(仓根标志).
+
+    最多向上走 _INBOX_REPO_ROOT_SEARCH_LIMIT 层; 找不到时抛 RuntimeError(绝不
+    静默回退到调用方传入的起点或当前目录拼路径).
+    """
+    cursor = start
+    for _ in range(_INBOX_REPO_ROOT_SEARCH_LIMIT):
+        if (cursor / "src" / "omnicompany").is_dir():
+            return cursor
+        if cursor.parent == cursor:
+            break
+        cursor = cursor.parent
+    raise RuntimeError(
+        "无法定位仓库根: 从模块路径 "
+        f"{start} 向上最多 {_INBOX_REPO_ROOT_SEARCH_LIMIT} 层均未找到 "
+        "src/omnicompany 标志目录。请检查是否安装/复制方式破坏了仓库结构"
+        "(模块被移出了 src/omnicompany 之下)。"
+    )
+
+
 def _resolve_inbox_path() -> Path:
-    """SQLite inbox 路径. 走和 audit log 同级的 data/runtime/buses/."""
+    """SQLite inbox 路径. 走和 audit log 同级的 data/runtime/buses/.
+
+    2026-07-03 批4返修 "仓库外启动即漂移"缺陷修复:
+      旧实现从 Path.cwd() 向上找仓根标志, 若进程从仓库外目录(如 C:\\ 或用户
+      主目录)启动, 向上永远走不到标志, 会静默退回到用最后的 cursor 拼路径,
+      产生仓库外的错误数据库文件——不报错也不提示。
+      现改为从模块自身 __file__ 向上找仓根标志(模块文件永远在仓库内, 这个锚点
+      不因进程 cwd 而丢失); 找不到仓根标志时不再静默回退, 改为抛 RuntimeError。
+    """
     import os
 
     override = os.environ.get("OMNI_HUMAN_INBOX_PATH")
     if override:
         return Path(override)
-    cwd = Path.cwd()
-    cursor = cwd
-    for _ in range(6):
-        if (cursor / "src" / "omnicompany").is_dir():
-            break
-        if cursor.parent == cursor:
-            break
-        cursor = cursor.parent
-    return cursor / "data" / "runtime" / "buses" / "human_inbox.db"
+    repo_root = _find_repo_root_from(Path(__file__).resolve())
+    return repo_root / "data" / "runtime" / "buses" / "human_inbox.db"
 
 
 # Schema 版本通过 PRAGMA user_version 管理:

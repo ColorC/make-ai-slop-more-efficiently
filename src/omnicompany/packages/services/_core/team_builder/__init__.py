@@ -4,11 +4,12 @@
 
 元管线: 输入自然语言需求 → 输出通过全部验证的 LAP-native 工作流代码.
 
-拓扑 (14 Worker + 1 AgentNodeLoop):
+拓扑 (13 Worker + 1 AgentNodeLoop):
   设计链:       req_analyzer → format_designer → node_planner → node_plan_auditor
   上下文注入:    framework_context_loader (composite fan-in: node_plan + format_chain)
   代码生成:      code_gen_loop (AgentNodeLoop · write_file/py_compile/read_written_file)
-  验证链:        compile_checker → lap_verifier → error_route_auditor → integration_tester
+  验证链:        compile_checker → error_route_auditor → integration_tester
+                 (2026-07-03 批4: lap_verifier 九维检查器显式废止, 已从验证链摘除)
   修复链:        deterministic_fixer (L1) → syntax_fixer (L2) → auto_fixer (L3)
   最终化:        finalizer (EMIT wf.done)
 
@@ -38,7 +39,6 @@ from .workers import (
     CompileCheckerWorker,
     ErrorRouteAuditorWorker,
     IntegrationTesterWorker,
-    LAPVerifierWorker,
     FinalizerWorker,
 )
 
@@ -66,7 +66,6 @@ from .routers import (
     CompileCheckerRouter,
     ErrorRouteAuditorRouter,
     IntegrationTesterRouter,
-    LAPVerifierRouter,
     FinalizerRouter,
 )
 
@@ -92,7 +91,6 @@ __all__ = [
     "CompileCheckerWorker",
     "ErrorRouteAuditorWorker",
     "IntegrationTesterWorker",
-    "LAPVerifierWorker",
     "FinalizerWorker",
     # Materials
     "ALL_FORMATS",
@@ -114,7 +112,6 @@ __all__ = [
     "CompileCheckerRouter",
     "ErrorRouteAuditorRouter",
     "IntegrationTesterRouter",
-    "LAPVerifierRouter",
     "FinalizerRouter",
     # AgentNodeLoop
     "CodeGenLoop",

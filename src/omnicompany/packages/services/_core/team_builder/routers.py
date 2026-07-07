@@ -34,7 +34,6 @@ from .workers import (
     CompileCheckerWorker,
     ErrorRouteAuditorWorker,
     IntegrationTesterWorker,
-    LAPVerifierWorker,
     FinalizerWorker,
     ALL_WORKERS,
 )
@@ -67,7 +66,7 @@ AutoFixerRouter = AutoFixerWorker
 CompileCheckerRouter = CompileCheckerWorker
 ErrorRouteAuditorRouter = ErrorRouteAuditorWorker
 IntegrationTesterRouter = IntegrationTesterWorker
-LAPVerifierRouter = LAPVerifierWorker
+# 2026-07-03 批4: LAP 九维检查器(旧 verifier 节点)显式废止, 旧名别名一并摘除。
 FinalizerRouter = FinalizerWorker
 
 
@@ -88,7 +87,6 @@ __all__ = [
     "CompileCheckerWorker",
     "ErrorRouteAuditorWorker",
     "IntegrationTesterWorker",
-    "LAPVerifierWorker",
     "FinalizerWorker",
     "ALL_WORKERS",
     # 旧名 (兼容)
@@ -107,7 +105,6 @@ __all__ = [
     "CompileCheckerRouter",
     "ErrorRouteAuditorRouter",
     "IntegrationTesterRouter",
-    "LAPVerifierRouter",
     "FinalizerRouter",
     # 辅助函数 / 共享基类
     "_wf_no_trunc",

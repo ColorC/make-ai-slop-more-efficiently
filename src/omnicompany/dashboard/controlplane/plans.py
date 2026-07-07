@@ -166,6 +166,44 @@ def _doc_summary(path: Path, limit: int = 160) -> str:
     return s
 
 
+def _binding_status(binding: dict[str, Any] | None) -> str:
+    """四件登记状态摘要: complete|incomplete|exempt|missing。
+
+    薄壳: missing 在此判(binding is None), 其余(complete/incomplete/exempt, 含
+    件级 worst-of)委托给 registry/plan_bindings.py::binding_status —— 与
+    guardian/rules/plan_bindings_guardian.py 扫描口径同一份逻辑, 不在这里另写一套
+    (2026-07-03 复验打回: 旧实现只看顶层 error_samples 非空就判 complete, 掩盖
+    items[] 件级缺失)。
+    """
+    if binding is None:
+        return "missing"
+    from omnicompany.packages.services._core.registry.plan_bindings import binding_status
+
+    return binding_status(binding)
+
+
+@plans_router.get("/plan-bindings")
+def list_plan_bindings() -> dict[str, Any]:
+    """只读: 绑定注册表里每个已登记计划的四件登记状态摘要(OMNI-099 巡检口径一致)。"""
+    from omnicompany.packages.services._core.registry.plan_bindings import list_bindings
+
+    bindings = list_bindings()
+    items = [
+        {
+            "plan_id": plan_id,
+            "status": _binding_status(binding),
+            "whatnow_task": binding.get("whatnow_task"),
+            "whatnow_verified": binding.get("_whatnow_verified"),
+            "tests_count": len(binding.get("tests") or []),
+            "error_samples_count": len(binding.get("error_samples") or []),
+            "review_mode": (binding.get("review") or {}).get("mode"),
+            "updated_at": binding.get("updated_at"),
+        }
+        for plan_id, binding in sorted(bindings.items())
+    ]
+    return {"items": items, "total": len(items)}
+
+
 @plans_router.get("/plans/{plan_id:path}")
 def get_plan(plan_id: str) -> dict[str, Any]:
     pr = _plans_root()

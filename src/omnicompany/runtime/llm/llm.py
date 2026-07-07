@@ -212,26 +212,35 @@ class ModelRegistry:
     """
 
     # ── 模型目录（raw model configs）──────────────────────────────────────
-    # the_company 聚合 API 定价对照（$ per 1M tokens, input/output）：
-    #   claude-opus-4-6      5.00 / 25.00   quality 最强
-    #   claude-sonnet-4-6    3.00 / 15.00   quality 首选
-    #   gpt-5.4              2.50 / 15.00
-    #   gpt-5.3-codex        1.75 / 14.00
-    #   gemini-3.1-pro       2.00 / 12.00
-    #   claude-haiku-4-5     1.00 / 5.00    balanced 中端
-    #   glm-5                0.57 / 2.57    standard 首选
-    #   kimi-k2.5            0.57 / 3.00
-    #   gemini-3-flash       0.50 / 3.00
-    #   qwen3.5-plus         0.40 / 1.20    cheap 常规
-    #   qwen3-max            0.36 / 1.43
-    #   qwen3.6-plus         0.29 / 1.71    vision 常规
-    #   deepseek-v3          0.28 / 0.43    cheap 稳定
-    #   gemini-3.1-flash-lite 0.25 / 1.50
-    #   qwen3.5-flash        0.03 / 0.29    ultra-cheap ← 鲁棒性测试
-    #   qwen3-vl-flash       0.02 / 0.21    vision ultra-cheap
-    #   qwen-flash           0.02 / 0.21
+    # the_company 聚合 API 定价对照（$ per 1M tokens, input/output）—— 2026-06-23 用户同步最新价目表：
+    #   gpt-5.5-expensive     5.00 / 30.00   quality 顶配(贵)
+    #   gpt-image-2           5.00 / 10.00   图像
+    #   gemini-3-pro-image    2.00 / 12.00   图像(pro)
+    #   gemini-3.1-pro        2.00 / 12.00   quality
+    #   gpt-5.3-codex         1.75 / 14.00   代码
+    #   qwen3.7-max           1.71 / 5.14
+    #   gemini-3.5-flash      1.50 / 9.00
+    #   glm-5.2               1.14 / 4.00
+    #   claude-haiku-4-5      1.00 / 5.00
+    #   kimi-k2.6             0.93 / 3.86
+    #   kimi-k2.7-code        0.93 / 3.86    代码
+    #   glm-5.1               0.86 / 3.43    standard 首选
+    #   gemini-3-flash        0.50 / 3.00
+    #   gemini-3.1-flash-image 0.50 / 3.00   图像(flash)
+    #   gpt-5.5               0.50 / 3.00  ★2026-06-23 自建 agent 主力(便宜+够强)
+    #   deepseek-v4-pro       0.43 / 0.86    cheap 稳定
+    #   qwen3-max             0.36 / 1.43
+    #   qwen3.6-plus          0.29 / 1.71    vision 常规
+    #   gpt-5.4               0.25 / 1.50  ← 大降价(原 2.50/15.00)
+    #   gemini-embedding-2    0.20 / 0.00    embedding
+    #   gemini-embedding-001  0.15 / 0.00    embedding
+    #   deepseek-v4-flash     0.14 / 0.29    ultra-cheap
+    #   text-embedding-3-large 0.13 / 0.00   embedding
+    #   qwen-flash            0.02 / 0.21    ultra-cheap
     _MODELS: dict[str, dict[str, str]] = {
-        # ── the_company proxy (THE_COMPANY_API_KEY) — 27 个可用模型 (2026-04-26 同步) ──
+        # ── the_company proxy (THE_COMPANY_API_KEY) — 2026-06-23 同步最新价目表 ──
+        # 旧型号(claude-opus/sonnet/glm-5/kimi-k2.5/qwen3.5-* 等)仍保留: 历史 policy/fallback 引用,
+        # 不在新表内的按旧价兜底估算; 新表以下方"★最新"段为权威。
         # quality tier (claude / gpt / opus)
         "claude-opus-4-6":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "claude-opus-4-7":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
@@ -241,11 +250,14 @@ class ModelRegistry:
         "gpt-5.3-codex":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gpt-5.4":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gpt-5.5":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.5-expensive":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # standard tier (glm / kimi / qwen-max)
         "glm-5":                {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "glm-5.1":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "glm-5.2":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "kimi-k2.5":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "kimi-k2.6":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "kimi-k2.7-code":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "qwen3-max":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "qwen3.7-max":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "qwen3.5-plus":         {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
@@ -261,8 +273,16 @@ class ModelRegistry:
         "qwen3-vl-flash":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.1":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3-flash-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.5-flash":             {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.1-flash-lite-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.1-pro-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        # image / embedding（非对话, 计价用; role 一般不选）
+        "gpt-image-2":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3-pro-image-preview":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.1-flash-image-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-embedding-001":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-embedding-2":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "text-embedding-3-large":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
     }
 
     # ── Policies: tier → model (每个 policy 定义四个 tier 的首选模型) ─────
@@ -595,23 +615,41 @@ class _UnifiedResponse:
 # 每百万 token 价格（美元），来源: the_company 聚合 API 定价 (2026-04-07)
 _MODEL_PRICING: dict[str, tuple[float, float]] = {
     # (input_per_M, output_per_M)
-    # quality tier
+    # ── ★2026-06-23 用户同步最新价目表（权威）──
+    "gpt-5.5-expensive":         (5.00,  30.00),
+    "gpt-image-2":               (5.00,  10.00),
+    "gemini-3-pro-image-preview": (2.00, 12.00),
+    "gemini-3.1-pro-preview":    (2.00,  12.00),
+    "gpt-5.3-codex":             (1.75,  14.00),
+    "qwen3.7-max":               (1.71,  5.14),
+    "gemini-3.5-flash":          (1.50,  9.00),
+    "glm-5.2":                   (1.14,  4.00),
+    "claude-haiku-4-5-20251001": (1.00,  5.00),
+    "claude-haiku-4-5@20251001": (1.00,  5.00),
+    "kimi-k2.6":                 (0.93,  3.86),
+    "kimi-k2.7-code":            (0.93,  3.86),
+    "glm-5.1":                   (0.86,  3.43),
+    "gemini-3-flash-preview":    (0.50,  3.00),
+    "gemini-3.1-flash-image-preview": (0.50, 3.00),
+    "gpt-5.5":                   (0.50,  3.00),   # ★本轮自建 agent 主力
+    "deepseek-v4-pro":           (0.43,  0.86),
+    "qwen3-max":                 (0.36,  1.43),
+    "qwen3.6-plus":              (0.29,  1.71),
+    "gpt-5.4":                   (0.25,  1.50),   # 大降价(原 2.50/15.00)
+    "gemini-embedding-2":        (0.20,  0.00),
+    "gemini-embedding-001":      (0.15,  0.00),
+    "deepseek-v4-flash":         (0.14,  0.29),
+    "text-embedding-3-large":    (0.13,  0.00),
+    "qwen-flash":                (0.02,  0.21),
+    # ── 旧型号（不在最新表内, 留旧价供历史/fallback 调用估算）──
     "claude-opus-4-6":           (5.00,  25.00),
     "claude-sonnet-4-6":         (3.00,  15.00),
-    "gpt-5.4":                   (2.50,  15.00),
-    "claude-haiku-4-5-20251001": (1.00,  5.00),
-    # standard tier
     "glm-5":                     (0.57,  2.57),
     "kimi-k2.5":                 (0.57,  3.00),
-    "qwen3-max":                 (0.36,  1.43),
     "qwen3.5-plus":              (0.40,  1.20),
-    # cheap tier
     "deepseek-v3-2-251201":      (0.28,  0.43),
     "qwen3.5-flash":             (0.03,  0.29),
-    "qwen-flash":                (0.02,  0.21),
-    # vision tier
     "qwen3-vl-flash":            (0.02,  0.21),
-    "qwen3.6-plus":              (0.29,  1.71),
 }
 
 

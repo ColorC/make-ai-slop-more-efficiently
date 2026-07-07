@@ -75,6 +75,33 @@ def _preview_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
 
 
+def _synthesize_testmap_yaml(team_name: str) -> str:
+    """骨架接管(与 py_compile / DESIGN.md 章节规范化同款): code_package 若未含
+    testmap.yaml, 确定性合成一份最小骨架(app=team_name, features 空), 与
+    `templates/team/骨架/testmap.yaml` 内容对齐(见 OMNI-100 · 2026-07-03
+    完成标准接线批)。不调 LLM, 不影响既有 files_to_write 结构。
+    """
+    return (
+        "# [OMNI] origin=team-builder domain=services/" + team_name + " ts=" + _now_iso() + " type=data\n"
+        "# testmap.yaml — 功能点-测试对照表。真源跟随本软件;omnicompany 只注册指针。\n"
+        "# 契约: src/omnicompany/packages/services/_governance/testmap.py; 查询: omni testmap show <app>\n"
+        "# 首个登记期限: 本软件首个功能性计划完成时,features 必须至少登记该计划交付的功能点"
+        "(空表过巡检但过不了计划收尾门)。\n"
+        f"app: {team_name}\n"
+        "doc: DESIGN.md\n"
+        "gates:\n"
+        "  - id: unit\n"
+        "    cmd: pytest tests/ -q\n"
+        "    cwd: .\n"
+        "features: []\n"
+    )
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _build_pipeline_entry_code(team_name: str, description: str) -> str:
     """生成要追加到 core/pipelines.py 的 PipelineEntry 代码段."""
     snake = team_name.replace("-", "_")
@@ -154,6 +181,13 @@ class RegistrarWorker(Worker):
                 output={},
                 diagnosis=f"target_package_path 不合规 · 必须以 {expected_prefix!r} 开头 (got {target_path!r})",
             )
+
+        # 骨架接管 · code_package 若未含 testmap.yaml, 确定性合成一份最小骨架
+        # (OMNI-100 完成标准接线批 · 2026-07-03): 新 team 落盘即带功能点-测试台账占位,
+        # 不调 LLM、不重构本管线, 只在 files dict 缺失时补一条。
+        if not any(Path(rel).name == "testmap.yaml" for rel in files):
+            files = dict(files)
+            files["testmap.yaml"] = _synthesize_testmap_yaml(team_name)
 
         # 骨架接管 · 对所有 .py 跑 py_compile 检测语法错
         # 100% 必做: "落盘前要能 import" 是确定性约束, 不靠 LLM 自觉

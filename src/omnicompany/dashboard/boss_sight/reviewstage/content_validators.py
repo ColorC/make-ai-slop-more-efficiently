@@ -58,7 +58,9 @@ def validate_material_structure(
     if kind == "markdown" and content.strip():
         if not re.search(r"^#{1,6}\s+\S+", content, flags=re.MULTILINE):
             warnings.append(_warning("markdown_missing_heading", "markdown has no heading", path="inline_content"))
-        if re.search(r"\b(TODO|TBD|FIXME)\b", content, flags=re.IGNORECASE):
+        # 仅匹配全大写的真占位标记;占位标记按惯例全大写。不加 IGNORECASE,
+        # 否则正文里描述状态值的小写 todo/draft/done 等普通词会被误报。
+        if re.search(r"\b(TODO|TBD|FIXME)\b", content):
             warnings.append(_warning("markdown_has_placeholder", "markdown contains TODO/TBD/FIXME markers", path="inline_content"))
 
     # live_url 型 html 材料的真内容是实时网页(iframe), inline_content 只是回退说明,
@@ -125,4 +127,63 @@ def validate_material_structure(
     return warnings
 
 
-__all__ = ["TEXT_KINDS", "validate_material_structure"]
+# ── 阻断校验(kind ↔ 文件类型): validate_material_structure(仅警告)的硬性半边 ──────
+# 2026-07-02 教训: .md 按 kind=static-report(=静态报告**网页**, HtmlMaterialView iframe
+# 渲染)提交, 全链路绿灯, 审阅台里 markdown 原文被当 HTML 展示。kind 决定渲染器,
+# 与内容格式不匹配必须在 store.create 咽喉阻断, 不能指望提交方望文生义选对。
+KIND_FILE_EXTS: dict[str, set[str]] = {
+    "image": IMAGE_EXTS,
+    "markdown": {".md", ".markdown", ".mdx", ".txt"},
+    "plan": {".md", ".markdown", ".mdx", ".txt"},
+    "agent-workflow-report": {".md", ".markdown", ".mdx", ".txt"},
+    "html": {".html", ".htm"},
+    "static-report": {".html", ".htm"},
+    "demo": {".html", ".htm"},
+    "video": {".mp4", ".webm", ".mov", ".m4v"},
+}
+
+_WEB_INLINE_KINDS = {"html", "static-report", "demo"}
+
+
+def validate_kind_file_compat(
+    *,
+    kind: str,
+    inline_content: str | None,
+    file_relpath: str | None,
+    extra: dict[str, Any] | None = None,
+) -> str | None:
+    """kind 与内容格式的兼容性硬校验。返回 None=放行; 返回 message=阻断。
+
+    宽松位(贴合本模块 forgiving 与 Format 可扩展设计):
+    - KIND_FILE_EXTS 表外的 kind(如 Format 扩展 kind)一律放行;
+    - 带 extra.live_url 的网页类放行 — 真内容是实时网页, inline/file 只是回退;
+    - 文件无扩展名放行(提交层会按 kind 补默认后缀);
+    - inline 路线只对网页类做轻量嗅探, 文本类 inline 不设限。
+    """
+    extra = extra or {}
+    if str(extra.get("live_url") or "").strip():
+        return None
+    if file_relpath:
+        allowed = KIND_FILE_EXTS.get(kind)
+        suffix = Path(file_relpath).suffix.lower()
+        if allowed is not None and suffix and suffix not in allowed:
+            return (
+                f"kind={kind} 期望 {'/'.join(sorted(allowed))} 文件, 收到 {suffix}。"
+                "markdown 报告请用 kind=markdown(或 plan/agent-workflow-report); "
+                "static-report/demo/html 是自包含 HTML 网页(或带 extra.live_url)。"
+            )
+        return None
+    content = (inline_content or "").strip()
+    if kind in _WEB_INLINE_KINDS and content:
+        lower = content.lower()
+        looks_html = "<html" in lower or "<!doctype" in lower or "<body" in lower
+        looks_md = bool(re.search(r"^#{1,6}\s+\S+", content, flags=re.MULTILINE))
+        if not looks_html and looks_md:
+            return (
+                f"kind={kind} 期望完整 HTML 网页, 但 inline 内容像 markdown"
+                "(有 # 标题、无 <html>/<!doctype> 骨架)。markdown 报告请用 kind=markdown。"
+            )
+    return None
+
+
+__all__ = ["TEXT_KINDS", "KIND_FILE_EXTS", "validate_material_structure", "validate_kind_file_compat"]

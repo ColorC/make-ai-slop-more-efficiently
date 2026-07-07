@@ -165,11 +165,13 @@ def build_team() -> TeamSpec:
             vkind=ValidatorKind.HARD,
             desc="三层编译检查: py_compile → import → TeamChecker。报告写进 reports['compile'], PASS 贴 compile-passed tag。",
             routes={
-                # 2026-04-10 回退 P7.4 并行: 三道 HARD 验证改回串行 compile→lap→error_route→integration→finalizer。
+                # 2026-04-10 回退 P7.4 并行: 三道 HARD 验证改回串行。
                 # 原因: runner 的 join barrier 是 AND 语义, P7.4 并行 fan-out 后若任一验证 FAIL,
                 # finalizer 永远凑不齐 3/3 (因为 FAIL 的那个走向 auto_fixer), auto_fixer 也凑不齐
                 # 3/3 (因为 PASS 的那两个走向 finalizer), 两端死锁。并行节省的 ~100ms 不值得这个语义代价。
-                VerdictKind.PASS: Route(action=RouteAction.NEXT, target="lap_verifier"),
+                # 2026-07-03 批4: lap_verifier 九维检查器显式废止, compile→error_route→integration→finalizer,
+                # PASS 直接进 error_route_auditor(原为 lap_verifier)。
+                VerdictKind.PASS: Route(action=RouteAction.NEXT, target="error_route_auditor"),
                 VerdictKind.FAIL: Route(action=RouteAction.NEXT, target="deterministic_fixer"),
             },
         ),
@@ -197,17 +199,9 @@ def build_team() -> TeamSpec:
             },
             maturity=NodeMaturity.GROWING,
         ),
-        # 2026-04-10 回退 P7.4 并行到串行: compile → lap → error_route → integration → finalizer
+        # 2026-04-10 回退 P7.4 并行到串行; 2026-07-03 批4 lap_verifier 废止后:
+        # compile → error_route → integration → finalizer
         # 每个验证 FAIL 单独走 auto_fixer (OR 语义, 不经过 join barrier), PASS 走下一个验证。
-        _anchor(
-            "lap_verifier", "wf.project_skeleton", "wf.project_skeleton",
-            vkind=ValidatorKind.HARD,
-            desc="确定性五维度 LAP 合规审计 (Format规范/Router规范/拓扑完整/Format健康/info_audit覆盖)",
-            routes={
-                VerdictKind.PASS: Route(action=RouteAction.NEXT, target="error_route_auditor"),
-                VerdictKind.FAIL: Route(action=RouteAction.NEXT, target="auto_fixer"),
-            },
-        ),
         _anchor(
             "error_route_auditor", "wf.project_skeleton", "wf.project_skeleton",
             vkind=ValidatorKind.HARD,
@@ -268,10 +262,9 @@ def build_team() -> TeamSpec:
         # 生成 → 验证
         TeamEdge(source="code_gen_loop", target="compile_checker", condition=VerdictKind.PASS),
 
-        # 验证链 (P7.3 单主干 + 2026-04-10 回退到串行)
-        # compile → lap → error_route → integration → finalizer, 每个 FAIL 单独走 auto_fixer。
-        TeamEdge(source="compile_checker", target="lap_verifier", condition=VerdictKind.PASS),
-        TeamEdge(source="lap_verifier", target="error_route_auditor", condition=VerdictKind.PASS),
+        # 验证链 (P7.3 单主干 + 2026-04-10 回退到串行; 2026-07-03 批4 lap_verifier 废止)
+        # compile → error_route → integration → finalizer, 每个 FAIL 单独走 auto_fixer。
+        TeamEdge(source="compile_checker", target="error_route_auditor", condition=VerdictKind.PASS),
         TeamEdge(source="error_route_auditor", target="integration_tester", condition=VerdictKind.PASS),
         TeamEdge(source="integration_tester", target="finalizer", condition=VerdictKind.PASS),
 
@@ -290,7 +283,7 @@ def build_team() -> TeamSpec:
         TeamEdge(source="syntax_fixer", target="auto_fixer", condition=VerdictKind.PARTIAL),
 
         # Level 3: 验证链失败 → auto_fixer (LLM fallback) → compile_checker (feedback)
-        TeamEdge(source="lap_verifier", target="auto_fixer", condition=VerdictKind.FAIL),
+        # (2026-07-03 批4: lap_verifier FAIL 边随节点废止一并摘除)
         TeamEdge(source="error_route_auditor", target="auto_fixer", condition=VerdictKind.FAIL),
         TeamEdge(source="integration_tester", target="auto_fixer", condition=VerdictKind.FAIL),
         TeamEdge(source="auto_fixer", target="compile_checker", condition=VerdictKind.PASS, feedback=True),

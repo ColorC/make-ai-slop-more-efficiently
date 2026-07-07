@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from omnicompany.core.projects_registry import (
     assets_dir,
+    build_quests,
     enrich_projects,
     list_projects,
     parse_index_file,
@@ -37,6 +38,16 @@ def get_projects(fresh: bool = False) -> dict[str, Any]:
     fresh=1 = 用户点了刷新按钮: 穿透 index 解析缓存, 保证读到最新。
     """
     return enrich_projects(fresh=fresh)
+
+
+@projects_router.get("/quests")
+def get_quests(fresh: bool = False) -> dict[str, Any]:
+    """任务窗口(驾驶舱主区第 2 个固定页签): 进行中项目 = 长期任务卡。
+
+    与项目工作板同源但呈现成游戏式任务面板 — 每个项目一条长期任务, 带长期目标/
+    当前章节/进行中计划子目标/近 7 天活跃/AIGC 图。fresh=1 穿透缓存。
+    """
+    return build_quests(fresh=fresh)
 
 
 class ProjectUpsert(BaseModel):
@@ -108,9 +119,11 @@ def get_project_findings(project_id: str) -> dict[str, Any]:
     if proj is None:
         raise HTTPException(status_code=404, detail=f"未注册的项目: {project_id}")
     try:
-        from omnicompany.packages.services._governance.work_history import latest_findings
-        f = latest_findings() or {}
-    except Exception:  # noqa: BLE001 — 治理产物损坏不拖垮项目页
+        import importlib
+        # work_history 是隐私排除的可选服务(不进公开白名单), 动态导入
+        _wh = importlib.import_module("omnicompany.packages.services._governance.work_history")
+        f = _wh.latest_findings() or {}
+    except Exception:  # noqa: BLE001 — 服务缺失/治理产物损坏不拖垮项目页
         f = {}
     def _mine(key: str) -> list[dict[str, Any]]:
         return [{k: v for k, v in it.items() if k != "assigned"}

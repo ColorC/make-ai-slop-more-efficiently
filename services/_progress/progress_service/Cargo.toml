@@ -1,0 +1,19 @@
+[package]
+name = "progress-service"
+version = "0.1.0"
+edition = "2021"
+description = "OmniCompany progress service — 北极星/主线/支线 → 计划 → 子计划 + 进度历史；接 dashboard / overlay-shell / meego / multica。Rust 栈，统一数据模型与统一身份。"
+
+[[bin]]
+name = "progressd"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "process", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+
+[profile.release]
+opt-level = 2

@@ -91,7 +91,7 @@ _STAGED_EXEMPTIONS_EXPIRES: dict[str, str] = {
 _FLOW_OUTSIDE_WORKER_EXEMPTIONS: tuple[str, ...] = (
     # LLM-CALL-UNIFICATION T4 (2026-06-13): this adapter keeps the multi-turn
     # tool_use_id continuity contract until runtime owns a structured-chat API.
-    "src/omnicompany/packages/domains/voxelcraft/item/_llm_helpers.py",
+    "src/omnicompany/packages/domains/voxelcraft/content/paths/_llm_helpers.py",
 )
 
 _ORPHAN_MODULE_EXEMPTIONS: tuple[str, ...] = (
@@ -101,9 +101,8 @@ _ORPHAN_MODULE_EXEMPTIONS: tuple[str, ...] = (
     # single structured JSON authority.
     "src/omnicompany/packages/services/_governance/plan_steward/steward.py",
     "src/omnicompany/packages/services/_governance/work_history/miner.py",
-    "src/omnicompany/packages/domains/voxelcraft/routers/design.py",
-    "src/omnicompany/packages/domains/voxelcraft/item/_llm_helpers.py",
-    "src/omnicompany/packages/domains/voxelcraft/item/workers/item_asset_picker.py",
+    "src/omnicompany/packages/domains/voxelcraft/content/paths/_llm_helpers.py",
+    "src/omnicompany/packages/domains/voxelcraft/content/paths/item/workers/item_asset_picker.py",
     "src/omnicompany/packages/domains/narrative/routers/beat_generate.py",
     "src/omnicompany/packages/domains/narrative/routers/csl_ingest.py",
     "src/omnicompany/packages/domains/narrative/routers/dialogue_generator.py",

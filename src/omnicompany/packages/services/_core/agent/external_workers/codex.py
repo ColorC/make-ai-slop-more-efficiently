@@ -69,6 +69,11 @@ class CodexExecWorker(ExternalAgentWorker):
             cmd.extend(["--profile", spec.profile])
         if spec.output_schema_path:
             cmd.extend(["--output-schema", str(Path(spec.output_schema_path).expanduser().resolve())])
+        # 调用方可经 metadata["codex_config"] 传 `-c key=value` 配置覆盖(如 research 开 tools.web_search)。
+        codex_config = (spec.metadata or {}).get("codex_config")
+        if isinstance(codex_config, dict):
+            for key, value in codex_config.items():
+                cmd.extend(["-c", f"{key}={value}"])
         cmd.append("-")
         return cmd
 

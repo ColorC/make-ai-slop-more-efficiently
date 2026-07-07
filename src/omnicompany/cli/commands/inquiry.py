@@ -24,7 +24,7 @@ def cmd_inquiry():
 @click.option("--db", type=str, default=None, help="询问数据库路径")
 def inquiry_list(db: str | None):
     """列出待回答的询问"""
-    store = get_default_store(db or "omnicompany_inquiries.db")
+    store = get_default_store(db)  # db=None → 锚定路径解析(见 user_inquiry._resolve_default_db_path)
     pending = store.list_pending()
     if not pending:
         click.echo("没有待回答的询问。")
@@ -42,7 +42,7 @@ def inquiry_list(db: str | None):
 @click.option("--db", type=str, default=None, help="询问数据库路径")
 def inquiry_show(inquiry_id: str, db: str | None):
     """查看单条询问的完整内容"""
-    store = get_default_store(db or "omnicompany_inquiries.db")
+    store = get_default_store(db)  # db=None → 锚定路径解析(见 user_inquiry._resolve_default_db_path)
     inq = store.get(inquiry_id)
     if not inq:
         click.echo(f"未找到询问 {inquiry_id}")
@@ -72,7 +72,7 @@ def inquiry_answer(inquiry_id: str, answer_text: str, db: str | None):
     示例：
         omnicompany inquiry answer abc12345 "idiom_translator 的 prompt 需要明确要求导出所有公开函数"
     """
-    store = get_default_store(db or "omnicompany_inquiries.db")
+    store = get_default_store(db)  # db=None → 锚定路径解析(见 user_inquiry._resolve_default_db_path)
     inq = store.get(inquiry_id)
     if not inq:
         click.echo(f"未找到询问 {inquiry_id}")
@@ -95,7 +95,7 @@ def inquiry_answer(inquiry_id: str, answer_text: str, db: str | None):
 @click.option("--db", type=str, default=None, help="询问数据库路径")
 def inquiry_all(limit: int, db: str | None):
     """列出所有询问（含已回答）"""
-    store = get_default_store(db or "omnicompany_inquiries.db")
+    store = get_default_store(db)  # db=None → 锚定路径解析(见 user_inquiry._resolve_default_db_path)
     inquiries = store.list_all(limit=limit)
     if not inquiries:
         click.echo("暂无询问记录。")

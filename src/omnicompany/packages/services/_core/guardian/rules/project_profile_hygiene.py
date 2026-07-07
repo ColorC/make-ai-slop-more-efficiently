@@ -8,6 +8,7 @@ next to the existing OMNI hygiene rules.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -43,6 +44,35 @@ def _as_list(value: Any) -> list[Any]:
 
 def _as_str_set(value: Any) -> set[str]:
     return {str(item) for item in _as_list(value)}
+
+
+# 文件系统大小写敏感性: Windows/NTFS 不区分大小写, 闭集成员判定必须同样不区分,
+# 否则 profile 登记 `WindowsWorkspace` 而工具写 `windowsworkspace\...`(同一物理目录)
+# 会把已登记核心目录误判 stray 并在 enforce 模式阻断写入 (对抗测试 path-tricks 实证)。
+_CASE_INSENSITIVE_FS = os.name == "nt"
+
+
+def _norm_name(name: str) -> str:
+    return name.lower() if _CASE_INSENSITIVE_FS else name
+
+
+def _norm_set(names) -> set[str]:
+    return {_norm_name(str(n)) for n in names}
+
+
+def _strip_ext_len_prefix(raw: str) -> str:
+    r"""去掉 Windows 扩展长度前缀 \\?\ (含 \\?\UNC\)。
+
+    pathlib(3.12)对 \\?\E:\... 解析异常(is_absolute 时真时假 / resolve 保留或追加该前缀),
+    使 relative_to(scan_root='E:\\') 全失败 → 顶层 stray 漏判(对抗测试 extended-length 绕过实证)。
+    含尾随空格的中间组件经 resolve() 也会被加上该前缀, 同源。统一剥掉按普通路径处理。
+    """
+    s = str(raw)
+    if s.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + s[len("\\\\?\\UNC\\"):]
+    if s.startswith("\\\\?\\"):
+        return s[len("\\\\?\\"):]
+    return s
 
 
 def _resolve_profile_root(project_root: Path, root_spec: dict[str, Any]) -> Path:
@@ -133,6 +163,50 @@ def _issue(
     }
 
 
+# 像"相对路径片段"的裸目录名: 在盘根/工作区根冒出这些, 几乎一定是错误 CWD 下
+# 跑了相对路径 (directory_cleanliness §6 的统一根因). 单字符同理 (例 `e`).
+_PATH_FRAGMENT_NAMES = frozenset({
+    "e", "root", "tmp", "temp", "bin", "data", "src", "lib", "out",
+    "dist", "build", "node_modules", "var", "log", "logs", "cache", "obj",
+})
+
+
+def _classify_root_stray(entry: Path) -> str:
+    """给闭集外的顶层条目分类根因 + 给改法 (满足"找到根因"诉求).
+
+    返回一句中文提示, 直接拼进告警 message。分三类:
+      手误/错误CWD相对写 · vendored 参考仓铺顶层 · 未登记游离条目。
+    """
+    name = entry.name
+    is_dir = False
+    try:
+        is_dir = entry.is_dir()
+    except (PermissionError, OSError):
+        pass
+    # 1) 单字符 / 像路径片段的裸名字 → 手误或错误 CWD 相对写。
+    #    这是【名字】信号, 与目录是否已落盘无关 —— 实时 hook 在写入【前】判, 目标常还不
+    #    存在 (正是要拦的"错误CWD相对写"); 故不 gate 在 is_dir 上 (否则 pre-write 退化成"未登记")。
+    if len(name) == 1 or name.lower() in _PATH_FRAGMENT_NAMES:
+        return (
+            f"[根因·手误或错误CWD] 像是在此根下跑了相对路径 `{name}/...` "
+            f"(本该用绝对路径或先 cd 进目标项目)。查内容+创建时间定位是哪条命令/哪个 agent 写的。"
+        )
+    # 2) 目录内含 .git → vendored 参考仓直接铺顶层
+    try:
+        if is_dir and (entry / ".git").exists():
+            return (
+                "[根因·参考仓铺顶层] 这是一个独立 git 仓 (含 .git): 收进 `参考项目/` "
+                "或所属项目的 vendor 子目录, 别占顶层。"
+            )
+    except (PermissionError, OSError):
+        pass
+    # 3) 其他 → 未登记游离条目
+    return (
+        "[根因·未登记] 说清它哪来的/归谁: 是某项目的私有数据被相对路径写错位置, "
+        "还是该登记的新项目? 定位后归位或登记进 hygiene-profile, 否则清理。"
+    )
+
+
 def scan_project_profile_violations(project_root: Path) -> list[dict[str, str]]:
     """Scan `.omni/hygiene-profile.yaml` if present.
 
@@ -204,33 +278,38 @@ def scan_project_profile_violations(project_root: Path) -> list[dict[str, str]]:
                     message=f"Required path is missing under {root_label}: {required}",
                 ))
 
-        allowed_dirs = _as_str_set(root_spec.get("allowed_root_dirs"))
-        allowed_files = _as_str_set(root_spec.get("allowed_root_files"))
+        allowed_dirs = _norm_set(_as_str_set(root_spec.get("allowed_root_dirs")))
+        allowed_files = _norm_set(_as_str_set(root_spec.get("allowed_root_files")))
         if allowed_dirs or allowed_files:
             for entry in _iter_entries(scan_root):
                 if entry.is_dir():
-                    if entry.name not in allowed_dirs:
+                    if _norm_name(entry.name) not in allowed_dirs:
                         issues.append(_issue(
                             rule_id="PROJ-HYG-ROOT-CLOSED-SET",
                             severity="MEDIUM",
                             profile_root=root_label,
                             rel_path=entry.name,
                             message=(
-                                f"Root directory `{entry.name}` is outside the hygiene "
-                                f"closed set for {root_label}."
+                                f"顶层目录 `{entry.name}` 不在 {root_label} 闭集内。 "
+                                + _classify_root_stray(entry)
                             ),
                         ))
-                elif entry.is_file() and entry.name not in allowed_files:
+                elif entry.is_file() and _norm_name(entry.name) not in allowed_files:
                     issues.append(_issue(
                         rule_id="PROJ-HYG-ROOT-CLOSED-SET",
                         severity="MEDIUM",
                         profile_root=root_label,
                         rel_path=entry.name,
                         message=(
-                            f"Root file `{entry.name}` is outside the hygiene closed "
-                            f"set for {root_label}."
+                            f"顶层文件 `{entry.name}` 不在 {root_label} 闭集内。 "
+                            + _classify_root_stray(entry)
                         ),
                     ))
+
+        # closed_set_only: 巨大外部根 (workspace/drive) 只做闭集判定 (一层 iterdir),
+        # 硬跳过下面递归全树的 forbidden_globs / versioned_name_scan, 防扫炸。
+        if root_spec.get("closed_set_only"):
+            continue
 
         forbidden = root_spec.get("forbidden_globs") or []
         for item_any in _as_list(forbidden):
@@ -283,3 +362,101 @@ def scan_project_profile_violations(project_root: Path) -> list[dict[str, str]]:
                     ))
 
     return issues
+
+
+# ── 实时 hook 复用接口 (2026-06-26): 让 PreToolUse 守卫复用同一份 hygiene-profile 闭集 ──
+# 这两个函数供 ccdaemon lock_pretooluse hook 在【写入前】实时拦顶层 stray。永不抛(hook fail-open)。
+
+def _load_closed_set_roots(project_root: Path) -> list[tuple[str, Path, set[str]]]:
+    """读 profile, 返回 closed_set_only 根的 (label, scan_root, allowed_names)。判不了返回 []。"""
+    if yaml is None:
+        return []
+    profile_path = project_root / PROFILE_REL
+    if not profile_path.exists():
+        return []
+    try:
+        profile = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return []
+    roots = profile.get("roots") or {}
+    if not isinstance(roots, dict):
+        return []
+    out: list[tuple[str, Path, set[str]]] = []
+    for name, spec in roots.items():
+        if not isinstance(spec, dict) or not spec.get("closed_set_only"):
+            continue
+        allowed = _as_str_set(spec.get("allowed_root_dirs")) | _as_str_set(spec.get("allowed_root_files"))
+        if not allowed:
+            continue
+        try:
+            out.append((str(name), _resolve_profile_root(project_root, spec), allowed))
+        except Exception:
+            continue
+    return out
+
+
+def check_top_level_stray(target: "Path | str", project_root: "Path | str | None" = None) -> dict | None:
+    """判一个【绝对路径】会不会在某 closed_set_only 根下制造顶层 stray。
+
+    供实时 hook 在写入前复用 hygiene-profile 闭集(单一真源)。永不抛异常。
+    返回 {root_label, top_name, scan_root, message} 或 None(不是 stray / 判不了)。
+    """
+    try:
+        # 先剥 \\?\ 扩展长度前缀(剥前 + resolve 后再剥), 防 pathlib 解析异常造成漏判。
+        target = Path(_strip_ext_len_prefix(str(target)))
+        if not target.is_absolute():
+            return None
+        try:
+            target = Path(_strip_ext_len_prefix(str(target.resolve())))
+        except OSError:
+            pass
+        if project_root is None:
+            from omnicompany.core.config import omni_workspace_root
+            project_root = omni_workspace_root()
+        project_root = Path(project_root)
+        for root_label, scan_root, allowed in _load_closed_set_roots(project_root):
+            try:
+                rel = target.relative_to(scan_root)
+            except ValueError:
+                continue
+            parts = rel.parts
+            if not parts:
+                continue
+            top = parts[0]
+            if _norm_name(top) in _norm_set(allowed):  # 大小写不敏感(NTFS)
+                continue
+            cause = _classify_root_stray(scan_root / top)
+            return {
+                "root_label": root_label,
+                "top_name": top,
+                "scan_root": str(scan_root),
+                "message": f"顶层 `{top}` 不在 {root_label} 闭集内({scan_root})。 {cause}",
+            }
+        return None
+    except Exception:
+        return None
+
+
+def dangerous_bash_roots(project_root: "Path | str | None" = None) -> list[Path]:
+    """返回"绝不该在其下用相对路径写"的大根 = closed_set_only 根中 project_root 的【严格祖先】。
+
+    project_root 自身(仓根)是合法工作目录, 不算危险; 其父(工作区根)、祖父(盘根)算。
+    供 hook 判 Bash 的 cwd 是否危险。永不抛。
+    """
+    try:
+        if project_root is None:
+            from omnicompany.core.config import omni_workspace_root
+            project_root = omni_workspace_root()
+        project_root = Path(project_root).resolve()
+        out: list[Path] = []
+        for _label, scan_root, _allowed in _load_closed_set_roots(project_root):
+            if scan_root == project_root:
+                continue  # 仓根是合法工作目录
+            try:
+                project_root.relative_to(scan_root)  # scan_root 是 project_root 的祖先?
+                out.append(scan_root)
+            except ValueError:
+                continue
+        return out
+    except Exception:
+        return []

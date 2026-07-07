@@ -1,0 +1,339 @@
+# 账本位置登记表 — 记录类内容落点闭集的唯一权威源
+# 铁律: 记录类内容(操作留痕/审批/进度/决策/日志/会话登记等一切"追加式事实记录")
+#       只允许存在于本表登记的位置; 表外出现记录类文件 = 违规。
+# 每类记录一个头(同一类事实只应有一个唯一真源, 其余要么是只读派生要么是违规多头)。
+# 新增记录类型时, 在本表加一行即合法 —— 闭集可低摩擦扩容, 不必先大改造再登记。
+# 记录工具本身不接受路径参数(写死登记位置), 想写别处只能绕过工具, 绕过即违规。
+# 权威依据: docs/plans/[2026-07-02]SEMANTIC-OS-MAP/target-architecture.md 第 3.5 节。
+# 普查底料: docs/plans/[2026-07-02]SEMANTIC-OS-MAP/design-candidates/fact-records-census.md。
+
+meta:
+  updated: "2026-07-02"
+  note: 重整第一批·闭集登记之二(第一条闭集登记是 config/ports.yaml)。
+
+# 字段说明:
+#   id: 记录类型短标识
+#   名称: 人话描述
+#   位置: 绝对路径或仓内相对路径(相对路径以 omnicompany/ 为根, 另注明的除外)
+#   格式: 文件/存储格式
+#   谁在写: 写入方(服务/CLI/角色)
+#   唯一性: 唯一真源 | 只读派生 | 多头待收敛 | 待修死
+#   保留滚动策略: { 现状, 目标 }
+#   备注: 关联条目/已知问题/待核事项
+
+records:
+  - id: review-materials
+    名称: 审阅材料(审阅台)
+    位置: data/boss_sight/reviewstage/
+    格式: json(元数据) + md/html/png(正文/封面) + 批注 json
+    谁在写: omni review submit
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 无清理, 持续累积
+      目标: 未定, 暂不动
+    备注: 结构清晰(材料/文件/封面/批注分离), 普查判定"规范"。
+
+  - id: human-approval
+    名称: 人工审批 / 问询队列
+    位置: data/runtime/buses/human_inbox.db
+    格式: sqlite
+    谁在写: human-inbox 收件箱服务(omni human / omni inquiry)
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 无滚动, 单库持续追加
+      目标: 未定, 暂不动
+    备注: 与"进化问询"(见 evolution-inquiries)是两回事, 不要混淆。
+
+  - id: evolution-inquiries
+    名称: 进化问询(evolution workflow 的 user inquiry 存储)
+    位置: data/runtime/buses/inquiries.db
+    格式: sqlite
+    谁在写: src/omnicompany/packages/services/_core/evolution/workflow/user_inquiry.py
+    唯一性: 唯一真源(已修死)
+    保留滚动策略:
+      现状: 已修死(2026-07-03 批4)。user_inquiry.py 补 _resolve_default_db_path()
+        (向上找仓根标志 src/omnicompany 后锚定, 与 cwd 无关) + 环境变量逃生舱
+        OMNI_INQUIRY_DB_PATH + migrate_legacy_inquiry_db()(迁移旧漂移文件带 .bak
+        回滚副本); CLI 四个子命令与 orchestrator 默认走锚定路径, 不再传裸相对名。
+        磁盘上仍未产生任何实体文件(尚无问询发生), 无历史文件需迁移。
+      目标: 固定落 data/runtime/buses/inquiries.db, 与 human_inbox.db 同级(已达成)
+    备注: 参照物 runtime/buses/human_bus.py::_resolve_inbox_path()(人工审批问询库,
+      本身用同构锚定, 无 cwd 漂移病, 本批核实无需改)。
+
+  - id: decisions-library
+    名称: 决策库(决策/信念/评论主记录)
+    位置: data/domains/decisions/library/records.jsonl
+    格式: jsonl + index.json 索引
+    谁在写: omni decisions
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 追加式, 不滚动
+      目标: 未定, 暂不动
+    备注: data/domains/research/library/records.jsonl 是另一个域(research)的同构但不同库, 命名模式重复非违规, 各域各自唯一。
+
+  - id: progress-service
+    名称: 进度(任务/目标/集群主台账)
+    位置: data/services/whatnow/whatnow.json
+    格式: json
+    谁在写: progressd
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 单文件持续写, 迁移前有 .pre-semantic-reorg.bak 备份
+      目标: 未定, 暂不动
+    备注: "进度服务已收编进本体。数据真源=本条位置(omnicompany/data/services/whatnow/whatnow.json, 文件名暂保留兼容; 正名环境变量为 PROGRESS_SERVICE_DATA_DIR, WHATNOW_DATA_DIR 仅兼容旧脚本); 代码真源=omnicompany/services/_progress/progress_service/; 进程走 OmniProgressDaemon 计划任务(隐藏窗口, 绑 127.0.0.1:8230)自启+保活。原仓 E:/WindowsWorkspace/_archive/progress-service-host-20260704 已降为纯归档。"
+
+  - id: progress-boss-sight
+    名称: 进度快照(boss_sight 侧)
+    位置: data/boss_sight/progress.json
+    格式: json
+    谁在写: boss_sight 服务
+    唯一性: 多头待收敛
+    保留滚动策略:
+      现状: 单文件覆写
+      目标: 定性为 progress-service 的只读派生; 若确认单向数据流保留为投影, 否则第五批收敛删除
+    备注: 与进度服务主账、progress_steward、data/lifecycle 是否单向派生关系未从代码层核实。
+
+  - id: progress-governance-steward
+    名称: 进度(治理管家侧审阅记录)
+    位置: data/governance/progress_steward/*
+    格式: json(progress_review-*.json + progress_review-latest.json + progress_scan.json)
+    谁在写: progress_steward 管家
+    唯一性: 多头待收敛
+    保留滚动策略:
+      现状: 多版本 + latest 指针
+      目标: 定性为 progress-service 的只读派生; 否则第五批收敛删除
+    备注: 同上, 与 progress-boss-sight 一并核实。
+
+  - id: progress-lifecycle
+    名称: 进度(生命周期任务追踪)
+    位置: data/lifecycle/*
+    格式: json(tasks/*.json, splits/*.json, task_bindings.json) + md(plan_reports/*.md)
+    谁在写: plan lifecycle 相关服务
+    唯一性: 多头待收敛
+    保留滚动策略:
+      现状: 多文件持续累积
+      目标: 定性为 progress-service 的只读派生; 否则第五批收敛删除
+    备注: 语义上与"进度"高度重叠, 三条并列多头统一在第五批一起核关系。
+
+  - id: cron-runs
+    名称: 定时任务运行记录
+    位置: .omni/cron/runs.jsonl + .omni/cron/runs/<job>/
+    格式: jsonl(汇总) + 目录(各 job 独立执行历史)
+    谁在写: _governance/scheduler.py, dashboard/controlplane/cron.py
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 持续追加/累积不滚动
+      目标: 按月归档
+    备注: 巡检类 job(如 guard-patrol-daily)的产物也落在 runs/<job>/ 下, 与"巡检结果"条目呼应。
+
+  - id: sessions-workspace
+    名称: 会话登记(工作区级)
+    位置: E:\WindowsWorkspace\.omni\sessions\
+    格式: json(每 session 一个文件)
+    谁在写: omni session 管理
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 持续累积, 约 487 个文件
+      目标: 未定, 暂不动
+    备注: 工作区级为唯一权威; omnicompany/.omni/sessions 是第二套, 见下条。
+
+  - id: sessions-omnicompany
+    名称: 会话登记(omnicompany 仓内一套)
+    位置: omnicompany/.omni/sessions/
+    格式: json
+    谁在写: omni session 管理(仓内触发路径)
+    唯一性: 多头待收敛
+    保留滚动策略:
+      现状: 持续累积, 数量级与工作区级相近
+      目标: 第五批核实与 sessions-workspace 是否 id 重叠/镜像关系, 确认后二选一或明确分工
+    备注: 未逐一比对文件名交集; E:\WindowsWorkspace\_scratch\ 下的会话导出 json(cc_history.json 等)是野记录, 不在闭集内, 不登记。
+
+  - id: patrol-current
+    名称: 巡检结果(当前)
+    位置: .omni/cron/runs/guard-patrol-daily/ (现行执行记录) + .omni/patrol_report_latest.json (最新指针)
+    格式: json
+    谁在写: guardian patrol(guard-patrol-daily cron job)
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: patrol_report_latest.json 已停更(最后写入 2026-05-08), 需确认 cron job 是否仍活跃
+      目标: 未定, 暂不动
+    备注: 与旧 omnicompany/logs/patrol/ 构成"过去权威+现在权威"重叠, 见下条。
+
+  - id: patrol-legacy
+    名称: 巡检结果(旧存储位置)
+    位置: omnicompany/logs/patrol/
+    格式: json(patrol-<timestamp>.json, 976 个文件)
+    谁在写: (历史)guardian patrol 旧版本
+    唯一性: 多头待收敛
+    保留滚动策略:
+      现状: 5 月上旬后停更, 长期堆积未清理
+      目标: 第五批归档处置(先查有无护栏/管线在读它, 再删除或归档)
+    备注: 与 patrol-current 判定为新旧两头, 非并行权威。
+
+  - id: governance-steward-output
+    名称: 治理管家产出
+    位置: data/governance/<steward>/
+    格式: json/md 混用, 各管家自定, 多版本 + latest 指针模式
+    谁在写: 各治理管家(commit_steward/doc_steward/job_steward/plan_steward/prose_steward/resume_steward/work_history/progress_steward 等)
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 各管家多版本累积 + *-latest.json/md 指针
+      目标: 未定, 暂不动
+    备注: 每个管家一个子目录即合法; progress_steward 是例外(见 progress-governance-steward, 因与 progress-service 语义重叠被列多头)。
+
+  - id: service-logs
+    名称: 服务日志
+    位置: data/logs/<服务名>.*
+    格式: log(含 .err.log/.out.log)
+    谁在写: 各常驻服务自身
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 未见统一滚动/切割策略
+      目标: 未定, 暂不动
+    备注: dashboard 日志存在多头(omnicompany/logs/dashboard.log 旧路径已停更 + omnicompany/_scratch/dashboard-82xx.* 等临时副本), 均为多头待收敛, 第五批清理; 权威落点是本条 data/logs/<服务名>.*。
+
+  - id: boss-sight-state
+    名称: 总控面状态
+    位置: data/boss_sight/*.json
+    格式: json(agent_notify.json / agent_attention.json / agent_digests.json / agent_registry.json 等)
+    谁在写: boss_sight 服务
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 各文件单文件覆写
+      目标: 未定, 暂不动
+    备注: progress.json 虽同目录, 因与 progress-service 多头单独登记(见 progress-boss-sight), 不算在本条内。
+
+  - id: input-captures
+    名称: 输入捕获(截图/页面快照/元素批注)
+    位置: E:\WindowsWorkspace\captures\
+    格式: md(page_snapshot-*, element_comment-*) + png
+    谁在写: poof/dashboard 浏览器自动化与审阅工具
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 全部扁平堆放, 无子目录/无索引/无 manifest, 140+ 文件持续增长
+      目标: 第三批(输入侧语义化)组织化, 按项目/日期分区 + 索引
+    备注: 目录本身在闭集内合法, 但内容组织方式待整治, 不是位置违规。
+
+  - id: android-logs
+    名称: 安卓端日志(LOFA 回传)
+    位置: data/logs/android/<日期>.jsonl
+    格式: jsonl, 按日一个文件
+    谁在写: LOFA 客户端回传服务
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 按日分文件, 6 个左右
+      目标: 未定, 暂不动
+    备注: 无需改动, 命名已规范。
+
+  - id: ledger-ops
+    名称: 留痕账本(操作留痕唯一位置)
+    位置: data/ledger/events.jsonl
+    格式: jsonl(一行一个事件, append-only, 绝不改写已有行)
+    谁在写: omni ledger append(CLI) + packages/services/_core/ledger 模块(程序内调用)
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 骨架已建(2026-07-02), 事件schema见模块; 尚无滚动/归档, 持续追加
+      目标: 按 target-architecture.md 3.3 节两机关(验证闸门/默认读历史裁决)在骨架上继续落地; 滚动策略未定, 暂不动
+    备注: 未来一切"运行留痕/裁决记录"的唯一位置; 事件数据类与读写函数见
+      src/omnicompany/packages/services/_core/ledger/(__init__.py + store.py);
+      verdict 升级(如 verified)不改写原行, 追加一条 type=verdict.update 的关联事件;
+      CLI 见 omni ledger {append,tail,verify}。
+
+  - id: plan-bindings
+    名称: 计划-进度-测试-评审 绑定注册表(四件登记结构化落点)
+    位置: data/registry/plan_bindings.json
+    格式: json(单文件, 按 plan_id 为键; 历史沿革走 git, 不额外滚动)
+    谁在写: omni governance bind(CLI, set/show/list) + plans-sync 新计划纳管骨架写入
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 骨架待建(2026-07-03 开工登记), 单文件持续写
+      目标: 未定, 暂不动
+    备注: 权威 docs/plans/[2026-07-02]SEMANTIC-OS-MAP/overnight-run.md 第六节"绑定注册表化的验收锚";
+      记录工具本身不接受路径参数(CLI 与核心模块函数均无路径类参数, 位置写死);
+      guardian 新规则(OMNI-099)巡检缺锚/登记不完整/悬空, 显式豁免+理由不点名;
+      读写函数见 src/omnicompany/packages/services/_core/registry/plan_bindings.py。
+
+  - id: domain-records
+    名称: 业务域内记录(随域走)
+    位置: domains/<域>/*.db 或 *.jsonl(各域自定子路径, 如 domains/demogame/events.db、domains/narrative/csl.db、domains/vilo/runs/eval_*/transcripts/*.jsonl)
+    格式: sqlite / jsonl, 各域自定
+    谁在写: 各域自身管线
+    唯一性: 唯一真源(域内)
+    保留滚动策略:
+      现状: 各域不一, 部分规范(如 vilo runs 按 run 目录分区)部分野(如 demogame_ux/scratch/rule_traces 每次新开碎片文件)
+      目标: 各域在本表登记自己的子条目, 新增域记录类型加一行即合法
+    备注: domains/demogame/events.db 与顶层 data/events.db 的关系待核(是否同类记录的两个库, 未比对 schema); 已知野记录 domains/demogame_ux/scratch/rule_traces/ 应改为统一 jsonl 追加或按 run-id 目录归档, 第五批处置。
+
+  - id: token-ledger
+    名称: token 记账(会话级用量 + 内部调用账聚合)
+    位置: data/llm/token_ledger/(sessions.jsonl + internal_by_caller_day.jsonl + watermark.json)
+    格式: jsonl(会话级/内部按caller×天) + json(水位线状态)
+    谁在写: omni token-ledger run(CLI) + gov-token-ledger-daily 定时任务(纯扫描不调LLM)
+    唯一性: 派生可重建
+    保留滚动策略:
+      现状: 每次运行按水位线增量收集新内容, 与已落盘的历史行合并累加后重写文件,
+        不是全量覆盖——sessions.jsonl 按 session_id 合并(命中同 session_id 时按模型
+        累加 token 数与 calls, 否则追加新行), internal_by_caller_day.jsonl 按
+        caller×day×model 三键合并累加, watermark.json 记录三路数据源各自的字节偏移
+        (及 codex 的当前模型/total 基线延续状态)续跑点。落盘账本保留跨多次 run 的
+        完整历史, 不会被下一次增量批次(只含水位线之后的新内容)整份覆盖掉。
+      目标: 未定, 暂不动
+    备注: 派生自 ~/.claude/projects(顶层会话, 排除 subagents/workflows)+ ~/.codex/sessions
+      + data/llm/meter.jsonl 三路只读数据源折算, 本条目本身可随时删除重跑重建(不是唯一真源,
+      唯一真源是那三处); 关联(cwd→项目/cron↔caller)只做确定性匹配, 对不上一律落"未关联"桶,
+      不猜测; 接口=看板 GET /api/boss-sight/token-ledger; 权威=
+      docs/plans/[2026-07-02]SEMANTIC-OS-MAP/overnight-run.md 第六节。
+
+  - id: kb-annotations
+    名称: 知识库标注
+    位置: data/kb_annotations/
+    格式: json, 低频
+    谁在写: knowledge audit 相关工具
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 3 个文件, 低频写入
+      目标: 未定, 暂不动
+    备注: 无需改动。
+
+  - id: notes-materialize-state
+    名称: overlay-note-store 消费任务水位线
+    位置: data/lifecycle/notes_materialize_state.json
+    格式: json(逐条 note_id → 上次处理的 updatedDate + entity_id)
+    谁在写: omni notes materialize(CLI) + gov-notes-materialize 定时任务(每15分钟, 无变更零LLM)
+    唯一性: 派生可重建(重建后果=下一轮全部当新增重跑分类, 不丢真源)
+    保留滚动策略:
+      现状: 单文件覆写, 逐条 note_id 键值合并
+      目标: 未定, 暂不动
+    备注: 消费的真源=overlay-note-store/index.json+docs/*.md(只读, 不复制不另存, 见
+      packages/services/_core/lifecycle/note_source.py); 入册产物落既有
+      data/services/registry/(material) + data/semantic_fs/index.db(语义索引);
+      ⚠注册表实际物理路径含 src/ 前缀(src/data/services/registry/, 默认路径层级偏差,
+      第五批双址收拢一并处置)——审计时别在仓根 data/ 下找而误判为空;
+      权威=docs/plans/[2026-07-02]SEMANTIC-OS-MAP/overnight-run.md「批3 开工锚」。
+
+  - id: decisions-collect-waitlist
+    名称: 长prompt自动采集洪水闸待收清单
+    位置: data/governance/decisions/collect_waitlist.jsonl
+    格式: jsonl(append-only, 单日超采集上限的溢出条目, 逐条含 session/text/src/ts)
+    谁在写: omni governance decisions-run 的采集步(authored/collect.py collect_long_prompts)
+    唯一性: 派生(可重跑重建, 只是"这次没收的"记录, 非唯一真源)
+    保留滚动策略:
+      现状: 无上限持续追加, 低频(仅单日超30条时才写)
+      目标: 未定, 存量回填另行安排时再定期清理策略
+    备注: 洪水闸=首跑只收最近7天用户消息+单日采集上限30条(超限收最长的); 权威=
+      docs/plans/[2026-07-02]SEMANTIC-OS-MAP/overnight-run.md「批3 开工锚」第二路侦察修正㈠。
+
+  - id: verb-annotations
+    名称: 决策边标准化动词标注(统一设计工作室第三期)
+    位置: data/domains/decisions/verb_annotations.jsonl
+    格式: jsonl(append-only, 一行一条 annotation; 幂等键=edge三元组{source,target,rel}+annotator,
+      同键重标=覆盖语义, fold 取最新行)
+    谁在写: omni decisions verb 子命令(add/auto-annotate) + domains/decisions/verbs.py
+    唯一性: 唯一真源
+    保留滚动策略:
+      现状: 无滚动, 持续追加(预期规模=首批100条实战标注)
+      目标: 未定, 暂不动
+    备注: 词表地基=调研草案C schema(verb/from_state/to_state/rationale/challenges)+ 草案A
+      六词默认表(拆分/推导/联想/生成/反证/延伸), 核心≤10+可插拔, 允许表外自定义词(单列统计);
+      权威=docs/plans/[2026-07-04]UNIFIED-DESIGN-STUDIO/plan.md §3.4+§10 第三期,
+      词表调研=docs/research/2026-07-04-decision-verbs-survey.md。

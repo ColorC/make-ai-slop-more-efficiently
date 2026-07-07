@@ -112,20 +112,21 @@ schema 详见 `formats.py::TB_A3_MATERIALS`.
 
 **解决的问题**:
 - 用户描述一个新管线需求 → LLM 解析成结构化需求 → 设计 Format 链 → 规划节点 →
-  注入框架真源码 → 用 agent-loop 逐文件生成代码 → 三层编译检查 → LAP 合规审计 →
+  注入框架真源码 → 用 agent-loop 逐文件生成代码 → 三层编译检查 →
   错误路由审计 → 集成测试 → 自动修复回路 → 注册到全局 registry.
+  (2026-07-03 批4: 原验证链里的 LAP 九维合规审计节点已显式废止, 见下方废止说明。)
 
 **不解决**:
 - 管线业务正确性 (生成后由领域专家手工验收 + 业务测试负责)
-- 生成代码的性能调优 (LAP 合规与功能正确不等于最优执行计划)
+- 生成代码的性能调优 (功能正确不等于最优执行计划)
 
 ## 核心接口
 
-- `build_pipeline()` → [pipeline.py](pipeline.py) 构造 14 节点 + 1 AgentNodeLoop 的 Team spec (含设计链 / 生成链 / 验证链 / 修复链 4 条回路).
+- `build_pipeline()` → [pipeline.py](pipeline.py) 构造 13 节点 + 1 AgentNodeLoop 的 Team spec (含设计链 / 生成链 / 验证链 / 修复链 4 条回路; 2026-07-03 批4 lap_verifier 废止后由 14 减为 13).
 - `build_bindings(*, model=None)` → [run.py](run.py) 映射 node_id → Worker/AgentNodeLoop 实例, 返回 `dict[str, Worker]`.
 - `register_formats(registry)` → [formats.py](formats.py) 注册 9 条 Material.
 
-### 14 Worker 清单 (Clean Migration 后全部继承自 omnicompany.Worker)
+### Worker 清单 (Clean Migration 后全部继承自 omnicompany.Worker)
 
 | Worker | MRO 来源 (Legacy Router) | 节点职责 | FORMAT_IN → FORMAT_OUT |
 |---|---|---|---|
@@ -144,7 +145,7 @@ schema 详见 `formats.py::TB_A3_MATERIALS`.
 | `CompileCheckerWorker` | Router (HARD) | 三层编译检查 (py_compile / import / PipelineChecker) | `wf.project_skeleton` → `wf.project_skeleton` |
 | `ErrorRouteAuditorWorker` | Router (HARD) | 错误路由完整性五项检查 | `wf.project_skeleton` → `wf.project_skeleton` |
 | `IntegrationTesterWorker` | Router (HARD) | 六项集成测试 (import + build + runner dry-run) | `wf.project_skeleton` → `wf.project_skeleton` |
-| `LAPVerifierWorker` | Router (HARD) | D1-D9 LAP 合规静态分析 | `wf.project_skeleton` → `wf.project_skeleton` |
+| ~~`LAPVerifierWorker`~~ | ~~Router (HARD)~~ | **已废止 (2026-07-03 批4)**: D1-D9 九维打分与"不打分列证据"民约冲突; 实现体留归档 `_archive/routers_legacy.py::LAPVerifierRouter` 不删, 活代码引用已全摘除 | — |
 | `FinalizerWorker` | Router (HARD) | 写盘 + 注册 + 生成 quality_summary | `wf.project_skeleton` → `wf.done` (sink) |
 
 **附加**: `CodeGenLoop` (AgentNodeLoop, [routers_codegen.py](routers_codegen.py)) 实际上占据 pipeline.py 的 `code_gen_loop` 节点,
@@ -260,8 +261,8 @@ NodePlanAuditorWorker (HARD)          │
                                       ↓
          ┌────────────────────────────┼────────────────────────────┐
          ↓                            ↓                            ↓
-   CompileCheckerWorker (HARD) → LAPVerifierWorker (HARD) → ErrorRouteAuditorWorker (HARD)
-                                      ↓                            ↓
+   CompileCheckerWorker (HARD) ──────→ ErrorRouteAuditorWorker (HARD)
+                    (2026-07-03 批4: LAPVerifier 节点已废止摘除)      ↓
                               IntegrationTesterWorker (HARD) ──────┘
                                       ↓ (FAIL → auto_fixer · PASS → finalizer)
                                       ↓

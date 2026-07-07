@@ -18,7 +18,6 @@ from omnicompany.packages.services._core.team_builder.workers import (
     FormatDesignerWorker,
     FrameworkContextLoaderWorker,
     IntegrationTesterWorker,
-    LAPVerifierWorker,
     NodePlanAuditorWorker,
     NodePlannerWorker,
     ReqAnalyzerWorker,
@@ -85,7 +84,7 @@ def build_bindings(input_dict: dict | None = None, *, model: str | None = None) 
 
         # 验证/修复
         "syntax_fixer": SyntaxFixerWorker(client=client),  # Level 2 SOFT
-        "lap_verifier": LAPVerifierWorker(),  # 确定性 HARD 节点
+        # 2026-07-03 批4: lap_verifier 节点(九维检查器)显式废止, 绑定已摘除。
         "auto_fixer": AutoFixerWorker(model=default_model),  # Level 3 LLM fallback
 
         # 最终化 — HARD

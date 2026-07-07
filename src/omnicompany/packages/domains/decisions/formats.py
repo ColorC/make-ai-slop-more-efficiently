@@ -62,12 +62,21 @@ _ORIGIN = {
 # links = 决策树的边。记录间靠这些链出拓扑,而非靠目录层级。
 _LINKS = {
     "type": "object",
-    "description": "决策树的边:决策依赖哪些信念、取代了哪条旧决策、父决策、相关项。",
+    "description": "决策树的边:决策依赖哪些信念、取代了哪条旧决策、父决策、相关项、被编译进哪个执法器。",
     "properties": {
         "rests_on": {"type": "array", "items": {"type": "string"}, "description": "belief id 列表:此决策立足的猜想/信念"},
         "supersedes": {"type": "array", "items": {"type": "string"}, "description": "被本记录取代的旧决策 id(决策演化)"},
         "parent": {"type": "string", "description": "父决策 id(子决策/分形)"},
         "related": {"type": "array", "items": {"type": "string"}, "description": "相关记录 id"},
+        "enforced_by": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "执法载体标识列表(值不是记录 id):此裁决被编译进哪个执法器,"
+                "如 demogame.design_doc_lint.check7_self_reference / frontend_design.frostpane.css#token。"
+                "记录时的权威声明,与 LLM 事后推断的因果边(causal sidecar)分家。"
+            ),
+        },
     },
 }
 

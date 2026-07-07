@@ -8,8 +8,10 @@
   - 代码生成 (4 per-file fallback): code_generator (含 4 子 Worker, 当前管线默认用
     CodeGenLoop AgentNodeLoop, 见 ../routers_codegen.py)
   - 修复 (3): syntax_fixer / deterministic_fixer / auto_fixer
-  - 验证/最终化 (4): compile_checker / error_route_auditor / integration_tester /
-    lap_verifier / finalizer
+  - 验证/最终化 (3): compile_checker / error_route_auditor / integration_tester /
+    finalizer
+    (2026-07-03 批4: LAP 九维检查器显式废止, 已从验证链摘除, 实现体留归档
+     _archive/routers_legacy.py 不删。见 DESIGN.md 废止说明。)
 
 Diamond 继承模式 (Diamond shortcut, 业务代码暂存 _archive/routers_legacy.py,
 Stage 3 清洁工作会搬进 workers/*.py). 所有 Worker 都从 omnicompany.Worker 继承链挂入.
@@ -33,7 +35,6 @@ from .syntax_fixer import SyntaxFixerWorker
 from .compile_checker import CompileCheckerWorker
 from .error_route_auditor import ErrorRouteAuditorWorker
 from .integration_tester import IntegrationTesterWorker
-from .lap_verifier import LAPVerifierWorker
 from .deterministic_fixer import DeterministicFixerWorker
 from .auto_fixer import AutoFixerWorker
 from .finalizer import FinalizerWorker
@@ -99,7 +100,6 @@ ALL_WORKERS: list[type[Worker]] = [
     CompileCheckerWorker,
     ErrorRouteAuditorWorker,
     IntegrationTesterWorker,
-    LAPVerifierWorker,
     FinalizerWorker,
     # ── A3 V1 agent-first 起步 (2026-04-23) ──
     OriginRequestLoaderWorker,  # HARD 入口
@@ -152,7 +152,6 @@ __all__ = [
     "CompileCheckerWorker",
     "ErrorRouteAuditorWorker",
     "IntegrationTesterWorker",
-    "LAPVerifierWorker",
     "FinalizerWorker",
     # A3 V1 agent-first 起步
     "OriginRequestLoaderWorker",

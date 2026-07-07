@@ -80,21 +80,28 @@ PROJECT = Format(
 CAPTURE = Format(
     id="omni.capture",
     name="界面捕获",
-    description="用户在 dashboard 上的元素评论/页面快照捕获, 落盘 captures/ 的 markdown。",
+    description=(
+        "统一捕获: 用户在任意位置截图(可选录屏/DOM快照/评论/三态), 按屏幕位置自动解析它压在哪个 "
+        "omni 实体上(material/plan/note/project/task)。落盘 captures/ 的 markdown + 可选挂札记。"
+        "见 plan docs/plans/dashboard/[2026-06-27]UNIVERSAL-CAPTURE。"
+    ),
     tags=["omni.material", "content.capture", "kind.source"],
     json_schema={
         "type": "object",
         "properties": {
             "capture_kind": {
                 "type": "string",
-                "enum": ["element_comment", "page_snapshot", "debug_start"],
+                "enum": ["capture", "element_comment", "page_snapshot", "debug_start"],
             },
+            "modality": {"type": "string", "enum": ["still", "video", "dom_snapshot"]},
             "title": {"type": ["string", "null"]},
             "comment": {"type": "string"},
+            "verdict": {"type": ["string", "null"], "enum": ["keep", "reject", "undecided", None]},
+            "omni_uri": {"type": ["string", "null"], "description": "解析出的目标实体 omni://kind/id"},
             "route": {"type": "string"},
             "path": {"type": "string", "description": "落盘的 markdown 路径"},
         },
-        "required": ["capture_kind", "path"],
+        "required": ["path"],
     },
 )
 

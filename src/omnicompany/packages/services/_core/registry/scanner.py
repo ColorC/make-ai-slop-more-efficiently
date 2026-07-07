@@ -14,12 +14,16 @@ canonical_form 描述完全一致。
 扫描结果保证：
   - 同一实体重复扫描 → 幂等（entity_id 不变，只更新 scanned_at）
   - 代码中删除实体 → 旧记录留存（需显式调用 prune_stale() 清除）
+    2026-07-03 批4: prune_stale() 已在本模块实现（重扫-diff-备份-清理三段，
+    apply=True 前强制整目录备份，只删源文件已消失的残留条目，绝不碰活条目）。
   - 私有类（_开头）跳过
 """
 from __future__ import annotations
 
 import ast
 import logging
+import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -339,6 +343,100 @@ def scan_pipelines(source_root: Path) -> Iterator[InstanceEntry]:
                 },
                 deps=[],
             )
+
+
+# ── 残留清理编排 (2026-07-03 批4 ㋔) ─────────────────────────────────────────
+#
+# 背景: InstanceRegistry.write() 只做幂等 upsert, 从不删除"历史上扫到过但这次
+# 没扫到"的条目; delete() 存在却从无调用方。结果 data/services/registry/router/
+# 囤积了大量源文件已删除/搬走的残留条目(实测 431 条 JSON 对 126 个活类)。本函数
+# 补上模块 docstring 一直承诺却从未实现的 prune_stale, 做"重扫-diff-备份-清理"三段:
+#   1. dry-run(apply=False): 只算残留清单, 零删除。
+#   2. 备份(apply=True 时): 删除任何条目前, 先把整个 registry_dir 整目录快照到
+#      backup_dir(时间戳子目录), 保证可回滚。
+#   3. 应用(apply=True): 只删 dry-run 标记为 stale 的条目, 绝不碰活条目。
+#
+# 残留判据 = 条目的 source_file 在磁盘上已不存在。source_file 的相对基准两种写法
+# 都兼容(相对 source_root, 或相对 source_root.parent 即仓根 —— 真实扫描用后者)。
+
+def _entry_source_exists(entry: InstanceEntry, source_root: Path) -> bool:
+    """判断一个条目的定义源文件当前是否仍存在于磁盘。
+
+    兼容两种 source_file 相对基准:
+      - 相对 source_root (测试构造的最小场景用这个)
+      - 相对 source_root.parent, 即仓根 (真实 scan 的 _rel_to_root 用这个)
+    只要任一基准下文件存在, 即认定活条目。source_file 为空则保守视为存在(不清理)。
+    """
+    src = (entry.source_file or "").strip()
+    if not src:
+        return True
+    src_path = Path(src)
+    if src_path.is_absolute():
+        return src_path.is_file()
+    candidates = [
+        source_root / src_path,
+        source_root.parent / src_path,
+    ]
+    return any(c.is_file() for c in candidates)
+
+
+def prune_stale(
+    registry: InstanceRegistry,
+    *,
+    source_root: Path,
+    apply: bool = False,
+    backup_dir: Path | None = None,
+    types: tuple[str, ...] = ("router", "agent_loop", "format", "pipeline"),
+) -> dict[str, list[InstanceEntry]]:
+    """重扫-diff-备份-清理编排 (批4 ㋔; 补齐 scanner docstring 承诺的 prune_stale)。
+
+    参数:
+      registry     : 目标注册表。
+      source_root  : 源码根(src/omnicompany); 用于判定条目 source_file 是否仍在磁盘。
+      apply=False  : dry-run, 只算残留不删。apply=True 才真删, 且删前必先备份。
+      backup_dir   : apply=True 时的备份根目录; 缺省时若 apply=True 会报错(强制留后路)。
+      types        : 参与清理的实体类型(默认四类)。
+
+    返回:
+      {"stale": [...], "alive": [...], "deleted": [...]}
+        - stale: 判定为残留(源文件已消失)的条目清单(dry-run/apply 都填)。
+        - alive: 源文件仍在的活条目清单。
+        - deleted: 实际删除的条目(仅 apply=True 时非空; dry-run 恒为空)。
+    """
+    source_root = Path(source_root)
+    stale: list[InstanceEntry] = []
+    alive: list[InstanceEntry] = []
+    for type_name in types:
+        for entry in registry.list_by_type(type_name):
+            if _entry_source_exists(entry, source_root):
+                alive.append(entry)
+            else:
+                stale.append(entry)
+
+    deleted: list[InstanceEntry] = []
+    if not apply:
+        return {"stale": stale, "alive": alive, "deleted": deleted}
+
+    # ── 应用前强制备份(可逆) ──
+    if backup_dir is None:
+        raise ValueError("prune_stale(apply=True) 必须提供 backup_dir(删除前留整目录回滚副本)")
+    backup_dir = Path(backup_dir)
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    snapshot_root = backup_dir / f"registry-backup-{stamp}"
+    # 整目录快照(发生在任何 delete 之前)。
+    shutil.copytree(registry.registry_dir, snapshot_root)
+    log.info("prune_stale: backed up %s -> %s before deletion", registry.registry_dir, snapshot_root)
+
+    # ── 只删 dry-run 标记为 stale 的条目 ──
+    for entry in stale:
+        if registry.delete(entry.entity_id):
+            deleted.append(entry)
+    log.info(
+        "prune_stale applied: %d stale entries removed (%d alive kept), backup at %s",
+        len(deleted), len(alive), snapshot_root,
+    )
+    return {"stale": stale, "alive": alive, "deleted": deleted}
 
 
 # ── 主扫描入口 ───────────────────────────────────────────────────────────────

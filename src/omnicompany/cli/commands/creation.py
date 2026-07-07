@@ -511,7 +511,7 @@ def _siblings_to_promote(content_path: Path, kind: str) -> list[tuple[Path, str]
 
     if kind == "team":
         # team: pipeline.yaml 跟 .omni/manifest.yaml 跟 DESIGN.md 都搬 (yaml 形态用 pipeline.yaml)
-        for fname in ("pipeline.yaml", "DESIGN.md", "formats.py"):
+        for fname in ("pipeline.yaml", "DESIGN.md", "formats.py", "testmap.yaml"):
             cand = parent / fname
             if cand.exists() and cand != content_path:
                 siblings.append((cand, fname))
@@ -664,6 +664,13 @@ def cmd_new(
                 prompt_target = target_parent / f"{name}_prompt.md"
                 shutil.copy2(prompt_src, prompt_target)
                 copied.append(prompt_target)
+        # team --form=yaml 配套 testmap.yaml 骨架 (--form=python 形态整目录 copytree 天然带上)
+        if kind == "team" and form == "yaml":
+            testmap_src = proj / "templates" / "team" / "骨架" / "testmap.yaml"
+            if testmap_src.is_file():
+                testmap_target = target_parent / "testmap.yaml"
+                shutil.copy2(testmap_src, testmap_target)
+                copied.append(testmap_target)
 
     # 注入 OmniMark 头 + 替换占位符
     if not no_substitute:
@@ -707,6 +714,9 @@ def _inject_header(
 
     简单占位符 (跨字段替换):
       - <domain> → 用户给的 --domain 值
+      - testmap.yaml 的 `app: <name>` 行 → 用户给的 --name 值 (窄范围, 只认精确的
+        `app: <name>` 整行, 不做全文 <name> 泛替换 —— plan/骨架.md 等文件里
+        `service:<name>` 这类是示例占位符, 泛替换会误伤它们)
     """
     try:
         text = file_path.read_text(encoding="utf-8")
@@ -727,5 +737,9 @@ def _inject_header(
         text = re.sub(r"<服务包名>", domain, text)
         text = re.sub(r"<业务域>", domain, text)
         text = re.sub(r'DOMAIN = "<[^"]*>"', f'DOMAIN = "{domain}"', text)
+
+    # name 占位符 (窄范围: 只认 testmap.yaml 的 `app: <name>` 整行)
+    if name:
+        text = re.sub(r"^app:\s*<name>\s*$", f"app: {name}", text, flags=re.MULTILINE)
 
     file_path.write_text(text, encoding="utf-8")

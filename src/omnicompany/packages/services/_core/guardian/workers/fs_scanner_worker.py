@@ -76,8 +76,18 @@ class FsScannerWorker(Worker):
     FORMAT_IN = "guardian.check-request"
     FORMAT_OUT = "guardian.fs-report"
 
-    def __init__(self, project_root: str | None = None):
+    def __init__(
+        self,
+        project_root: str | None = None,
+        *,
+        excluded_mount_roots: list[str] | None = None,
+    ):
         self._root = Path(project_root) if project_root else _DEFAULT_PROJECT_ROOT
+        # 已挂载外部业务仓根排除清单(错误样本㊄): 这些仓虽被扫描逻辑(尤其盘根扫描)
+        # 触及, 但它们是登记在案的业务仓, 其正常业务文件不该被巡逻当散落文件误报。
+        # None → 内部懒调用 list_mounted_repo_roots() 现取真实登记表(形状A的默认行为);
+        # 给了列表 → 直接用(便于单元测试不碰真实 yaml)。
+        self._excluded_mount_roots = excluded_mount_roots
 
     def run(self, input_data: Any) -> Verdict:
         if isinstance(input_data, dict):
@@ -197,17 +207,68 @@ class FsScannerWorker(Worker):
                 "suggestion": "这些是 agent 运行残留，应该清理",
             })
 
+    def _resolve_excluded_mount_roots(self) -> list[Path]:
+        """解析"已挂载外部仓根"排除清单(错误样本㊄)。
+
+        - 构造时显式给了 excluded_mount_roots(形状A) → 直接用。
+        - 否则懒导入 external_mounts.list_mounted_repo_roots() 现取现用(形状B)。
+        - 读取失败/为空 → 退化为空集, 绝不抛异常(安全默认: 宁可多报一次也不能
+          因为排除功能挂了而让整个巡检罢工)。
+        """
+        raw: list[str] = []
+        if self._excluded_mount_roots is not None:
+            raw = list(self._excluded_mount_roots)
+        else:
+            try:
+                # 经模块对象取函数(而非 from-import 绑定), 兼容懒/静态两种导入写法,
+                # 也让测试的 monkeypatch(打在 external_mounts 模块上)能生效。
+                from omnicompany.packages.services._core.registry import (
+                    external_mounts as _em,
+                )
+
+                raw = [str(p) for p in _em.list_mounted_repo_roots()]
+            except Exception as e:  # noqa: BLE001
+                logger.debug("FsScanner: 读取挂载排除清单失败, 退化为空集: %s", e)
+                raw = []
+
+        resolved: list[Path] = []
+        for r in raw:
+            try:
+                resolved.append(Path(r).resolve())
+            except Exception:  # noqa: BLE001
+                continue
+        return resolved
+
+    @staticmethod
+    def _is_under_any(target: Path, roots: list[Path]) -> bool:
+        """target 本身或其任一父目录命中 roots 中任一路径即返回 True。"""
+        try:
+            target_resolved = target.resolve()
+        except Exception:  # noqa: BLE001
+            return False
+        for root in roots:
+            try:
+                target_resolved.relative_to(root)
+                return True
+            except ValueError:
+                continue
+        return False
+
     def _check_drive_roots(self, issues: list[dict]) -> None:
         """检查盘根目录是否有 omnicompany/agent 产出的散落文件。"""
         suspect_patterns = (
             "omnicompany", "semantic_network", "evolution",
             "trace", "pain", "repair", "embedding",
         )
+        excluded_roots = self._resolve_excluded_mount_roots()
         for drive in _DRIVE_ROOTS_TO_CHECK:
             if not drive.exists():
                 continue
             try:
                 for entry in drive.iterdir():
+                    # 错误样本㊄: 已登记的外部挂载仓路径(及其内部)一律不误报为散落文件。
+                    if self._is_under_any(entry, excluded_roots):
+                        continue
                     name_lower = entry.name.lower()
                     # 只关注疑似 omnicompany 产出的
                     if any(p in name_lower for p in suspect_patterns):

@@ -31,7 +31,7 @@ boss_sight_proxy_router = APIRouter(prefix="/api/boss-sight", tags=["boss-sight-
 
 
 def _daemon_http_base() -> str:
-    s = lifecycle.read_status()
+    s = lifecycle.read_status(probe=False)  # 热路径: 不在每次代理请求时打 /health
     if not (s.alive and s.port):
         raise HTTPException(
             status_code=503,
@@ -41,7 +41,7 @@ def _daemon_http_base() -> str:
 
 
 def _daemon_ws_base() -> str | None:
-    s = lifecycle.read_status()
+    s = lifecycle.read_status(probe=False)  # 热路径: 不在每次代理请求时打 /health
     if not (s.alive and s.port):
         return None
     return f"ws://127.0.0.1:{s.port}"

@@ -1,11 +1,12 @@
 # [OMNI] origin=ai-ide domain=research/cli ts=2026-06-14T00:00:00Z type=cli status=active
-# [OMNI] summary="omni research — 公开调研管线导航 + 统一研究库查询。管线是 Team,用 omni run research.run 跑。"
-# [OMNI] why="框架级统一:管线只能是 Team。本命令做落点/清单导航 + 看研究库累积了什么(查重的人读面)。"
-# [OMNI] tags=research,cli,pipeline,team,library
-"""omni research — 公开调研导航(status / list / library)。
+# [OMNI] summary="omni research — 公开调研导航 + 统一研究库查询 + 原生搜索协议脚手架(check/save)。"
+# [OMNI] why="2026-06-30 转原生搜索:交互式由前台 agent 用原生 WebSearch 跑(SKILL),check/save 是协议脚手架;无人值守走 omni run research.run(codex 执行器)。"
+# [OMNI] tags=research,cli,library,native
+"""omni research — 公开调研导航 + 研究库 + 原生搜索协议脚手架。
 
-跑调研: `omni run research.run --topic "<题目>"`。
-本命令: 看落点、列管线、查统一研究库累积的记录。
+无人值守跑调研: `omni run research.run -i topic="<题目>"`(codex 原生搜索)。
+交互式: 前台 agent 按 research SKILL 协议自己搜,用 `check` 查重、`save` 落库。
+本命令: 查重(check)、落库(save)、看库累积(library)、落点(status)、本地资产(find-local)。
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from .._access import any_caller
 
 @click.group("research")
 def cmd_research() -> None:
-    """公开调研管线导航。管线是 Team,用 `omni run research.run --topic "..."` 跑。"""
+    """公开调研:原生搜索协议脚手架 + 研究库。无人值守跑 `omni run research.run -i topic="..."`。"""
 
 
 @cmd_research.command("status")
@@ -33,7 +34,8 @@ def cmd_research_status() -> None:
     click.echo(f"  统一研究库  : {_paths.RECORDS_PATH}  ({len(recs)} 条 active)")
     click.echo(f"  runs        : {n_runs}")
     click.echo(f"  reports     : {_paths.REPORTS_ROOT}")
-    click.echo("  跑调研      : omni run research.run --topic \"<题目>\"")
+    click.echo("  无人值守跑  : omni run research.run -i topic=\"<题目>\"  (codex 原生搜索)")
+    click.echo("  交互式跑    : 按 research SKILL 协议自己搜 → omni research save")
 
 
 @cmd_research.command("list")
@@ -79,6 +81,98 @@ def cmd_research_library(topic: str) -> None:
     for r in recs:
         click.echo(f"  [{r.get('richness', 0):>2}] {r.get('topic', '')[:40]:<40} "
                    f"{r.get('record_id', '')}  (更新 {r.get('updated_at', '')[:10]})")
+
+
+@cmd_research.command("check")
+@click.argument("topic")
+@any_caller
+def cmd_research_check(topic: str) -> None:
+    """开跑前查重(给 agent/脚本读的 JSON):库里有没有同题、已覆盖/还缺哪些角度。
+
+    原生搜索协议第一步。exists=true 时按 perspectives_open 只补缺口(增量),不重复全搜。
+    """
+    import json
+
+    from omnicompany.packages.domains.research import library
+
+    hit = library.lookup_by_topic(library.normalize_topic(topic))
+    out: dict = {"exists": bool(hit)}
+    if hit:
+        out.update({
+            "record_id": hit["record_id"],
+            "topic": hit.get("topic"),
+            "summary": (hit.get("summary") or "")[:400],
+            "richness": hit.get("richness", 0),
+            "n_sources": len(hit.get("sources") or []),
+            "n_findings": len(hit.get("findings") or []),
+            "keywords": hit.get("keywords") or [],
+            "aliases": hit.get("aliases") or [],
+            "perspectives_covered": hit.get("perspectives_covered") or [],
+            "perspectives_open": hit.get("perspectives_open") or [],
+        })
+    click.echo(json.dumps(out, ensure_ascii=False))
+
+
+@cmd_research.command("save")
+@click.option("--file", "file_path", default="", help="读 JSON 文件(原生/codex 搜完综合好的产物)")
+@click.option("-j", "--json", "json_str", default="", help="直接传 JSON 字符串;都不给则读 stdin")
+@any_caller
+def cmd_research_save(file_path: str, json_str: str) -> None:
+    """把原生搜索综合好的产物落进统一研究库(查重增量合并 + 投影 catalog + 渲 report)。
+
+    \b
+    入参 JSON:
+      {
+        "topic": "调研题目(必填)",
+        "summary": "2-4 句概述",
+        "findings": [{"claim": "具体结论", "source_url": "依据 url",
+                      "support": "supported|partial|unsupported|unverified"}],
+        "sources": [{"title": "...", "url": "...", "snippet": "...", "text": "正文(给了就落本地快照)"}],
+        "keywords": [], "aliases": [], "perspectives_covered": [], "perspectives_open": []
+      }
+    """
+    import json
+    import sys
+    from pathlib import Path
+
+    from omnicompany.packages.domains.research import library
+
+    if file_path:
+        raw = Path(file_path).read_text(encoding="utf-8")
+    elif json_str:
+        raw = json_str
+    else:
+        raw = sys.stdin.read()
+    data = json.loads(raw)
+    topic = (data.get("topic") or "").strip()
+    if not topic:
+        raise click.ClickException("JSON 缺 topic")
+
+    sources: list[dict] = []
+    snaps: dict[str, str] = {}
+    for s in data.get("sources") or []:
+        src = {k: s[k] for k in ("title", "url", "snippet") if s.get(k)}
+        if s.get("text") and src.get("url"):
+            snaps[src["url"]] = s["text"]
+        if src.get("url"):
+            sources.append(src)
+
+    synthesis = {
+        "summary": data.get("summary", ""),
+        "findings": data.get("findings") or [],
+        "keywords": data.get("keywords") or [],
+        "aliases": data.get("aliases") or [],
+        "perspectives_open": data.get("perspectives_open") or [],
+    }
+    coverage = {"covered": data.get("perspectives_covered") or []}
+    saved, is_dup, report = library.save_research_record(
+        topic, synthesis, sources, coverage=coverage, snapshot_texts=snaps or None,
+    )
+    n_unsup = sum(1 for f in (saved.get("findings") or []) if f.get("support") == "unsupported")
+    click.echo(f"{'✓ 增量更新' if is_dup else '✓ 新建'} {saved['record_id']} · "
+               f"丰富度 {saved.get('richness', 0)} · 来源 {len(saved.get('sources') or [])} · "
+               f"发现 {len(saved.get('findings') or [])}（{n_unsup} 条无源支撑）")
+    click.echo(f"  report: {report}")
 
 
 @cmd_research.command("find-local")

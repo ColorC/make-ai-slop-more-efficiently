@@ -1945,3 +1945,42 @@ def cmd_hygiene_status(root: str):
     out = v.output
     click.echo(f"  last scan: violations={out['violation_count']}  "
                f"candidates={out['candidate_count']}  whitelisted={out['whitelisted_count']}")
+
+
+# ─── guardian plan-bindings (OMNI-099 巡检接线, 2026-07-03 打回硬化㈠) ────────
+
+@cmd_guardian.group("plan-bindings")
+def cmd_guardian_plan_bindings():
+    """绑定注册表(计划-进度-测试-评审四件登记)巡检工具组."""
+
+
+@cmd_guardian_plan_bindings.command("scan")
+@click.option("--root", type=str, default=_DEFAULT_ROOT)
+@click.option("--category", "-c", type=str, default=None,
+              help="只列指定 category (missing_anchor/incomplete/dangling_test_file/dangling_whatnow/empty_error_samples)")
+@click.option("--json-output", is_flag=True)
+def cmd_plan_bindings_scan(root: str, category: str | None, json_output: bool):
+    """跑一次绑定注册表巡检扫描(PlanBindingsScanWorker, 纯确定性不调 LLM)."""
+    from omnicompany.packages.services._core.guardian.workers import PlanBindingsScanWorker
+
+    v = PlanBindingsScanWorker().run({"project_root": root})
+    out = v.output
+    violations = out["violations"]
+    if category:
+        violations = [x for x in violations if f": {category} —" in x.get("message", "")]
+
+    if json_output:
+        click.echo(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+
+    click.echo(click.style("> guardian plan-bindings scan", fg="cyan", bold=True))
+    click.echo(f"  root: {root}")
+    click.echo(f"  汇总: {out['violation_count']} 违规  by_category={out['by_category']}")
+    click.echo()
+    if violations:
+        for v_ in violations[:200]:
+            click.echo(f"    [{v_['rule_id']}] {v_['path']}: {v_['message'].splitlines()[0]}")
+        if len(violations) > 200:
+            click.echo(f"    ... +{len(violations) - 200} more")
+    else:
+        click.echo(click.style("  [OK] 绑定注册表巡检干净", fg="green"))

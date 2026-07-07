@@ -57,7 +57,7 @@ docs/plans/<topic>/[YYYY-MM-DD]<plan-name>/
 
 ```markdown
 ---
-title: <计划标题>
+title: 【短称】完整中文标题            # 短称取归属项目 short 字段; 格式权威见 concepts/plan.md §3.0
 date: '<YYYY-MM-DD>'
 work_type: <refactor|infra-convergence|...>
 status: active
@@ -231,7 +231,7 @@ PlanDiagnosticAgent 看这些点判 finding:
 
 ## 五 · 合规样本
 
-合规样本: [`docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/samples/sample_compliant_plan_exemplar_library.md`](../../plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/samples/sample_compliant_plan_exemplar_library.md)
+合规样本: [`docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/samples/sample_compliant_plan_exemplar_library.md`](../../plans/diagnosis/%5B2026-05-05%5D诊断重整/samples/sample_compliant_plan_exemplar_library.md)
 
 > 跟元规范 v1 (`standards_meta.md`) 第 2 条配套立的真合规样本. 本样本逐条符合本模板 (一-七节齐 + OMNI 头齐 + 产物清单 + 静态/动态验收 + 三档处置), **修本模板前必同步改样本**, 不一致是本模板出问题信号.
 

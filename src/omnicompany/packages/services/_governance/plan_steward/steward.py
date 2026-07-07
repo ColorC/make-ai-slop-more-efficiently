@@ -30,11 +30,11 @@ BATCH_SIZE = 10
 EXCERPT_CHARS = 600
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n.*?\n---\s*\n", re.DOTALL)
 
-SYSTEM_PROMPT = """你是 omnicompany 仓库的计划治理员。对每个计划(plan)判定归属项目并起中文短标题。
+SYSTEM_PROMPT = """你是 omnicompany 仓库的计划治理员。对每个计划(plan)判定归属项目并起一个完整的中文标题。
 规则:
 1. project 只能取给定项目清单里的 id, 或 null(不属于任何已注册项目, 例如 omnicompany 自身的框架/实验/知识吸收类计划)。不确定时宁可 null。
 2. 归属 = 这个计划是该项目的**工作内容本身**。仅仅"与项目主题相关"不算归属(例如"给某游戏业务建知识库"的基建计划属于知识吸收基建, 不属于该游戏项目)。
-3. title_zh: 不超过 16 个汉字, 概括计划主题; 不含日期、编号、英文缩写堆砌。
+3. title_zh: 一个**完整、读得通**的中文标题, 完整概括计划主题。不要硬压到十几个字、不要砍成名词堆; 也别啰嗦, 一般 10-24 个汉字。不含日期、编号、英文缩写堆砌。**不要自己加【】方括号或项目名前缀** —— 项目短称由系统自动接在前面, 你只产标题正文。
 4. 判断依据优先级: 摘录内容 > 目录名 > 所在类目目录。类目目录可能放错(这正是治理对象); hint_categories 只是目录结构对应提示, 绝不能作为归属个别计划的依据。
 5. 输出严格 JSON, 不要任何其它文字:
 {"plans": [{"id": "...", "project": "<项目id或null>", "title_zh": "...", "confidence": "high|medium|low", "reason": "不超过25字"}]}"""
@@ -166,11 +166,56 @@ def _project_catalog() -> list[dict[str, Any]]:
         out.append({
             "id": p["id"],
             "name": p.get("name") or p["id"],
+            "short": p.get("short") or "",
             "group": p.get("group"),
             "desc": (p.get("desc") or "")[:120],
             "hint_categories": p.get("plan_categories") or [],
         })
     return out
+
+
+# ── 标题短称前缀 (2026-06-22 用户: 全部 plan 标题中文完整化并接项目短称) ──────────
+# 格式 = 【短称】完整中文标题。短称由项目注册表 short 字段给(确定性, 不靠模型);
+# 模型只产"完整中文标题正文", 前缀由本模块按归属项目确定性拼接 — 归属变了前缀自动跟着变。
+# 无归属(project=null)的框架/实验类计划: 按类目目录映射一个短称, 兜底【综合】。
+
+# 类目目录 → 短称 (null-project 计划用; key 取 plan_id 第一段或类目)
+_CATEGORY_SHORT: dict[str, str] = {
+    "agent-framework": "框架",
+    "reasoning-network": "推理",
+    "stage-experiments": "实验",
+    "diagnosis": "队医",
+    "omnicompany-调研吸收": "学习",
+    "cli": "CLI",
+    "webworks": "网页活",
+    "dashboard": "驾驶舱",
+    "guardian": "守护",
+}
+_FALLBACK_SHORT = "综合"
+
+
+def _strip_existing_bracket(title: str) -> str:
+    """去掉历史标题已带的【...】前缀, 避免重刷时套娃。"""
+    t = (title or "").strip()
+    m = re.match(r"^[【\[][^】\]]{1,8}[】\]]\s*", t)
+    return t[m.end():].strip() if m else t
+
+
+def _short_for(project_id: str | None, plan_id: str,
+               projects_by_id: dict[str, dict[str, Any]]) -> str:
+    """这个计划标题该接哪个短称: 有归属项目用其 short; 否则按类目映射兜底。"""
+    if project_id and project_id in projects_by_id:
+        s = (projects_by_id[project_id].get("short") or "").strip()
+        if s:
+            return s
+    head = (plan_id or "").split("/", 1)[0]
+    return _CATEGORY_SHORT.get(head, _FALLBACK_SHORT)
+
+
+def _bracketed_title(project_id: str | None, plan_id: str, body: str,
+                     projects_by_id: dict[str, dict[str, Any]]) -> str:
+    short = _short_for(project_id, plan_id, projects_by_id)
+    return f"【{short}】{_strip_existing_bracket(body)}"
 
 
 def _prefix_projects(plan_id: str, projects: list[dict[str, Any]]) -> list[str]:
@@ -203,9 +248,12 @@ def _classify_batch(batch: list[dict[str, Any]], projects: list[dict[str, Any]],
         if proj is not None and proj not in valid_ids:
             issues.append(f"模型给了未注册项目 {proj!r}, 已置 null")
             proj = None
+        # 模型只产标题正文(无【】前缀); 前缀由 run_governance 按归属项目确定性拼接。
+        body = _strip_existing_bracket(str(row.get("title_zh") or ""))[:40]
         out[pid] = {
             "project": proj,
-            "title_zh": str(row.get("title_zh") or "")[:32],
+            "title_body": body,
+            "title_zh": body,  # run_governance 会覆盖为【短称】正文; 这里先放正文兜底
             "confidence": row.get("confidence") or "low",
             "reason": str(row.get("reason") or "")[:60],
             "issues": issues,
@@ -271,8 +319,9 @@ def run_governance(*, model: str | None = None, limit: int | None = None,
         results.update(item_result)
     failures.extend(batch_run.failures)
 
-    # 确定性格式检查 + 位置一致性
+    # 确定性格式检查 + 位置一致性 + 标题短称前缀
     by_id = {it["id"]: it for it in catalogue}
+    projects_by_id = {p["id"]: p for p in projects}
     for pid, entry in results.items():
         it = by_id.get(pid) or {}
         issues = list(entry.get("issues") or [])
@@ -287,12 +336,26 @@ def run_governance(*, model: str | None = None, limit: int | None = None,
             issues.append(f"位置与归属不一致(旧前缀规则命中 {','.join(old_hits)})")
         if len(old_hits) > 1:
             issues.append(f"多项目前缀命中: {','.join(old_hits)}")
+        # 标题 = 【短称】完整中文标题。前缀按归属项目确定性拼接(归属变了前缀跟着变)。
+        body = entry.get("title_body") or _strip_existing_bracket(entry.get("title_zh") or "")
+        entry["title_body"] = body
+        entry["title_zh"] = _bracketed_title(new_proj, pid, body, projects_by_id)
         entry["issues"] = issues
         entry["category"] = it.get("category")
         entry["model"] = model
         entry["ts"] = _now()
 
     merged = {**existing, **results}
+    # 自愈: 丢弃磁盘上已不存在的孤儿治理条目 + 确保每条标题都带【短称】前缀(幂等)。
+    catalogue_ids = set(by_id)
+    for pid in [k for k in merged if k not in catalogue_ids]:
+        del merged[pid]
+    bracket_re = re.compile(r"^[【\[][^】\]]{1,8}[】\]]")
+    for pid, e in merged.items():
+        if not bracket_re.match(str(e.get("title_zh") or "")):
+            body = e.get("title_body") or _strip_existing_bracket(e.get("title_zh") or "")
+            e["title_body"] = body
+            e["title_zh"] = _bracketed_title(e.get("project"), pid, body, projects_by_id)
     gold_stats = _apply_gold(merged)
     summary = _summarize(merged, projects, failures)
     summary.update(gold_stats)

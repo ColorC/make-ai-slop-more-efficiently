@@ -319,6 +319,30 @@ meta_registry.register_type(EntityTypeDef(
 ))
 
 meta_registry.register_type(EntityTypeDef(
+    name="testmap",
+    display_name="功能点-测试台账",
+    canonical_form=(
+        "各业务仓根 testmap.yaml(契约: services/_governance/testmap.py)。"
+        "由 `omni testmap sync` 跑 discover_testmaps + verify_testmap 自动发现并写入,"
+        "不走 omni new / omni register 手工通道。"
+    ),
+    data_dir="testmap",
+    quality_fields={
+        "covered": "verify 实测 status=covered 的功能点数",
+        "gap": "verify 实测 status=gap 的功能点数(有 should 无测试锚)",
+        "stale": "verify 实测 status=stale 的功能点数(锚文件/用例锚失效)",
+        "gates_status": "各 gate 最近一次真跑的 green/red(attrs.gates)",
+        "review_findings_count": "理论覆盖再评最近一次的 finding 数(attrs.review)",
+    },
+    registration_criteria=(
+        "testmap 是功能点与测试锚的对照契约, 稳定身份 = app 名; 独立质量面 = "
+        "covered/gap/stale 三态 + 门禁真跑结果 + 理论覆盖再评; 演变主体 = 功能点增删/测试锚变化; "
+        "依赖表面 = testmap_path 指向的真实测试文件。registration_criteria: 由 "
+        "omni testmap sync 自动发现注册, 不走 omni new/omni register 手工通道。"
+    ),
+))
+
+meta_registry.register_type(EntityTypeDef(
     name="meta_io",
     display_name="Meta IO",
     canonical_form=(

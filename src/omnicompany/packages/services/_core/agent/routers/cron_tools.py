@@ -95,6 +95,8 @@ class ScheduleCronRouter(SingleToolRouter):
         if action == "list":
             tasks = []
             for f in sorted(cron_dir.glob("*.json")):
+                if f.name.startswith("."):
+                    continue  # 跳过内部状态/锁文件
                 try:
                     tasks.append(json.loads(f.read_text(encoding="utf-8")))
                 except Exception:

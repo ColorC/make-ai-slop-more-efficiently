@@ -395,13 +395,14 @@ WF_PROJECT_SKELETON = Material(
         "以及一个增量累加的 reports 字典（compile/lap_audit/error_route/integration 等）。"
         "\n\n"
         "P7.3 重构 (2026-04-09): 单主干 Material + reports 容器 + granted_tags 模式 (SKILL §2.3)。"
-        "compile_checker / lap_verifier / error_route_auditor / integration_tester 都用本 Material "
+        "compile_checker / error_route_auditor / integration_tester 都用本 Material "
         "作为 format_in 和 format_out, 把自家报告写进 reports[key], 用 Verdict.granted_tags 累加状态。"
+        "(2026-07-03 批4: lap_verifier 九维检查器废止, 已从验证链摘除。)"
         "废弃了 wf.compiled_skeleton / wf.audited_skeleton / wf.route_checked_skeleton / wf.tested_skeleton "
         "四个克隆 Material (代码本体未变只是验收印章, GAP §1.2-A 反模式)。"
         "\n\n"
         "验证标准：所有 files 通过 py_compile, package_path 合法。reports 是可选字段。"
-        "下游用途：compile_checker → lap_verifier/error_route_auditor/integration_tester → finalizer。"
+        "下游用途：compile_checker → error_route_auditor/integration_tester → finalizer。"
         "Kind: internal (验证节点共用单主干 · Worker 间流转 · 见 F-19)。"
     ),
     parent="requirement",

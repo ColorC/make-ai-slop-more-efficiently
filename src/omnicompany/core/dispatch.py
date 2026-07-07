@@ -169,11 +169,32 @@ async def dispatch(
 
     entry = get_or_raise(pipeline_name)
 
-    # ── E1: 事件型引擎分支 (MaterialDispatcher), 默认 teamrunner 路径不变 ──
-    if getattr(entry, "engine", "teamrunner") == "event":
-        return await _run_event_pipeline(
-            entry, input_dict, max_iterations=(max_steps or entry.default_max_steps),
+    # ── 运行级上下文钩子 (阶段一 1-5): 如 voxelcraft 的 eternal-war worktree 隔离 ──
+    from contextlib import ExitStack
+
+    with ExitStack() as _run_stack:
+        _ctx_factory = getattr(entry, "run_context", None)
+        if _ctx_factory is not None:
+            _run_stack.enter_context(_ctx_factory(input_dict))
+
+        # ── E1: 事件型引擎分支 (MaterialDispatcher), 默认 teamrunner 路径不变 ──
+        if getattr(entry, "engine", "teamrunner") == "event":
+            return await _run_event_pipeline(
+                entry, input_dict, max_iterations=(max_steps or entry.default_max_steps),
+            )
+
+        return await _dispatch_teamrunner(
+            entry, input_dict, db_path=db_path, max_steps=max_steps,
         )
+
+
+async def _dispatch_teamrunner(
+    entry, input_dict: dict[str, Any], *, db_path: str | None, max_steps: int | None,
+) -> Any:
+    """teamrunner 引擎主体 (自 dispatch() 原地提取, 行为不变; 1-5 为 run_context 包裹重构)."""
+    from omnicompany.core.config import resolve_db_path
+    from omnicompany.bus.sqlite import SQLiteBus
+    from omnicompany.runtime.exec.runner import TeamRunner
 
     pipeline = entry.build_team()
     bindings = _call_build_bindings(entry, input_dict)
@@ -190,7 +211,7 @@ async def dispatch(
 
     logger.info(
         "dispatch: pipeline=%s domain=%s db=%s max_steps=%d",
-        pipeline_name, entry.domain, resolved_db, steps,
+        getattr(entry, "name", entry.domain), entry.domain, resolved_db, steps,
     )
 
     # 尝试为 domain 加载 FormatRegistry（composite fan-in 需要）

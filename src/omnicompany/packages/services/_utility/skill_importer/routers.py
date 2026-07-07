@@ -9,6 +9,7 @@ from __future__ import annotations
 from .workers import (
     SkillParserWorker as SkillParserRouter,
     StructureAnalysisWorker as StructureAnalysisRouter,
+    MaterialInferenceWorker as MaterialInferenceRouter,
     RequirementDraftWorker as RequirementDraftRouter,
     VerifyAgainstSkillWorker as VerifyAgainstSkillRouter,
 )

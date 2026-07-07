@@ -2,11 +2,9 @@
 # [OMNI] material_id="material:dashboard.boss_sight.routes.py"
 """routes — BOSS SIGHT FastAPI 路由.
 
-块 1 重构后总控不是常驻 service, 而是按需 AgentNodeLoop. routes 只提供:
-- GET /api/boss-sight/health  健康探测 + 模块导入状态
-- GET /api/boss-sight/ctx     当前 ctx 快照 (plan_index + subagent_status), 调用者
-                              可以直接看而不必创 controller session
-- GET /api/boss-sight/prompt  当前总控 system prompt (外部维护会话查看用)
+块 1 重构后总控不是常驻 service, 而是按需 AgentNodeLoop. 本模块含健康/上下文/prompt/
+材料注册表/驾驶舱/洞察/常驻agent/关注等约40个端点, 明细见代码 (下方 include_router /
+@boss_sight_router 装饰器逐条列出, 本 docstring 不再逐一枚举以免与实现脱节).
 """
 
 from __future__ import annotations
@@ -35,6 +33,7 @@ from .cockpit_workflow import build_workflow_summary
 from .entity_registry import parse_entity_uri, resolve_entity_uri, search_entities
 from .llm_runtime_usage import build_llm_runtime_usage
 from .material_registry import build_material_registry
+from .token_ledger_view import build_token_ledger_view
 from .services.control_observability_store import get_control_observability_store
 
 boss_sight_router = APIRouter(prefix="/api/boss-sight", tags=["boss-sight"])
@@ -726,6 +725,82 @@ async def add_permanent_allow(body: PermanentAllowBody) -> dict[str, Any]:
     return entry
 
 
+# ── WORK-LIFECYCLE: 网页端启动 plan 执行 ──────────────────────────────
+class PlanRunBody(BaseModel):
+    plan_id: str
+    carrier: str = "sdk"
+    cwd: str | None = None
+    steps: int | None = None
+    until_task: str | None = None
+    hold_at_review: bool = False
+    keep_going: bool = False
+    override_gate: bool = False
+
+
+def _plan_runs_dir() -> Path:
+    d = omni_workspace_root() / "data" / "lifecycle" / "plan_runs"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+@boss_sight_router.post("/plan/run")
+async def start_plan_run(body: PlanRunBody) -> dict[str, Any]:
+    """网页端启动一个 plan 的执行(后台线程跑, 进度走 task board / multiagent view 观测)。
+
+    先过完成度硬门(不过且未 override → 400 拒绝); 通过则后台驱动, 立即返回 run_id。
+    """
+    import threading
+    import uuid as _uuid
+
+    from omnicompany.packages.services._core.lifecycle.run_plan import run_plan
+    from omnicompany.packages.services._core.plan_audit.gate import check_plan_dispatch_gate
+
+    gate = check_plan_dispatch_gate(body.plan_id)
+    if not gate["ok"] and not body.override_gate:
+        raise HTTPException(status_code=400, detail={"error": "plan 完成度硬门未过, 拒绝执行",
+                                                     "gate": gate})
+    run_id = f"run-{_uuid.uuid4().hex[:10]}"
+    status_path = _plan_runs_dir() / f"{run_id}.json"
+    status: dict[str, Any] = {"run_id": run_id, "plan_id": body.plan_id,
+                              "state": "running", "events": []}
+    status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _on_event(ev: dict[str, Any]) -> None:
+        status["events"].append(ev)
+        try:
+            status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _drive() -> None:
+        try:
+            rep = run_plan(body.plan_id, carrier=body.carrier, cwd=body.cwd,
+                           max_steps=body.steps, until_task=body.until_task,
+                           hold_at_review=body.hold_at_review,
+                           keep_going_on_fail=body.keep_going,
+                           override_gate=body.override_gate, on_event=_on_event)
+            status.update({"state": "done", "report": rep})
+        except Exception as e:  # noqa: BLE001
+            status.update({"state": "error", "error": str(e)})
+        try:
+            status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    threading.Thread(target=_drive, daemon=True, name=f"plan-run-{run_id}").start()
+    return {"started": True, "run_id": run_id, "plan_id": body.plan_id,
+            "observe": f"omni task board '{body.plan_id}'  (或 GET /api/boss-sight/plan/run/{run_id})"}
+
+
+@boss_sight_router.get("/plan/run/{run_id}")
+async def get_plan_run(run_id: str) -> dict[str, Any]:
+    """轮询一次 plan run 的进度/结果。"""
+    p = _plan_runs_dir() / f"{run_id}.json"
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail=f"unknown run_id: {run_id}")
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
 @boss_sight_router.get("/observability/settings")
 async def get_observability_settings() -> dict[str, Any]:
     return get_control_observability_store().observability_settings()
@@ -846,6 +921,245 @@ async def get_briefing() -> dict[str, Any]:
         action_limit=20,
     ).get("ctx_summary", {})
     return briefing
+
+
+# residents 取数:常态走 Rust scanner(127.0.0.1:8765,~ms,带真 5 态),仅 scanner 断了才回落
+# Python 全扫(~6.8s)。薄合并层 + 后台刷新:永不阻塞 UI,且 Rust 在跑时近实时(TTL 3s)。
+# (不是"快照"—— 源是活的 scanner;此层只为合并突发轮询 + 兜底 Python 慢路径。)
+_RESIDENTS_CACHE: dict[str, Any] = {"payload": None, "ts": 0.0, "refreshing": False}
+_RESIDENTS_TTL = 3.0
+
+
+def _refresh_residents() -> None:
+    from .services.residents import build_residents
+    try:
+        payload = build_residents()
+        _RESIDENTS_CACHE["payload"] = payload
+        _RESIDENTS_CACHE["ts"] = time.time()
+    finally:
+        _RESIDENTS_CACHE["refreshing"] = False
+
+
+@boss_sight_router.get("/residents")
+async def get_residents() -> dict[str, Any]:
+    """多-agent 监控:本机所有在跑 agent 的统一列表(后台刷新缓存,永不阻塞 UI)。
+
+    来源 Rust agent-scanner 索引(回落 Python 扫描),agent_digest 回填 title/last_step,
+    总控作第一公民钉顶。给 multiagent view 网格消费。见
+    docs/plans/[2026-06-24]MULTIAGENT-AND-REVIEW-REDESIGN/plan.md (P1/P3)。
+    """
+    import asyncio
+    import threading
+
+    c = _RESIDENTS_CACHE
+    now = time.time()
+    if c["payload"] is None:  # 冷启:首帧丢线程池跑, 别阻塞事件循环
+        c["payload"] = await asyncio.get_running_loop().run_in_executor(None, _residents_now)
+        c["ts"] = time.time()
+        return c["payload"]
+    if now - c["ts"] > _RESIDENTS_TTL and not c["refreshing"]:
+        c["refreshing"] = True
+        threading.Thread(target=_refresh_residents, daemon=True, name="residents-refresh").start()
+    return c["payload"]  # 立刻返回上一份(stale-while-revalidate)
+
+
+def _residents_now() -> dict[str, Any]:
+    from .services.residents import build_residents
+    return build_residents()
+
+
+@boss_sight_router.get("/residents/{session_id}/tail")
+async def get_resident_tail(session_id: str, n: int = 14) -> dict[str, Any]:
+    """某 agent 会话最近活动行 [{role,text}] —— multiagent 详情面板的"它在干嘛"feed。
+    数据来自 Rust scanner 的 /sessions/<id>/tail;scanner 不在 → 空(前端退只显摘要)。"""
+    from .services import rust_scanner_client
+
+    n = max(1, min(int(n), 40))
+    lines = rust_scanner_client.tail(session_id, n=n)
+    return {"lines": (lines or [])[-n:], "available": lines is not None}
+
+
+class ActiveContextBody(BaseModel):
+    session_id: str | None = None
+    kind: str = "conversation"
+    source: str = "ui"
+
+
+@boss_sight_router.get("/context/active")
+async def get_active_context() -> dict[str, Any]:
+    """当前选中的对话/上下文(跟随脊梁)。审阅台跟随视图/peek 据此过滤。
+
+    见 docs/plans/[2026-06-24]MULTIAGENT-AND-REVIEW-REDESIGN/plan.md (P0)。
+    """
+    from .services.active_context import get_active
+
+    return get_active()
+
+
+@boss_sight_router.post("/context/active")
+async def set_active_context(body: ActiveContextBody) -> dict[str, Any]:
+    """设当前选中上下文并广播给订阅者(页签焦点解析器 / multiagent 点选 / 审阅台调用)。"""
+    from .services.active_context import set_active
+
+    return set_active(body.session_id, body.kind, body.source)
+
+
+class ResolveTabBody(BaseModel):
+    label: str | None = None
+    cwd: str | None = None
+    set_active: bool = True
+
+
+@boss_sight_router.post("/context/resolve-tab")
+async def resolve_focused_tab(body: ResolveTabBody) -> dict[str, Any]:
+    """把"聚焦的 Claude 对话页签"(标题 + workspace cwd)解析成 session_id 并(可选)设为当前上下文。
+
+    omnichat 扩展监听 tabGroups,焦点切到 claudeVSCodePanel 时调本接口。低置信(needs_escalation)
+    时前端/扩展可再走 OCR/UIA 拿更准的 label 重试。见 plan P1。
+    """
+    from .services.active_context import set_active
+    from .services.residents import build_residents
+    from .services.session_resolver import needs_escalation, resolve
+
+    residents = build_residents().get("residents", [])
+    result = resolve(body.label, body.cwd, residents)
+    if result is None:
+        return {"resolved": False, "escalate": False}
+    if body.set_active:
+        set_active(result["session_id"], kind="conversation", source="tab-focus")
+    return {
+        "resolved": True,
+        "session_id": result["session_id"],
+        "confidence": result["confidence"],
+        "reason": result["reason"],
+        "escalate": needs_escalation(result),
+    }
+
+
+# ── AGENT 自我身份 + 主动请求审阅本对话 + 发回意见 ───────────────────────
+# 用户(2026-06-25): agent 应能感知/输入自己的身份, 主动让用户专注审阅本对话;
+# 详情里「发回意见」按钮把指示经 hook 发回 agent。见 plan 的 work-report 控制台。
+def _identity_of(r: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "session_id": r.get("session_id"),
+        "provider": r.get("provider"),
+        "identity": r.get("identity"),
+        "project": r.get("project"),
+        "role": r.get("role"),
+        "name": r.get("name"),
+        "location": r.get("location"),
+        "current_task": r.get("current_task") or r.get("title"),
+    }
+
+
+def _resolve_self(session_id: str | None, cwd: str | None) -> dict[str, Any] | None:
+    """把 (session_id | cwd) 解析成本机某个常驻 agent 的身份记录。"""
+    from .services.residents import build_residents
+    from .services.session_resolver import resolve
+
+    residents = build_residents().get("residents", [])
+    if session_id:
+        for r in residents:
+            if r.get("session_id") == session_id:
+                return r
+    if cwd:
+        res = resolve(None, cwd, residents)
+        if res:
+            sid = res["session_id"]
+            for r in residents:
+                if r.get("session_id") == sid:
+                    return r
+    return None
+
+
+class AgentWhoamiBody(BaseModel):
+    session_id: str | None = None
+    cwd: str | None = None
+
+
+@boss_sight_router.post("/agent/whoami")
+async def agent_whoami(body: AgentWhoamiBody) -> dict[str, Any]:
+    """agent 感知自己被派生出的身份(从 cwd/session 解析常驻列表里的自己)。"""
+    r = _resolve_self(body.session_id, body.cwd)
+    if r is None:
+        return {"resolved": False, "cwd": body.cwd}
+    return {"resolved": True, **_identity_of(r)}
+
+
+class AgentRequestReviewBody(BaseModel):
+    headline: str = Field(..., min_length=1, max_length=280)
+    session_id: str | None = None
+    cwd: str | None = None
+    identity: str = ""
+    project: str = ""
+    role: str = ""
+    name: str = ""
+    kind: str = "conversation"
+    set_active: bool = True
+
+
+@boss_sight_router.post("/agent/request-review")
+async def agent_request_review(body: AgentRequestReviewBody) -> dict[str, Any]:
+    """agent 主动举手:让用户在审阅总览/多Agent 顶部专注于本对话的工作报告。"""
+    from .services import agent_attention
+    from .services.active_context import set_active
+
+    sid = body.session_id
+    ident = {"identity": body.identity, "project": body.project, "role": body.role, "name": body.name}
+    r = _resolve_self(body.session_id, body.cwd)
+    if r is not None:
+        sid = sid or r.get("session_id")
+        for k in ("identity", "project", "role", "name"):
+            if not ident[k]:
+                ident[k] = r.get(k, "") or ""
+    rec = agent_attention.request_attention(sid or "", headline=body.headline, kind=body.kind, **ident)
+    if body.set_active and sid:
+        set_active(sid, kind="conversation", source="agent-request")
+    return {"ok": True, "request": rec, "session_id": sid, "resolved_identity": r is not None}
+
+
+@boss_sight_router.get("/agent/attention")
+async def agent_attention_list() -> dict[str, Any]:
+    """当前活跃的「请审阅」举手列表(多Agent / 审阅总览顶部消费)。"""
+    from .services import agent_attention
+
+    items = agent_attention.list_attention()
+    return {"items": items, "count": len(items)}
+
+
+@boss_sight_router.post("/agent/resolve/{session_id}")
+async def agent_attention_resolve(session_id: str) -> dict[str, Any]:
+    """用户审完/发回意见后,把该对话的举手标记为已处理。"""
+    from .services import agent_attention
+
+    return {"ok": agent_attention.resolve_attention(session_id)}
+
+
+class AgentFeedbackBody(BaseModel):
+    session_id: str = Field(..., min_length=1)
+    message: str = Field(..., min_length=1, max_length=2000)
+    author: str = "user"
+    resolve: bool = False
+
+
+@boss_sight_router.post("/agent/feedback")
+async def agent_feedback_post(body: AgentFeedbackBody) -> dict[str, Any]:
+    """「发回意见」:把用户指示压入该对话的反馈队列(agent 侧 hook 取走继续)。"""
+    from .services import agent_attention
+
+    item = agent_attention.queue_feedback(body.session_id, body.message, author=body.author)
+    if body.resolve:
+        agent_attention.resolve_attention(body.session_id)
+    return {"ok": True, "item": item}
+
+
+@boss_sight_router.get("/agent/feedback/{session_id}")
+async def agent_feedback_pull(session_id: str, mark: bool = True) -> dict[str, Any]:
+    """agent hook 取走某对话未消费的反馈。mark=False 仅 peek。"""
+    from .services import agent_attention
+
+    items = agent_attention.pop_feedback(session_id, mark=mark)
+    return {"items": items, "count": len(items)}
 
 
 @boss_sight_router.get("/cockpit")
@@ -1151,6 +1465,16 @@ async def get_usage(force: bool = False) -> dict[str, Any]:
 @boss_sight_router.get("/llm-runtime")
 async def get_llm_runtime_usage() -> dict[str, Any]:
     return build_llm_runtime_usage()
+
+
+# token 记账(#6 监督设施追加件): claude/codex 会话用量 + 内部调用账三路归并, 只读不落盘。
+# 落盘版由 `omni token-ledger run` CLI / gov-token-ledger-daily 定时任务负责写 data/llm/token_ledger/。
+# 权威: docs/plans/[2026-07-02]SEMANTIC-OS-MAP/overnight-run.md 第六节。
+@boss_sight_router.get("/token-ledger")
+async def get_token_ledger() -> dict[str, Any]:
+    """按会话/按天/按项目三种聚合 + 未关联桶 + 内部调用账 + cron 字符串匹配(读文件, 丢线程池跑)。"""
+    import asyncio
+    return await asyncio.get_running_loop().run_in_executor(None, build_token_ledger_view)
 
 
 __all__ = ["boss_sight_router"]

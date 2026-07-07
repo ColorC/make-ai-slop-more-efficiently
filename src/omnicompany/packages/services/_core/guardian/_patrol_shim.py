@@ -15,7 +15,9 @@ needs_judgment 候选 (规则判不准的) 直接当确认违规处理 (保守�
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -88,6 +90,42 @@ class RuleEngine:
 
 _DEFAULT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
 
+# ── patrol 非阻塞锁(2026-07-04 密度分层批1) ─────────────────────────────
+# patrol 提到心跳级(@every15m)后, 会话手动跑与 tick 顺带跑可能并发, 存在无锁并发
+# 写注册表/日志的窗口。这是"跳过锁"不是"排队锁"——巡逻是幂等增量活, 跳过一轮无损。
+_PATROL_LOCK_STALE_S = 900  # 15min 视为僵死(单次 patrol 不该跑这么久)
+
+
+def _patrol_lock_path(project_root: str | Path) -> Path:
+    d = Path(project_root) / ".omni" / "guardian"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / ".patrol.lock"
+
+
+def _acquire_patrol_lock(project_root: str | Path) -> bool:
+    """非阻塞获取 patrol 锁; 已有新鲜锁(<15min)返回 False(跳过本次)。"""
+    p = _patrol_lock_path(project_root)
+    if p.exists():
+        try:
+            held = json.loads(p.read_text(encoding="utf-8"))
+            started = datetime.fromisoformat(held["started_at"])
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - started).total_seconds() < _PATROL_LOCK_STALE_S:
+                return False  # 有活 patrol 在跑
+        except Exception:  # noqa: BLE001
+            pass  # 锁损坏/过期 → 接管
+    p.write_text(json.dumps({"pid": os.getpid(), "started_at": datetime.now(timezone.utc).isoformat()},
+                            ensure_ascii=False), encoding="utf-8")
+    return True
+
+
+def _release_patrol_lock(project_root: str | Path) -> None:
+    try:
+        _patrol_lock_path(project_root).unlink()
+    except OSError:
+        pass
+
 
 def _count_by_severity(violations: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
@@ -95,6 +133,57 @@ def _count_by_severity(violations: list[dict[str, Any]]) -> dict[str, int]:
         severity = str(violation.get("severity") or "UNKNOWN")
         counts[severity] = counts.get(severity, 0) + 1
     return counts
+
+
+# ── 结构化落盘(2026-07-04 修: 恢复提醒链路的断头) ──────────────────────────
+# _governance/testmap.py::collect_reminders 读 `logs/patrol/*.json` 的 OMNI-100
+# violations 做"改源码没更新台账"提醒; 2026-05-05 诊断重制后本模块只调
+# sync_patrol_result_to_registry, 从未写过这个目录, 提醒链路生产上是断的。
+# 这里补写一份, 字段形态照 collect_reminders 的读法对齐: 顶层 scan_ts/scan_mode,
+# violations[] 保留 rule_id/path/message/detected_at 等键(Violation dataclass 原样)。
+def _patrol_log_dir(project_root: str | Path) -> Path:
+    return Path(project_root) / "logs" / "patrol"
+
+
+def _persist_patrol_log(
+    *,
+    project_root: str | Path,
+    scan_ts: str | None,
+    scan_mode: str | None,
+    violations: list[dict[str, Any]],
+) -> None:
+    """把本轮巡逻结果写一份 `logs/patrol/patrol-<UTC时间戳>.json`。
+
+    violations 为空不落盘(心跳级每 15 分钟一跑, 全绿不留垃圾)。写失败容错不抛
+    (try/except 记 debug), 目录不存在则建。
+    """
+    if not violations:
+        return
+    try:
+        log_dir = _patrol_log_dir(project_root)
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        now = datetime.now(timezone.utc)
+        safe_ts = now.strftime("%Y%m%dT%H%M%S%f")
+        log_path = log_dir / f"patrol-{safe_ts}.json"
+
+        detected_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        payload = {
+            "scan_ts": scan_ts or detected_at,
+            "scan_mode": scan_mode or "diff",
+            "violations": [
+                {
+                    **v,
+                    "detected_at": v.get("detected_at") or detected_at,
+                }
+                for v in violations
+            ],
+        }
+        log_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+    except Exception as e:  # noqa: BLE001 — 落盘失败不阻断巡逻主流程
+        logger.debug("run_patrol: 结构化日志落盘失败(非致命): %s", e)
 
 
 def _summarize_judged_violations(
@@ -160,9 +249,50 @@ def run_patrol(
     staged_only: bool = False,
     since_ts: Optional[str] = None,
 ) -> dict:
-    """向后兼容 shim: 保留原 patrol_runner.run_patrol 的参数签名和返回结构。
+    """向后兼容 shim(带非阻塞锁): 保留原 patrol_runner.run_patrol 的参数签名和返回结构。
 
-    内部 delegate 到 run_guardian(scan_request)。
+    锁: 心跳级(@every15m)后会话手动跑与 tick 顺带跑可能并发, 本函数入口非阻塞取锁——
+    已有新鲜锁(<15min)直接跳过不等待(幂等增量活, 跳过一轮无损); ≥15min 视为僵死接管。
+    正常/异常退出都释放(try/finally)。
+    """
+    if not _acquire_patrol_lock(project_root):
+        return {
+            "skipped": "patrol already running",
+            "scan_ts": None,
+            "scan_mode": "full" if full_scan else ("staged" if staged_only else "diff"),
+            "files_scanned": 0,
+            "violations_found": 0,
+            "violations": [],
+            "by_severity": {},
+        }
+    try:
+        return _run_patrol_impl(
+            project_root=project_root, full_scan=full_scan, committed=committed,
+            uncommitted=uncommitted, n_commits=n_commits, use_llm=use_llm,
+            llm_new_only=llm_new_only, llm_pilot_paths=llm_pilot_paths,
+            use_agent=use_agent, auto_tow=auto_tow, tow_phase2=tow_phase2,
+            staged_only=staged_only, since_ts=since_ts,
+        )
+    finally:
+        _release_patrol_lock(project_root)
+
+
+def _run_patrol_impl(
+    project_root: str | Path = _DEFAULT_ROOT,
+    full_scan: bool = False,
+    committed: bool = True,
+    uncommitted: bool = True,
+    n_commits: int = 1,
+    use_llm: bool = False,
+    llm_new_only: bool = True,
+    llm_pilot_paths: tuple[str, ...] | None = None,
+    use_agent: bool = False,
+    auto_tow: bool = True,
+    tow_phase2: bool = False,
+    staged_only: bool = False,
+    since_ts: Optional[str] = None,
+) -> dict:
+    """原 run_patrol 实现体(内部 delegate 到 run_guardian(scan_request))。
 
     原 patrol_runner.py 已归档到 _archive/patrol_runner_legacy.py。
     """
@@ -368,6 +498,15 @@ def run_patrol(
         "violations": judged,
         "by_severity": _count_by_severity(judged),
     }
+
+    # 结构化落盘(2026-07-04 修: 恢复提醒链路的断头, 见 _persist_patrol_log 顶部注释)。
+    # 仍在 run_patrol 的锁包装内(本函数只被持锁的 run_patrol 调用)。
+    _persist_patrol_log(
+        project_root=project_root,
+        scan_ts=result["scan_ts"],
+        scan_mode=result["scan_mode"],
+        violations=judged,
+    )
 
     # 自动同步到 REGISTRY.md §活跃违规 + ARCH-CHANGES.jsonl (2026-04-23 修复:
     # 迁移到 _patrol_shim 时丢了这一步, sentinel 跑完不登记到 REGISTRY).

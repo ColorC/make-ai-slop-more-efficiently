@@ -41,7 +41,9 @@ type ChatHostMessage =
   | { type: 'open-in-claude-code'; cwd?: string; sessionId?: string }
   | { type: 'open-codex-terminal'; cwd?: string; sessionId?: string }
   | { type: 'restore-region-internal'; region?: string }
-  | { type: 'focus-native-view'; viewId: string };
+  | { type: 'focus-native-view'; viewId: string }
+  | { type: 'shell-selftest'; iframeSrc?: string }
+  | { type: 'page-selftest'; href?: string };
 
 function cfg<T>(key: string, fallback: T): T {
   return vscode.workspace.getConfiguration('omniChat').get<T>(key) ?? fallback;
@@ -87,11 +89,22 @@ function appendDeeplinkToUrl(baseUrl: string, slot: WebviewSlot): string {
   return hash ? `${next}#${hash}` : next;
 }
 
+function appendExtMarker(baseUrl: string): string {
+  // omniext=1 = "页面运行在本扩展的 webview 外壳里"。前端据此判断 __omnichat postMessage 转发链存在;
+  // 没有此标记(Simple Browser / 浏览器直开 / 其它 iframe 宿主)时"在 VSCode 打开"改走后端 vscode:// 深链,
+  // 不再对着不存在的转发链静默丢点击。常量参数, 不破坏稳定 URL 缓存。
+  const [pathAndQuery, hash = ''] = baseUrl.split('#', 2);
+  if (pathAndQuery.includes('omniext=1')) return baseUrl;
+  const sep = pathAndQuery.includes('?') ? '&' : '?';
+  const next = `${pathAndQuery}${sep}omniext=1`;
+  return hash ? `${next}#${hash}` : next;
+}
+
 function getDashboardUrlForSlot(slot: WebviewSlot): string {
   // 稳定 URL — 不再每次渲染都打 Date.now() 时间戳。时间戳会让每次开/恢复窗口都拿到全新 URL,
   // 命不中 webview 的 HTTP 缓存, 整个重型 SPA 冷启动一遍(用户「开窗口就刷新、很慢」的主因)。
   // Vite 产物已按内容哈希; 静默更新交给 devReload(产物哈希真变才刷); 这里给稳定 URL 让恢复窗口直接吃缓存。
-  return appendDeeplinkToUrl(appendSurfaceToUrl(appendSessionToUrl(getDashboardUrl(), slot.state.sessionId), slot), slot);
+  return appendExtMarker(appendDeeplinkToUrl(appendSurfaceToUrl(appendSessionToUrl(getDashboardUrl(), slot.state.sessionId), slot), slot));
 }
 
 function findBackendRoot(): string | null {
@@ -160,17 +173,24 @@ async function waitForDashboard(timeoutMs: number): Promise<boolean> {
 }
 
 function getWebviewHtml(url: string, status: BackendStatus): string {
-  const origin = new URL(url).origin;
+  // url 为 loopback(http://127.0.0.1:8210/…)。远程(code serve-web 经 Caddy 反代)时 iframe 在
+  // 客户端浏览器渲染, 127.0.0.1 指向客户端 → 拒绝访问 + https 页加 http iframe 触发混合内容拦截。
+  // 故 iframe 不在服务端写死 src, 改由下方脚本按 location.ancestorOrigins 客户端解析:
+  // 顶层是 https 源(被反代/远程)→ 换成该源根路径(本套 codeweb 里 Caddy 把 / 反代到 dashboard);
+  // 否则(桌面 vscode-file:// / 本机 http 直连)保持 loopback 不变。
   const iframe = status.phase === 'ready'
-    ? `<iframe id="chat" src="${escapeHtml(url)}" allow="clipboard-read; clipboard-write"></iframe>`
+    ? `<iframe id="chat" src="${escapeHtml(url)}" data-loopback="${escapeHtml(url)}" allow="clipboard-read; clipboard-write"></iframe>`
     : '';
+  // 注意: webview.html 赋"相同字符串"是 no-op(不会重载)。这里埋一个构建戳, 每次 impl 版本变了
+  // 外壳字符串必然不同 → 热换时外壳/页面真正重载重接, 而不是静默跳过。
   return `<!DOCTYPE html>
+<!-- impl-build: 2026-07-04-deeplink-v3 -->
 <html>
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none';
-               frame-src ${origin};
+               frame-src http://127.0.0.1:* http://localhost:* https:;
                script-src 'unsafe-inline';
                style-src 'unsafe-inline';">
 <style>
@@ -211,7 +231,34 @@ ${iframe || `<div class="boot">
   window.vscode = vscode;
   window.addEventListener('message', (ev) => {
     if (ev.data && ev.data.__omnichat === true) vscode.postMessage(ev.data);
+    // 扩展→页面 回执中继: 扩展 slot.webview.postMessage 到达外壳 window, 转投给内页 iframe
+    // (前端用 ack 判断桥接活着; 无 ack 则自行走 vscode:// 深链兜底)。
+    if (ev.data && ev.data.__omnichat_ack === true) {
+      const inner = document.getElementById('chat');
+      try { if (inner && inner.contentWindow) inner.contentWindow.postMessage(ev.data, '*'); } catch (e) { /* */ }
+    }
   });
+  // 外壳自检: 加载即上报一条, 证明"外壳脚本已运行 + 外壳→扩展通道活着"。
+  // (排查"在 VSCode 打开点了没反应"用: 若日志无此条 = 外壳脚本没跑; 有此条但点击无 recv = 页面→外壳断。)
+  try {
+    const fEl = document.getElementById('chat');
+    vscode.postMessage({ __omnichat: true, type: 'shell-selftest', iframeSrc: fEl ? String(fEl.getAttribute('src')).slice(0, 120) : '(no-iframe)' });
+  } catch (e) { /* 自检失败不影响正常功能 */ }
+  // 远程适配(仅远程才动): iframe 服务端已写死 loopback src(本地/桌面照常用它)。
+  // 只有当顶层源是 https(经 Caddy 反代的远程访问)时, 才把 src 覆盖成同源根路径(Caddy / → dashboard),
+  // 因为远程客户端浏览器解析不了 127.0.0.1。本地什么都不做 → 行为与改动前完全一致。
+  try {
+    const f = document.getElementById('chat');
+    const ao = location.ancestorOrigins;
+    const top = ao && ao.length ? ao[ao.length - 1] : '';
+    if (f && /^https:\/\//.test(top)) {
+      const u = new URL(f.getAttribute('data-loopback') || '');
+      const t = new URL(top);
+      u.protocol = t.protocol;
+      u.host = t.host;
+      f.src = u.toString();
+    }
+  } catch (e) { /* 解析失败 → 保留服务端写死的 loopback src */ }
 })();
 </script>
 </body>
@@ -245,6 +292,8 @@ class BackendSupervisor {
   private monitor: NodeJS.Timeout | null = null;
   private disposed = false;
   private healthFailStreak = 0;  // 连续健康探测失败次数; 容忍瞬时抖动, 别一抖就掀掉已就绪面板触发重载
+  private healAttempts = 0;      // 自愈(自动重拉后端)尝试次数; 健康恢复即清零
+  private lastHealAt = 0;        // 上次自愈时间戳(ms); 配合冷却防 restart 抖动
 
   constructor(private readonly host: ImplHost, private readonly renderAll: () => void) {
     this.statusBar.command = 'omniChat.backendStatus';
@@ -298,6 +347,7 @@ class BackendSupervisor {
     const dashboardReady = await httpOk(`http://127.0.0.1:${dashboardPort()}/`, 5000);
     const healthy = dashboardReady && daemonReady;
     this.healthFailStreak = healthy ? 0 : this.healthFailStreak + 1;
+    if (healthy) this.healAttempts = 0;  // 恢复健康 → 清自愈计数, 下次掉了重新算
     // 关键: 已 ready 的面板, 单次/少数几次探测失败不降级(不掀掉 iframe → 不重载)。
     // 只有连续 STREAK 次(≈15s)都失败 = 后端真挂了, 才降级。瞬时抖动一律维持 ready。
     const STREAK_TO_DEGRADE = 3;
@@ -316,6 +366,34 @@ class BackendSupervisor {
       message: healthy ? 'OmniChat backend is ready.' : 'OmniChat backend is not fully ready.',
     });
     if (showOutput) this.showStatusOutput();
+
+    // ── 自愈: 持续不健康就自动重拉, 别永远转圈等人点 Restart ──────────────────
+    // 历史坑: 监控只降级不恢复 → ccdaemon 挂死/退出后扩展永远卡 "not fully ready"。
+    // 现在持续失败(比降级略晚, 确认真挂)+ 过冷却 → 自动 ensureStarted() 重拉挂掉的组件
+    // (端口被僵尸占的情形由 ensureStartedInner 等不到健康就杀重起处理)。冷却 + 次数上限防抖动。
+    const STREAK_TO_HEAL = 4;       // ≈20s 连续失败才自愈, 晚于 degrade(15s)
+    const HEAL_COOLDOWN_MS = 60000; // 两次自愈至少隔 60s
+    const MAX_HEAL_ATTEMPTS = 5;    // 连续 5 次自愈都没救活 = 根因不在"没起", 停手交给人
+    if (
+      !healthy &&
+      cfg<boolean>('autoStartBackend', true) &&
+      !this.starting &&
+      this.healthFailStreak >= STREAK_TO_HEAL &&
+      this.healAttempts < MAX_HEAL_ATTEMPTS &&
+      Date.now() - this.lastHealAt > HEAL_COOLDOWN_MS
+    ) {
+      this.lastHealAt = Date.now();
+      this.healAttempts += 1;
+      this.output.appendLine(`[auto-heal] backend unhealthy ×${this.healthFailStreak} → ensureStarted() 尝试 ${this.healAttempts}/${MAX_HEAL_ATTEMPTS}`);
+      void this.ensureStarted();
+    } else if (!healthy && this.healAttempts >= MAX_HEAL_ATTEMPTS && this.status.phase !== 'error') {
+      this.update({
+        phase: 'error',
+        dashboardReady,
+        daemonReady,
+        message: `自愈 ${MAX_HEAL_ATTEMPTS} 次仍未就绪 — 请查看 OmniChat Backend 输出或点 Restart。`,
+      });
+    }
   }
 
   showStatusOutput(): void {
@@ -344,9 +422,23 @@ class BackendSupervisor {
     let daemonReady = await httpOk(`http://127.0.0.1:${daemonPort()}/cc/chat/health`);
     if (!daemonReady) {
       if (await this.isPortListening(daemonPort())) {
-        // 别的窗口已起共享 ccdaemon(端口已被监听) — 只等它健康, 绝不 killPort(否则杀掉别窗口的后端 → 全员刷新)。
+        // 端口被占但 /health 不通: 要么(a)别窗口的共享 ccdaemon 正在冷启动 → 等它健康即可,
+        // 绝不 killPort(否则杀掉别窗口的后端 → 全员刷新); 要么(b)进程挂死=僵尸(pid 在、占着
+        // 端口却不服务)。先按(a)等 30s; 等不到 = 不是健康共享后端而是僵尸 → 杀掉重起
+        // (僵尸帮不了任何窗口, 此时 killPort 是对的, 不违反"别杀健康共享后端")。
         this.update({ phase: 'starting-daemon', message: `Waiting for shared ccdaemon on ${daemonPort()}...`, dashboardReady: false, daemonReady: false });
         daemonReady = await waitForHttp(`http://127.0.0.1:${daemonPort()}/cc/chat/health`, 30000);
+        if (!daemonReady) {
+          this.update({ phase: 'starting-daemon', message: `ccdaemon on ${daemonPort()} 占端口却不健康(僵尸)→ 杀掉重起...`, dashboardReady: false, daemonReady: false });
+          await this.killPort(daemonPort());
+          this.spawnBackend(root, [
+            '-m', 'uvicorn',
+            'omnicompany.dashboard.ccdaemon.main:app',
+            '--host', '127.0.0.1',
+            '--port', String(daemonPort()),
+          ], { OMNI_CC_DAEMON_PORT: String(daemonPort()) });
+          daemonReady = await waitForHttp(`http://127.0.0.1:${daemonPort()}/cc/chat/health`, 30000);
+        }
       } else {
         this.update({ phase: 'starting-daemon', message: `Starting ccdaemon on ${daemonPort()}...`, dashboardReady: false, daemonReady: false });
         await this.killPort(daemonPort());
@@ -511,6 +603,11 @@ async function saveSnapshot(context: vscode.ExtensionContext, html: string, file
 export function activateImpl(host: ImplHost): ImplApi {
   const messageBindings = new Map<WebviewSlot, vscode.Disposable>();
   const renderedPhase = new Map<WebviewSlot, BackendPhase>();
+  // 桥接看门狗: 外壳每次加载都会发 shell-selftest; 附着后迟迟收不到 = webview→扩展通道失联
+  // (VSCode 渲染层按 viewType 复用 webview origin, 该层卡死后重开页签也继承坏状态,
+  //  唯一解法是重载窗口 — 2026-07-02 实锤过一次: 页面显示/内部运行全正常, 仅宿主桥双向断)。
+  const selftestSeen = new WeakSet<WebviewSlot>();
+  let bridgeWarned = false;
 
   // 2026-06-14 用户: "点一个区别把另俩刷了/老显示启动中"。重设 slot.webview.html = 重载 iframe,
   // 加上 cache-bust 每次都是新 URL, 所以任何 renderSlot 都会闪一次"启动中"。修法: 已经在显示就绪
@@ -526,9 +623,92 @@ export function activateImpl(host: ImplHost): ImplApi {
     for (const slot of host.listSlots()) renderSlot(slot, supervisor.current);
   });
 
+  // vscode:// 深链通道 —— 完全绕开 webview postMessage 桥(桥接失联是已知慢性病, 2026-07-02/04 实锤)。
+  // 页面在非扩展宿主(Simple Browser/浏览器)或桥死时, 经后端 code --open-url 或浏览器协议弹窗抵达这里。
+  // vscode://omnicompany.omni-chat/material?id=…&title=… → 材料正文页签;
+  // vscode://omnicompany.omni-chat/omnidashboard?type=…&id=…&facet=… → 完整驾驶舱深链页签。
+  // "在 VSCode 打开"的免深链主通道: 长轮询 dashboard 领取打开请求(先到先得)。
+  // 深链(vscode://)在部分环境被静默丢弃, 且 webview 消息桥会失联 —— 这条通道两者都不依赖。
+  // 长轮询: 服务端 wait=25s 挂住, 一有请求立刻放行 → 点击到开页签近零延迟(2026-07-04 用户嫌 2.5s 轮询慢)。
+  let pendingOpensStopped = false;
+  const pollPendingOpens = (): void => {
+    if (pendingOpensStopped) return;
+    const req = http.get(
+      `http://127.0.0.1:${dashboardPort()}/api/dev/pending-opens?consume=1&wait=25`,
+      { timeout: 30000 },
+      (res) => {
+        let buf = '';
+        res.on('data', (c) => { buf += c; });
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(buf) as { items?: Array<{ kind: string; id: string; title?: string }> };
+            for (const it of data.items || []) {
+              if (it.kind === 'material' && it.id) {
+                host.log(`[open-queue] material ${it.id}`);
+                try {
+                  host.openMaterialPanel(it.id, it.title || it.id);
+                } catch (err) {
+                  host.log(`[open-queue] openMaterialPanel failed: ${String(err)}`);
+                  void vscode.window.showErrorMessage(`OmniChat 打开材料页签失败: ${String((err as Error)?.message || err)}`);
+                }
+              } else if (it.kind === 'file' && it.id) {
+                // 2026-07-06 用户: "在 VSCode 打开"持续失效, 打开方式不该是网页链接, 要中转。
+                // 文件打开接上同一条队列通道: id = 绝对路径(可带 :行[:列], openLocalFile 自解析)。
+                host.log(`[open-queue] file ${it.id}`);
+                void openLocalFile(it.id);
+              }
+            }
+          } catch { /* 半截 JSON / 后端重启中 */ }
+          setTimeout(pollPendingOpens, 150);
+        });
+      },
+    );
+    req.on('error', () => { setTimeout(pollPendingOpens, 3000); });
+    req.on('timeout', () => { req.destroy(); setTimeout(pollPendingOpens, 500); });
+  };
+  pollPendingOpens();
+
+  const uriHandler = vscode.window.registerUriHandler({
+    handleUri(uri: vscode.Uri): void {
+      try {
+        const q = new URLSearchParams(uri.query);
+        host.log(`[uri] recv ${uri.path}?${uri.query}`);
+        if (uri.path === '/material') {
+          const id = q.get('id') || '';
+          if (id) host.openMaterialPanel(id, q.get('title') || id);
+          else void vscode.window.showErrorMessage('OmniChat 深链缺少材料 id');
+          return;
+        }
+        if (uri.path === '/omnidashboard') {
+          const openType = q.get('type') || '';
+          const openId = q.get('id') || '';
+          if (openType && openId) host.openOmnidashboardPanel(openType, openId, q.get('title') || openId, q.get('facet') || undefined);
+          else void vscode.window.showErrorMessage('OmniChat 深链缺少 type/id');
+          return;
+        }
+        host.log(`[uri] 未识别路径: ${uri.path}`);
+      } catch (err) {
+        host.log(`[uri] handleUri failed: ${String(err)}`);
+        void vscode.window.showErrorMessage(`OmniChat 深链处理失败: ${String((err as Error)?.message || err)}`);
+      }
+    },
+  });
+
   const bindMessages = (slot: WebviewSlot): void => {
     messageBindings.get(slot)?.dispose();
     const binding = slot.webview.onDidReceiveMessage((msg: ChatHostMessage) => {
+      // 排查期日志: 每条 webview→扩展消息都记一笔(量很小: 点击类 + 每次外壳加载一条自检)。
+      host.log(`[msg] recv ${String((msg as { type?: unknown }).type)}`);
+      if (msg.type === 'shell-selftest') {
+        host.log(`[msg] shell-selftest iframeSrc=${msg.iframeSrc || '?'}`);
+        selftestSeen.add(slot);
+        return;
+      }
+      if (msg.type === 'page-selftest') {
+        // 页面(信标)加载即上报: 证明"页面→外壳→扩展"整条入站链活着。
+        host.log(`[msg] page-selftest href=${msg.href || '?'}`);
+        return;
+      }
       if (msg.type === 'backend-restart') {
         void supervisor.restart();
         return;
@@ -546,12 +726,26 @@ export function activateImpl(host: ImplHost): ImplApi {
       }
       if (msg.type === 'open-material-native') {
         // 队列点项 / 材料页签"在 VSCode 打开" → 编辑区开一个材料正文页签(surface=material)。
-        host.openMaterialPanel(msg.materialId, msg.title || msg.materialId);
+        // 静默失败 = 用户视角"点了没反应"(2026-06-12 教训), 出错必须可见。
+        try {
+          host.openMaterialPanel(msg.materialId, msg.title || msg.materialId);
+          host.log(`[msg] openMaterialPanel ok id=${msg.materialId}`);
+          // 回执给页面(经外壳中继): 前端 1.5s 内没收到 ack 就自行走 vscode:// 深链兜底。
+          void slot.webview.postMessage({ __omnichat_ack: true, type: 'open-material-native-ack', materialId: msg.materialId });
+        } catch (err) {
+          host.log(`[msg] openMaterialPanel failed: ${String(err)}`);
+          void vscode.window.showErrorMessage(`OmniChat 打开材料页签失败: ${String((err as Error)?.message || err)}`);
+        }
         return;
       }
       if (msg.type === 'open-omnidashboard') {
         // 主侧栏 section 点条目 → 完整驾驶舱编辑页签, 深链到该条目。
-        host.openOmnidashboardPanel(msg.openType, msg.openId, msg.title || msg.openId, msg.facet || undefined);
+        try {
+          host.openOmnidashboardPanel(msg.openType, msg.openId, msg.title || msg.openId, msg.facet || undefined);
+        } catch (err) {
+          host.log(`[msg] openOmnidashboardPanel failed: ${String(err)}`);
+          void vscode.window.showErrorMessage(`OmniChat 打开页签失败: ${String((err as Error)?.message || err)}`);
+        }
         return;
       }
       if (msg.type === 'open-in-claude-code') {
@@ -590,6 +784,9 @@ export function activateImpl(host: ImplHost): ImplApi {
         slot.state.preview = (msg.preview || '').trim() || null;
       } else if (msg.type === 'open-file') {
         void openLocalFile(msg.path, msg.line, msg.column);
+        // 回执给页面(经外壳中继): 前端 1.5s 内没收到 ack 就自行走后端队列中转
+        // (与 open-material-native-ack 同款; 桥接失联慢性病的兜底)。
+        void slot.webview.postMessage({ __omnichat_ack: true, type: 'open-file-ack', path: msg.path });
         return;
       } else if (msg.type === 'save-snapshot') {
         void saveSnapshot(host.context, msg.html, msg.fileName);
@@ -603,11 +800,54 @@ export function activateImpl(host: ImplHost): ImplApi {
   supervisor.startMonitor();
   void supervisor.ensureStarted();
 
+  // 排查期日志: 报告 loader 手里现有 slot 数(=0 说明所有可见页签都已失联, 点击必然无响应)。
+  host.log(`[attach] loader tracked slots at impl activate: ${host.listSlots().length}`);
+
   return {
     attachWebview(slot: WebviewSlot): void {
+      host.log(`[attach] attachWebview surface=${slot.surface ? slot.surface.kind : '(editor-panel)'}`);
       bindMessages(slot);
       renderSlot(slot, supervisor.current);
       void supervisor.ensureStarted();
+      // 看门狗: 收不到该 slot 的外壳自检 → 桥接失联, 弹一键重载窗口(每个 impl 实例只提醒一次)。
+      // VSCode 冷启动恢复页签时, 渲染进程忙 + 后端在拉起, 自检晚于 10s 到达是常态且会自愈
+      // (2026-07-04 用户实锤: 开机必弹这条警告, 过一会儿自己就好了)。所以分两段:
+      // 20s 未到只记日志继续等; 60s 仍未到才判真失联弹警告。真渲染层卡死不会自愈, 晚 50s 提醒无损。
+      // 2026-07-06 再修(用户: 后台明明活着还弹"断连"): 该看门狗要抓的故障(07-02 那种渲染层
+      // 按 viewType origin 整体卡死)必然是"本扩展全部 webview 一起失联", 单个区静默只说明该区
+      // 没真正加载(折叠 section 不跑脚本是 VSCode 正常行为), 不是全局故障。因此:
+      // ① 任一兄弟 slot 的自检到过 → 渲染层活着, 本区只记日志不弹窗;
+      // ② 后端还没 ready(冷启动最坏 ~60s, 与本阈值重叠, 整机都在忙)→ 顺延 40s 再判;
+      // ③ 真要弹时文案带上具体区名, 便于事后对日志。
+      const watchdogCheck = (delayMs: number, isFinal: boolean): void => {
+        setTimeout(() => {
+          if (selftestSeen.has(slot) || bridgeWarned) return;
+          const kind = slot.surface ? slot.surface.kind : 'editor-panel';
+          if (!isFinal) {
+            host.log(`[watchdog] ${kind} 附着 20s 未收到 shell-selftest, 启动期慢加载常见, 继续观察到 60s`);
+            watchdogCheck(40_000, true);
+            return;
+          }
+          if (host.listSlots().some((s) => selftestSeen.has(s))) {
+            host.log(`[watchdog] ${kind} 60s 未收到 shell-selftest, 但其他区桥接正常 → 判为该区未真正加载(折叠/惰性), 不弹警告`);
+            return;
+          }
+          if (supervisor.current.phase !== 'ready') {
+            host.log(`[watchdog] ${kind} 60s 未收到 shell-selftest, 但后端仍在 ${supervisor.current.phase} → 冷启动竞争期, 顺延 40s 再判`);
+            watchdogCheck(40_000, true);
+            return;
+          }
+          bridgeWarned = true;
+          host.log(`[watchdog] ${kind} 60s 仍未收到 shell-selftest 且无任何区桥通 — webview→扩展桥接失联, 需重载窗口`);
+          void vscode.window.showWarningMessage(
+            `OmniChat: webview 桥接失联(${kind} 区, 且所有区均未通)。页面显示正常但"在 VSCode 打开"等按钮全部无效时, 是 VSCode 渲染层卡死, 重开页签无用, 需重载窗口。`,
+            '重载窗口',
+          ).then((pick) => {
+            if (pick === '重载窗口') void vscode.commands.executeCommand('workbench.action.reloadWindow');
+          });
+        }, delayMs);
+      };
+      watchdogCheck(20_000, false);
     },
 
     handleCommand(command: string): void {
@@ -630,6 +870,8 @@ export function activateImpl(host: ImplHost): ImplApi {
     dispose(): void {
       for (const binding of messageBindings.values()) binding.dispose();
       messageBindings.clear();
+      pendingOpensStopped = true;
+      uriHandler.dispose();
       supervisor.dispose();
     },
   };

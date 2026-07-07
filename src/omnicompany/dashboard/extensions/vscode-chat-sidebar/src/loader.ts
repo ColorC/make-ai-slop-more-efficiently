@@ -280,7 +280,9 @@ export function activate(context: vscode.ExtensionContext): void {
     reg('omniChat.project', 'project'),
     reg('omniChat.plan', 'plan'),
     reg('omniChat.threads', 'threads'),
+    reg('omniChat.multiagent', 'multiagent'),
     reg('omniChat.queue', 'queue'),
+    reg('omniChat.reviewOverview', 'review-overview'),
     reg('omniChat.authored', 'authored'),
     reg('omniChat.comments', 'comments'),
   );

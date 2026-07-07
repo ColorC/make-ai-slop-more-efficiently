@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -90,6 +91,8 @@ class Intake(Router):
         ensure_dirs()
         run_dir = runs_root() / f"{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}-{slug}"
         run_dir.mkdir(parents=True, exist_ok=True)
+        if body:  # 存全文,供视频脚本撰写(给不懂的人讲清,需完整原文不能只靠精简 IR)
+            (run_dir / "source.md").write_text(body, encoding="utf-8")
 
         do_build = _truthy(req.get("build", True))
         out = {
@@ -163,6 +166,8 @@ class RenderSlidev(Router):
         md = _render.render_slidev(ctx["deck_ir"])
         slides_path = run_dir / "slides.md"
         slides_path.write_text(md, encoding="utf-8")
+        # field-manual 配色全局样式(Slidev 自动加载 deck 旁的 style.css)
+        (run_dir / "style.css").write_text(_render.STYLE_CSS, encoding="utf-8")
         out = dict(ctx)
         out["slides_md"] = str(slides_path)
         n = md.count("\n---\n") + 1
@@ -199,11 +204,30 @@ class BuildDeck(Router):
                            granted_tags=["domain.slidecast", "stage.built"])
 
         studio = studio_root()
-        dist = run_dir / "dist"
+        dist = (run_dir / "dist").resolve()
         cli = studio / "node_modules" / "@slidev" / "cli" / "bin" / "slidev.mjs"
+        # 在 studio 内构建:userRoot=studio → 自动加载 studio/style.css(field-manual 配色);
+        # 把 slides.md + assets 复制进 studio(slides.md 旁的 style.css 不随 entry 目录加载)
         try:
+            (studio / "style.css").write_text(_render.STYLE_CSS, encoding="utf-8")
+            # 浅色 shiki 主题(代码块高对比);setup/ 随项目自动加载
+            (studio / "setup").mkdir(exist_ok=True)
+            (studio / "setup" / "shiki.ts").write_text(
+                "import { defineShikiSetup } from '@slidev/types'\n"
+                "export default defineShikiSetup(() => ({ themes: { light: 'github-dark', dark: 'github-dark' } }))\n",
+                encoding="utf-8")
+            shutil.copyfile(slides_md, studio / "slides.md")
+            # 资产放 public/assets:Slidev background 用字面路径 ./assets/x.png,public 原样serve不哈希(否则404)
+            shutil.rmtree(studio / "assets", ignore_errors=True)
+            studio_assets = studio / "public" / "assets"
+            if studio_assets.exists():
+                shutil.rmtree(studio_assets, ignore_errors=True)
+            run_assets = run_dir / "assets"
+            if run_assets.is_dir():
+                studio_assets.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(run_assets, studio_assets)
             r = subprocess.run(
-                ["node", str(cli), "build", str(slides_md), "--base", "./", "--out", str(dist)],
+                ["node", str(cli), "build", "slides.md", "--base", "./", "--out", str(dist)],
                 cwd=str(studio), capture_output=True, text=True, timeout=300,
                 encoding="utf-8", errors="replace", creationflags=_NO_WINDOW,
             )

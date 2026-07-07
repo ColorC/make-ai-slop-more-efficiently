@@ -36,6 +36,134 @@ def _project_root_str() -> str:
     return str(sh.repo_root())
 
 
+# ── 顶层 stray 实时守卫 (2026-06-26 用户"防垃圾"): 复用 hygiene-profile 闭集 ──
+# 防"错误CWD下相对路径写"造顶层游离垃圾 (E:\e / E:\tmp / WS\data 等同一根因)。
+# 写工具: 精确闭集判定(高置信, enforce 可阻断 = 用户要的"自己通道报错形")。
+# Bash:   cwd 在危险大根(盘根/工作区根)+写命令 → 详细警告(启发式, 只 warn 不误杀)。
+# 全程 fail-open: 守卫自身任何异常都不阻塞用户工作。规范见 directory_cleanliness §一·5/§6。
+
+def _stray_guard_mode() -> str:
+    """warn(默认) / enforce / off。读 protection_policy.stray_guard_mode。"""
+    try:
+        from omnicompany.packages.services._core.protection import load_policy
+        return str((load_policy() or {}).get("stray_guard_mode", "warn")).lower()
+    except Exception:
+        return "warn"
+
+
+def _stray_guard(payload: dict) -> int | None:
+    """返回 2 = 阻断(仅 enforce 命中写工具 stray); 否则 None(可能已打印 warning)。永不抛。"""
+    try:
+        mode = _stray_guard_mode()
+        if mode == "off":
+            return None
+        tool_name = payload.get("tool_name") or payload.get("toolName") or ""
+        tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+        if not isinstance(tool_input, dict):
+            return None
+        cwd = str(payload.get("cwd") or os.getcwd())
+        from omnicompany.packages.services._core.guardian.rules.project_profile_hygiene import (
+            check_top_level_stray, dangerous_bash_roots,
+        )
+        from pathlib import Path
+
+        # 写工具: 精确解析 file_path → 闭集判定
+        if tool_name in _WRITE_TOOLS:
+            fp = (tool_input.get("file_path") or tool_input.get("path")
+                  or tool_input.get("notebook_path") or "")
+            if not fp:
+                return None
+            try:
+                p = Path(str(fp))
+                target = p if p.is_absolute() else (Path(cwd) / p)
+            except Exception:
+                return None
+            stray = check_top_level_stray(target)
+            if not stray:
+                return None
+            label = "BLOCKED" if mode == "enforce" else "WARN"
+            msg = (
+                f"\n[OMNI-STRAY-{label}] 这次写入会在顶层制造游离垃圾:\n"
+                f"  目标: {target}\n"
+                f"  {stray['message']}\n\n"
+                f"正确做法: 用绝对路径写进具体项目, 或先 cd 进该项目再用项目内相对路径。\n"
+                f"若是合法新顶层(需审批): 往 {{项目}}/.omni/hygiene-profile.yaml 对应 root 的\n"
+                f"allowed_root_dirs/allowed_root_files 登记一行再重试。规范: directory_cleanliness §一·5/§6。\n"
+            )
+            sh.append_audit("stray_guard_write", {
+                "target": str(target), "tool_name": tool_name,
+                "mode": mode, "root": stray.get("root_label"),
+            })
+            try:
+                print(msg, file=sys.stderr)
+            except OSError:
+                pass
+            return 2 if mode == "enforce" else None
+
+        # Bash 两道警告(启发式, 不阻断):
+        #   (1) 命令里出现【绝对】顶层 stray 路径 → 精确判闭集(任何 cwd 都抓, 如 mkdir E:\junk)。
+        #   (2) cwd 在危险大根 + 写命令(相对路径)→ 启发式(补 SHELL_WRITE_RE 漏的 cp/mv/clone/pnpm)。
+        if tool_name in ("Bash", "Shell"):
+            import re as _re
+            command = str(tool_input.get("command") or "")
+            if not command:
+                return None
+            # (1) 抽命令里的绝对路径 token(含 \\?\ 前缀), 逐个精确判顶层 stray
+            for tok in _re.findall(r"(?:\\\\\?\\)?[A-Za-z]:[\\/][^\s\"'|&;<>]*", command):
+                s = check_top_level_stray(tok.rstrip("\\/"))
+                if s:
+                    msg = (
+                        f"\n[OMNI-STRAY-WARN] Bash 命令会在顶层制造游离垃圾:\n"
+                        f"  命令含绝对路径: {tok}\n  {s['message']}\n\n"
+                        f"正确做法: 写进具体项目(绝对路径)或先 cd 进项目。规范: directory_cleanliness §一·5/§6。\n"
+                    )
+                    sh.append_audit("stray_guard_bash_abs", {
+                        "token": tok, "command": command[:200], "root": s.get("root_label"),
+                    })
+                    try:
+                        print(msg, file=sys.stderr)
+                    except OSError:
+                        pass
+                    return None
+            # (2) 写命令检测: SHELL_WRITE_RE + 补 cp/mv/clone/pnpm/xcopy 等它漏的
+            is_write = False
+            try:
+                from ..write_scope import SHELL_WRITE_RE
+                is_write = bool(SHELL_WRITE_RE.search(command))
+            except Exception:
+                pass
+            if not is_write:
+                is_write = bool(_re.search(
+                    r"\b(cp|mv|move|copy|xcopy|robocopy|pnpm|npm|yarn|wget|tar)\b|git\s+clone",
+                    command, _re.IGNORECASE))
+            if not is_write:
+                return None
+            bcwd = str(tool_input.get("cwd") or cwd)
+            try:
+                bcwd_resolved = Path(bcwd).resolve()
+            except Exception:
+                return None
+            if not any(r == bcwd_resolved for r in dangerous_bash_roots()):
+                return None
+            msg = (
+                f"\n[OMNI-STRAY-WARN] 在大根目录下用写命令, 相对路径极易制造顶层垃圾:\n"
+                f"  cwd: {bcwd_resolved}  (盘根/工作区根, 不该在此直接写)\n\n"
+                f"根因铁律(directory_cleanliness §6): 写文件/建目录一律【绝对路径】, 或先 cd 进具体项目。\n"
+                f"别在此用 `data/...` `tmp/...` `e/...` 这类相对路径 —— 会长成顶层游离垃圾。\n"
+            )
+            sh.append_audit("stray_guard_bash", {
+                "cwd": str(bcwd_resolved), "command": command[:200],
+            })
+            try:
+                print(msg, file=sys.stderr)
+            except OSError:
+                pass
+            return None
+        return None
+    except Exception:
+        return None
+
+
 def _build_warn_message(file_path: str, mode: str) -> str:
     label = "WARN" if mode == "warn" else "BLOCKED"
     return (
@@ -70,6 +198,11 @@ def main() -> int:
     """PreToolUse hook entry. 通过 stdin 拿 tool_use_id / tool_name / tool_input."""
     payload = sh.read_stdin_json()
     tool_name = payload.get("tool_name") or payload.get("toolName") or ""
+
+    # 顶层 stray 实时守卫 (覆盖 Bash + 写工具)。返回 2 = enforce 阻断; None = 放行/已 warn。
+    _sg = _stray_guard(payload)
+    if _sg is not None:
+        return _sg
 
     # 不是写入工具 → 直接放行
     if tool_name not in _WRITE_TOOLS:

@@ -52,6 +52,12 @@ class PipelineEntry:
     """仅 engine="event" 用: 起跑的初始 material id。
     None 时从 worker 清单自动推导 —— 被某 worker 的 FORMAT_IN 消费、却无任何 worker 以 FORMAT_OUT
     产出的那块 material 即 source(从契约直接推得, 无需额外配置)。推不出唯一时须显式给。"""
+    run_context: Callable[[dict], Any] | None = None
+    """可选: 运行级上下文工厂 —— 接收 input_dict, 返回 context manager。
+    dispatch() 在管线执行前进入、结束后退出(两种引擎都生效)。
+    首个消费者 = voxelcraft 五条内容路径 (阶段一 1-5, architecture §3.2 方案a):
+    工厂返回 eternal_war_worktree(), 使 worker 的 active_eternal_war_root() 解析到
+    隔离副本 —— 没有它, event 引擎裸挂会让 worker 静默回退到活基线直写。"""
 
 
 # ── 全局注册表 ──────────────────────────────────────────────────────────────

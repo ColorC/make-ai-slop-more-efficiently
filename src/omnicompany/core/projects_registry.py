@@ -10,9 +10,13 @@
 - 本体在 core 层(本模块), 数据在 data/registry/projects.json(老位置 data/boss_sight/
   projects.json 首次读取时自动迁移)。dashboard / CLI / 总控全是消费方。
 - 每个项目绑定一个 **index 文件** (PROJECT_INDEX.md, 在项目自己的仓库根):
-  YAML frontmatter(强结构: roots/entry_points/latest/quick_actions/links) + 五节正文。
+  YAML frontmatter(强结构: roots/entry_points/latest/quick_actions/links/threads) + 五节正文。
   快速工作选项(绑定 skill)注册在 index 里, 本模块只存指针并在 enrich 时浮出。
-- 最后活跃时间 = max(关联 plan 的 mtime, progress 时间线条目, index 文件 mtime)。
+- 最后活跃时间(last_active) = max(关联 plan mtime, progress 条目, 项目文件改动, git 提交);
+  **不含 index 文件自身 mtime**(改 index ≠ 干活 — 否则循环自证, 还会盖掉"文件在动但叙事冻住"的过期)。
+- 状态可靠性(2026-06-26): 工作线 threads 是项目状态的结构化真源(取代正文手写"活跃");
+  机器真活跃晚于 index 声明日(updated / threads[].updated)超 STALE_AFTER_DAYS 天
+  → index_stale=True(及时提示, 让"文件在动但状态冻住"被自动揪出)。
 - plan 关联: plan_categories 里既可写类目前缀(如 "demogame/figma-to-prefab")也可写完整
   plan id, 匹配规则 = 精确相等 或 前缀+"/"。
 - 纯模块(不依赖 FastAPI): omni project CLI 与 dashboard controlplane/projects.py 共用。
@@ -43,8 +47,13 @@ GROUP_LABELS: dict[str, str] = {
     "other": "其他",
 }
 
+# 工作线状态机(治本: 项目不是"活/不活"二元, 而是多条 thread 各有状态)。
+THREAD_STATUSES = ("active", "done", "blocked", "parked")
+# 机器测的真活跃晚于 index 声明日超过这么多天 → 判定状态可能不可靠(及时提示)。
+STALE_AFTER_DAYS = 7
+
 _OPTIONAL_FIELDS = (
-    "name", "group", "tags", "desc", "roots", "index_path", "bg", "icon",
+    "name", "short", "group", "tags", "desc", "roots", "index_path", "bg", "icon",
     "plan_categories", "links", "pinned",
 )
 
@@ -205,7 +214,24 @@ def parse_index_file(index_path: str | Path) -> dict[str, Any]:
         mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat()
     except OSError:
         mtime = None
-    return {"ok": True, "data": fm, "mtime": mtime}
+    # threads(可选): 工作线结构化状态。结构不对只警告不让整份 index 失败 —— 向后兼容无 threads 的旧档。
+    warnings: list[str] = []
+    threads = fm.get("threads")
+    if threads is not None:
+        if not isinstance(threads, list):
+            warnings.append("threads 应为列表 [{name, status, updated, note}]")
+        else:
+            for i, t in enumerate(threads):
+                if not isinstance(t, dict) or not str(t.get("name") or "").strip():
+                    warnings.append(f"threads[{i}] 缺 name")
+                    continue
+                st = str(t.get("status") or "").strip().lower()
+                if st not in THREAD_STATUSES:
+                    warnings.append(f"threads[{i}]({t.get('name')}) status 非法 {t.get('status')!r}(应取 {THREAD_STATUSES})")
+    result: dict[str, Any] = {"ok": True, "data": fm, "mtime": mtime}
+    if warnings:
+        result["warnings"] = warnings
+    return result
 
 
 # ── 计划治理 (plan_steward 产物): plan→project 显式覆盖 + 中文标题 ──────────────
@@ -330,7 +356,12 @@ def _refresh_activity_async(item: dict[str, Any], pid: str) -> None:
     def _work() -> None:
         try:
             roots = _project_roots(item)
-            ts = _recent_file_ts(roots) + _git_commit_ts(roots)
+            # 排除 index 文件自身: 它常住在某个 root 下, 不排除则"改 index"会被 os.walk 当成项目改动。
+            exclude: set[str] = set()
+            ip = item.get("index_path")
+            if ip:
+                exclude.add(os.path.normcase(os.path.abspath(str(ip))))
+            ts = _recent_file_ts(roots, exclude=exclude) + _git_commit_ts(roots)
             _ACTIVITY_CACHE[pid] = (time.time() + 90.0, ts)
         except Exception:  # noqa: BLE001 — 后台刷新失败不该影响请求; 下轮再试
             pass
@@ -353,11 +384,14 @@ def _project_roots(item: dict[str, Any]) -> list[Path]:
     return out
 
 
-def _recent_file_ts(roots: list[Path], days: int = 8, cap: int = 3000) -> list[str]:
-    """roots 下近 days 天内创建/修改过的文件 mtime(ISO)。跳过 node_modules/缓存等; 文件数封顶防大目录拖慢看板。"""
+def _recent_file_ts(roots: list[Path], days: int = 8, cap: int = 3000,
+                    exclude: set[str] | None = None) -> list[str]:
+    """roots 下近 days 天内创建/修改过的文件 mtime(ISO)。跳过 node_modules/缓存等; 文件数封顶防大目录拖慢看板。
+    exclude: 归一化绝对路径集合 —— 用来排除 index 文件自身(改 index ≠ 干活, 见 enrich_projects)。"""
     import os
     from datetime import timedelta
     cutoff = (datetime.now(tz=timezone.utc) - timedelta(days=days)).timestamp()
+    exclude = exclude or set()
     out: list[str] = []
     n = 0
     for root in roots:
@@ -367,8 +401,11 @@ def _recent_file_ts(roots: list[Path], days: int = 8, cap: int = 3000) -> list[s
                 n += 1
                 if n > cap:
                     return out
+                full = os.path.join(dirpath, fn)
+                if os.path.normcase(os.path.abspath(full)) in exclude:
+                    continue
                 try:
-                    m = os.stat(os.path.join(dirpath, fn)).st_mtime
+                    m = os.stat(full).st_mtime
                 except OSError:
                     continue
                 if m >= cutoff:
@@ -443,6 +480,82 @@ def _activity_7d(ts_list: list[str]) -> list[bool]:
     return [(today - timedelta(days=6 - i)) in days for i in range(7)]
 
 
+def _as_date(s: Any) -> Any:
+    """把 'YYYY-MM-DD' 或 ISO datetime 归一成本地 date(与 activity_7d 同口径); 不可解析返回 None。"""
+    from datetime import date as _date
+    if not s:
+        return None
+    s = str(s)
+    try:
+        if len(s) == 10:
+            return _date.fromisoformat(s)
+        return datetime.fromisoformat(s).astimezone().date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _declared_date(fm: dict[str, Any]) -> Any:
+    """index 声明的"最后核对日" = max(frontmatter.updated, 各 thread.updated)。"""
+    cands = []
+    d = _as_date(fm.get("updated"))
+    if d:
+        cands.append(d)
+    for t in (fm.get("threads") or []):
+        if isinstance(t, dict):
+            td = _as_date(t.get("updated"))
+            if td:
+                cands.append(td)
+    return max(cands) if cands else None
+
+
+def _enrich_threads(threads: Any, real_active: str | None) -> list[dict[str, Any]]:
+    """规整工作线 + 给"声明在做/受阻却久未核对"的线打 stale 标(done/parked 冻着是对的, 不查)。"""
+    if not isinstance(threads, list):
+        return []
+    ra = _as_date(real_active)
+    out: list[dict[str, Any]] = []
+    for t in threads:
+        if not isinstance(t, dict):
+            continue
+        status = str(t.get("status") or "").strip().lower()
+        rec: dict[str, Any] = {
+            "name": str(t.get("name") or "").strip(),
+            "status": status,
+            "status_ok": status in THREAD_STATUSES,
+            # YAML 把 updated: 2026-06-26 解析成 date 对象; 归一成字符串, 否则 CLI 的 json.dumps 崩。
+            "updated": str(t.get("updated")) if t.get("updated") is not None else None,
+            "note": t.get("note"),
+        }
+        td = _as_date(t.get("updated"))
+        if ra and status in ("active", "blocked") and (td is None or (ra - td).days > STALE_AFTER_DAYS):
+            rec["stale"] = True
+        out.append(rec)
+    return out
+
+
+def _apply_staleness(item: dict[str, Any], fm: dict[str, Any], real_active: str | None,
+                     threads: list[dict[str, Any]] | None = None) -> None:
+    """项目级状态可靠性 → index_stale + 原因(供前端/CLI 提示)。两种触发:
+    (a) 机器真活跃晚于 index 声明日(updated/threads.updated 取 max)> 阈值;
+    (b) 任一进行中/受阻的工作线自身久未核对(防"标个别线为 done 把整体刷新"的盲点)。"""
+    ra = _as_date(real_active)
+    declared = _declared_date(fm)
+    reasons: list[str] = []
+    if ra is not None and declared is not None:
+        gap = (ra - declared).days
+        if gap > STALE_AFTER_DAYS:
+            item["stale_days"] = gap
+            reasons.append(f"近期有改动(最近 {str(real_active)[:10]})但 index 声明停在 {declared.isoformat()}, 已 {gap} 天未核对")
+    stale_threads = [t.get("name") or "(未命名)" for t in (threads or []) if t.get("stale")]
+    if stale_threads:
+        reasons.append("进行中工作线久未核对: " + "、".join(stale_threads))
+    if reasons:
+        item["index_stale"] = True
+        item["stale_reason"] = "; ".join(reasons) + " —— 状态可能不可靠, 复核 threads/latest 后更新 updated:"
+    else:
+        item["index_stale"] = False
+
+
 def enrich_projects(fresh: bool = False) -> dict[str, Any]:
     """注册表 + 计算字段(last_active / activity_7d / 关联 plan 数 / index 浮出)。前端与总控共用。
 
@@ -464,20 +577,21 @@ def enrich_projects(fresh: bool = False) -> dict[str, Any]:
         # 关联 plan: 治理覆盖表优先, 未治理的退回前缀规则(见 resolve_project_plans)
         related = resolve_project_plans(p["id"], cats, catalogue)
         item["plan_count"] = len(related)
-        candidates: list[str] = []
+        candidates: list[str] = []  # 机器测的「真活跃」信号 — 绝不含 index 文件自身 mtime(见下)
         for it in related:
             ts = _plan_mtime_iso(it.get("folder_path") or "")
             if ts:
                 candidates.append(ts)
         candidates.extend(_progress_ts_all(set(cats) | {item["id"]}))
-        candidates.extend(_activity_signals(item))  # + 文件改动 + git 记录(2026-06-19)
+        candidates.extend(_activity_signals(item))  # + 文件改动 + git 记录(2026-06-19, 已排除 index 自身)
+        # 真活跃 = 上述信号最大值。不含 index mtime: 否则"改一下 index"就刷绿(循环自证),
+        # 还会盖掉"文件在动但叙事冻住"的过期(2026-06-26 治本 + 禁写死)。
+        real_active = max(candidates) if candidates else None
+        item["last_active"] = real_active or p.get("updated_at")
+        item["activity_7d"] = _activity_7d(candidates)
         idx_info: dict[str, Any] | None = None
         if p.get("index_path"):
             idx_info = parse_index_file_cached(p["index_path"])
-            if idx_info.get("mtime"):
-                candidates.append(idx_info["mtime"])
-        item["last_active"] = max(candidates) if candidates else p.get("updated_at")
-        item["activity_7d"] = _activity_7d(candidates)
         item["index_ok"] = bool(idx_info and idx_info.get("ok")) if p.get("index_path") else None
         if idx_info and idx_info.get("ok"):
             fm = idx_info["data"]
@@ -485,8 +599,13 @@ def enrich_projects(fresh: bool = False) -> dict[str, Any]:
             # links: 注册表与 index 合并(index 优先在前)
             item["links"] = (fm.get("links") or []) + (p.get("links") or [])
             item["index_latest"] = fm.get("latest") or []
+            # 治本: threads 是项目状态的结构化真源; 及时提示: 真活跃晚于声明日 → 状态不可靠。
+            item["threads"] = _enrich_threads(fm.get("threads"), real_active)
+            _apply_staleness(item, fm, real_active, item["threads"])
         else:
             item["quick_actions"] = []
+            item["threads"] = []
+            item["index_stale"] = None
             item["index_error"] = (idx_info or {}).get("error") if p.get("index_path") else None
         out.append(item)
     # 排序: pinned 优先, 然后按 last_active 降序
@@ -499,4 +618,97 @@ def enrich_projects(fresh: bool = False) -> dict[str, Any]:
         "groups_order": order,
         "group_labels": GROUP_LABELS,
         "updated_at": data.get("updated_at"),
+    }
+
+
+# ── 任务窗口 (quest log): 把进行中项目当"长期任务"浮成游戏式任务面板 ──────────────
+# 2026-06-22 用户: 驾驶舱主区第 2 个固定页签 = 任务窗口(像游戏任务面板), 把我们的
+# 长期任务都纳入进去。来源 = 项目注册表(每个进行中项目本身就是一个长期任务/主线),
+# 长期目标正文优先取 quest steward 蒸馏结果(data/registry/project_quests.json),
+# 缺失时退回项目 index 的 latest / desc。子目标 = 该项目进行中(未归档)计划的中文标题。
+
+def project_quests_path() -> Path:
+    return omni_workspace_root() / "data" / "registry" / "project_quests.json"
+
+
+def _quest_text(v: Any) -> str:
+    """把 index latest / desc 归一成纯文本(latest 条目可能是 YAML 映射/列表, 不能直接喂前端渲染)。"""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, dict):
+        parts = []
+        for k, val in v.items():
+            parts.append(f"{k}: {val}" if val not in (None, "") else str(k))
+        return " · ".join(parts).strip()
+    if isinstance(v, (list, tuple)):
+        return _quest_text(v[0]) if v else ""
+    return str(v).strip()
+
+
+def _quest_overrides() -> dict[str, dict[str, Any]]:
+    """quest steward 蒸馏产物(project_id → {objective, chapter, status, art})。缺文件返回空。"""
+    p = project_quests_path()
+    if not p.is_file():
+        return {}
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        q = raw.get("quests") if isinstance(raw, dict) else None
+        return q if isinstance(q, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def build_quests(fresh: bool = False) -> dict[str, Any]:
+    """任务窗口数据: 进行中项目 = 长期任务卡(目标/当前章节/子目标/进度/AIGC 图)。
+
+    与项目工作板同源(enrich_projects), 但呈现成游戏任务面板。长期目标正文优先取
+    quest steward 覆盖表, 退回 index latest / 项目描述。子目标 = 进行中计划中文标题。
+    """
+    board = enrich_projects(fresh=fresh)
+    gov = plan_governance()
+    catalogue = _plan_catalogue()
+    overrides = _quest_overrides()
+    quests: list[dict[str, Any]] = []
+    for p in board.get("projects", []):
+        pid = p["id"]
+        ov = overrides.get(pid, {})
+        related = resolve_project_plans(pid, p.get("plan_categories"), catalogue, gov)
+        active_plans = [it for it in related if not it.get("archived")]
+        sub: list[dict[str, Any]] = []
+        for it in active_plans:
+            t = (gov.get(it["id"]) or {}).get("title_zh") or it.get("topic") or it["id"]
+            sub.append({"id": it["id"], "title": t, "date": it.get("date")})
+        sub.sort(key=lambda x: x.get("date") or "", reverse=True)
+        latest = p.get("index_latest") or []
+        latest0 = _quest_text(latest[0]) if latest else ""
+        objective = _quest_text(ov.get("objective")) or _quest_text(p.get("desc")) or latest0
+        chapter = _quest_text(ov.get("chapter")) or latest0 or (sub[0]["title"] if sub else "")
+        active7 = sum(1 for x in (p.get("activity_7d") or []) if x)
+        is_main = bool(p.get("pinned") or active7 >= 1 or active_plans)
+        quests.append({
+            "id": pid,
+            "title": p.get("name") or pid,
+            "short": p.get("short"),
+            "group": p.get("group"),
+            "art": p.get("bg") or None,
+            "icon": p.get("icon"),
+            "objective": objective,
+            "chapter": chapter,
+            "sub_objectives": sub[:6],
+            "active_plan_count": len(active_plans),
+            "activity_7d": p.get("activity_7d"),
+            "last_active": p.get("last_active"),
+            "status": ov.get("status") or ("main" if is_main else "side"),
+            "index_path": p.get("index_path"),
+        })
+    # 主线优先, 然后按最后活跃降序
+    quests.sort(key=lambda q: q.get("last_active") or "", reverse=True)
+    quests.sort(key=lambda q: q.get("status") != "main")
+    return {
+        "quests": quests,
+        "groups_order": board.get("groups_order", DEFAULT_GROUPS_ORDER),
+        "group_labels": GROUP_LABELS,
+        "updated_at": board.get("updated_at"),
     }

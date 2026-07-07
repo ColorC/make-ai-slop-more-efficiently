@@ -37,13 +37,23 @@ def _safe_echo(text: str) -> None:
 
 
 _LEGACY_REMOVED_MSG = (
-    "omni assistant 的 goal / status / context-show / plan / history / 等子命令依赖已废弃的 "
-    "dashboard._legacy.assistant_context_builder + assistant_db. 这俩模块在 "
-    "[2026-05-09]DASHBOARD-DOGFOOD-RESILIENCE 阶段 11 已删 (用户授权清理).\n"
-    "替代:\n"
-    "  - 进度 / 目标 / plan 管理: docs/plans/ 文件结构是主权威 (见 docs/PROGRESS.md)\n"
-    "  - chat 仍工作: omni assistant chat 走 native_agent + IDEAgentLoop, 跟 _legacy 无关"
+    "omni assistant 的 goal / status / plan / workspace / rule / cron / history 子命令依赖已废弃的 "
+    "assistant_db SQL 设施 (2026-04-18 router 化铁律后退役, 不复活).\n"
+    "替代 (进度/目标/plan 现在的真源):\n"
+    "  - 目标 / 计划 / 进度: whatnow 目标系统 (:8230) —— `whatnow board` / `whatnow add/patch/progress`\n"
+    "  - 新计划自动纳管 + 进度刷新: `omni governance plans-sync` (每日 cron gov-progress-sync 已挂)\n"
+    "  - 定时任务: `omni cron`;chat 仍工作: `omni assistant chat` (走 native_agent, 跟 assistant_db 无关)"
 )
+
+
+def _require_adb():
+    """已退役的 assistant_db: 不复活, 给清晰指引后退出(替代旧的裸 import 崩溃)。"""
+    try:
+        from omnicompany.dashboard import assistant_db as adb  # noqa: F401
+        return adb
+    except ImportError:
+        click.echo(_LEGACY_REMOVED_MSG, err=True)
+        sys.exit(2)
 
 
 def _get_db_path() -> Path:
@@ -232,7 +242,7 @@ def cmd_goal():
 @click.option("--status", default=None, type=click.Choice(["active", "planned", "done", "cancelled"]))
 @click.option("--json", "json_out", is_flag=True)
 def cmd_goal_list(status, json_out):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     rows = adb.list_goals(conn, status=status)
     conn.close()
@@ -259,7 +269,7 @@ def cmd_goal_list(status, json_out):
               type=click.Choice(["active", "planned", "done", "cancelled"]))
 @click.option("--plan", "related_plan", default=None)
 def cmd_goal_create(title, implementation_proof, status, related_plan):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     g = adb.create_goal(conn, {
         "title": title,
@@ -281,7 +291,7 @@ def cmd_goal_create(title, implementation_proof, status, related_plan):
 @click.option("--tick", default=None, help="Mark a proof line as done by substring match")
 @click.option("--untick", default=None, help="Mark a proof line as not done by substring match")
 def cmd_goal_update(goal_id, title, status, implementation_proof, tick, untick):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
 
     patch = {}
@@ -330,7 +340,7 @@ def cmd_goal_update(goal_id, title, status, implementation_proof, tick, untick):
 def cmd_goal_delete(goal_id, yes):
     if not yes:
         click.confirm(f"Delete goal {goal_id}?", abort=True)
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     ok = adb.delete_goal(conn, goal_id)
     conn.close()
@@ -350,7 +360,7 @@ def cmd_plan():
 @click.option("--status", default=None, type=click.Choice(["active", "done", "paused"]))
 @click.option("--json", "json_out", is_flag=True)
 def cmd_plan_list(status, json_out):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     rows = adb.list_plans(conn, status=status)
     conn.close()
@@ -368,7 +378,7 @@ def cmd_plan_list(status, json_out):
 @click.option("--phase", "current_phase", default=None)
 @click.option("--goal", "goal_ids", multiple=True, help="Associated goal_id (repeatable)")
 def cmd_plan_register(title, folder_path, current_phase, goal_ids):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     p = adb.create_plan(conn, {
         "title": title,
@@ -385,7 +395,7 @@ def cmd_plan_register(title, folder_path, current_phase, goal_ids):
 @click.argument("current_phase")
 def cmd_plan_phase(plan_id, current_phase):
     """Update the current phase of a plan."""
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     p = adb.update_plan(conn, plan_id, {"current_phase": current_phase})
     conn.close()
@@ -429,7 +439,7 @@ def cmd_workspace():
 @cmd_workspace.command("list")
 @click.option("--json", "json_out", is_flag=True)
 def cmd_ws_list(json_out):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     rows = adb.list_workspaces(conn, active_only=False)
     conn.close()
@@ -449,7 +459,7 @@ def cmd_ws_list(json_out):
 @click.option("--url", default=None)
 @click.option("--desc", "description", default=None)
 def cmd_ws_set(key, title, path_val, url, description):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     w = adb.upsert_workspace(conn, {
         "key": key, "title": title, "kind": "url" if url else "folder",
@@ -468,7 +478,7 @@ def cmd_rule():
 @cmd_rule.command("list")
 @click.option("--json", "json_out", is_flag=True)
 def cmd_rule_list(json_out):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     rows = [r for r in adb.list_extra(conn) if r["kind"] == "rule"]
     conn.close()
@@ -487,7 +497,7 @@ def cmd_rule_list(json_out):
 @click.option("--goal-id", "goal_id", default=None)
 @click.option("--plan-id", "plan_id", default=None)
 def cmd_rule_add(title, content, goal_id, plan_id):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     scope = None
     if goal_id or plan_id:
         scope = {}
@@ -511,7 +521,7 @@ def cmd_cron():
 @cmd_cron.command("list")
 @click.option("--json", "json_out", is_flag=True)
 def cmd_cron_list(json_out):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     rows = adb.list_cron(conn)
     conn.close()
@@ -527,7 +537,7 @@ def cmd_cron_list(json_out):
 @click.option("--schedule", required=True, help="5-field cron expression")
 @click.option("--task", "task_prompt", required=True)
 def cmd_cron_add(schedule, task_prompt):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     j = adb.create_cron(conn, {"schedule": schedule, "task_prompt": task_prompt})
     conn.close()
@@ -537,7 +547,7 @@ def cmd_cron_add(schedule, task_prompt):
 @cmd_cron.command("delete")
 @click.argument("job_id")
 def cmd_cron_delete(job_id):
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     ok = adb.delete_cron(conn, job_id)
     conn.close()
@@ -622,7 +632,7 @@ def cmd_policy_pin(role, model):
 @click.option("--json", "json_out", is_flag=True)
 def cmd_history(limit, json_out):
     """Show compact-time work history archives."""
-    from omnicompany.dashboard import assistant_db as adb
+    adb = _require_adb()
     conn = _open_db()
     rows = adb.list_history(conn, limit=limit)
     conn.close()

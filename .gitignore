@@ -142,3 +142,16 @@ config/personal_site/site.yaml
 scripts/job_apply/facts.json
 scripts/job_apply/self_eval.md
 scripts/job_apply/*.local.*
+
+# ── voxelcraft 数据区白名单 (阶段一 1-6, 2026-07-06) ──
+# curated references (~1.3MB 人工整理/抓取, 不可再生) + MANIFEST 进 git;
+# twilightforest/source (124MB 上游克隆) / 贴图池 / 缓存仍走重建 (见 data/domains/voxelcraft/MANIFEST.yaml)
+!data/
+data/*
+!data/domains/
+data/domains/*
+!data/domains/voxelcraft/
+data/domains/voxelcraft/*
+!data/domains/voxelcraft/MANIFEST.yaml
+!data/domains/voxelcraft/references/
+data/domains/voxelcraft/references/twilightforest/source/

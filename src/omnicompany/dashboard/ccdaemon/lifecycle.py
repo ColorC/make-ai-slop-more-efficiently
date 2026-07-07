@@ -55,11 +55,28 @@ def log_file() -> Path:
 class DaemonStatus(NamedTuple):
     pid: int | None
     port: int | None
-    alive: bool
+    alive: bool      # 进程层面活着: pid 存在(或端口被本 daemon 占)
+    serving: bool    # 应用层面在服务: /health 真应答 ccdaemon 签名
+
+    @property
+    def zombie(self) -> bool:
+        """进程在但 /health 不应答 = 僵尸(挂死/启动卡住) → 该重启, 不能当"已在跑"放过.
+
+        历史坑: read_status 只看 pid 活不活时, 挂死进程(pid 在、socket 不服务)被
+        误报 alive=True → `omni cc daemon start` 说 already running 拒绝拉新, 扩展
+        readiness gate (daemon /health) 又永远过不了 → 持续转圈 'not fully ready'。
+        """
+        return self.alive and not self.serving
 
 
-def read_status() -> DaemonStatus:
-    """读 pid/port 文件 + 校验 pid 真活. CLI status 跟 cc_proxy.py 都用这个."""
+def read_status(probe: bool = True) -> DaemonStatus:
+    """读 pid/port 文件 + 校验 pid 真活 + (probe) 打 /health 判 serving.
+
+    probe=True (默认, CLI status/start/restart 用): 总是打 /health → serving 真值,
+      可识别僵尸 (alive 但 not serving)。
+    probe=False (cc_proxy 热路径, 每次代理请求都调): 不主动打 /health, 仅在 pid
+      丢/陈旧时探一次端口 (沿用旧兜底行为, 避免每请求一次 HTTP round-trip)。
+    """
     pid: int | None = None
     port: int | None = None
     pf = pid_file()
@@ -85,9 +102,22 @@ def read_status() -> DaemonStatus:
             except OSError:
                 pass
             pid = None
-    if not alive and port is not None:
-        alive = _port_alive(port)
-    return DaemonStatus(pid=pid, port=port, alive=alive)
+
+    serving = False
+    # probe=True: 总是探 /health(僵尸检测 + serving 真值)。
+    # probe=False: 仅在 pid 丢/陈旧时探(旧 cc_proxy 兜底行为, 不在热路径加 round-trip)。
+    if port is not None and (probe or not alive):
+        # 端口有人听 → 必须确认占用者是 ccdaemon 本身 (查 /health 签名), 否则被别的
+        # 进程抢端口时会误判 daemon 活着 → 代理静默 404。命中则顺手把真 pid 从
+        # /health 取回, 让 status/stop/restart 仍能正常工作。
+        health_pid = _daemon_health_pid(port)
+        if health_pid is not None:
+            serving = True
+            if not alive:
+                alive = True
+                if pid is None:
+                    pid = health_pid
+    return DaemonStatus(pid=pid, port=port, alive=alive, serving=serving)
 
 
 def _pid_alive(pid: int) -> bool:
@@ -128,6 +158,33 @@ def _port_alive(port: int) -> bool:
             return True
     except OSError:
         return False
+
+
+def _daemon_health_pid(port: int) -> int | None:
+    """端口被占时确认占用者就是 ccdaemon 本身 — 命中 /health 看签名, 返回其 daemon_pid.
+
+    为什么需要: pid 文件丢/陈旧时 read_status 只靠 `_port_alive` 判活, 但任何进程
+    占着这个端口都会让它误判 daemon 活着 (实测被 slidecast 临时 `python -m http.server
+    8201` 抢端口, 代理把 /api/boss-sight/* 全转给静态服务器 → 静默 404 而非 503)。
+    ccdaemon /health 回 {"daemon_pid": ..., "boss_sight": {...}}; 静态服务器只会回
+    404 HTML, 无法伪造这个签名。返回 None = 占端口的不是我们的 daemon。
+    """
+    if port <= 0:
+        return None
+    import json
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=0.5) as r:
+            if r.status != 200:
+                return None
+            data = json.loads(r.read(8192).decode("utf-8", "replace"))
+    except Exception:
+        return None
+    if not isinstance(data, dict) or "boss_sight" not in data:
+        return None
+    dp = data.get("daemon_pid")
+    return dp if isinstance(dp, int) and dp > 0 else None
 
 
 def write_pid(pid: int) -> None:

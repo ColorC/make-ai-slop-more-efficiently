@@ -97,13 +97,21 @@ issues 无即空数组 []. **不瞎编凑数**. 不返回 health_score 字段 (�
 class _HealthReporterPromptBuilder(PromptBuilderRouter):
     """HealthReporter 自定义首轮 user message — 按 category 聚合扫描问题."""
 
+    DESCRIPTION = "Guardian health reporter prompt builder assembles scanner facts into a strict JSON-only health assessment prompt."
+    FORMAT_IN: ClassVar[str] = "agent.prompt-request"
+    FORMAT_OUT: ClassVar[str] = "agent.prompt-built"
+
     def build_initial_messages(self, input_data: dict) -> list[dict]:
         fs_issues = input_data.get("fs_issues", [])
         arch_issues = input_data.get("arch_issues", [])
         all_issues = fs_issues + arch_issues
 
         if not all_issues:
-            return [{"role": "user", "content": "无问题。请直接用 finish 输出 health_score=100。"}]
+            return [{"role": "user", "content": (
+                "自动扫描未发现问题。请直接用 finish 输出严格 JSON: "
+                '{"verdict":"healthy","issues":[],"summary":"自动扫描未发现问题",'
+                '"top_actions":[],"report":"自动扫描未发现问题"}'
+            )}]
 
         # 按 category 聚合
         by_category: dict[str, list[dict]] = {}
@@ -130,6 +138,10 @@ class _HealthReporterPromptBuilder(PromptBuilderRouter):
 
 class _HealthReporterExtractResult(ExtractResultRouter):
     """HealthReporter 自定义产物提取 — parse JSON health report, fallback 到 FAIL verdict."""
+
+    DESCRIPTION = "Guardian health reporter result extractor parses strict JSON reports and separates reporter infrastructure failures."
+    FORMAT_IN: ClassVar[str] = "agent.result-request"
+    FORMAT_OUT: ClassVar[str] = "guardian.health-report"
 
     def extract(
         self,
@@ -158,10 +170,10 @@ class _HealthReporterExtractResult(ExtractResultRouter):
             parsed = json.loads(text)
         except Exception as e:
             logger.error("[health_reporter] 结果解析失败: %s", e)
-            # 解析失败 → FAIL · 不用 health_score=0 占位 (铁律: 不打分)
-            # 造一个 critical 的 parse_error issue 代表"无法评估"
+            # Reporter infra failure: the health result is unusable, but this is not
+            # evidence of a critical repository-structure issue.
             parse_err_issue = {
-                "severity": "critical",
+                "severity": "major",
                 "category": "llm_output_parse_error",
                 "field": "extract_result",
                 "message": f"LLM 输出 JSON 解析失败: {e}",
@@ -174,11 +186,12 @@ class _HealthReporterExtractResult(ExtractResultRouter):
                     "verdict": "uncertain",              # 非 "healthy"
                     "passed": False,
                     "issues": [parse_err_issue],
-                    "counts": {"critical": 1, "major": 0, "minor": 0},
+                    "counts": {"critical": 0, "major": 1, "minor": 0},
                     "total_issues": 1,
                     "top_actions": [],
                     "fs_issues": fs_issues,
                     "arch_issues": arch_issues,
+                    "infrastructure_error": True,
                     "report": f"LLM 输出解析失败: {e}",
                     "summary": "parse_error · LLM 响应不合规 JSON",
                 },
@@ -251,7 +264,7 @@ class HealthReporterRouter(AgentNodeLoop):
         permission=PermissionConfig(mode="readonly"),  # 健康检查只读
     )
 
-    DESCRIPTION = "AgentNodeLoop: LLM 评估项目健康度（可探查文件）"
+    DESCRIPTION = "AgentNodeLoop guardian health reporter evaluates repository health from scanner facts with read-only file probes."
     FORMAT_IN = "guardian.arch-report"
     FORMAT_OUT = "guardian.health-report"
 

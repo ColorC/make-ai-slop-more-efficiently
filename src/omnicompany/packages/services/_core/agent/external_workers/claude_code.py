@@ -48,6 +48,10 @@ _CLAUDE_PERMISSION_BY_MODE: dict[ExternalAgentPermissionMode, str] = {
 
 _READONLY_DISALLOWED_TOOLS = ["Write", "Edit", "MultiEdit", "NotebookEdit", "Bash"]
 _READONLY_ALLOWED_TOOLS = {"Read", "Grep", "Glob", "LS", "NotebookRead", "WebFetch"}
+# headless 外部 worker 不能用交互/委托类工具:Plan-mode 要批准、AskUserQuestion 要用户、Task 子委托
+# 在 SDK headless 下会中断(实测:worker 用 Task 去"thorough 探索"时在写文件前被 "[Request interrupted by user]"
+# 打断)。外部 worker 本就是确定性自动化单元,移除这些工具 = 强制它直接 Read/Grep/Write,不靠 prompt 求它别用。
+_HEADLESS_INCOMPATIBLE_TOOLS = ["Task", "EnterPlanMode", "ExitPlanMode", "AskUserQuestion"]
 
 
 @dataclasses.dataclass
@@ -77,9 +81,13 @@ async def _workspace_write_can_use_tool(tool_name: str, tool_input: dict[str, An
     return _permission_deny(
         message=(
             "workspace-write external worker may only run narrow validation/search "
-            "Bash commands; ask Codex to run this command"
+            "Bash commands (rg / git status|diff|ls-files / read-only probes). "
+            "This command is blocked — do NOT retry it. Verify by reading source files "
+            "(Read/Grep/Glob) instead of running shell commands."
         ),
-        interrupt=True,
+        # 只拒绝这一次工具调用, 不掐断整个会话(interrupt=True 会让 worker 一试被挡的 Bash
+        # 就整体 "[Request interrupted by user]" 死掉 —— headless 自动化 worker 不该这么脆)。
+        interrupt=False,
     )
 
 
@@ -97,6 +105,24 @@ def _permission_deny(*, message: str, interrupt: bool) -> Any:
     except Exception:
         return _PermissionFallback(behavior="deny", message=message, interrupt=interrupt)
     return PermissionResultDeny(message=message, interrupt=interrupt)
+
+
+# WORK-LIFECYCLE: 安全的 omni 生命周期子命令(只读 / task·review 状态管理), headless worker 可自闭环。
+# 只白名单这些精确 "<group> <sub>" 对; 不放开任意 omni / 任意 shell。
+_SAFE_OMNI_LIFECYCLE = (
+    "review submit", "review list", "review annotate",
+    "task complete", "task status", "task start", "task next", "task show",
+    "task list", "task assign", "task board", "task bindings", "task update",
+    "plan gate", "plan show", "plan current", "plan list", "plan report",
+    "notes ls", "notes read", "human inbox",
+)
+
+
+def _is_safe_omni_lifecycle_bash(command: str) -> bool:
+    c = f" {command.strip()} "
+    if "omni " not in c and "omnicompany.cli.main" not in c:
+        return False
+    return any(f" {pair} " in c or f" {pair}" in c for pair in _SAFE_OMNI_LIFECYCLE)
 
 
 def _is_workspace_write_safe_bash(command: str) -> bool:
@@ -130,6 +156,11 @@ def _is_workspace_write_safe_bash(command: str) -> bool:
     if any(item in padded for item in forbidden):
         return False
     if normalized.startswith(("rg ", "git status", "git diff", "git ls-files")):
+        return True
+    # WORK-LIFECYCLE: 放行少数**安全的 omni 生命周期命令**, 让 headless worker 能自己闭环
+    # (提交物料审阅 / 自报 task 完成), 而非放开任意 shell。forbidden 列表(>, rm, git reset…)
+    # 仍先拦截; 这里只白名单 review/task/plan/notes 的只读或状态管理子命令。
+    if _is_safe_omni_lifecycle_bash(normalized_without_null_stderr):
         return True
     if normalized.startswith("python ") and "/app/tool/prefab-workstation/scripts/" in normalized:
         return True
@@ -236,10 +267,11 @@ class ClaudeCodeSdkWorker(ExternalAgentWorker):
             "model": spec.model,
         }
         if is_readonly:
-            kwargs["disallowed_tools"] = list(_READONLY_DISALLOWED_TOOLS)
+            kwargs["disallowed_tools"] = list(_READONLY_DISALLOWED_TOOLS) + list(_HEADLESS_INCOMPATIBLE_TOOLS)
             kwargs["can_use_tool"] = _readonly_can_use_tool
         elif spec.normalized_permission_mode() == ExternalAgentPermissionMode.WORKSPACE_WRITE:
             kwargs["can_use_tool"] = _workspace_write_can_use_tool
+            kwargs["disallowed_tools"] = list(_HEADLESS_INCOMPATIBLE_TOOLS)
         return kwargs
 
     def build_prompt(self, spec: ExternalAgentRunSpec) -> str:

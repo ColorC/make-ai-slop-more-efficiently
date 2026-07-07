@@ -140,6 +140,12 @@ def build_workflow_summary(
     comments = _comment_feedback_summary(materials)
     actions = _action_history_summary(root, limit=action_limit)
     unresolved = _unresolved_summary(snapshot)
+    # AI 主动推送的提醒(带 open_ref 跳转)并入铃铛 —— 用户要"AI 发提醒让我跳转去某页面"(2026-06-27)
+    try:
+        from .services import agent_notify
+        ai_notices = agent_notify.list_notices()
+    except Exception:  # noqa: BLE001 — 提醒读取失败不该挡 workflow summary
+        ai_notices = []
     blocked_agents = [
         agent
         for agent in (snapshot.get("running_agents") or {}).get("items", [])
@@ -175,7 +181,7 @@ def build_workflow_summary(
             "status": status,
             "headline": headline,
             "summary": summary,
-            "unresolved": unresolved["items"][:10],
+            "unresolved": (ai_notices + unresolved["items"])[:10],
             "comment_feedback": {
                 "by_status": comments["by_status"],
                 "unresolved_count": comments["unresolved_count"],

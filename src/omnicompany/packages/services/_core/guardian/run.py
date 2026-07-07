@@ -9,6 +9,16 @@ from typing import Any
 from omnicompany.runtime.routing.router import Router
 
 
+class _NoopBus:
+    """Constructor-only bus; TeamRunner injects the real EventBus before run()."""
+
+    async def publish(self, event: Any) -> str:
+        return "noop_event_id"
+
+    def emit(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
 def build_bindings(input_dict: dict[str, Any] | None = None) -> dict[str, Router]:
     """构建管线节点→Router 绑定。"""
     from omnicompany.packages.services._core.guardian.routers import (
@@ -26,7 +36,7 @@ def build_bindings(input_dict: dict[str, Any] | None = None) -> dict[str, Router
     return {
         "fs_scanner": FsScannerRouter(project_root=project_root),
         "arch_auditor": ArchAuditorRouter(),
-        "health_reporter": HealthReporterRouter(model=model),
+        "health_reporter": HealthReporterRouter(model=model, bus=_NoopBus()),
     }
 
 

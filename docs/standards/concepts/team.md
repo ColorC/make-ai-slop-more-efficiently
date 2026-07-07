@@ -276,3 +276,16 @@ workspace_id 格式: workspace.<team_name>.<session_kind>[.<job_id>]
 | PA-14 | 硬编码 workspace 路径 | 违反 P-14, 业务代码 `Path("data/workspaces/...")` 而非走 `config.resolve_workspace_dir` | 开发/生产路径错 / 无法迁 |
 | PA-15 | sealed workspace 写入 | 违反 P-17, 完成 job 后试图继续写 | 破坏 replay 确定性 |
 | PA-16 | material 本体硬塞 DB | material 的大明文本体塞 DB 而不走 workspace 文件（本质是 FA-09, pipeline 层也列出提醒）| DB 膨胀 / 查询慢 |
+
+### P-18 · 用统一设施, 不平行造（2026-06-23 用户立 · ⚠硬规则）
+
+**Team 里需要的"通用能力"一律用全项目唯一实现, 禁止在某个 team/worker 里平行造第二套。** 尤其:
+
+- **agent（调 LLM+工具多轮干活）= 唯一实现 `packages/services/_core/agent`（AgentNodeLoop）**。team 里的"脑子" worker 走它（子类化 / `ConfigurableAgent` / `launch.run_json_agent`），禁手搓 ReAct 循环 → 详见 [`worker.md` R-26](worker.md) + Guardian **OMNI-095**。
+- LLM 调用 → `runtime.llm.call_json`（OMNI-094）；写文件 → `core.guarded_write`（OMNI-013）；注册 → `PipelineEntry`/team-builder。
+
+**外部自建 team（沉淀桥等亲手写包的场景）**: 必须严格照本规范模板 + 用上述统一设施。统一设施不够用 → **改进它**, 不复制平行第二套（重构可以, fork 不行）。
+
+| 编号 | 名称 | 描述 | 后果 |
+|---|---|---|---|
+| PA-17 | team 内平行造核心设施 | 某 team/worker 自建 agent 循环 / 自管 LLM 调用 / 自己写文件门禁, 不用统一实现 | 核心设施 N 重化 / 审计·治理·压缩·重试各行其是 / 维护灾难 / Guardian OMNI-095·094·013 |

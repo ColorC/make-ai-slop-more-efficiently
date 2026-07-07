@@ -54,10 +54,23 @@ from .commands.workflow import cmd_workflow
 from .commands.dashboard import cmd_dashboard
 from .commands.project import cmd_project
 from .commands.governance import cmd_governance
+from .commands.cron import cmd_cron
+from .commands.testmap import cmd_testmap
+from .commands.plan_gate import cmd_plan_complete_gate
+from .commands.semantic import cmd_semantic
 from .commands.vilo import cmd_vilo
 from .commands.research import cmd_research
 from .commands.decisions import cmd_decisions
+from .commands.notify import cmd_notify
 from .commands.refs import cmd_refs
+from .commands.agents import cmd_agents
+from .commands.dispatch import cmd_dispatch
+from .commands.notes import cmd_notes
+from .commands.task import cmd_task
+from .commands.atlas import cmd_atlas
+from .commands.ledger import cmd_ledger
+from .commands.resolve import cmd_resolve
+from .commands.token_ledger import cmd_token_ledger
 
 # 统一命令组（执行 + 观测 + 管理）
 from .unified import (
@@ -202,6 +215,11 @@ cli.add_command(cmd_debt)
 
 # ── 注册体系查询 ──
 cli.add_command(cmd_registry)
+# 统一引用解析器 (2026-07-02): target-architecture.md 3.2 节 —— 双链/URI/裸id → 真源 + 回指自检
+cli.add_command(cmd_resolve)
+
+# ── 语义文件系统(所有产出皆 material)──
+cli.add_command(cmd_semantic)
 
 # ── 身份 (claude code session 跟 dashboard 共用一身份链) ──
 cli.add_command(cmd_who)
@@ -263,12 +281,26 @@ cli.add_command(cmd_chat)
 
 # 公开调研管线导航 + 统一研究库查询 (2026-06-14)
 cli.add_command(cmd_research)
+cli.add_command(cmd_atlas)
 
 # 统一决策库 — 手记/召回/接树 (2026-06-18): 决策记录主线,源无关契约,提取后续往同一库灌数
 cli.add_command(cmd_decisions)
+# 留痕账本 — 一条只追加的事件流 (2026-07-02): target-architecture.md 3.3 节骨架
+cli.add_command(cmd_ledger)
+# token 记账 v1 (2026-07-03): claude/codex 会话用量 + 内部调用账三路归并, overnight-run.md 第六节
+cli.add_command(cmd_token_ledger)
+# AI 推带跳转的提醒到铃铛 (2026-06-27): 我做完东西推一条, 用户点了直达对应页面
+cli.add_command(cmd_notify)
 
 # 本地资产发现 — 用公开内容/参考源前先查本地 (2026-06-14)
 cli.add_command(cmd_refs)
+
+# 机器级 agent 注册表 + 总控派发路由 (2026-06-21): 统一身份(项目-角色-名字)/位置/在做啥;
+# 一条消息 → 跳转已活跃窗口 / 发给 poof 窗格 / 带项目新起 / 最强模型新起 / 问用户。
+cli.add_command(cmd_agents)
+cli.add_command(cmd_dispatch)
+cli.add_command(cmd_notes)  # 操控 poof 笔记元素(经文件桥)· 2026-06-22
+cli.add_command(cmd_task)  # task 一等对象 + 投递观测介入兜底 · 2026-06-25 (WORK-LIFECYCLE-AND-DISPATCH)
 
 # (omni board 三态 lane 工作板已于 2026-06-12 退役 — 项目唯一权威见 omni project / core/projects_registry)
 cli.add_command(cmd_progress)
@@ -283,6 +315,9 @@ cli.add_command(cmd_project)
 
 # 治理部门 (2026-06-12): 计划治理(归属/汉化/格式) + 工作历史整理(原进化部门重组), 便宜模型干活
 cli.add_command(cmd_governance)
+cli.add_command(cmd_cron)  # 统一定时调度面(心跳 tick + 任务管理)· 2026-06-23
+cli.add_command(cmd_testmap)  # 功能点-测试台账查询面(list/show/verify/gaps)· 2026-07-03
+cli.add_command(cmd_plan_complete_gate)  # 计划完成硬闸查询面(allow/refuse, whatnow patch_task 消费)· 2026-07-04
 
 # Vilo 内容管线 (2026-06-13 内化): 管线代码进 domains/vilo, 产物进 data/domains/vilo, 走 omni 调用
 cli.add_command(cmd_vilo)

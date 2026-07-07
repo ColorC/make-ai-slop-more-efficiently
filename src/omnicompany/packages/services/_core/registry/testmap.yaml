@@ -1,0 +1,107 @@
+# [OMNI] origin=claude-code domain=omnicompany/packages/services/_core/registry ts=2026-07-04T00:00:00Z type=data
+# testmap.yaml — 实例注册表(registry 包)的功能点-测试对照表。
+# 契约定义: src/omnicompany/packages/services/_governance/testmap.py(load_testmap)
+# 上位计划: docs/plans/omnicompany-governance/[2026-07-04]REGISTRY-STORAGE-SPLIT-REPAIR/plan.md
+#
+# 本表首次为 registry 包立台账(此前没有独立 testmap)。登记两块:
+#   1. 本次存储分裂修复引入的新行为锚(_DEFAULT_REGISTRY_DIR 回归 + 迁移脚本冲突/幂等规则)。
+#   2. grep 逐条核实的既有核心行为测试(InstanceRegistry 读写走消费者间接覆盖;
+#      MetaTypeRegistry 核心边界原本无独立单测, 已在本次一并补上, 不留虚 gap)。
+
+app: omnicompany-registry
+doc: DESIGN.md
+gates:
+  - id: unit
+    cmd: venv\Scripts\python.exe -m pytest tests/services/_core/registry tests/governance/test_testmap.py -q
+    cwd: ../../../../../..
+
+features:
+  # ── 本次修复: 默认路径回归 + 迁移脚本(2026-07-04) ────────────────────────
+  - id: registry.default_dir_resolves_to_repo_root
+    what: "get_registry() 裸调(不传 registry_dir)必须落到仓根 data/services/registry/, 不能算到 src/data/ 下(旧 bug——parents[5] 因文件实际比注释假设深一层, 算错到 src/)"
+    should:
+      - "_DEFAULT_REGISTRY_DIR 的祖先目录里同时存在 src/omnicompany 与 docs(仓根标志)"
+      - "_DEFAULT_REGISTRY_DIR 路径末三段是 data/services/registry"
+      - "_DEFAULT_REGISTRY_DIR 不落在 src/ 下(防再挪层回归)"
+    tests:
+      - file: ../../../../../../tests/services/_core/registry/test_registry_default_dir_and_migration.py
+        cases:
+          - "test_default_registry_dir_resolves_to_repo_root"
+    status: covered
+
+  - id: registry.migration_conflict_resolution
+    what: "一次性迁移脚本(scripts/migrate_registry_storage_split_20260704.py)处理 src/data/services/registry/ 存量与仓根同名冲突时, 按 scanned_at(缺失退化 mtime)新者胜, 败者搬入 _merged-away-20260704/ 留档不删(计划错误样本①——禁止直接覆盖丢失)"
+    should:
+      - "src 更新(scanned_at 更晚)时 src 内容胜出落到目标位置, dst 旧内容原样留档进 _merged-away-20260704/<type>/"
+      - "dst 更新时 dst 内容保持不变, src 内容原样留档进 _merged-away-20260704/<type>/(不丢弃)"
+      - "scanned_at 字段缺失时退化用文件 mtime 判新旧"
+      - "无冲突的文件被干净搬移(moved_clean), 不经过留档流程"
+    tests:
+      - file: ../../../../../../tests/services/_core/registry/test_registry_default_dir_and_migration.py
+        cases:
+          - "test_migration_conflict_newer_scanned_at_wins_loser_archived"
+          - "test_migration_conflict_missing_scanned_at_falls_back_to_mtime"
+    status: covered
+
+  - id: registry.migration_idempotent_and_scoped
+    what: 迁移脚本必须幂等(重复跑第二遍零动作零报错, 计划错误样本②), 且严格限定在 src/data/services/registry/ 子树内, 同级/上级的非 registry 内容一根手指不碰
+    should:
+      - "src/data/services/registry 迁空后自动删除该空目录树"
+      - "第二遍重跑判定 idempotent_noop=true, 不重复搬运、不报错"
+      - "src/data/services/registry 从一开始就不存在时同样判定为幂等 noop"
+      - "src/data 下 services/registry 以外的目录与文件(其它子目录、顶层文件)不被移动、不被删除、内容不变(负路径)"
+    tests:
+      - file: ../../../../../../tests/services/_core/registry/test_registry_default_dir_and_migration.py
+        cases:
+          - "test_migration_is_idempotent_on_second_run"
+          - "test_migration_noop_when_src_registry_missing_entirely"
+          - "test_migration_never_touches_non_registry_content_under_src_data"
+    status: covered
+
+  # ── 既有核心行为(grep 核实): InstanceRegistry 读写 ───────────────────────
+  - id: registry.instance_write_read_via_consumers
+    what: InstanceRegistry 的 write/read 幂等语义(entity_id 存在则更新且保留 first_seen_at)目前只被消费者测试间接覆盖, 没有独立于消费者的核心单测文件
+    should:
+      - "写入新条目后可通过 entity_id 精确读回, attrs 完整"
+      - "重复写入同一 entity_id 会更新内容但保留原 first_seen_at(通过 sync_registry 的合并语义测试间接验证)"
+      - "attrs 合并语义: 不同调用方各自写入的 attrs 键互不抹除(gates/review/reminders/verify 四键共存)"
+    tests:
+      - file: ../../../../../../tests/governance/test_testmap_sync.py
+        cases:
+          - "test_sync_registry_writes_entry_with_correct_counts"
+          - "test_sync_registry_preserves_existing_gates_attr"
+      - file: ../../../../../../tests/governance/test_testmap_reminders.py
+        cases:
+          - "test_sync_registry_adds_reminders_while_preserving_gates_and_review"
+    status: covered
+
+  - id: registry.instance_write_at_correct_workspace_root_path
+    what: review/sync/gates-run 等命令真实落盘位置必须是 <workspace_root>/data/services/registry/, 且反向断言旧 bug 落点(包相对默认目录)不应出现同一条目
+    should:
+      - "review 命令写入的 testmap 条目真实落在 <workspace_root>/data/services/registry/testmap/ 下, 用 InstanceRegistry 直接读回验证"
+      - "旧 bug 落点(_DEFAULT_REGISTRY_DIR, 包相对目录)若存在, 不应读到同一条目(负路径)"
+    tests:
+      - file: ../../../../../../tests/governance/test_testmap_sync.py
+        cases:
+          - "test_review_cli_writes_registry_at_workspace_root_path"
+    status: covered
+
+  # ── 本次补齐: MetaTypeRegistry 核心边界(此前无独立单测, 已补) ─────────────
+  - id: registry.meta_type_registration_core
+    what: "MetaTypeRegistry.register_type() 核心边界——重复注册同名类型报错、update_type 允许覆盖演变、get_type 对未注册名报 KeyError; 模块级单例 meta_registry 六元 + 扩展类型全部注册齐全(此前只被六元类型消费者间接练到, 无独立核心单测, 本次补齐, 不再是 gap)"
+    should:
+      - "register_type 注册后 has_type/get_type/list_types/all_types 均能读到该类型"
+      - "对同一 name 重复 register_type 抛 ValueError(而不是静默覆盖)"
+      - "update_type 允许覆盖已注册类型的定义(演变路径, 与 register_type 的拒绝行为区分)"
+      - "get_type 对未注册的 name 抛 KeyError"
+      - "模块级单例 meta_registry 六元(format/router/pipeline/agent_loop/tool/hook) + 扩展类型(data/template/plan/external_pointer/testmap/meta_io)全部已注册"
+    tests:
+      - file: ../../../../../../tests/services/_core/registry/test_meta_type_registration.py
+        cases:
+          - "test_register_type_then_get_and_has_type"
+          - "test_register_duplicate_name_raises_value_error"
+          - "test_update_type_allows_overwriting_existing_definition"
+          - "test_get_type_unregistered_name_raises_key_error"
+          - "test_list_types_and_all_types_reflect_registrations"
+          - "test_module_singleton_has_all_builtin_types_registered"
+    status: covered

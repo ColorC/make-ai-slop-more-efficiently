@@ -1,9 +1,9 @@
 # [OMNI] origin=ai-ide domain=services/_core/registry ts=2026-05-03T01:00:00Z type=material status=active agent=ai-ide
 # [OMNI] summary="MaterialIdIndex - 从所有文件 OmniMark 头里 material_id 字段同步出来的扁平索引 (单 JSON 落盘). 跟 InstanceRegistry 6 种 AST 实体并存, 不替代"
-# [OMNI] why="J 管线给 846 文件批量写了 material_id 头, 消费方 (G4 锁 / guardian / lap_auditor) 要按 material_id 查 file_path / kind 时需统一索引. AST 注册不覆盖 .md/.yaml/prompt 等带 material_id 的非代码文件"
+# [OMNI] why="J 管线给 846 文件批量写了 material_id 头; 消费方 (G4 锚 / guardian / lap_auditor) 要按 material_id 查 file_path / kind 时需统一索引. AST 注册不覆盖 .md/.yaml/prompt 等带 material_id 的非代码文件"
 # [OMNI] tags=registry,material_id,index,omnimark,P0
 # [OMNI] material_id="material:core.registry.material_id_index.flat_index.py"
-"""Material ID Index — 从 OmniMark headers 同步的扁平索引
+"""Material ID Index — 从 OmniMark headers 同步的扁平索引.
 
 数据源: 文件 OmniMark 头里的 `material_id="..."` 字段 (规范 omni-header.md).
 存储: <registry_dir>/material_id_index.json (单文件, 扁平 dict).
@@ -11,12 +11,13 @@
 值: file_path + kind + origin/ts/agent/domain + summary/why/tags.
 
 跟 InstanceRegistry 关系:
-  - InstanceRegistry: 6 种实体 AST 扫描 (代码即注册, format/router/agent_loop/...)
+  - InstanceRegistry: 6 种实体 AST 扫描 (代码即注册: format/router/agent_loop/...)
   - MaterialIdIndex: 文件 OmniMark 头扫描 (扩展到 .md/.yaml 等非代码文件)
   - 两个并存, 索引同一文件可在两边都有记录.
 
 职责:
   - rebuild_from_headers(scopes, project_root): 走 scopes 全文件树, 解析头, 落 index
+  - refresh_incremental(scopes, project_root): 增量刷新(只重扫水位线之后变更的文件)
   - lookup(material_id): 单条查
   - reverse_lookup(file_path): 反查 material_id
   - list_all(): 全量
@@ -37,11 +38,44 @@ _OMNIMARK_FILE_SUFFIXES = {".py", ".md", ".yaml", ".yml", ".json", ".toml"}
 _SKIP_DIRS = {
     "__pycache__", ".venv", "venv", "node_modules",
     "_archive", "_graveyard", ".git", "dist", "build",
+    ".omni",  # 运行态/沙箱附属目录, 里面的 material_id 字段是数据不是自述头(2026-07-02 验收缺陷2)
 }
+
+
+def _clean_material_id(raw: str) -> str:
+    """归一 material_id 值: 去首尾空白与包裹引号(源文件把值连引号写进头时的防御,
+    2026-07-02 验收发现 1/1924 条带字面引号的脏条目)。"""
+    s = (raw or "").strip()
+    while len(s) >= 2 and s[0] == s[-1] and s[0] in ("\"", "'"):
+        s = s[1:-1].strip()
+    return s
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _dir_latest_mtime(scopes: list[Path]) -> float:
+    """扫 scopes 内所有受支持文件, 取最新 mtime(增量刷新的水位线基准)。"""
+    latest = 0.0
+    for scope in scopes:
+        scope = Path(scope)
+        if not scope.exists():
+            continue
+        for p in scope.rglob("*"):
+            if not p.is_file():
+                continue
+            if any(part in _SKIP_DIRS for part in p.parts):
+                continue
+            if p.suffix.lower() not in _OMNIMARK_FILE_SUFFIXES:
+                continue
+            try:
+                mt = p.stat().st_mtime
+            except OSError:
+                continue
+            if mt > latest:
+                latest = mt
+    return latest
 
 
 @dataclass
@@ -80,7 +114,7 @@ class MaterialIdIndex:
         self._cache: Optional[dict[str, MaterialIdEntry]] = None
         self._meta: dict = {}
 
-    # ── 读 ─────────────────────────────────────────────────────────────
+    # ── 读 ──────────────────────────────────────────────
     def _load(self) -> None:
         if self._cache is not None:
             return
@@ -134,7 +168,7 @@ class MaterialIdIndex:
         self._load()
         return dict(self._meta)
 
-    # ── 写 ─────────────────────────────────────────────────────────────
+    # ── 写 ──────────────────────────────────────────────
     def rebuild_from_headers(
         self,
         scopes: list[Path],
@@ -179,7 +213,7 @@ class MaterialIdIndex:
                 if fields is None:
                     continue
                 total_with_header += 1
-                material_id = (fields.extra or {}).get("material_id", "")
+                material_id = _clean_material_id((fields.extra or {}).get("material_id", ""))
                 if not material_id:
                     continue
                 total_with_material_id += 1
@@ -216,6 +250,7 @@ class MaterialIdIndex:
         self._cache = new_cache
         self._meta = {
             "rebuilt_at": _now_iso(),
+            "rebuilt_mtime": _dir_latest_mtime(scopes),
             "scopes": [str(s) for s in scopes],
             "project_root": str(project_root),
             "total_scanned": total_scanned,
@@ -229,6 +264,112 @@ class MaterialIdIndex:
             "total_with_header": total_with_header,
             "total_with_material_id": total_with_material_id,
             "entries_written": len(new_cache),
+            "conflicts": conflicts,
+        }
+
+    def refresh_incremental(
+        self,
+        scopes: list[Path],
+        project_root: Path,
+    ) -> dict:
+        """增量刷新: 只重扫比索引 rebuilt_mtime 新的文件, 已治理未变更的不碰。
+
+        语义 (对齐目标架构 3.4 增量巡检"只扫水位线之后的变更"):
+          - 无既有索引 → 退化为全量 rebuild_from_headers。
+          - 有索引 → 以上次 meta.rebuilt_mtime 为水位, 只解析 mtime > 水位 的文件,
+            把新增/变更的 material_id 覆盖进已有 cache, 未变更的原样保留。
+          - 不做删除检测(文件删了/头去了 material_id 的陈旧条目留待下次全量清), 保守。
+
+        Returns: {mode, total_rescanned, entries_updated, entries_total, conflicts}
+        """
+        self._load()
+        assert self._cache is not None
+        watermark = float(self._meta.get("rebuilt_mtime") or 0.0)
+        if not self.index_path.exists() or watermark <= 0.0 or not self._cache:
+            full = self.rebuild_from_headers(scopes, project_root)
+            return {
+                "mode": "full",
+                "total_rescanned": full["total_scanned"],
+                "entries_updated": full["entries_written"],
+                "entries_total": full["entries_written"],
+                "conflicts": full["conflicts"],
+            }
+
+        from omnicompany.core.omnimark import parse_omnimark
+
+        # file_path(相对) → material_id, 用于变更时先摘掉旧 id 再写新 id
+        path_to_mid: dict[str, str] = {
+            e.file_path: mid for mid, e in self._cache.items()
+        }
+        total_rescanned = 0
+        updated = 0
+        conflicts_seen: dict[str, list[str]] = {}
+
+        for scope in scopes:
+            scope = Path(scope)
+            if not scope.exists():
+                continue
+            for p in scope.rglob("*"):
+                if not p.is_file():
+                    continue
+                if any(part in _SKIP_DIRS for part in p.parts):
+                    continue
+                if p.suffix.lower() not in _OMNIMARK_FILE_SUFFIXES:
+                    continue
+                try:
+                    mtime = p.stat().st_mtime
+                except OSError:
+                    continue
+                if mtime <= watermark:
+                    continue  # 水位线之前, 已治理未变更, 不碰
+                total_rescanned += 1
+                try:
+                    rel = p.relative_to(project_root).as_posix()
+                except ValueError:
+                    rel = p.as_posix()
+                try:
+                    fields = parse_omnimark(p)
+                except Exception:
+                    continue
+                if fields is None:
+                    continue
+                material_id = _clean_material_id((fields.extra or {}).get("material_id", ""))
+                if not material_id:
+                    continue
+                # 该文件之前登记过别的 material_id(改了头) → 摘掉旧条目
+                old_mid = path_to_mid.get(rel)
+                if old_mid and old_mid != material_id:
+                    self._cache.pop(old_mid, None)
+                # material_id 冲突: 已被别的文件占用
+                existing = self._cache.get(material_id)
+                if existing is not None and existing.file_path != rel:
+                    conflicts_seen.setdefault(material_id, [existing.file_path]).append(rel)
+                    continue
+                self._cache[material_id] = MaterialIdEntry(
+                    material_id=material_id,
+                    file_path=rel,
+                    kind=fields.type or "",
+                    origin=fields.origin or "",
+                    ts=fields.ts or "",
+                    agent=fields.agent or "",
+                    domain=fields.domain or "",
+                    summary=fields.summary or "",
+                    why=fields.why or "",
+                    tags=tuple(fields.tags or ()),
+                )
+                path_to_mid[rel] = material_id
+                updated += 1
+
+        self._meta = dict(self._meta)
+        self._meta["refreshed_at"] = _now_iso()
+        self._meta["rebuilt_mtime"] = max(watermark, _dir_latest_mtime(scopes))
+        self._save()
+        conflicts = [{"material_id": m, "files": fs} for m, fs in conflicts_seen.items()]
+        return {
+            "mode": "incremental",
+            "total_rescanned": total_rescanned,
+            "entries_updated": updated,
+            "entries_total": len(self._cache),
             "conflicts": conflicts,
         }
 

@@ -19,6 +19,7 @@ LIBRARY_ROOT = DATA_ROOT / "library"             # 统一决策库
 RECORDS_PATH = LIBRARY_ROOT / "records.jsonl"    # 一行一条 decision.record(append-only,墓碑软删,最新行权威)
 INDEX_PATH = LIBRARY_ROOT / "index.json"         # 聚合视图:id→statement + by_alias/by_tag/by_project(可 grep)
 RUNS_ROOT = DATA_ROOT / "runs"                   # 抽取管线单次 run 的 observation 原始片段/中间态
+VERB_ANNOTATIONS_PATH = DATA_ROOT / "verb_annotations.jsonl"  # 标准化动词层边标注(ledgers.yaml: verb-annotations)
 
 
 def ensure_dirs() -> None:

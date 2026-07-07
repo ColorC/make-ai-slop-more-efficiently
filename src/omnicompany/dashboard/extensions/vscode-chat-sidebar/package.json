@@ -2,7 +2,7 @@
   "name": "omni-chat",
   "displayName": "Omni Chat",
   "description": "Permanent thin loader for the BOSS SIGHT cockpit; impl hot-swaps from the repo without restarting VSCode.",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "omnicompany",
   "engines": {
     "vscode": "^1.85.0"
@@ -12,7 +12,8 @@
   ],
   "main": "./out/loader.js",
   "activationEvents": [
-    "onWebviewPanel:omniChat"
+    "onWebviewPanel:omniChat",
+    "onUri"
   ],
   "contributes": {
     "commands": [
@@ -98,9 +99,21 @@
         },
         {
           "type": "webview",
+          "id": "omniChat.multiagent",
+          "name": "Agent",
+          "icon": "$(server-process)"
+        },
+        {
+          "type": "webview",
           "id": "omniChat.queue",
           "name": "审阅材料",
           "icon": "$(inbox)"
+        },
+        {
+          "type": "webview",
+          "id": "omniChat.reviewOverview",
+          "name": "审阅总览",
+          "icon": "$(book)"
         },
         {
           "type": "webview",

@@ -12,6 +12,35 @@ from omnicompany.protocol.format import FormatRegistry
 _DEFAULT_REGISTRY: FormatRegistry | None = None
 _DEFAULT_REGISTRY_LOCK = threading.Lock()
 
+# 域格式源登记点(决策树=具象管线的接入口): 新域接入 = 在域包 formats 模块里提供
+# "register 函数"(往注册表登记 review.stage.* 层级 Format)与可选 STAGE_RULING_MAP
+# (层级名 → 适用裁决 DEC id 列表), 然后在这里登记一行 "模块路径:函数名"。
+# 模块缺失/导入失败一律吞掉不阻断审阅台启动(允许先登记后实现)。
+DOMAIN_FORMAT_SOURCES: dict[str, str] = {
+    "frontend_design": "omnicompany.packages.domains.frontend_design.formats:register_formats",
+    "demogame_design_doc": "omnicompany.packages.domains.demogame.design_doc_lint.formats:register_formats",
+    "narrative": "omnicompany.packages.domains.narrative.formats:register_review_stage_formats",
+    "voxelcraft": "omnicompany.packages.domains.voxelcraft.review_stage_formats:register_review_stage_formats",
+}
+
+
+def _domain_format_module(domain: str):
+    src = DOMAIN_FORMAT_SOURCES.get(domain)
+    if not src:
+        return None
+    import importlib
+    try:
+        return importlib.import_module(src.split(":", 1)[0])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def domain_ruling_map(domain: str) -> dict[str, list[str]]:
+    """该域的 层级名 → 适用已拍板裁决 DEC id 列表(域作者知识, 住在域包 formats 模块)。"""
+    mod = _domain_format_module(domain)
+    m = getattr(mod, "STAGE_RULING_MAP", None) if mod else None
+    return m if isinstance(m, dict) else {}
+
 
 def default_review_format_registry() -> FormatRegistry:
     """进程级共享 Format 注册表 — 审阅台生产路径用它解析 review.kind.* 扩展。
@@ -32,6 +61,15 @@ def default_review_format_registry() -> FormatRegistry:
                 _register_company_formats(reg)
             except Exception:  # noqa: BLE001
                 pass  # 公司材料 Format 注册失败不应阻断审阅台启动
+            # 域级产物层级(决策树=具象管线): 各接入域的层级 Format 登记进来,
+            # domain_stages/... 读它们的 review.stage.* 标签。单域失败不阻断其余域与审阅台启动。
+            for _domain, _src in DOMAIN_FORMAT_SOURCES.items():
+                try:
+                    import importlib
+                    _mod_name, _fn_name = _src.split(":", 1)
+                    getattr(importlib.import_module(_mod_name), _fn_name)(reg)
+                except Exception:  # noqa: BLE001
+                    pass
             _DEFAULT_REGISTRY = reg
         return _DEFAULT_REGISTRY
 
@@ -41,6 +79,13 @@ DEFAULT_REVIEW_KINDS: tuple[str, ...] = (
     "html",
     "key_question",
     "custom_web_template",
+    "video",
+    # WORK-REPORT-AND-REVIEW-TYPES: 五个典型审阅类型(2026-06-25)
+    "plan",                    # 计划
+    "static-report",           # 静态工作报告网页
+    "demo",                    # demo 网页
+    "aigc-image",              # AIGC 图片(路由到 aigc-lab 审阅台)
+    "agent-workflow-report",   # Agent 标准工作流程工作报告
 )
 
 DEFAULT_REVIEW_TIERS: tuple[str, ...] = (
@@ -52,6 +97,16 @@ DEFAULT_REVIEW_TIERS: tuple[str, ...] = (
 
 REVIEW_KIND_TAG_PREFIX = "review.kind."
 REVIEW_TIER_TAG_PREFIX = "review.tier."
+
+# 域级产物层级(决策树=具象管线)标签族。层级词汇的家在域包 Format, 这里只做只读投影。
+# review.stage.<域>.<序>.<层级名>       — 某域的一个有序产物层级
+# review.stage-member.<域>.<project>    — 某项目属于某域
+# review.stage-expected-kind.<kind>     — 该层的形态期望 kind(可多值)
+# review.stage-gate.<enforcer>          — 进入下一层的门禁执法器标识(单值)
+REVIEW_STAGE_TAG_PREFIX = "review.stage."
+REVIEW_STAGE_MEMBER_TAG_PREFIX = "review.stage-member."
+REVIEW_STAGE_EXPECTED_KIND_TAG_PREFIX = "review.stage-expected-kind."
+REVIEW_STAGE_GATE_TAG_PREFIX = "review.stage-gate."
 
 
 def _value(value: Any) -> str:
@@ -105,6 +160,36 @@ def normalize_review_tier(value: Any, registry: FormatRegistry | None = None) ->
     )
 
 
+UNFILED_PROJECT = "unfiled"
+
+
+def known_review_projects() -> set[str]:
+    """项目名录唯一真源=决策库: 活跃记录的 project 值集合 ∪ {"unfiled"}。
+
+    禁止本地硬编码项目列表 — 新项目先在决策库立项(`omni decisions record -p <project>`),
+    审阅台材料的 project 才能跟着解锁。"unfiled"=未分组, 永远合法。
+    """
+    from omnicompany.packages.domains.decisions import library
+
+    projects = {(r.get("project") or "").strip() for r in library.active_records()}
+    return {p for p in projects if p} | {UNFILED_PROJECT}
+
+
+def normalize_review_project(value: Any) -> str:
+    """project 白名单校验。空 → ValueError; 不在 known_review_projects() → ValueError。"""
+    project = _value(value)
+    if not project:
+        raise ValueError("project is required and cannot be empty")
+    known = known_review_projects()
+    if project not in known:
+        raise ValueError(
+            f"project {project!r} 不在项目名录里。项目名录真源=决策库, "
+            f"先 `omni decisions record -p {project}` 立项, 或改用已有项目名 "
+            f"(如 {', '.join(sorted(known)[:8])})。"
+        )
+    return project
+
+
 def review_kind_format_preconditions(value: Any, registry: FormatRegistry | None = None) -> list[str]:
     """该 review kind 对应 Format 声明的语义前置条件(= 该类材料的审阅格式要求)。
 
@@ -119,6 +204,100 @@ def review_kind_format_preconditions(value: Any, registry: FormatRegistry | None
         if tag in fmt.tags:
             out.extend(fmt.semantic_preconditions)
     return out
+
+
+def domain_stages(domain: str, registry: FormatRegistry | None = None) -> list[dict[str, Any]]:
+    """某域的有序产物层级清单(决策树=具象管线的步骤定义)。
+
+    从注册的 Format 标签 review.stage.<域>.<序>.<层级名> 解析: 每层带 name/order/desc
+    (= Format.description)/expected_kinds(review.stage-expected-kind.*)/gate 执法器
+    (review.stage-gate.*)。按 order 升序返回; 每层附 next=下一层名(末层为 None)。
+    未注册该域或 registry 为空时返回空列表。
+    """
+    if registry is None:
+        return []
+    prefix = f"{REVIEW_STAGE_TAG_PREFIX}{domain}."
+    stages: list[dict[str, Any]] = []
+    for fmt in registry.all_formats():
+        stage_tag = next((t for t in fmt.tags if t.startswith(prefix)), None)
+        if stage_tag is None:
+            continue
+        rest = stage_tag[len(prefix):]  # "<序>.<层级名>"
+        seq_str, _, name = rest.partition(".")
+        try:
+            order = int(seq_str)
+        except ValueError:
+            continue
+        if not name:
+            continue
+        expected_kinds = sorted(
+            t[len(REVIEW_STAGE_EXPECTED_KIND_TAG_PREFIX):]
+            for t in fmt.tags
+            if t.startswith(REVIEW_STAGE_EXPECTED_KIND_TAG_PREFIX)
+        )
+        gate = next(
+            (t[len(REVIEW_STAGE_GATE_TAG_PREFIX):]
+             for t in fmt.tags if t.startswith(REVIEW_STAGE_GATE_TAG_PREFIX)),
+            "",
+        )
+        stages.append({
+            "name": name,
+            "order": order,
+            "desc": fmt.description,
+            "expected_kinds": expected_kinds,
+            "gate": {"enforcer": gate},
+        })
+    stages.sort(key=lambda s: s["order"])
+    for i, s in enumerate(stages):
+        s["next"] = stages[i + 1]["name"] if i + 1 < len(stages) else None
+    return stages
+
+
+def registered_domains(registry: FormatRegistry | None = None) -> set[str]:
+    """有产物层级登记的域名集合(从 review.stage.<域>.* 标签抽出的 <域> 段)。"""
+    if registry is None:
+        return set()
+    out: set[str] = set()
+    for fmt in registry.all_formats():
+        for tag in fmt.tags:
+            if tag.startswith(REVIEW_STAGE_TAG_PREFIX) and not tag.startswith(REVIEW_STAGE_MEMBER_TAG_PREFIX):
+                rest = tag[len(REVIEW_STAGE_TAG_PREFIX):]
+                domain = rest.split(".", 1)[0]
+                if domain:
+                    out.add(domain)
+    return out
+
+
+def project_domains(project: str, registry: FormatRegistry | None = None) -> set[str]:
+    """项目所属的注册域集合(读 review.stage-member.<域>.<project> 标签)。
+
+    归属维度将来迁进决策库项目名录(唯一真源); 现从域包 Format 标签只读投影。
+    """
+    if registry is None or not project:
+        return set()
+    out: set[str] = set()
+    for fmt in registry.all_formats():
+        for tag in fmt.tags:
+            if not tag.startswith(REVIEW_STAGE_MEMBER_TAG_PREFIX):
+                continue
+            rest = tag[len(REVIEW_STAGE_MEMBER_TAG_PREFIX):]  # "<域>.<project>"
+            domain, _, member = rest.partition(".")
+            if domain and member == project:
+                out.add(domain)
+    return out
+
+
+def project_registered_tracks(project: str, registry: FormatRegistry | None = None) -> set[str]:
+    """项目在册轨道集 = 所属各域的层级名并集。
+
+    形如 "<project>/..." 的项目前缀轨道视为在册(域剖面草案: 项目专属层级带项目前缀显式登记),
+    但那类是运行期动态判断(见 store 轨道软校验), 本函数只返回域层级并集。
+    """
+    tracks: set[str] = set()
+    for domain in project_domains(project, registry):
+        for stage in domain_stages(domain, registry):
+            tracks.add(str(stage["name"]))
+    return tracks
 
 
 def review_material_tags(kind: Any, tier: Any, extra: Iterable[str] | None = None) -> list[str]:
@@ -136,9 +315,17 @@ __all__ = [
     "DEFAULT_REVIEW_KINDS",
     "DEFAULT_REVIEW_TIERS",
     "REVIEW_KIND_TAG_PREFIX",
+    "REVIEW_STAGE_TAG_PREFIX",
     "REVIEW_TIER_TAG_PREFIX",
+    "UNFILED_PROJECT",
+    "domain_stages",
+    "known_review_projects",
     "normalize_review_kind",
+    "normalize_review_project",
     "normalize_review_tier",
+    "project_domains",
+    "project_registered_tracks",
+    "registered_domains",
     "registered_review_kinds",
     "registered_review_tiers",
     "review_kind_format_preconditions",

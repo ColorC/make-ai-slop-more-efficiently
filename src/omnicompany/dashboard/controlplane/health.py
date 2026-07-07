@@ -10,6 +10,10 @@ URL 不变:
 
 from __future__ import annotations
 
+import os
+import socket
+import time
+
 from fastapi import APIRouter
 
 from ._db_helpers import db_paths, read_json, read_jsonl, safe_conn
@@ -64,4 +68,35 @@ def api_health():
         "latest_evolution": latest,
         "route_node_count": node_count,
         "latest_guardian": latest_guardian,
+    }
+
+
+def _port_open(host: str, port: int, timeout: float = 0.4) -> bool:
+    """便宜的 TCP 探活, 不发 HTTP, 用于 healthz 快速判定子进程在不在。"""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+@health_router.get("/healthz")
+def api_healthz():
+    """轻量健康探测 — 供 LOFA 安卓远程端启动判定"能不能连上本机"。
+
+    刻意不读 DB(区别于偏重的 /api/health), 保证手机端探测快(<1s)。
+    dashboard_ok 恒 true(本进程响应即说明 8210 可达); daemon/chat 走本机 TCP 探活。
+    """
+    daemon_port = int(os.environ.get("OMNI_CCDAEMON_PORT", "8201"))
+    chat_port = int(os.environ.get("OMNI_CHATUI_PORT", "7348"))
+    daemon_ok = _port_open("127.0.0.1", daemon_port)
+    chat_ok = _port_open("127.0.0.1", chat_port)
+    return {
+        "ok": True,
+        "service": "omnicompany-dashboard",
+        "version": "0.3.1",
+        "dashboard_ok": True,
+        "daemon_ok": daemon_ok,
+        "chat_ok": chat_ok,
+        "ts": time.time(),
     }

@@ -218,6 +218,75 @@ def upsert(record: dict) -> tuple[dict, bool]:
     return record, is_dup
 
 
+def save_research_record(
+    topic: str,
+    synthesis: dict[str, Any],
+    sources: list[dict] | None = None,
+    *,
+    coverage: dict[str, Any] | None = None,
+    run_id: str | None = None,
+    snapshot_texts: dict[str, str] | None = None,
+) -> tuple[dict, bool, str]:
+    """三路(原生交互/codex 无人值守/旧管线)共用的落库核心。
+
+    组装 record → upsert 进统一库(同题增量) → 投影进 catalog → 渲 report.md。
+    `synthesis` = {summary, findings[{claim,source_url,support?}], keywords[], aliases[], perspectives_open[]}。
+    `snapshot_texts` = {url: 正文} —— 给了就落本地快照并回填 source.snapshot_path(源本地留底,原页失效仍可回源)。
+    返回 (saved_record, is_dup, report_path)。
+    """
+    from ._paths import REPORTS_ROOT
+
+    topic = (topic or "").strip()
+    topic_norm = normalize_topic(topic)
+    synthesis = synthesis or {}
+    sources = [dict(s) for s in (sources or [])]
+
+    if snapshot_texts:
+        for s in sources:
+            url = (s.get("url") or "").strip()
+            txt = snapshot_texts.get(url)
+            if url and txt and not s.get("snapshot_path"):
+                sp = save_snapshot(url, txt)
+                if sp:
+                    s["snapshot_path"] = sp
+
+    record = {
+        "record_id": record_id_for(topic_norm),
+        "topic": topic,
+        "topic_norm": topic_norm,
+        "summary": synthesis.get("summary", ""),
+        "findings": synthesis.get("findings") or [],
+        "keywords": synthesis.get("keywords") or [],
+        "aliases": synthesis.get("aliases") or [],
+        "perspectives_covered": (coverage or {}).get("covered") or [],
+        "perspectives_open": synthesis.get("perspectives_open") or [],
+        "sources": sources,
+        "run_ids": [run_id] if run_id else [],
+    }
+    saved, is_dup = upsert(record)
+
+    # 落库即投影进统一资产 catalog(研究记录这半永远新鲜,不靠定时)
+    try:
+        from . import catalog
+
+        catalog.upsert_item({
+            "id": saved["record_id"], "kind": "research_record",
+            "name": saved.get("topic", ""), "path": "",
+            "description": (saved.get("summary") or "")[:300],
+            "aliases": sorted(set((saved.get("aliases") or []) + (saved.get("keywords") or []))),
+            "source_url": "", "tags": ["research_record"],
+            "status": saved.get("status", "active"),
+        })
+    except Exception:  # noqa: BLE001 — catalog 投影失败不阻断落库
+        pass
+
+    ensure_dirs()
+    report_md = render_report(saved)
+    report_path = REPORTS_ROOT / f"{saved['record_id'].replace(':', '_')}.md"
+    report_path.write_text(report_md, encoding="utf-8")
+    return saved, is_dup, str(report_path)
+
+
 def render_report(record: dict) -> str:
     """把一条 record 渲成人读 markdown(待发布产物)。"""
     lines = [f"# 调研:{record.get('topic', '')}", ""]

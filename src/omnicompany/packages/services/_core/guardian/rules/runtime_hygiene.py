@@ -189,6 +189,8 @@ _TEMP_HARD_PATTERNS: tuple[str, ...] = (
     # 进程 crash / nohup 残留
     "core.[0-9]*",
     "nohup.out",
+    # Python bytecode cache files must never live in tracked source/doc areas.
+    "*.pyc", "*.pyo",
     # 临时 pid 文件 (sentinel.pid 等合法 .omni/ 内 pid 由路径豁免保护)
     "*.pid",
 )
@@ -291,7 +293,7 @@ def _is_suspicious_exempt(rel: str) -> bool:
     return False
 
 # 跳过扫描的目录 (复用空目录的 _SKIP_DIR_NAMES + 归档 + vendors)
-_TEMP_SKIP_DIR_NAMES = _SKIP_DIR_NAMES | {"vendors"}
+_TEMP_SKIP_DIR_NAMES = (_SKIP_DIR_NAMES - {"__pycache__"}) | {"vendors"}
 
 
 def _path_matches_any_glob(name: str, patterns: Iterable[str]) -> bool:

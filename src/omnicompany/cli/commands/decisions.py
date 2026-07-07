@@ -204,11 +204,11 @@ def cmd_decisions_show(record_id) -> None:
 
 @cmd_decisions.command("link")
 @click.argument("src_id")
-@click.argument("rel", type=click.Choice(["rests_on", "supersedes", "parent", "related"]))
+@click.argument("rel", type=click.Choice(["rests_on", "supersedes", "parent", "related", "enforced_by"]))
 @click.argument("dst_id")
 @any_caller
 def cmd_decisions_link(src_id, rel, dst_id) -> None:
-    """给决策树加边:src --rel--> dst(如 决策 rests_on 猜想)。"""
+    """给决策树加边:src --rel--> dst(如 决策 rests_on 猜想;enforced_by 的 dst 是执法器标识非记录 id)。"""
     from omnicompany.packages.domains.decisions import catalog, library
 
     try:
@@ -297,3 +297,255 @@ def cmd_decisions_reindex() -> None:
 
     res = catalog.rebuild_index()
     click.echo(f"✓ 索引重建:{res['total']} 条 → {_paths.INDEX_PATH}")
+
+
+# ── 探索路径可视化 / 决策树管理(plan B7)──────────────────────────────────────
+
+from .._access import external_or_controller  # noqa: E402
+
+
+@cmd_decisions.command("graph")
+@click.option("--project", "-p", default=None, help="按项目过滤(如 aigc)")
+@click.option("--kind", "-k", multiple=True, help="按 record_kind 过滤(decision/belief/comment)")
+@click.option("--no-deleted", is_flag=True, help="不含墓碑节点")
+@click.option("--json", "as_json", is_flag=True, help="打印完整图 JSON(默认只打 stats)")
+@any_caller
+def cmd_decisions_graph(project, kind, no_deleted, as_json) -> None:
+    """投影出探索 DAG(决策库→material-centric 图):看 stats 或导完整 JSON。"""
+    import json as _json
+
+    from omnicompany.packages.domains.decisions.exploration import projection
+
+    g = projection.build_graph(project=project, kinds=list(kind) or None,
+                               include_deleted=not no_deleted)
+    if as_json:
+        click.echo(_json.dumps(g, ensure_ascii=False, indent=2))
+        return
+    s = g["stats"]
+    click.echo(f"探索图{f'·{project}' if project else '(全库)'}: "
+               f"{s['n_nodes']} 节点 · {s['n_edges']} 边 · {s['n_roots']} 散落根 · "
+               f"{s['n_version_chains']} 版本链 · {s['n_deleted']} 墓碑")
+    click.echo(f"  按类型: {s['by_kind']}")
+    click.echo(f"  按关系: {s['by_rel']}")
+
+
+@cmd_decisions.command("gaps")
+@click.option("--project", "-p", default="aigc", help="项目(默认 aigc)")
+@any_caller
+def cmd_decisions_gaps(project) -> None:
+    """列探索图的真本体缺口(产物/设施/真源 注册没注册、丢没丢)。"""
+    from omnicompany.packages.domains.decisions.exploration import backfill
+
+    rows = backfill.plan_backfill(project)
+    if not rows:
+        click.echo(f"(项目 {project} 无登记缺口规格)")
+        return
+    icon = {"registered": "✓ 可注册", "lost": "✗ 已丢失", "unlocated": "? 未定位"}
+    click.echo(f"探索图缺口 · {project} · {len(rows)} 项:")
+    for r in rows:
+        click.echo(f"  {icon.get(r['status'], r['status']):<10} [{r['kind']}] {r['label'][:34]:<34} → {r['link_to']}")
+
+
+@cmd_decisions.command("backfill")
+@click.option("--project", "-p", default="aigc", help="项目(默认 aigc)")
+@click.option("--run", is_flag=True, help="真注册+写台账(默认 dry-run 只算)")
+@external_or_controller
+def cmd_decisions_backfill(project, run) -> None:
+    """把缺的产物/设施/真源注册进 material registry(external_pointer,幂等),写台账。"""
+    from omnicompany.packages.domains.decisions.exploration import backfill
+
+    s = backfill.run_backfill(project=project, dry_run=not run)
+    mode = "已注册" if run else "DRY-RUN(加 --run 真注册)"
+    click.echo(f"回填 · {project} · {mode}:共 {s['total']} 项,{s['by_status']}")
+    if run:
+        click.echo(f"  注册 {s['registered']} 条 external_pointer · 台账 {s['ledger']}")
+
+
+@cmd_decisions.command("versions")
+@click.option("--project", "-p", default=None, help="按项目过滤")
+@any_caller
+def cmd_decisions_versions(project) -> None:
+    """列版本链(耐用物 supersedes 串成的演化序列)。"""
+    from omnicompany.packages.domains.decisions.exploration import projection
+
+    g = projection.build_graph(project=project)
+    label = {n["id"]: n.get("label") or n["id"] for n in g["nodes"]}
+    chains = g["version_chains"]
+    if not chains:
+        click.echo("(无版本链:暂无 supersedes 边 / 同族版本号)")
+        return
+    click.echo(f"版本链 · {len(chains)} 条:")
+    for ch in chains:
+        click.echo("  " + " → ".join(label.get(i, i)[:24] for i in ch))
+
+
+@cmd_decisions.command("dedup")
+@click.option("--project", "-p", default=None, help="按项目过滤")
+@click.option("--threshold", "-t", default=0.6, type=float, help="相似度阈值(0~1,默认 0.6)")
+@any_caller
+def cmd_decisions_dedup(project, threshold) -> None:
+    """找近重复决策簇(同 session + 语句高相似),供去重/标『同一决策多次落定』。"""
+    from omnicompany.packages.domains.decisions.exploration import manage
+
+    clusters = manage.duplicate_clusters(project=project, threshold=threshold)
+    if not clusters:
+        click.echo("(没找到近重复决策簇)")
+        return
+    click.echo(f"近重复决策簇 · {len(clusters)} 簇:")
+    for i, cl in enumerate(clusters, 1):
+        click.echo(f"  簇{i}({len(cl)} 条,session {cl[0]['session_ref'][:8]}):")
+        for c in cl:
+            click.echo(f"    {c['id']:<22} {c['statement'][:46]}")
+
+
+@cmd_decisions.command("causal")
+@click.option("--project", "-p", default="aigc", help="项目(默认 aigc)")
+@click.option("--model", default=None, help="覆盖模型(默认 gpt-5.5;qwen3.6-plus 更省)")
+@click.option("--write", is_flag=True, help="真写因果边 sidecar(默认 dry-run)")
+@external_or_controller
+def cmd_decisions_causal(project, model, write) -> None:
+    """从对话散文抽 refines/critiques/responds_to_critique 因果边(独立 agent,走 omni LLM 网关)。"""
+    from omnicompany.packages.domains.decisions.exploration import causal_extract
+
+    s = causal_extract.extract_for_project(project, model=model, dry_run=not write)
+    mode = "已写入" if write else "DRY-RUN(加 --write 落库)"
+    click.echo(f"因果抽取 · {project} · {mode}:扫 {s['sessions']} session,"
+               f"得 {s['edges_found']} 边,写 {s['edges_written']} 边")
+    for e in s.get("samples", []):
+        click.echo(f"  {e['src']} --{e['rel']}--> {e['dst']}")
+
+
+@cmd_decisions.command("consolidate")
+@click.option("--project", "-p", required=True, help="按项目筛候选裁决(必填)")
+@click.option("--tag", default=None, help="再按标签筛(可选)")
+@click.option("--model", "-m", default=None, help="覆盖聚类模型(默认 qwen3.6-plus)")
+@external_or_controller
+def cmd_decisions_consolidate(project, tag, model) -> None:
+    """反向固化器 v0:已拍板高权威裁决 → 规则候选报告(L3,禁自动写规则文档,须人裁)。"""
+    from omnicompany.packages.domains.decisions import consolidate
+
+    res = consolidate.run(project=project, tag=tag, model=model)
+    if res.get("skipped"):
+        click.echo(f"(未生成报告){res['reason']}")
+        return
+    click.echo(f"✓ 规则候选报告: {res['report_path']}")
+    click.echo(f"  候选裁决 {res['eligible_count']} 条 → 规则候选 {res['candidate_count']} 条")
+    click.echo("  规则候选=L3 级,禁自动写进规则文档,须人裁。")
+
+
+@cmd_decisions.command("narrative")
+@click.option("--mode", type=click.Choice(["project", "period"]), default="project",
+              help="project=A 单领域聚焦 / period=B 时期全景")
+@click.option("--project", "-p", default=None, help="A 模式的领域(如 aigc)")
+@click.option("--model", default=None, help="覆盖模型(默认 gpt-5.5)")
+@click.option("--max-sessions", "max_sessions", default=4, type=int, help="取料会话上限")
+@click.option("--force", is_flag=True, help="忽略缓存重抽")
+@external_or_controller
+def cmd_decisions_narrative(mode, project, model, max_sessions, force) -> None:
+    """提炼探索历程(连续操作流 + 主题泳道,独立 agent/gpt-5.5,带缓存)。"""
+    from omnicompany.packages.domains.decisions.exploration import narrative
+
+    res = narrative.extract_narrative(mode=mode, project=project, model=model,
+                                      force=force, max_sessions=max_sessions)
+    click.echo(f"探索历程 · {mode}{('/' + project) if project else ''}:"
+               f"{len(res.get('lanes', []))} 泳道 · {len(res.get('events', []))} 事件")
+    for ln in res.get("lanes", []):
+        click.echo(f"  [{ln.get('theme')}]")
+    if res.get("note"):
+        click.echo(f"  ⚠ {res['note']}")
+    click.echo(f"  缓存: {narrative.cache_path(mode, project)}")
+
+
+# ── 标准化动词层(计划第三期,BLF-2026-07-04-001)────────────────────────────────
+
+@cmd_decisions.group("verb")
+def cmd_decisions_verb() -> None:
+    """决策边/画布连线的标准化动词标注(默认六词:拆分/推导/联想/生成/反证/延伸,可表外)。"""
+
+
+@cmd_decisions_verb.command("add")
+@click.argument("src")
+@click.argument("rel")
+@click.argument("dst")
+@click.option("--verb", "-v", required=True, help="动词(默认六词表之一,或表外自定义)")
+@click.option("--rationale", "-r", default="", help="一句话:为什么是这个动作")
+@click.option("--from-state", "from_state", default="", help="前置状态(schema C,可空)")
+@click.option("--to-state", "to_state", default="", help="效果状态(schema C,可空)")
+@click.option("--challenge", "challenges", multiple=True, help="反证挂载(可多次)")
+@click.option("--annotator", default="human", help="标注者身份(幂等键的一部分,默认 human)")
+@click.option("--source", "source_kind", type=click.Choice(["human", "ai"]), default="human",
+              help="标注来源:human=人工/ai=模型")
+@any_caller
+def cmd_decisions_verb_add(src, rel, dst, verb, rationale, from_state, to_state, challenges,
+                           annotator, source_kind) -> None:
+    """给一条边(src --rel--> dst)标一个动词。verb 不在六词表时仍照记,提示'表外词'。"""
+    from omnicompany.packages.domains.decisions import verbs
+
+    if verbs.is_out_of_table(verb):
+        click.echo(f"  ⚠ 表外词「{verb}」(允许,进统计单列;默认六词表:{'/'.join(verbs.VERBS)})")
+    rec = verbs.append_annotation(
+        source=src, target=dst, rel=rel, verb=verb, rationale=rationale,
+        from_state=from_state, to_state=to_state, challenges=list(challenges),
+        annotator=annotator, source_kind=source_kind,
+    )
+    click.echo(f"✓ {src} --{rel}--> {dst}  [{rec['verb']}]  by {rec['annotator']}({rec['source']})")
+
+
+@cmd_decisions_verb.command("list")
+@click.option("--verb", "-v", default=None, help="只看某个动词")
+@any_caller
+def cmd_decisions_verb_list(verb) -> None:
+    """列当前态的动词标注(同边同标注者取最新)。"""
+    from omnicompany.packages.domains.decisions import verbs
+
+    recs = verbs.list_annotations(verb=verb)
+    if not recs:
+        click.echo("(暂无标注)" if not verb else f"(没有标「{verb}」的标注)")
+        return
+    click.echo(f"动词标注 · {len(recs)} 条:")
+    for r in recs:
+        e = r.get("edge") or {}
+        click.echo(f"  {e.get('source',''):<20} --{e.get('rel',''):<12}--> {e.get('target',''):<20} "
+                   f"[{r.get('verb',''):<6}] by {r.get('annotator',''):<12}({r.get('source','')})")
+
+
+@cmd_decisions_verb.command("stats")
+@any_caller
+def cmd_decisions_verb_stats() -> None:
+    """词频/per-rel 分布/human-ai 计数/表外词/边界冲突(证据列表不打分)。"""
+    from omnicompany.packages.domains.decisions import verbs
+
+    s = verbs.stats()
+    click.echo(f"标注统计 · 共 {s['total']} 条(human {s['by_source'].get('human', 0)} · "
+               f"ai {s['by_source'].get('ai', 0)})")
+    click.echo("  词频:")
+    for v, n in sorted(s["verb_freq"].items(), key=lambda kv: -kv[1]):
+        tag = " (表外)" if verbs.is_out_of_table(v) else ""
+        click.echo(f"    {v}{tag}: {n}")
+    if s["out_of_table"]:
+        click.echo(f"  表外词: {s['out_of_table']}")
+    if s["conflicts"]:
+        click.echo(f"  ⚠ 边界冲突 {len(s['conflicts'])} 处(同边不同标注者给了不同动词):")
+        for c in s["conflicts"]:
+            e = c["edge"]
+            click.echo(f"    {e['source']} --{e['rel']}--> {e['target']}: {c['verbs']}")
+    else:
+        click.echo("  边界冲突: 无")
+
+
+@cmd_decisions_verb.command("auto-annotate")
+@click.option("--project", "-p", default=None, help="按项目过滤取边(默认不过滤)")
+@click.option("--cap", "-n", default=100, type=int, help="本次最多标注几条边(默认 100)")
+@click.option("--model", "-m", default="qwen3.6-plus", help="结构化模型(默认 qwen3.6-plus)")
+@click.option("--two-pass", "two_pass", is_flag=True,
+              help="同一批边用两个视角各标一遍(annotator 后缀 -p1/-p2),供边界冲突统计")
+@any_caller
+def cmd_decisions_verb_auto_annotate(project, cap, model, two_pass) -> None:
+    """AI 半程标注器:从决策图边采样,调结构化模型选动词(六词或'其他:<词>'),断点续跑。"""
+    from omnicompany.packages.domains.decisions import auto_annotate
+
+    res = auto_annotate.run(project=project, cap=cap, model=model, two_pass=two_pass)
+    click.echo(f"✓ 自动标注:采样 {res['sampled']} 条边,新写 {res['written']} 条标注"
+               f"(跳过已标 {res['skipped']} 条)")
+    if res.get("note"):
+        click.echo(f"  ⚠ {res['note']}")

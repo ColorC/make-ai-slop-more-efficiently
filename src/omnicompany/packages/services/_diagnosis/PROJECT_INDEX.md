@@ -99,3 +99,10 @@ doctor/SKILL.md(操作)、docs/plans/diagnosis/(计划)。
 - 诊断结果怎么读: Finding 看语义标签和证据, 别找分数(设计上就没有)
 - 改 doctor: 先读 doctor/DESIGN.md 分清旧 Worker 线和新 agent 线, 别混
 - 计划上下文: docs/plans/diagnosis/ 两个诊断重整目录
+
+## 自动补漏候选(机器生成,并入正文或删除即可)
+<!-- projidx-candidates:begin -->
+- [ ] (2026-07-04) 在主要目录/entry_points 或 latest 中补充 _diagnosis/ux_audit，说明其是前端三维 UX 审计 omni pipeline，并可列 run.py/team.py 为入口。 — 证据: 近 30 天 git log: 2026-06-30 "ux-audit 管线: 前端三维 UX 审计(交互/信息/跳转)做成 omni pipeline"；仓内已有路径 E:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/_diagnosis/ux_audit/，包含 team.py、run.py、nodes.py、formats.py、enumerators.py。当前 PROJECT_INDEX.md 未列出 ux_audit。
+- [ ] (2026-07-04) 将 lap_auditor 从活跃小诊断服务列表中移除或标为已废止/归档，避免读者把 _diagnosis/lap_auditor 当作现行权威入口。 — 证据: 当前 PROJECT_INDEX.md 将 _diagnosis/lap_auditor 归入"各自独立的小诊断服务"；近 30 天 git log: 2026-07-03 "LAP九维检查器显式废止(活引用清零,归档件保留,废止决策已登记)"。路径 E:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/_diagnosis/lap_auditor/README.md 也标注 status=archived，并说明历史代码在 _archive/。
+- [ ] (2026-07-04) 在主要目录或 entry_points 补充 _diagnosis/project_audit，说明其是项目审计/发现相关 team 与 Worker 管线，权威文档可指向 project_audit/DESIGN.md。 — 证据: 当前 PROJECT_INDEX.md 的 roots/entry_points/主要目录未列 E:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/_diagnosis/project_audit；近 30 天 git log 有 2026-06-19 "feat(team): project_audit — 项目遍历+计划完成度审计 team(统一可复用设施)" 及 2026-06-22 "feat(diagnosis): 实现项目审计v2架构与Worker管线"；仓内该目录包含 DESIGN.md、team.py、run.py、workers/。
+<!-- projidx-candidates:end -->

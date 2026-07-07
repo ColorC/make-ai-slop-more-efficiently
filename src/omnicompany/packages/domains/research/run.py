@@ -11,16 +11,12 @@ from omnicompany.runtime.routing.router import Router
 
 
 def build_research_bindings(input_dict: dict[str, Any] | None = None) -> dict[str, Router]:
-    """research.run 的节点 ID → Router 绑定(6 节点 SOTA 管线)。"""
-    from omnicompany.packages.domains.research.routers.deep import Orchestrator, Planner
+    """research.run 的节点 ID → Router 绑定(3 节点原生搜索管线)。"""
+    from omnicompany.packages.domains.research.routers.native import NativeResearch
     from omnicompany.packages.domains.research.routers.pipeline import LibraryWrite, TopicIntake
-    from omnicompany.packages.domains.research.routers.synth import ClaimVerify, Synthesize
 
     return {
         "intake": TopicIntake(),
-        "planner": Planner(),
-        "orchestrate": Orchestrator(),
-        "synthesize": Synthesize(),
-        "claim_verify": ClaimVerify(),
+        "native": NativeResearch(),
         "library_write": LibraryWrite(),
     }

@@ -375,7 +375,22 @@ Worker 产出 `verdict.output` 带特殊字段 `_emit_as_new_job: True` 时, dis
 
 ---
 
-### 反模式（R-18~R-25 相关）
+### R-26 · 禁止重复造 agent — 用统一 AgentNodeLoop（2026-06-23 用户立 · ⚠硬规则 · Guardian OMNI-095）
+
+**agent 是最核心设施之一, 全项目唯一实现 = `packages/services/_core/agent`（`AgentNodeLoop` 薄调度器 + `SingleToolRouter` 工具族 + `TOOL_REGISTRY` + `ConfigurableAgent` 配置驱动）。任何"让 worker 调 LLM + 工具多轮干活"的需求, 一律走它, 禁止手搓第二套。**
+
+正确做法（三选一, 都用统一实现）:
+- **子类化 `AgentNodeLoop`**: 声明 `NODE_PROMPT` + `TOOL_ROUTERS`, agent 即 worker（`AgentNodeLoop.run` 是 async, MaterialDispatcher 的 `_invoke_worker_async` 原生 await, **不存在 asyncio 嵌套问题**——这早在 2026-04-20 解决, 别拿它当借口 fork）。
+- **`ConfigurableAgent`**: 配置驱动（`SPEC = AgentSpec(...)`, 工具按字符串名查 `TOOL_REGISTRY`, prompt 走外部 .md, `workspace.write_prefixes` 限定写位置）。
+- **普通 worker 借 `services._core.agent.launch.run_json_agent(...)`** 启动统一 AgentNodeLoop（只读 + 出结构化 JSON 的标准入口）。
+
+**禁止**（即 RA-19）: 自己 `for/while` 循环里直调 `call_json`/`LLMClient.call` + 手拼 `tool_use`/`tool_result` 回合 = 手搓 ReAct = 重复造 agent。
+
+**统一 agent 不够用怎么办**: **改进它**——加工具（写个 `SingleToolRouter` 注册进 `TOOL_REGISTRY`）/ 加启动器 / 扩 `AgentSpec` / 提 PR 到 `_core/agent`。重构统一实现可以, 复制出平行第二套不行。
+
+> 溯源: 2026-06-23 我（Claude Code）沉淀 team 时嫌统一 AgentNodeLoop（async+bus）麻烦, 自建了同步 ReAct 循环（`runtime/agent/tool_agent.py`）。用户裁决"你重建了一个 agent?…如果统一实现不够好, 你就改进统一实现, 不要二重 / 不要搞第二套, 用统一设施执行"。已删 fork、改用统一 `AgentNodeLoop`、立此规 + Guardian OMNI-095。
+
+### 反模式（R-18~R-26 相关）
 
 | 编号 | 名称 | 描述 | 后果 |
 |---|---|---|---|
@@ -386,3 +401,4 @@ Worker 产出 `verdict.output` 带特殊字段 `_emit_as_new_job: True` 时, dis
 | RA-16 | verdict.output 嵌套 | 违反 R-23, output = `{format_id: payload}` 嵌套而非平铺 | PipelineRunner / MaterialDispatcher 消费错乱, Team 2 selftest 暴露 |
 | RA-17 | FORMAT_IN list 无 MODE | 违反 R-24, `FORMAT_IN = list[str]` 不显式声明 AND/OR | 未来 dispatcher 语义变化时 worker 行为错乱 |
 | RA-18 | Worker 内部 while 循环持状态 | 违反 R-07 Statelessness + R-25, 应用 `_emit_as_new_job` 让 dispatcher 驱动循环 | 无法 replay / 不可观测 / 阶段 D AgentNodeLoop 替换后更痛苦 |
+| RA-19 | 重复造 agent | 违反 R-26, 手搓 ReAct/工具循环(循环内直调 LLM + 自拼 tool 回合)而非用统一 AgentNodeLoop | 核心设施二重化 / 失去统一审计·压缩·重试·工具治理 / Guardian OMNI-095 |

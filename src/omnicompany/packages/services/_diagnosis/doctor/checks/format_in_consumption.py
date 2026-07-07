@@ -8,7 +8,8 @@
 
 本模块提供一个纯 AST 函数, 接收 routers.py 和 formats.py 源码文本, 返回
 violation findings。**不 import 被检代码, 不依赖 runner / pipeline**, 既可:
-- 被 workflow_factory LAPVerifier D9 调 (生成代码的本地自检)
+- 被 team_builder 生成代码的本地自检调用 (2026-07-03 批4: 原 LAP 九维检查器
+  D9 已显式废止, 本模块的纯 AST 函数仍保留供其他消费方调用)
 - 被 doctor Router 包装成诊断节点
 - 被脚本全仓扫
 

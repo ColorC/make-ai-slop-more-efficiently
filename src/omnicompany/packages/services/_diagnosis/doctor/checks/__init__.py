@@ -3,8 +3,9 @@
 """doctor/checks — 可复用的静态分析 checker 集合。
 
 这些 check 是**纯函数**, 不依赖 pipeline / runner。既可以被 doctor 管线
-里的 Router 调用（与 Verdict / EventBus 集成）, 也可以被 workflow_factory
-LAPVerifier 等独立 Router 直接调用, 避免两处漂移。
+里的 Router 调用（与 Verdict / EventBus 集成）, 也可以被 team_builder 的
+验证类 Worker 直接调用, 避免两处漂移。
+（2026-07-03 批4: 原文提及的 LAP 九维检查器已显式废止, 措辞同步更新。）
 """
 from __future__ import annotations
 

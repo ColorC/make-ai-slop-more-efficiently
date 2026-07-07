@@ -35,7 +35,7 @@ cc_proxy_router = APIRouter(prefix="/api/cc", tags=["cc-proxy"])
 
 def _daemon_http_base() -> str:
     """读 daemon 状态 → http://127.0.0.1:<port>; 没活就 503."""
-    s = lifecycle.read_status()
+    s = lifecycle.read_status(probe=False)  # 热路径: 不在每次代理请求时打 /health
     if not (s.alive and s.port):
         raise HTTPException(
             status_code=503,
@@ -46,7 +46,7 @@ def _daemon_http_base() -> str:
 
 def _daemon_ws_base() -> str | None:
     """daemon 不活时返 None, 让 WebSocket 端点 close(1011) 而非抛 HTTPException."""
-    s = lifecycle.read_status()
+    s = lifecycle.read_status(probe=False)  # 热路径: 不在每次代理请求时打 /health
     if not (s.alive and s.port):
         return None
     return f"ws://127.0.0.1:{s.port}"
@@ -61,6 +61,22 @@ _HOP_BY_HOP = {
 
 def _filter_headers(headers: dict[str, str]) -> dict[str, str]:
     return {k: v for k, v in headers.items() if k.lower() not in _HOP_BY_HOP}
+
+
+# ── chatui 自启动 ensure (非透传, 必须在下面 catch-all 之前注册) ──────────────
+# 前端 /chat-standalone 跳转到收编 chatui(:7348)之前先打这个端点; chatui 没起就
+# 在这里拉起来(ensure_chatui_running 内部 spawn + 轮询 ready), 避免落"连接被拒"死页。
+# 注意: 必须定义在 catch-all `/{path:path}` 之前 — FastAPI 按定义顺序匹配, 否则
+# /chatui/ensure 会被当作 /api/cc/{path} 透传给 ccdaemon(那边没这路由 → 404/503)。
+@cc_proxy_router.post("/chatui/ensure")
+async def chatui_ensure() -> Response:
+    from fastapi.concurrency import run_in_threadpool
+    from fastapi.responses import JSONResponse
+
+    # 懒导入: 避免 controlplane 导入期拉起整个 CLI click 树。
+    from omnicompany.cli.commands.cc import ensure_chatui_running
+    res = await run_in_threadpool(ensure_chatui_running)
+    return JSONResponse(res)
 
 
 # ── HTTP 透传 (catch-all) ──────────────────────────────────────────────────

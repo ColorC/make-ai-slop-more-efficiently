@@ -25,6 +25,13 @@ from .archive import HealthSnapshot, HealthArchive, make_router_snapshot, make_f
 from .finding_archive import FindingArchive, get_finding_archive, git_head_short_hash
 from .incremental import run_incremental_diagnosis, get_changed_files
 from .material_index import MaterialIdIndex, MaterialIdEntry, get_material_id_index
+from .resolver import (
+    ResolveResult,
+    ResolveError,
+    UnifiedResolver,
+    get_resolver,
+    resolve_reference,
+)
 
 __all__ = [
     "EntityTypeDef",
@@ -51,15 +58,34 @@ __all__ = [
     "MaterialIdIndex",
     "MaterialIdEntry",
     "get_material_id_index",
+    "ResolveResult",
+    "ResolveError",
+    "UnifiedResolver",
+    "get_resolver",
+    "resolve_reference",
 ]
 
 # ── 默认路径 ─────────────────────────────────────────────────────────────────
 _THIS_FILE = Path(__file__)
-# src/omnicompany/packages/services/registry/__init__.py
-# → omnicompany 根目录 = parents[5]
-_DEFAULT_SOURCE_ROOT = _THIS_FILE.parents[3]   # src/omnicompany  (registry/__init__.py → registry → services → packages → omnicompany)
+# 实际文件位置: src/omnicompany/packages/services/_core/registry/__init__.py
+# (2026-07-04 修: 旧注释假设 services/registry/, 实为 services/_core/registry/, 多一层,
+#  导致 parents[5] 算到 src/ 而非仓根, src/data/services/registry/ 由此长出一份错位存量。
+#  见 docs/plans/omnicompany-governance/[2026-07-04]REGISTRY-STORAGE-SPLIT-REPAIR/plan.md)
+# → omnicompany 包根 = parents[3]; 仓根("向上找 src/omnicompany + docs 并存"更抗目录挪动,
+#   与 cli/commands/testmap.py::_project_root 同款写法, 兜底 parents[6])
+_DEFAULT_SOURCE_ROOT = _THIS_FILE.parents[3]   # src/omnicompany  (registry/__init__.py → registry → _core → services → packages → omnicompany)
+
+
+def _find_repo_root(start: Path) -> Path:
+    """向上找仓根标志(src/omnicompany + docs 并存), 找不到则兜底固定层数。"""
+    for p in (start, *start.parents):
+        if (p / "src" / "omnicompany").is_dir() and (p / "docs").is_dir():
+            return p
+    return start.parents[6]
+
+
 # 2026-04-21 B4: data/registry/ → data/services/registry/ (对齐 archmap allowed_subdirs)
-_DEFAULT_REGISTRY_DIR = _THIS_FILE.parents[5] / "data" / "services" / "registry"
+_DEFAULT_REGISTRY_DIR = _find_repo_root(_THIS_FILE) / "data" / "services" / "registry"
 
 
 def get_registry(registry_dir: Path | str | None = None) -> InstanceRegistry:

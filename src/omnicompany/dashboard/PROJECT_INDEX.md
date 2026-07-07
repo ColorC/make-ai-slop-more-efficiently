@@ -94,3 +94,11 @@ dashboard 控制面(8210, 可随便重启)和 ccdaemon 会话运行时(8201, 长
 - 改扩展: omni dashboard ext-update, 不用重启 VSCode
 - 接需求先读 docs/plans/dashboard/ 下对应计划目录, 架构问题读三份 DESIGN.md
 - 排查健康: omni dashboard status 看两进程和版本 token
+
+## 自动补漏候选(机器生成,并入正文或删除即可)
+<!-- projidx-candidates:begin -->
+- [ ] (2026-07-04) 在 entry_points 或主要目录补充 dashboard/chatui，说明其为收编 claudecodeui 后的统一聊天 UI/provider 入口，并标注旧手搓聊天 UI 已不再作为入口。 — 证据: 2026-06-25 提交摘要: '@ vendor: 收编上游 claudecodeui 进 dashboard/chatui'; 随后 2026-06-25/26 多条摘要显示 'dashboard 聊天入口全屏导航到 chatui'、'驾驶舱普通人用聊天统一到 chatui'、'全面剥离并删除驾驶舱手搓聊天 UI, 统一走收编 chatui'。当前 PROJECT_INDEX.md 的 entry_points/主要目录未列 E:/WindowsWorkspace/omnicompany/src/omnicompany/dashboard/chatui。
+- [ ] (2026-07-04) 补充驾驶舱定时任务管理资产：CronView、/api/cron、/api/cron/history、/api/cron/log，以及运行历史落盘 runs/<name>/<ts>.log/jsonl 的用途。 — 证据: 2026-06-25 提交摘要: 'feat(dashboard): 定时任务管理视图 — 控制器加"定时任务"顶层视图(CronView: 11任务/LLM标注/立即跑/心跳状态) + 后端 /api/cron(GET 读 + POST run, detached 无窗口)'；同日还有 '运行历史(scheduler 记录 runs.jsonl + /api/cron/history 端点)' 与 'runs/<name>/<ts>.log + jsonl ... /api/cron/log'。当前 PROJECT_INDEX.md 未提到 CronView、/api/cron 或 runs/<name>/<ts>.log。
+- [ ] (2026-07-04) 在主要目录/能力中补充 universal-capture 相关资产与入口：/surface、/resolve、/omni-capture-beacon.js、data-omni-uri/CaptureBody 契约，用于说明驾驶舱材料/页面捕获与定位能力。 — 证据: 2026-06-27 至 2026-07-01 多条提交摘要新增 universal-capture/surface resolver：'/surface /resolve endpoints + CaptureBody(omni_uri/modality/verdict) + beacon + data-omni-uri'、'/omni-capture-beacon.js'、'beacon tracks cursor element'、'beacon reports viewport content atoms'。当前 PROJECT_INDEX.md 未列 universal-capture、surface resolver 或 omni-capture-beacon.js。
+- [ ] (2026-07-04) 在主要目录/能力中补充统一设计工作室/材料轨迹画布资产：frontend/src/entities/review-canvas、/review-canvas 投影、决策树/强制标签/next-step-dispatch 等入口，说明其承接审阅材料到裁决与下一步分派的链路。 — 证据: 2026-07-04 多条提交摘要集中新增统一设计工作室: '统一设计工作室一期: enforced_by契约+首棵可见决策树+留痕钩子+核查脚本'、'统一设计工作室二期后端: Material 契约链端到端+强制标签阻断+M4回填+画布投影端点'、'统一设计工作室二期前端: 材料轨迹画布+项目页默认tab+队列降待办+发起下一步最小形态'、'发起下一步·增强形态后端: POST /{id}/next-step-dispatch 经 omni dispatch route 路由决策'。相关前端路径存在 E:/WindowsWorkspace/omnicompany/src/omnicompany/dashboard/frontend/src/entities/review-canvas/ReviewCanvas.tsx 与 StudioDemoMount.tsx。
+<!-- projidx-candidates:end -->

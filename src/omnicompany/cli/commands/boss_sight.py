@@ -366,7 +366,9 @@ def cmd_review() -> None:
 
 
 @cmd_review.command("submit")
-@click.option("--kind", required=True, type=click.Choice(["image", "markdown", "html", "key_question", "custom_web_template", "webgame-spec"]))
+@click.option("--kind", required=True, type=click.Choice(["image", "markdown", "html", "key_question", "custom_web_template", "video", "webgame-spec", "plan", "static-report", "demo", "aigc-image", "agent-workflow-report"]),
+              help="按内容格式选, 别按用途名望文生义: md 报告=markdown/plan/agent-workflow-report; "
+                   "static-report/demo/html=自包含 HTML 网页(或 extra.live_url)。kind 决定渲染器, 错配会被拒。")
 @click.option("--tier", required=True, type=click.Choice(["mandatory", "important", "processual", "ignored"]))
 @click.option("--title", required=True)
 @click.option("--plan-id", "source_plan_id", required=True)
@@ -377,14 +379,37 @@ def cmd_review() -> None:
 @click.option("--file-ext", default=None)
 @click.option("--schema-id", "data_schema_id", default=None)
 @click.option("--extra-json", "extra_json", default=None,
-              help="JSON 对象 merge 进 material.extra (webgame-spec 三件套引用 / 兄弟材料 attached_to)。")
+              help="JSON 对象 merge 进 material.extra (webgame-spec 三件套引用 / 兄弟材料 attached_to)。"
+                   "禁止塞 project/track/version/version_family — 用同名正式选项。")
+@click.option("--project", default=None,
+              help="必填(store 会拒绝空值)。项目名录真源=决策库: `omni decisions list` 看已有项目, "
+                   "或 `omni decisions record -p <project>` 先立项。'unfiled'=未分组待办。")
+@click.option("--track", default=None,
+              help="必填。阶段/轨道名, 如 信息审阅稿/交互审阅稿/工作报告。")
+@click.option("--version", "version", type=int, default=None,
+              help="必填。版本号(同 --version-family 内递增, 从 1 起)。")
+@click.option("--version-family", "version_family", default=None,
+              help="版本族(同一份稿的多版本共 family)。省略则默认=--title。")
+@click.option("--links-json", "links_json", default=None,
+              help='JSON 对象, 如 {"parent":"mat_xxx","supersedes":["mat_yyy"],"related":["mat_zzz"]}。')
 # M2 Phase 2 步骤 4: subagent 在收尾时通过 omni review submit emit material 是核心协议
 # (emit_material_protocol = A_explicit_tool, 见 plan.md). 把 submit 放开给三档 caller.
 # annotate / push 仍受限 — 那是总控/外部的活, subagent 不应该自评和自推.
 @any_caller
 def cmd_review_submit(kind, tier, title, source_plan_id, source_subagent_id, file_path,
-                      inline_content, annotations_allowed, file_ext, data_schema_id, extra_json):
-    """Submit a material to the review stage (§2.7)."""
+                      inline_content, annotations_allowed, file_ext, data_schema_id, extra_json,
+                      project, track, version, version_family, links_json):
+    """Submit a material to the review stage (§2.7).
+
+    project/track/version 是强制标签(阻断校验在 store.create 唯一收口, 这里只透传;
+    缺了会报错, 错误信息里会说明怎么补, 不是本命令自己重复一份规则)。
+
+    错误样本:
+      omni review submit --kind markdown --tier important --title X --plan-id P --content C
+        → ERROR: project is required — 补 `--project <project>` ...
+      omni review submit ... --project not-a-real-project ...
+        → ERROR: project 'not-a-real-project' 不在项目名录里 ...
+    """
     from omnicompany.dashboard.boss_sight.controller.tools import SubmitToReviewstageRouter
     args = {"kind": kind, "tier": tier, "title": title, "source_plan_id": source_plan_id,
             "annotations_allowed": annotations_allowed}
@@ -394,6 +419,11 @@ def cmd_review_submit(kind, tier, title, source_plan_id, source_subagent_id, fil
     if file_ext: args["file_ext"] = file_ext
     if data_schema_id: args["data_schema_id"] = data_schema_id
     if extra_json: args["extra_json"] = extra_json
+    if project is not None: args["project"] = project
+    if track is not None: args["track"] = track
+    if version is not None: args["version"] = version
+    if version_family is not None: args["version_family"] = version_family
+    if links_json: args["links_json"] = links_json
     click.echo(_invoke_router(SubmitToReviewstageRouter, args))
 
 
@@ -413,9 +443,14 @@ def cmd_review_submit(kind, tier, title, source_plan_id, source_subagent_id, fil
 @click.option("--include-unchanged", is_flag=True, help="附 diff 目录同级未改文件(供前端'显示全部')")
 @click.option("--no-inline-diff", "no_inline", is_flag=True, help="不内联 diff 文本")
 @click.option("--no-preview", "no_preview", is_flag=True, help="不内嵌图片/html 预览")
+@click.option("--project", default=None, help="必填(store 会拒绝空值)。项目名录真源=决策库。")
+@click.option("--track", default=None, help="必填。阶段/轨道名。")
+@click.option("--version", "version", type=int, default=None, help="必填。版本号(从 1 起)。")
+@click.option("--version-family", "version_family", default=None, help="省略则默认=--title。")
 @any_caller
 def cmd_review_filetree_diff(tier, title, source_plan_id, source_subagent_id, root, ref, snapshot,
-                             since, until, paths, paths_file, attached_to, include_unchanged, no_inline, no_preview):
+                             since, until, paths, paths_file, attached_to, include_unchanged, no_inline, no_preview,
+                             project, track, version, version_family):
     """生成文件树 diff 并作为审阅材料(custom_web_template / filetree_diff_v1)提交。"""
     import json as _json
     from omnicompany.dashboard.boss_sight.reviewstage.filetree_diff import build_filetree_diff
@@ -455,6 +490,10 @@ def cmd_review_filetree_diff(tier, title, source_plan_id, source_subagent_id, ro
         args["source_subagent_id"] = source_subagent_id
     if attached_to:
         args["extra_json"] = _json.dumps({"attached_to": attached_to})
+    if project is not None: args["project"] = project
+    if track is not None: args["track"] = track
+    if version is not None: args["version"] = version
+    if version_family is not None: args["version_family"] = version_family
     click.echo(_invoke_router(SubmitToReviewstageRouter, args))
 
 
@@ -517,6 +556,29 @@ def cmd_review_push(material_id, reason):
     }))
 
 
+@cmd_review.command("relay")
+@click.argument("material_id")
+@click.option("--reason", required=True, help="带反馈的审阅意见(非 yes/no)")
+@click.option("--plan-id", "plan_id", default=None, help="material 的源 plan(自动找不到时给)")
+@click.option("--task-id", "task_id", default=None, help="直接指定回流到哪个 task")
+@click.option("--verdict", type=click.Choice(["rejected", "annotated"]), default="rejected")
+@click.option("--no-inject", is_flag=True, help="只定位+留痕, 不实际注入会话")
+@click.option("--json", "as_json", is_flag=True)
+@external_or_controller
+def cmd_review_relay(material_id, reason, plan_id, task_id, verdict, no_inject, as_json):
+    """审阅意见回流: 用户带反馈的驳回/批注 → 注入回原 agent 会话继续 (修断掉的回路)。"""
+    import json as _json
+    from omnicompany.packages.services._core.lifecycle.review_relay import relay_feedback
+    res = relay_feedback(material_id, reason, plan_id=plan_id, task_id=task_id,
+                         verdict=verdict, inject=not no_inject)
+    if as_json:
+        click.echo(_json.dumps(res, ensure_ascii=False, indent=2))
+    else:
+        click.echo(res.get("summary", _json.dumps(res, ensure_ascii=False)))
+    if not res.get("ok"):
+        raise SystemExit(1)
+
+
 # ────────────────────────────────────────────────────────────────────────
 # 新 omni prompt group (list)
 # ────────────────────────────────────────────────────────────────────────
@@ -566,6 +628,112 @@ def cmd_propose_change(kind, rationale, content_draft, target_location, componen
 
 
 # ────────────────────────────────────────────────────────────────────────
+# 新 omni agent group (whoami / request-review) — agent 自我身份 + 主动请审阅本对话
+# 用户(2026-06-25): "作为 agent 你应当可以感知自己的身份信息并输入自己的身份信息,
+#                    主动让用户专注于本对话审阅。"
+# ────────────────────────────────────────────────────────────────────────
+
+
+def _dashboard_base() -> str:
+    import os
+    return os.environ.get("OMNI_DASHBOARD_URL", "http://127.0.0.1:8210").rstrip("/")
+
+
+def _post_dashboard(path: str, payload: dict[str, Any], *, timeout: float = 6.0) -> dict[str, Any] | None:
+    """POST 到运行中的看板(走 8210 反代 boss-sight)。失败返回 None(调用方回落本地)。"""
+    import urllib.error
+    import urllib.request
+    url = f"{_dashboard_base()}/api/boss-sight{path}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — 本机回环
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+@click.group("agent")
+def cmd_agent() -> None:
+    """Agent 自我身份 / 主动请用户审阅本对话(work-report 控制台)。"""
+
+
+@cmd_agent.command("whoami")
+@click.option("--cwd", default=None, help="解析身份用的工作目录, 省略=当前目录。")
+@click.option("--session-id", default=None, help="直接指定 session_id(跳过 cwd 解析)。")
+@click.option("--json", "as_json", is_flag=True)
+@any_caller
+def cmd_agent_whoami(cwd, session_id, as_json):
+    """感知自己被派生出的身份(project-role-name + session)。"""
+    import os
+    cwd = cwd or os.getcwd()
+    res = _post_dashboard("/agent/whoami", {"cwd": cwd, "session_id": session_id})
+    if res is None:  # 看板不可达 → 本地解析
+        from omnicompany.dashboard.boss_sight.services.residents import build_residents
+        from omnicompany.dashboard.boss_sight.services.session_resolver import resolve
+        residents = build_residents().get("residents", [])
+        target = None
+        if session_id:
+            target = next((r for r in residents if r.get("session_id") == session_id), None)
+        if target is None:
+            rr = resolve(None, cwd, residents)
+            if rr:
+                target = next((r for r in residents if r.get("session_id") == rr["session_id"]), None)
+        res = ({"resolved": True, "session_id": target.get("session_id"), "identity": target.get("identity"),
+                "project": target.get("project"), "role": target.get("role"), "name": target.get("name"),
+                "location": target.get("location"), "current_task": target.get("current_task")}
+               if target else {"resolved": False, "cwd": cwd})
+    if not res.get("resolved"):
+        raise click.ClickException(f"未能从 cwd={cwd} 解析出本对话身份(无匹配 claude_code 会话)。可显式 --session-id。")
+    if as_json:
+        click.echo(json.dumps(res, ensure_ascii=False, indent=2))
+    else:
+        click.echo(f"{res.get('identity') or '(未命名)'}  · session={res.get('session_id')} · @ {res.get('location')}")
+
+
+@cmd_agent.command("request-review")
+@click.option("--headline", required=True, help="一句话工作报告(让用户知道该看什么)。")
+@click.option("--cwd", default=None, help="省略=当前目录。")
+@click.option("--session-id", default=None)
+@click.option("--as", "as_identity", default=None, help="project-role-name 覆盖自动解析的身份。")
+@click.option("--kind", default="conversation", type=click.Choice(["conversation", "material", "plan"]))
+@click.option("--no-active", is_flag=True, help="不把本对话设为当前跟随上下文。")
+@any_caller
+def cmd_agent_request_review(headline, cwd, session_id, as_identity, kind, no_active):
+    """主动举手: 让用户在审阅总览/多Agent 顶部专注于本对话, 给出指示。"""
+    import os
+    cwd = cwd or os.getcwd()
+    ident = {"identity": "", "project": "", "role": "", "name": ""}
+    if as_identity:
+        parts = as_identity.split("-")
+        if len(parts) >= 3:
+            ident.update(identity=as_identity, project=parts[0], role=parts[1], name="-".join(parts[2:]))
+    payload = {"headline": headline, "cwd": cwd, "session_id": session_id,
+               "kind": kind, "set_active": not no_active, **ident}
+    res = _post_dashboard("/agent/request-review", payload)
+    if res is None:  # 看板不可达 → 本地落文件(看板起来后仍可见; active_context 跨进程无法设)
+        from omnicompany.dashboard.boss_sight.services import agent_attention
+        from omnicompany.dashboard.boss_sight.services.residents import build_residents
+        from omnicompany.dashboard.boss_sight.services.session_resolver import resolve
+        residents = build_residents().get("residents", [])
+        sid = session_id
+        if not sid:
+            rr = resolve(None, cwd, residents)
+            sid = rr["session_id"] if rr else None
+        if sid and not as_identity:
+            r = next((x for x in residents if x.get("session_id") == sid), None)
+            if r:
+                ident = {k: (ident[k] or r.get(k, "")) for k in ident}
+        rec = agent_attention.request_attention(sid or "", headline=headline, kind=kind, **ident)
+        click.echo(f"[本地] 已请求审阅本对话: {rec['headline']}  (session={sid or '未解析'}; 看板未运行, "
+                   f"起来后顶部可见)")
+        return
+    sid = res.get("session_id")
+    click.echo(f"已请求审阅本对话: {headline}  →  审阅总览/多Agent 顶部高亮 "
+               f"(session={sid or '未解析'}, 身份{'已' if res.get('resolved_identity') else '未'}解析)")
+
+
+# ────────────────────────────────────────────────────────────────────────
 # 入口: main.py 调
 # ────────────────────────────────────────────────────────────────────────
 
@@ -582,9 +750,10 @@ def register_boss_sight_commands(cli: click.Group, *, cmd_worker: click.Group, c
     cli.add_command(cmd_review)
     cli.add_command(cmd_prompt)
     cli.add_command(cmd_propose)
+    cli.add_command(cmd_agent)
 
 
 __all__ = [
     "register_boss_sight_commands",
-    "cmd_review", "cmd_prompt", "cmd_propose",
+    "cmd_review", "cmd_prompt", "cmd_propose", "cmd_agent",
 ]

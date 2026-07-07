@@ -23,8 +23,9 @@ from ._paths import RECORDS_PATH, ensure_dirs
 _KIND_PREFIX = {"decision": "DEC", "belief": "BLF", "comment": "CMT"}
 _KIND_INIT_STATUS = {"decision": "proposed", "belief": "untested", "comment": "open"}
 
-# links 的边:parent 是标量(单父),其余是 id 列表
-_LINK_LIST_RELS = ("rests_on", "supersedes", "related")
+# links 的边:parent 是标量(单父),其余是列表。
+# enforced_by 的值是执法载体标识(如 demogame.design_doc_lint.check7_self_reference),不是记录 id。
+_LINK_LIST_RELS = ("rests_on", "supersedes", "related", "enforced_by")
 _LINK_SCALAR_RELS = ("parent",)
 
 
@@ -208,6 +209,14 @@ def validate_record(record: dict) -> list[str]:
             issues.append("decision: 已拍板却没列被否决项 —— 不算显化决策(见 DESIGN)")
     if kind == "belief" and not record.get("risk_if_wrong"):
         issues.append("belief: 缺 risk_if_wrong(猜想错了多大代价,关系到要不要验)")
+    # enforced_by 边纪律(双权威 A6):库是索引,规则正文的人读权威在域文档。
+    links = record.get("links") or {}
+    if links.get("enforced_by"):
+        anchor = record.get("anchor") or {}
+        if not (anchor.get("ref") or "").strip():
+            issues.append("enforced_by: 带执法边的记录必须有 anchor.ref 指回规则文档(库=索引,文档=人读权威)")
+        if len(record.get("statement") or "") > 200:
+            issues.append("enforced_by: statement 超 200 字——索引存要点与原话引文,规则正文留在域文档")
     return issues
 
 
@@ -265,7 +274,10 @@ def soft_delete(record_id: str) -> bool:
 
 
 def add_link(src_id: str, rel: str, dst_id: str) -> dict:
-    """给决策树加一条边:src --rel--> dst。rel ∈ rests_on/supersedes/parent/related。"""
+    """给决策树加一条边:src --rel--> dst。rel ∈ rests_on/supersedes/parent/related/enforced_by。
+
+    enforced_by 的 dst 是执法载体标识(函数/token 路径),不校验为记录 id。
+    """
     if rel not in _LINK_LIST_RELS + _LINK_SCALAR_RELS:
         raise ValueError(f"未知关系 {rel!r}(应为 {_LINK_LIST_RELS + _LINK_SCALAR_RELS})")
     src = get(src_id)

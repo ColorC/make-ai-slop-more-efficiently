@@ -1,5 +1,5 @@
 <!-- [OMNI] origin=ai-ide domain=services/guardian ts=2026-05-04T11:30:00Z type=doc status=active agent=ai-ide belongs_to_service=guardian -->
-<!-- [OMNI] summary="guardian service 自我叙事 README — 源码/文档/架构合规自动巡逻, 30+ 规则 OMNI-001~035, 跟 Doctor 互补 (Guardian 静态/Doctor 运行时)" -->
+<!-- [OMNI] summary="guardian service 自我叙事 README — 源码/文档/架构合规自动巡逻, 83 条规则实例/66 个基础编号(2026-07-02 实测) OMNI-001~035, 跟 Doctor 互补 (Guardian 静态/Doctor 运行时)" -->
 <!-- [OMNI] why="DESIGN.md 285 行混了核心目的+架构. Guardian 是核心层四件武器之一+自稳第二阶段地基. README/DESIGN/SKILL 拆开让目的+架构+操作各管一段" -->
 <!-- [OMNI] tags=readme,guardian,core,self-narrative -->
 <!-- [OMNI] material_id="material:services._core.guardian.readme.self_narrative.md"-->
@@ -75,7 +75,7 @@ guardian 不是 Team 形态 (虽然有"巡逻管线"), 是**多功能合规 serv
 | Registry 同步 | patrol 结果同步到 tech_debt + ARCH-CHANGES | [registry_updater.py](registry_updater.py) |
 | Evolve signal | 罚单 7 天逾期升级 | [evolve_signal.py](evolve_signal.py) + [guardian_hook.py](guardian_hook.py) |
 
-技术架构详述见 [DESIGN.md](DESIGN.md) (含 D1-D10 决策 + 30+ 规则家族表 + 巡逻管线拓扑), 操作手册见 [SKILL.md](SKILL.md).
+技术架构详述见 [DESIGN.md](DESIGN.md) (含 D1-D10 决策 + 83 条规则实例/66 个基础编号(2026-07-02 实测) 规则家族表 + 巡逻管线拓扑), 操作手册见 [SKILL.md](SKILL.md).
 
 ## 想了解更多
 

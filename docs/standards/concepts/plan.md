@@ -70,7 +70,7 @@ plan.md 结构: **顶部 frontmatter → OmniMark v3 头注释 → §1 主题正
 ```yaml
 ---
 # ── 平铺字段 (dashboard 列表/看板直接消费; 存量 plan 已全用) ──
-title: <计划标题>
+title: 【短称】完整中文标题                        # 格式见 §3.0; 短称取归属项目的 short 字段
 date: '<YYYY-MM-DD>'                              # 立计划日
 project: <project_id>                             # 可选, 跨 plan 关联到项目 (归属以 plan_governance 覆盖表优先)
 work_type: <refactor|infra-convergence|...>
@@ -95,6 +95,35 @@ ttl_days: <int>                                   # 可选, 填写后守护按�
 ```
 
 存量 plan 只有平铺字段、无 binding 块 — 不违规, 下次实质性更新时补 binding。新立 plan 必带 binding.workspace。
+
+### 3.0 title 标题格式 (2026-06-22 用户立: 中文完整化 + 项目短称)
+
+> **2026-06-22 用户裁决**: "现在和之后所有的 plan 标题全部中文完整化并接项目短称"。
+
+plan 的 `title` 字段统一格式:
+
+```
+【短称】完整中文标题
+```
+
+- **短称 (短名)**: 归属项目的标识短名, 取**项目注册表** `short` 字段 (`data/registry/projects.json`, 每个项目一个, 如 配表 / 跑测 / 预制件 / 驾驶舱 / 守护 / 悬浮层…)。用全角方括号 `【】` 包住放在标题最前。
+- **完整中文标题**: 一个读得通的完整中文标题, 完整概括计划主题 (一般 10-24 字)。**不砍成名词堆、不压到十几个字**; 不含日期、编号 (禁 B0/M0.1 之类)、英文缩写堆砌。
+- **无归属 plan** (`project=null` 的框架/实验/知识吸收类): 短称按类目映射 (框架 / 推理 / 实验 / 队医 / 学习…), 兜底 `【综合】`。映射表见 `plan_steward/steward.py` `_CATEGORY_SHORT`。
+
+举例:
+
+| 归属项目 (short) | title |
+|---|---|
+| omnidashboard-os (悬浮层) | `【悬浮层】悬浮层框架地基` |
+| omnidashboard (驾驶舱) | `【驾驶舱】圈选评论与超级审阅` |
+| demogame-unity (跑测) | `【跑测】Unity CLI 收敛硬实` |
+| demogame-config (配表) | `【配表】配表 LIVE 管线卫士` |
+| (无归属 → 框架) | `【框架】事件驱动核心重构` |
+
+**短称是确定性前缀, 不靠人/模型每次手填**: 治理管线 (`omni governance plans-run` → [`plan_steward`](../../../src/omnicompany/packages/services/_governance/plan_steward/steward.py)) 对每个 plan 判归属 + 起完整中文标题正文, **由系统按归属项目的 short 自动拼 `【短称】` 前缀** —— 归属变了前缀自动跟着变。`title` 与治理覆盖表 `data/registry/plan_governance.json` 的 `title_zh` 同语义 (dashboard 浮出后者); 存量 179 个 title 已由治理管线一次性刷成本格式。
+
+- **新立 plan**: `title` 直接按本格式手写 (短称查项目 `short`), 或 `omni governance plans-run --only-missing` 让治理管线补。
+- **改归属**: 改 `plan_governance.json` 的 project 即可, 重跑治理前缀自动重算, 不用手改标题。
 
 ### 3.1 binding.workspace (必填, 单值)
 
@@ -262,7 +291,7 @@ omnicompany/docs/plans/
     <按上面同结构镜像>
 ```
 
-主题代号沿用大写蛇形 + 不挂版本号 (跟现有规则一致).
+主题代号 (文件夹 slug, 如 `OVERLAY-FRAMEWORK-FOUNDATION`) 沿用大写蛇形 + 不挂版本号 (跟现有规则一致) —— 它是**稳定 id/引用键** (治理覆盖表、wikilink `[[plan:...]]` 都按它), **不**改中文. 中文化的是**人读的 `title` 字段**, 格式 `【短称】完整中文标题` (见 §3.0), 两者分工: slug = 机器引用键(英文不变), title = 人读标题(中文+短称).
 
 ## 八、 standards 目录树 (规范权威定义)
 

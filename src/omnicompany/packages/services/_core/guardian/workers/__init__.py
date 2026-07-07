@@ -13,6 +13,7 @@ from .rule_engine_worker import RuleEngineWorker
 from .fs_scanner_worker import FsScannerWorker
 from .arch_auditor_worker import ArchAuditorWorker
 from .hygiene_scan_worker import HygieneScanWorker
+from .plan_bindings_scan_worker import PlanBindingsScanWorker
 from .report_writer import GuardianReportWorker
 
 
@@ -22,6 +23,7 @@ ALL_WORKERS = [
     FsScannerWorker,
     ArchAuditorWorker,
     HygieneScanWorker,
+    PlanBindingsScanWorker,
     GuardianReportWorker,
 ]
 
@@ -33,5 +35,6 @@ __all__ = [
     "ArchAuditorWorker",
     "GuardianReportWorker",
     "HygieneScanWorker",
+    "PlanBindingsScanWorker",
     "ALL_WORKERS",
 ]

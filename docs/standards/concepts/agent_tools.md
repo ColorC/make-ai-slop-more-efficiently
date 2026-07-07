@@ -30,7 +30,7 @@
 
 ### 正向替代
 
-**提供受限的结构化工具集**（对标 Claude Code 的 GrepTool/GlobTool/FileReadTool）：
+**提供受限的结构化工具集**（对标 Claude Code 的 [GrepTool/GlobTool/FileReadTool](../../../../参考项目/claude-code-analysis/src/tools/)）：
 - Glob / Grep / Read / Ls / （其他领域特定 readonly 工具）
 - 每工具 `path` **必填**（schema required），Agent **无法缺省到全盘搜索**
 - 底层用经过验证的高性能二进制（ripgrep）
@@ -62,7 +62,7 @@
 
 ### 证据
 
-Claude Code 的 GrepTool.ts schema：`pattern` required，`path` optional（默认 cwd —— 但 CC 有明确 cwd 上下文）。在**无明确 cwd** 的 AgentNodeLoop 场景下（我们的场景），`path` 应升级为 required。
+Claude Code 的 [GrepTool.ts](../../../../参考项目/claude-code-analysis/src/tools/GrepTool/GrepTool.ts) schema：`pattern` required，`path` optional（默认 cwd —— 但 CC 有明确 cwd 上下文）。在**无明确 cwd** 的 AgentNodeLoop 场景下（我们的场景），`path` 应升级为 required。
 
 ## 原则 3 · 底层用经过验证的高性能二进制
 
@@ -145,14 +145,14 @@ LLM 不需要传参才排除 —— 工具自动做。
 ## 标准 tool 体系位置（canonical）
 
 **ToolDefinition**（供 AgentNodeLoop 子类 `TOOLS` 引用）：
-`omnicompany.runtime.agent.agent_loop_tools`
+[`omnicompany.runtime.agent.agent_loop_tools`](../../../src/omnicompany/runtime/agent/agent_loop_tools.py)
 - `GlobTool` — 按文件名 glob 找文件
 - `GrepTool` — ripgrep 内容搜索
 - `ReadFileTool` — 读文件（cat -n 格式）
 - `ListDirTool` — 列目录
 
 **底层 impl**：
-`omnicompany.runtime.exec.tool_executor.ToolExecutor`
+[`omnicompany.runtime.exec.tool_executor.ToolExecutor`](../../../src/omnicompany/runtime/exec/tool_executor.py)
 - `execute_glob` / `execute_grep` — ripgrep + VCS 排除 + head_limit + output_mode
 - `_find_rg_binary()` — 跨平台 rg.exe 候选查找（Windows 下解决 CC shell function 问题）
 - `_read_file_call` / `_list_dir_call` — 定义在 agent_loop_tools.py

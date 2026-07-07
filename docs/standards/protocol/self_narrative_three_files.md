@@ -316,7 +316,7 @@ demogame domain 提供赛季手册 / 装饰抽奖 / 商店等 13 张表的自动
 
 ### 6.1 跟现行 .claude/skills/ 形态的关系
 
-现有 .claude/skills/omnicompany-dev/SKILL.md 是 **Claude Code skill 框架**的产物, 用于 AI IDE 调起. 它有 YAML frontmatter (name / description / user-invocable / disable-model-invocation / argument-hint) + 内容.
+现有 `.claude/skills/omnicompany-dev/SKILL.md` 是 **Claude Code skill 框架**的产物, 用于 AI IDE 调起. 它有 YAML frontmatter (name / description / user-invocable / disable-model-invocation / argument-hint) + 内容.
 
 **新规范下 SKILL.md 是更广义的"操作手册"** — 不只是给 Claude Code 调起, 也给:
 - 人类用户读
@@ -469,7 +469,7 @@ argument-hint: "<可选, CLI 风格参数提示>"
 
 ### 7.3 .claude/skills/ vs 各模块 SKILL.md
 
-- .claude/skills/omnicompany-dev/SKILL.md / omnicompany-use/SKILL.md — Claude Code 顶层 skill 入口, 保留, 它们是用户调起 omnicompany 的"门面 skill"
+- `.claude/skills/omnicompany-dev/SKILL.md` / `omnicompany-use/SKILL.md` — Claude Code 顶层 skill 入口, 保留, 它们是用户调起 omnicompany 的"门面 skill"
 - 各 module 的 SKILL.md — 是该 module 的"操作手册", 由门面 skill 在恰当时引导用户跳转
 
 不替代关系, 是层级关系: 门面 skill 在顶层提示用户"做 X 看 module Y 的 SKILL", module Y 的 SKILL 有具体操作手册.

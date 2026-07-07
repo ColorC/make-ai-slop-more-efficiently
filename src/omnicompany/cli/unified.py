@@ -223,7 +223,8 @@ def _write_output_to_file(payload, output_path: str) -> None:
     if isinstance(payload, str):
         p.write_text(payload, encoding="utf-8")
     elif isinstance(payload, (dict, list)):
-        p.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        # default=str: event 引擎 result 携带 FactoryEvent 等非原生对象, 黑盒消费降级为字符串即可
+        p.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     else:
         p.write_text(str(payload), encoding="utf-8")
     click.echo(click.style(f"  → output written to {output_path}", fg="bright_black"))

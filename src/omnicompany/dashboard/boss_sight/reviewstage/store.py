@@ -39,10 +39,13 @@ from omnicompany.packages.services._core.omnicompany.formats import REVIEW_MATER
 from omnicompany.packages.services._core.omnicompany.material_events import publish_material_event
 from omnicompany.protocol.format import FormatRegistry
 
-from .content_validators import TEXT_KINDS, validate_material_structure
+from .content_validators import TEXT_KINDS, validate_kind_file_compat, validate_material_structure
 from .material_types import (
     normalize_review_kind,
+    normalize_review_project,
     normalize_review_tier,
+    project_domains,
+    project_registered_tracks,
     review_material_tags,
 )
 
@@ -66,6 +69,9 @@ class MaterialKind(str, Enum):
     # 块 5 B5-R1: §4.2.5 自定义网页模板元编程
     # inline_content 是 JSON 字符串, extra.data_schema_id 指定渲染模板
     custom_web_template = "custom_web_template"
+    # 公众号式审阅总览的可读媒体类型(2026-06-24): 视频材料,file_relpath 指向视频文件,
+    # extra.poster_relpath / extra.video_url(YouTube 等)可选。见 docs/plans/dashboard 计划。
+    video = "video"
 
 
 class MaterialTier(str, Enum):
@@ -169,6 +175,12 @@ class Material:
     archived: bool = False
     # extra: 留给元编程 phase B
     extra: dict[str, Any] = field(default_factory=dict)
+    # ── Material 契约链(第二期): 项目上下文画布用它做投影(A1) ──
+    project: str = ""            # 复用 decisions 库项目名录; "unfiled"=未分组
+    track: str = ""              # 阶段/轨道名(如 信息审阅稿/交互审阅稿/工作报告)
+    version: int | None = None   # 版本号(同 version_family 内递增)
+    version_family: str = ""     # 版本族(同一份稿的多版本共 family; 默认=title)
+    links: dict[str, Any] = field(default_factory=dict)  # {parent?, supersedes?: [], related?: []} 值=material id
 
     def to_dict(self) -> dict[str, Any]:
         d = {
@@ -192,6 +204,11 @@ class Material:
             "pushed_at": self.pushed_at,
             "archived": self.archived,
             "extra": dict(self.extra),
+            "project": self.project,
+            "track": self.track,
+            "version": self.version,
+            "version_family": self.version_family,
+            "links": dict(self.links),
         }
         return d
 
@@ -241,6 +258,11 @@ class Material:
             pushed_at=d.get("pushed_at"),
             archived=bool(d.get("archived", False)),
             extra=dict(d.get("extra") or {}),
+            project=d.get("project", "") or "",
+            track=d.get("track", "") or "",
+            version=d.get("version", None),
+            version_family=d.get("version_family", "") or "",
+            links=dict(d.get("links") or {}),
         )
 
 
@@ -279,6 +301,33 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _track_registration_warning(
+    project: str, track: str, registry: FormatRegistry | None,
+) -> dict[str, Any] | None:
+    """轨道在册软校验。project 不属任何注册域 → None(存量不校验)。属注册域但 track 既非
+    该域层级名、也非 "<project>/..." 前缀轨道 → 返回一条 code=track-unregistered 警告
+    (message 附该项目可用层级清单)。绝不阻断创建。"""
+    if not project or not track:
+        return None
+    if not project_domains(project, registry):
+        return None  # 项目不属任何注册域: 完全不校验
+    if track.startswith(f"{project}/"):
+        return None  # 项目前缀轨道视为在册(项目专属层级)
+    registered = project_registered_tracks(project, registry)
+    if track in registered:
+        return None
+    available = "、".join(sorted(registered)) if registered else "(无)"
+    return {
+        "code": "track-unregistered",
+        "severity": "warning",
+        "message": (
+            f"轨道 {track!r} 不在项目 {project!r} 的在册层级里。该项目可用层级: {available}"
+            f"(或用 \"{project}/...\" 前缀登记项目专属层级)。"
+        ),
+        "path": "track",
+    }
 
 
 class MaterialStore:
@@ -428,8 +477,18 @@ class MaterialStore:
         inline_content: str | None = None,
         annotations_allowed: bool = True,
         extra: dict[str, Any] | None = None,
+        project: str | None = None,
+        track: str | None = None,
+        version: int | None = None,
+        version_family: str | None = None,
+        links: dict[str, Any] | None = None,
     ) -> Material:
-        """新建 material 落盘 + emit 'created'."""
+        """新建 material 落盘 + emit 'created'.
+
+        Material 契约链(第二期 A1): project/track/version 是强制标签, 在这里(唯一收口)
+        做阻断校验(ValueError) —— HTTP 层 400、CLI 层报错都透传这里的错误信息, 不在
+        routes.py / cli 各写一份规则(双权威会漂移)。
+        """
         # 校验: enum 只保留内置兼容; 扩展 kind/tier 走 Format tags。
         kind_text = normalize_review_kind(kind, self.format_registry)
         tier_text = normalize_review_tier(tier, self.format_registry)
@@ -445,9 +504,71 @@ class MaterialStore:
             raise ValueError("title required")
         if file_relpath is None and inline_content is None:
             raise ValueError("must provide file_relpath or inline_content")
+
+        # ── Material 契约链强制标签(A1): project / track / version ─────────
+        project_text = (project or "").strip()
+        if not project_text:
+            raise ValueError(
+                "project is required — 补 `--project <project>`(或 API/工具的 project 字段)。"
+                "项目名录真源=决策库, 用 `omni decisions list` 看已有项目, "
+                "或 `omni decisions record -p <project>` 立项。"
+            )
+        project_v = normalize_review_project(project_text)
+
+        track_text = (track or "").strip()
+        if not track_text:
+            raise ValueError(
+                "track is required — 补 `--track <track>`(如 信息审阅稿/交互审阅稿/工作报告)。"
+            )
+
+        if version is None:
+            raise ValueError("version is required — 补 `--version <int>`(同一份稿的版本号, 从 1 起)。")
+        try:
+            version_int = int(version)
+        except (TypeError, ValueError):
+            raise ValueError(f"version must be a positive integer, got {version!r}")
+        if version_int <= 0:
+            raise ValueError(f"version must be a positive integer, got {version_int}")
+
+        version_family_text = (version_family or "").strip() or title.strip()
+
+        links_v: dict[str, Any] = dict(links or {})
+        allowed_link_keys = {"parent", "supersedes", "related"}
+        for key, value in links_v.items():
+            if key not in allowed_link_keys:
+                raise ValueError(
+                    f"links 里出现未知键 {key!r} — 只允许 {sorted(allowed_link_keys)}。"
+                )
+            if isinstance(value, str):
+                continue
+            if isinstance(value, list) and all(isinstance(v, str) for v in value):
+                continue
+            raise ValueError(
+                f"links[{key!r}] 的值必须是字符串或字符串列表(material id), 收到 {type(value).__name__}。"
+            )
+
         if file_relpath is not None:
             self._prepare_declared_file(file_relpath, inline_content)
         extra_v = dict(extra or {})
+        # 双权威禁令(A1): extra 里不许塞 project/track/version/version_family —— 这些是
+        # 正式字段, 塞进 extra 会造成"两套真源"(一处走 store 校验, 一处绕过)。
+        reserved_extra_keys = {"project", "track", "version", "version_family"}
+        leaked = reserved_extra_keys & set(extra_v.keys())
+        if leaked:
+            raise ValueError(
+                f"extra 里不能塞 {sorted(leaked)} — 这些是正式字段, 请用 create() 的同名关键字参数"
+                "(或 CLI 的 --project/--track/--version/--version-family), 不要塞进 extra 旁路。"
+            )
+        # 阻断校验: kind 决定渲染器, 与内容格式不匹配直接拒(如 .md 提 static-report,
+        # 会被 HtmlMaterialView 当 HTML 渲染 — 2026-07-02 实踩)。所有提交入口都过这里。
+        compat_error = validate_kind_file_compat(
+            kind=kind_text,
+            inline_content=inline_content,
+            file_relpath=file_relpath,
+            extra=extra_v,
+        )
+        if compat_error:
+            raise ValueError(compat_error)
         validation_content = inline_content
         if validation_content is None and file_relpath is not None and kind_text in TEXT_KINDS:
             validation_content = self._read_declared_file_text(file_relpath)
@@ -458,6 +579,12 @@ class MaterialStore:
             file_relpath=file_relpath,
             extra=extra_v,
         )
+        # 轨道软校验(决策树=具象管线, 先软后硬): 项目属某注册域, 且 track 不在册
+        # (不是该域任一层级名, 也不是 "<project>/..." 项目前缀轨道)→ 追加一条警告, 绝不阻断。
+        # 项目不属任何注册域则完全跳过(存量不惊动)。
+        track_warning = _track_registration_warning(project_v, track_text, self.format_registry)
+        if track_warning:
+            structure_warnings.append(track_warning)
         if structure_warnings:
             extra_v["structure_warnings"] = structure_warnings
 
@@ -488,6 +615,11 @@ class MaterialStore:
                 updated_at=now,
                 history=history,
                 extra=extra_v,
+                project=project_v,
+                track=track_text,
+                version=version_int,
+                version_family=version_family_text,
+                links=links_v,
             )
             self._cache[mid] = m
             self._persist(m)
@@ -515,6 +647,8 @@ class MaterialStore:
         subagent_id: str | None = None,
         pushed_only: bool = False,
         include_archived: bool = False,
+        project: str | None = None,
+        track: str | None = None,
     ) -> list[Material]:
         with self._lock:
             items = list(self._ensure_loaded().values())
@@ -533,6 +667,10 @@ class MaterialStore:
             items = [m for m in items if m.source_subagent_id == subagent_id]
         if pushed_only:
             items = [m for m in items if m.pushed_to_user]
+        if project is not None:
+            items = [m for m in items if getattr(m, "project", "") == project]
+        if track is not None:
+            items = [m for m in items if getattr(m, "track", "") == track]
         items.sort(key=lambda m: m.created_at, reverse=True)
         return items
 
@@ -587,6 +725,9 @@ class MaterialStore:
         author: str = "user",
         target: dict[str, Any] | None = None,
     ) -> Comment:
+        """已冻结(2026-07-04,双权威 A8): 评论唯一真源=authored store 的 Note,
+        Material.comments[] 只是历史+水合视图。生产代码禁止新增本方法调用
+        (studio_authority_audit A8 机械核查零调用方);保留仅为旧数据兼容与测试。"""
         with self._lock:
             m = self.get(material_id)
             if m is None:

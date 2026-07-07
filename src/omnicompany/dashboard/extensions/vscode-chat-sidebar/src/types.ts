@@ -21,7 +21,7 @@ export interface SlotSessionBag {
 /** 单区表面: 这个 webview 只渲染哪个语义区。无 = 完整驾驶舱(?surface=full/缺省)。
  * 主侧栏 section: project/plan/threads/queue/authored; 编辑页签: material; 次级侧栏: comments。 */
 export interface SlotSurface {
-  kind: 'queue' | 'material' | 'comments' | 'project' | 'plan' | 'threads' | 'authored';
+  kind: 'queue' | 'material' | 'comments' | 'project' | 'plan' | 'threads' | 'authored' | 'multiagent' | 'review-overview';
   id?: string;
 }
 
