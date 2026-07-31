@@ -2454,7 +2454,7 @@ cc_chat_router = APIRouter(prefix="/cc/chat", tags=["cc-chat"])
 class CreateChatSessionBody(BaseModel):
     cwd: str | None = Field(
         default=None,
-        description="工作目录，默认 E:\\WindowsWorkspace；其他目录会记录在会话元数据中",
+        description="工作目录，默认 C:/workspace/；其他目录会记录在会话元数据中",
     )
     model: str | None = Field(default=None, description=f"模型短名, 默认 {DEFAULT_MODEL}")
     provider: str | None = Field(

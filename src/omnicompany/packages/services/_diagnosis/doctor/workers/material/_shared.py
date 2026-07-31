@@ -17,7 +17,7 @@ logger = logging.getLogger("omnicompany.doctor.format")
 
 
 # 默认 source root (omnicompany 项目的 src/omnicompany/)
-DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
+DEFAULT_SOURCE_ROOT = Path("C:/workspace/omnicompany/src/omnicompany")
 
 # ── HealthArchive 可选集成 ─────────────────────────────────────────
 try:

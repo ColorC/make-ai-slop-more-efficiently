@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 # ── 默认配置(可被 CLI/env 覆盖)────────────────────────────────────────────
-DEFAULT_SRC = os.environ.get("OMNI_AIWORKSPACE_ROOT", r"d:\P4\main\AIWorkSpace")
+DEFAULT_SRC = os.environ.get("OMNI_AIWORKSPACE_ROOT", r"C:/workspace/AIWorkSpace/")
 GITEE_URL = "https://git-host.example.com/user/omnifactory-private.git"
 SNAPSHOT_BRANCH = "aiworkspace-snapshot"
 DEFAULT_MAX_FILE_MB = 2  # 单文件超此当数据/产物跳过

@@ -20,7 +20,7 @@ from omnifactory.runtime.routing.router import LLMRouter
 _CLEANUP_SYSTEM_PROMPT = """\
 你是一个「系统环境异常清理机器人」的大脑。
 AI Agent 在操作宿主机时，经常因为 bash 相对路径写错、或者字符拼接遗漏，导致在操作系统里留下"错位、嵌套、重复"的垃圾文件夹。
-例如：意图访问 E:\\WindowsWorkspace，但不小心执行了 mkdir -p E:\\e\\WindowsWorkspace。
+例如：意图访问 C:/workspace/，但不小心执行了 mkdir -p E:\\e\\WindowsWorkspace。
 
 现在，底层的扫描器已经搜集了一批包含特定关键词的文件系统的物理路径。
 请仔细评估这些路径，分析哪些是**正常的系统文件/业务仓库**，哪些是**一眼鉴定为 AI 误触产生的错误嵌套垃圾**。

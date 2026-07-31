@@ -8,7 +8,7 @@ afterEach(() => cleanup())
 describe('WebFileContextMenu', () => {
   const target = {
     name: 'PROJECT_INDEX.md',
-    path: 'E:\\WindowsWorkspace\\PROJECT_INDEX.md',
+    path: 'C:/workspace/PROJECT_INDEX.md',
     kind: 'file',
     open_token: 'signed-token',
   }

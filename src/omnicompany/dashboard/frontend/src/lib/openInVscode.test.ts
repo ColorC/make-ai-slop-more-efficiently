@@ -3,8 +3,8 @@ import { vscodeFileUrl } from './openInVscode'
 
 describe('vscodeFileUrl', () => {
   it('Windows 反斜杠路径归一并加前导斜杠', () => {
-    expect(vscodeFileUrl('e:\\WindowsWorkspace\\omnicompany\\PROJECT_INDEX.md'))
-      .toBe('vscode://file/e:/WindowsWorkspace/omnicompany/PROJECT_INDEX.md')
+    expect(vscodeFileUrl('C:/workspace/omnicompany\\PROJECT_INDEX.md'))
+      .toBe('vscode://file/C:/workspace/omnicompany/PROJECT_INDEX.md')
   })
 
   it('空格与中文做 URL 编码, 冒号斜杠保留', () => {

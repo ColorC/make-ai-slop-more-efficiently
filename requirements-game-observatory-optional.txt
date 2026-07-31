@@ -1,0 +1,9 @@
+# Stable mobile replay plugin validated against MuMu Android 15 on 2026-07-13.
+airtest==1.4.3
+
+# Maa controller/pipeline substrate validated against MuMu Android 15 on 2026-07-13.
+maafw==5.11.2
+
+# Production-compatible evidence/object projection and PostgreSQL JSONB index.
+minio==7.2.20
+psycopg[binary]==3.3.4

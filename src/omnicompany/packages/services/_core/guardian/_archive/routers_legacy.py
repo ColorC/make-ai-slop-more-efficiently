@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ── 默认配置 ──
 
-_DEFAULT_PROJECT_ROOT = Path("e:/WindowsWorkspace/omnifactory")
+_DEFAULT_PROJECT_ROOT = Path("C:/workspace/omnifactory")
 
 # 项目根目录下允许的合法条目
 _ALLOWED_ROOT_ENTRIES = frozenset({

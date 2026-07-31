@@ -183,24 +183,30 @@ body {
 #root { position: relative; z-index: 1; }
 
 /* 标尺/数字进网格层(chrome 装饰,aria-hidden;只画在"面板盖不到"的边缘带):
-   横向刻度尺贴内容视口顶缘(页签条 28px 之下——页签条/rail 是常驻宿主 chrome 玻璃,
-   画在视口 0/0 缘会被 blur 洗没;工具行/内容收边带透明,标尺在其下清晰可读),
-   40px 细 tick(α.45)/ 200px 长 tick(α.75,高 12px=--fp-bp-tick) + 尺寸数字 0/200/400…
-   (mono 带 CJK 回落,11px 刻度豁免档);纵向字母尺贴 rail(56px)右缘 A/B/C…(同族竖排)。 */
-#bp-grid .bp-ruler-x { position: absolute; top: 28px; left: 0; right: 0; height: 24px;
+   2026-07-20 波六改址 —— 旧址(横尺贴页签条下缘 top:28、纵尺贴 rail 右缘 left:56)与
+   透明头区撞车:刻度数字叠在审阅详情标题/通过·驳回按钮上(用户实证反馈)。
+   新址 = 横尺下缘、纵尺右缘(top:150 起,避开一切页头 chrome/裁决组/邮票格):
+   边缘带本在 #bp-grid(z0),内容贴边处被不透明纸面自然盖掉 = "贴边自动隐藏",零 JS;
+   透明收边带(米卡 14px 外边距、项目板列底)刻度隐约可读,正是蓝图边注感。
+   横尺 40px 细 tick(α.45)/ 200px 长 tick(α.75,高 12px=--fp-bp-tick,自底缘向上长)
+   + 尺寸数字 0/200/400…(mono 带 CJK 回落,11px 刻度豁免档);
+   纵尺字母 A/B/C… 每 130px(=主格一行,tick 贴右缘)。 */
+#bp-grid .bp-ruler-x { position: absolute; left: 56px; right: 0; bottom: 0; height: 26px;
   background:
     repeating-linear-gradient(90deg, rgba(235,245,255,.45) 0 1px, transparent 1px 40px),
     repeating-linear-gradient(90deg, rgba(235,245,255,.75) 0 1px, transparent 1px 200px);
-  background-size: auto 5px, auto var(--fp-bp-tick); background-repeat: repeat-x; }
-#bp-grid .bp-ruler-x span { position: absolute; top: 13px; padding-left: 4px;
+  background-size: auto 5px, auto var(--fp-bp-tick); background-repeat: repeat-x;
+  background-position: left bottom; }
+#bp-grid .bp-ruler-x span { position: absolute; bottom: 14px; padding-left: 4px;
   font-family: var(--fp-font-mono); font-size: 11px; letter-spacing: .08em;
   color: rgba(235,245,255,.6); white-space: nowrap; }
-#bp-grid .bp-ruler-y { position: absolute; top: 0; left: 56px; bottom: 0; width: 20px;
+#bp-grid .bp-ruler-y { position: absolute; top: 150px; right: 0; bottom: 0; width: 20px;
   background:
     repeating-linear-gradient(0deg, rgba(235,245,255,.45) 0 1px, transparent 1px 40px),
     repeating-linear-gradient(0deg, rgba(235,245,255,.75) 0 1px, transparent 1px 130px);
-  background-size: 5px auto, var(--fp-bp-tick) auto; background-repeat: repeat-y; }
-#bp-grid .bp-ruler-y span { position: absolute; left: 8px; padding-top: 3px;
+  background-size: 5px auto, var(--fp-bp-tick) auto; background-repeat: repeat-y;
+  background-position: right top; }
+#bp-grid .bp-ruler-y span { position: absolute; right: 6px; padding-top: 3px;
   font-family: var(--fp-font-mono); font-size: 11px; letter-spacing: .08em;
   color: rgba(235,245,255,.6); }
 /* 窄屏(<600)/reduced-motion: 标尺装饰自动隐藏(网格本体保留)。 */

@@ -101,7 +101,7 @@ def _root_specs() -> list[dict[str, Any]]:
 
     add("staging", "上传暂存区", _staging_root(), writable=True)
     add("workspace", "WindowsWorkspace", Path(default_session_cwd()))
-    add("aiworkspace", "AIWorkSpace", Path(r"D:\P4\main\AIWorkSpace"))
+    add("aiworkspace", "AIWorkSpace", Path(r"C:/workspace/AIWorkSpace/"))
 
     configured = os.environ.get("OMNI_FILE_BRIDGE_ROOTS", "")
     for index, value in enumerate(configured.split(";"), start=1):

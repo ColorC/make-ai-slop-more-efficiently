@@ -145,7 +145,7 @@ To use Claude Code's full functionality, you'll need to manually enable tools:
 
 <div align="center">
 
-![Tools Settings Modal](public/screenshots/tools-modal.png)
+!Tools Settings Modal
 *Tools Settings interface - enable only what you need*
 
 </div>

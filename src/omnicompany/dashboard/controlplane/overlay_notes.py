@@ -1,7 +1,7 @@
 # [OMNI] origin=ai-ide ts=2026-06-28 type=infra
 """controlplane/overlay_notes.py — overlay note store(BlockSuite/Yjs) 的 HTTP 桥。
 
-overlay-shell 桌面端把笔记落在 E:\\WindowsWorkspace\\overlay-note-store(docs/<id>.ydoc 等),走 Tauri 命令读写。
+overlay-shell 桌面端把笔记落在 C:/workspace/overlay-note-store(docs/<id>.ydoc 等),走 Tauri 命令读写。
 LOFA 网页/手机端没有 Tauri,这里把同一套命令做成 HTTP,落同一个目录。对外只走 8210 一个口。
 `/lofa/poof/*` 保留为旧路由兼容;新路由是 `/lofa/overlay/*`。
 
@@ -32,11 +32,11 @@ overlay_notes_router = APIRouter(tags=["overlay-note-store"])
 
 _ROOT = Path(
     os.environ.get("OVERLAY_NOTE_STORE_ROOT")
-    or os.environ.get("POOF_NOTES_ROOT", r"E:\WindowsWorkspace\overlay-note-store")
+    or os.environ.get("POOF_NOTES_ROOT", r"C:/workspace/overlay-note-store")
 )
 _WEB_DIR = Path(
     os.environ.get("OVERLAY_SHELL_WEB_DIR")
-    or os.environ.get("POOF_WEB_DIR", r"E:\WindowsWorkspace\overlay-shell\dist-web")
+    or os.environ.get("POOF_WEB_DIR", r"C:/workspace/overlay-shell\dist-web")
 )
 _SEARCH_HTTP_URL = os.environ.get("OVERLAY_SHELL_HTTP_URL", "http://127.0.0.1:8732").rstrip("/")
 _MAX_FILE_TEXT_BYTES = 2 * 1024 * 1024

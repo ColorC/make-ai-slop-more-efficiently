@@ -37,12 +37,12 @@ function uploadResult(name: string) {
   return {
     batch_id: '20260731-170000-abc123',
     uploaded_at: '2026-07-31T17:00:00+08:00',
-    batch_path: 'E:\\WindowsWorkspace\\temp\\omni-file-bridge\\20260731-170000-abc123',
+    batch_path: 'C:/workspace/temp\\omni-file-bridge\\20260731-170000-abc123',
     root_id: 'staging' as const,
     total_bytes: 5,
     items: [{
       name,
-      path: `E:\\WindowsWorkspace\\temp\\omni-file-bridge\\20260731-170000-abc123\\${name}`,
+      path: `C:/workspace/temp\\omni-file-bridge\\20260731-170000-abc123\\${name}`,
       relative_path: `20260731-170000-abc123/${name}`,
       kind: 'file' as const,
       size: 5,

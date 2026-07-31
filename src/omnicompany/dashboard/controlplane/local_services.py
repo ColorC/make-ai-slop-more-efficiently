@@ -67,7 +67,7 @@ def _registry() -> dict[str, dict[str, Any]]:
             "aliases": ["aigc", "aigc-lab"],
             "base": aigc_review_url,
             "health_path": "/api/health",
-            "manual_start": "node E:/WindowsWorkspace/webworks/apps/aigc-lab/server.mjs",
+            "manual_start": "node C:/workspace/webworks/apps/aigc-lab/server.mjs",
             "timeout": httpx.Timeout(10.0, read=120.0),
         },
     }

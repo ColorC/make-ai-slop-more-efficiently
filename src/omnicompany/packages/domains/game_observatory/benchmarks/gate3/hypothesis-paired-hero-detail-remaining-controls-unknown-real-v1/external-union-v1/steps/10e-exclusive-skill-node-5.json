@@ -1,1 +1,0 @@
-{"action":{"type":"tap","x":746,"y":1100,"duration_ms":250},"target_name":"专属装备技能节点5，等级3","target_bounds":{"x":682,"y":1025,"width":128,"height":150},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

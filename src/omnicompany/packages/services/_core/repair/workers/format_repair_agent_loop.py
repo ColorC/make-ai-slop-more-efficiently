@@ -23,7 +23,7 @@ from omnicompany.protocol.anchor import Verdict, VerdictKind
 from .format_patcher import FormatPatcherWorker
 from .repair_planner import RepairPlannerWorker
 
-_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
+_DEFAULT_SOURCE_ROOT = Path("C:/workspace/omnicompany/src/omnicompany")
 
 
 def _run_diagnosis(format_id: str, source_root: str) -> dict:

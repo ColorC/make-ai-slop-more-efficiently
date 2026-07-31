@@ -27,9 +27,9 @@ _NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # 禁子进程弹前台控制
 # 文章真源候选根(传相对路径时挨个试)
 _BASES = [
     "",
-    "E:/WindowsWorkspace/webworks/apps/personal-homepage/",
-    "E:/WindowsWorkspace/webworks/apps/personal-homepage/data/curated/",
-    "E:/WindowsWorkspace/webworks/apps/personal-homepage/data/works/",
+    "C:/workspace/webworks/apps/personal-homepage/",
+    "C:/workspace/webworks/apps/personal-homepage/data/curated/",
+    "C:/workspace/webworks/apps/personal-homepage/data/works/",
 ]
 
 

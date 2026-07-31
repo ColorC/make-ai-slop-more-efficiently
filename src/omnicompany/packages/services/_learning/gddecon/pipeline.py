@@ -32,7 +32,7 @@ _PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[6]  # 仓根 .../omnico
 _METHOD_PATH = _PKG_DIR / "discovery_method.md"
 _GAP_METHOD_PATH = _PKG_DIR / "gap_method.md"
 _UI_STD_METHOD_PATH = _PKG_DIR / "ui_standard_method.md"
-_DEFAULT_PROJECT_ROOT = "E:/WindowsWorkspace"
+_DEFAULT_PROJECT_ROOT = "C:/workspace/"
 _OUT_DIR = _PROJECT_ROOT / "data" / "knowledge" / "aspect_trees"
 
 

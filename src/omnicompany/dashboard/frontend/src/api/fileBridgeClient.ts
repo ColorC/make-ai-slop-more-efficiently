@@ -55,6 +55,9 @@ async function responseJson<T>(response: Response, fallback: string): Promise<T>
   if (!response.ok) {
     throw new Error(body?.detail || body?.error || `${fallback} (${response.status})`)
   }
+  if (body == null || typeof body !== 'object') {
+    throw new Error(`${fallback}：服务返回了非 JSON 响应`)
+  }
   return body as T
 }
 

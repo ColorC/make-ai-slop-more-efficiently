@@ -1,15 +1,21 @@
-import React from 'react'
-import { create } from 'zustand'
+import React, { Suspense, lazy } from 'react'
+import { MessageSquare, Package } from 'lucide-react'
 import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
-import HomeThreeCards from './HomeThreeCards'
-import CronView from './CronView'
-import ProjectBoard from '../project/ProjectBoard'
-import QuestBoard from '../quest/QuestBoard'
-import MultiagentView from '../multiagent/MultiagentView'
-import ReviewOverview from '../review/ReviewOverview'
-import { ChatuiHandoff } from '../cc_session/ChatuiHandoff'
+import './controller.css'
+
+// 子视图逐个懒加载（2026-07 首屏拆包）：总控注册进入首屏静态图，
+// 静态引入这些面板会把它们全部钉进主包；切到对应视图时再下载各自 chunk。
+const HomeThreeCards = lazy(() => import('./HomeThreeCards'))
+const CronView = lazy(() => import('./CronView'))
+const ProjectBoard = lazy(() => import('../project/ProjectBoard'))
+const QuestBoard = lazy(() => import('../quest/QuestBoard'))
+const MultiagentView = lazy(() => import('../multiagent/MultiagentView'))
+const ReviewOverview = lazy(() => import('../review/ReviewOverview'))
+const ThreadMonitorPanel = lazy(() => import('./ThreadMonitorPanel'))
+const ControllerChat = lazy(() => import('./ControllerChat'))
 import { usePanels } from '../../stores/panelsStore'
+import { useControllerView } from './viewStore'
 
 export interface ControllerEntity extends Entity {
   type: 'controller'
@@ -33,17 +39,8 @@ const resolver: EntityResolver<ControllerEntity> = {
   },
 }
 
-/** 2026-06 重做: 总控 = 对话(人↔AI 主交互)。原内置"项目/对话·计划·审阅/总控对话"三选一 toggle
- *  已删 —— 项目板是独立首页(rail「项目」), 不再在总控里重复。保留此 store 仅为兼容旧引用。 */
-export type ControllerView = 'project' | 'home' | 'chat' | 'cron' | 'quest' | 'multiagent' | 'review'
-export const useControllerView = create<{ view: ControllerView; setView: (v: ControllerView) => void }>((set) => ({
-  view: 'home',
-  setView: (view) => set({ view }),
-}))
-
 const S: Record<string, React.CSSProperties> = {
-  // root 透明 → 吃 CockpitShell 的全局冷渐变（与其余所有面板一致）。铺实色 var(--fp-bg)
-  // 会把渐变整面盖死成死黑块——2026-07-02 玻璃感割裂的根因，别改回来。
+  // root 透明，透出 CockpitShell 的统一蓝图背景；不要重新铺实色。
   root: {
     display: 'flex',
     flexDirection: 'column',
@@ -53,71 +50,69 @@ const S: Record<string, React.CSSProperties> = {
     background: 'transparent',
     color: 'var(--fp-text)',
   },
-  bar: {
-    flexShrink: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    padding: '3px 8px',
-    borderBottom: '1px solid var(--fp-border-subtle)',
-  },
-  matBtn: {
-    border: '1px solid var(--fp-border)',
-    background: 'var(--fp-card)',
-    color: 'var(--fp-text-2)',
-    borderRadius: 4,
-    padding: '3px 8px',
-    cursor: 'pointer',
-    fontSize: 14,
-  },
   chatWrap: { flex: 1, minHeight: 0, minWidth: 0, display: 'flex' },
-}
-
-/** 总控对话已迁到收编的 chatui(provider=controller)。这里只渲染落点卡片, 点开
- *  带 ?provider=controller 跳 chatui。总控退居二线(用户 2026-06): 不再在驾驶舱内
- *  嵌手搓聊天面板, 统一走 chatui 一套对话底座。压缩/新会话由 chatui 自带能力承接。 */
-function ControllerChat() {
-  return <ChatuiHandoff provider="controller" />
 }
 
 const Editor: React.FC<{ entity: ControllerEntity }> = () => {
   const openTab = usePanels((s) => s.openTab)
   const view = useControllerView((s) => s.view)
   const setView = useControllerView((s) => s.setView)
-  const tBtn = (on: boolean): React.CSSProperties => ({
-    border: 0, background: on ? 'var(--fp-accent-weak)' : 'transparent', color: on ? 'var(--fp-link)' : '#9aa7b4',
-    padding: '3px 11px', cursor: 'pointer', fontSize: 14, fontWeight: on ? 700 : 500,
-  })
+  const views: Array<{ key: typeof view; label: string; testid: string }> = [
+    { key: 'chat', label: '总控对话', testid: 'controller-view-chat' },
+    { key: 'sessions', label: '会话 / CLI', testid: 'controller-view-sessions' },
+    { key: 'home', label: '最近访问', testid: 'controller-view-home' },
+    { key: 'project', label: '项目', testid: 'controller-view-project' },
+    { key: 'quest', label: '任务窗口', testid: 'controller-view-quest' },
+    { key: 'review', label: '审阅总览', testid: 'controller-view-review' },
+    { key: 'cron', label: '定时任务', testid: 'controller-view-cron' },
+  ]
+
   return (
     <div style={S.root} data-testid="boss-controller-root">
-      <div style={S.bar}>
-        <div style={{ display: 'inline-flex', border: '1px solid var(--fp-border)', borderRadius: 5, overflow: 'hidden' }} role="tablist" aria-label="总控视图">
-          <button type="button" data-testid="controller-view-home" style={tBtn(view === 'home')} onClick={() => setView('home')}>最近访问</button>
-          <button type="button" data-testid="controller-view-project" style={tBtn(view === 'project')} onClick={() => setView('project')}>项目</button>
-          <button type="button" data-testid="controller-view-quest" style={tBtn(view === 'quest')} onClick={() => setView('quest')}>任务窗口</button>
-          <button type="button" data-testid="controller-view-multiagent" style={tBtn(view === 'multiagent')} onClick={() => setView('multiagent')}>多Agent</button>
-          <button type="button" data-testid="controller-view-chat" style={tBtn(view === 'chat')} onClick={() => setView('chat')}>总控对话</button>
-          <button type="button" data-testid="controller-view-review" style={tBtn(view === 'review')} onClick={() => setView('review')}>审阅总览</button>
-          <button type="button" data-testid="controller-view-cron" style={tBtn(view === 'cron')} onClick={() => setView('cron')}>定时任务</button>
-        </div>
+      <div className="ct-bar">
+        <span className="v2-seg" role="radiogroup" aria-label="总控视图">
+          {views.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="radio"
+              aria-checked={view === item.key}
+              className="seg-i"
+              data-testid={item.testid}
+              onClick={() => setView(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </span>
         <button
           type="button"
           data-testid="open-material-registry"
-          style={S.matBtn}
+          className="ct-matbtn"
           onClick={() => openTab({ type: 'material_registry', id: 'main' }, '任务材料')}
         >
-          任务材料
+          <Package size={13} aria-hidden />任务材料
         </button>
       </div>
-      {view === 'home' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-home"><HomeThreeCards /></div>}
-      {view === 'project' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-project"><ProjectBoard /></div>}
-      {view === 'quest' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-quest"><QuestBoard /></div>}
-      {/* 点列表只看信息不跳转(用户 2026-06-26);cc_session 对外部 agent 会话是坏的 handoff,不接 onPick。 */}
-      {view === 'multiagent' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-multiagent"><MultiagentView /></div>}
-      {view === 'chat' && <div style={S.chatWrap} data-testid="controller-chat"><ControllerChat /></div>}
-      {view === 'review' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-review"><ReviewOverview pollMs={4000} onOpen={(m) => openTab({ type: 'review_material', id: m.id }, m.title)} /></div>}
-      {view === 'cron' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-cron"><CronView /></div>}
+      <Suspense fallback={<div style={{ padding: 24, fontSize: 'var(--fp-fs-3)', color: 'var(--fp-text-3)' }}>加载视图…</div>}>
+        {view === 'home' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-home"><HomeThreeCards /></div>}
+        {view === 'project' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-project"><ProjectBoard /></div>}
+        {view === 'quest' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-quest"><QuestBoard /></div>}
+        {/* Multiagent 已移到一级 rail；保留该视图分支供旧状态/深链兼容。 */}
+        {view === 'multiagent' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-multiagent"><MultiagentView /></div>}
+        {view === 'chat' && <div style={S.chatWrap} data-testid="controller-chat"><ControllerChat /></div>}
+        {view === 'sessions' && <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }} data-testid="controller-sessions"><ThreadMonitorPanel /></div>}
+        {view === 'review' && (
+          <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-review">
+            <ReviewOverview
+              pollMs={4000}
+              onOpen={(material) => openTab({ type: 'review_material', id: material.id }, material.title)}
+              onOpenReview={() => openTab({ type: 'review_queue', id: 'main' }, '审阅')}
+            />
+          </div>
+        )}
+        {view === 'cron' && <div style={{ flex: 1, minHeight: 0 }} data-testid="controller-cron"><CronView /></div>}
+      </Suspense>
     </div>
   )
 }
@@ -126,5 +121,5 @@ export const controllerRegistration: EntityRegistration<ControllerEntity> = {
   resolver,
   renderer: { type: 'controller', Editor },
   label: '总控',
-  icon: '◎',
+  icon: <MessageSquare size={14} />,
 }

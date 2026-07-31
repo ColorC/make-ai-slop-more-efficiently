@@ -118,7 +118,7 @@ Router 内的"Python 源码清理" / "从 LLM 响应提代码块" / "JSON schema
 | CA-06 | Hook 里调 LLM | PeriodicHook 子类里 `LLMClient().complete()` |
 | CA-07 | Tool 做决策 | Tool 里判断 `VerdictKind.PASS / FAIL` 并返回 |
 | CA-08 | Router 写数据库 | `run()` 里 `sqlite3.connect(...).execute("INSERT ...")` |
-| CA-09 | 根层垃圾 | `e:/WindowsWorkspace/omnicompany/output.log` |
+| CA-09 | 根层垃圾 | `C:/workspace/omnicompany/output.log` |
 | CA-10 | system prompt 当 changelog | 堆积"LLM 常犯错误"禁令代替真源码注入 |
 
 ---

@@ -128,7 +128,7 @@ const Editor: React.FC<{ entity: SettingsEntity }> = () => {
   }, [])
 
   return (
-    <div className="st-page">
+    <div className="st-page" data-testid="settings-page">
       <div className="st-tools">
         <span className="v2-seg" role="radiogroup" aria-label="设置视图" data-testid="settings-view-tabs">
           {TABS.map((t) => {

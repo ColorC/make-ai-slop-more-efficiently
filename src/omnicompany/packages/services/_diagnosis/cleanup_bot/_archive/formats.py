@@ -45,8 +45,8 @@ CLEANUP_EVIDENCE = Material(
     examples=[
         {
             "keyword": "WindowsWorkspace",
-            "evidence_str": "E:\\e\\WindowsWorkspace\nE:\\WindowsWorkspace",
-            "raw_paths": ["E:\\e\\WindowsWorkspace", "E:\\WindowsWorkspace"],
+            "evidence_str": "E:\\e\\WindowsWorkspace\nC:/workspace/",
+            "raw_paths": ["E:\\e\\WindowsWorkspace", "C:/workspace/"],
         }
     ],
 )

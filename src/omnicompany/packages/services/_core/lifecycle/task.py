@@ -60,7 +60,7 @@ class TaskServiceUnavailable(RuntimeError):
     def __init__(self, cause: str = "") -> None:
         super().__init__(
             "progress-service(:8230) 未运行, 无法读写任务(任务唯一真源在它那里)。\n"
-            "启动: E:\\WindowsWorkspace\\omnicompany\\services\\_progress\\progress_service\\start-progress-service.cmd\n"
+            "启动: C:/workspace/omnicompany\\services\\_progress\\progress_service\\start-progress-service.cmd\n"
             "或:   venv\\Scripts\\python.exe services\\_progress\\progress_service\\ensure_progress_service_running.py"
             + (f"\n底层错误: {cause}" if cause else "")
         )

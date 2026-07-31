@@ -25,7 +25,7 @@ from omnicompany.packages.services._core.omnicompany import Worker
 logger = logging.getLogger(__name__)
 
 
-_DEFAULT_PROJECT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
+_DEFAULT_PROJECT_ROOT = Path("C:/workspace/omnicompany")
 
 
 class ArchAuditorWorker(Worker):

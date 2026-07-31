@@ -89,7 +89,7 @@ _VERIFY_AND_OUTPUT = """\
 - **对话存在文件里(首轮消息给了路径), 用 read_file 分片读(offset/limit), 别假设整段已在上下文; 读到文件末尾再下"指示提全了"的结论. 边读边记指示, 让 compact 管理上下文.**
 - 先 list_dir / glob 摸清相关目录结构, 再精确 read_file / grep.
 - bash 的 cwd: **直接用首轮消息里给你的『审计目标仓库根』那个绝对路径原样传入 cwd 参数**
-  (例如 cwd='E:/WindowsWorkspace/omnicompany'). 不要自己拼接子目录, 不要在路径前后加多余的盘符或斜杠,
+  (例如 cwd='C:/workspace/omnicompany'). 不要自己拼接子目录, 不要在路径前后加多余的盘符或斜杠,
   否则会因路径不存在被拒. 要进子目录就在命令里 `cd sub && ...`, cwd 参数始终是那个仓库根.
   用途: `git log --oneline -- <path>` `git log --all --oneline -S '<symbol>'` `git show <sha> -- <path>`
   `find . -name ...` `ls`. bash 禁写操作(git commit/push、rm -rf 等会被拒), 这是只读审计, 别试图改任何东西.

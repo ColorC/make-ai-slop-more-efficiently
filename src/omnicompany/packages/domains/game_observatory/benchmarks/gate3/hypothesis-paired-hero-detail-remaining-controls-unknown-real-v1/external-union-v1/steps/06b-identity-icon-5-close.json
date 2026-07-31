@@ -1,1 +1,0 @@
-{"action":{"type":"tap","x":392,"y":185,"duration_ms":250},"target_name":"展开状态下再次点击第五枚身份图标","target_bounds":{"x":368,"y":160,"width":49,"height":50},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

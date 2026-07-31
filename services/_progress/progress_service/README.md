@@ -13,7 +13,7 @@ OmniCompany 的进度器官: 全机器"进行到哪 / 完成度多少 / 哪些�
 
 ## 当前正名
 
-- 代码真源: `E:\WindowsWorkspace\omnicompany\services\_progress\progress_service\`
+- 代码真源: `C:/workspace/omnicompany\services\_progress\progress_service\`
 - 启动守卫: `ensure_progress_service_running.py`
 - Windows 计划任务: `OmniProgressDaemon`
 - Rust package: `progress-service`
@@ -29,7 +29,7 @@ start-progress-service.cmd
 或直接运行守卫:
 
 ```cmd
-E:\WindowsWorkspace\omnicompany\venv\Scripts\python.exe ensure_progress_service_running.py
+C:/workspace/omnicompany\venv\Scripts\python.exe ensure_progress_service_running.py
 ```
 
 数据目录优先读 `PROGRESS_SERVICE_DATA_DIR`; `WHATNOW_DATA_DIR` 仅作旧脚本兼容。

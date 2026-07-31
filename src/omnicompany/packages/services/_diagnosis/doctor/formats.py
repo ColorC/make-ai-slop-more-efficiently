@@ -37,7 +37,7 @@ FORMAT_REQUEST = Format(
         {"format_id": "guardian.check-request"},
         {
             "format_id": "guardian.fs-report",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
         },
     ],
 )
@@ -55,7 +55,7 @@ FORMAT_EXTRACTED = Format(
     examples=[
         {
             "format_id": "guardian.check-request",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
             "found": True,
             "defined_in": "omnicompany/packages/services/guardian/formats.py",
             "constant_name": "FORMAT_CHECK_REQUEST",
@@ -65,7 +65,7 @@ FORMAT_EXTRACTED = Format(
                 "description": "触发守护检查管线的入口请求，携带待检查的项目根目录路径",
                 "parent": "requirement",
                 "tags": ["guardian", "input", "service"],
-                "examples": [{"project_root": "e:/WindowsWorkspace/omnicompany"}],
+                "examples": [{"project_root": "C:/workspace/omnicompany"}],
             },
             "usages": [
                 {
@@ -92,7 +92,7 @@ FORMAT_ACC = Format(
     examples=[
         {
             "format_id": "guardian.check-request",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
             "extracted": {
                 "format_id": "guardian.check-request",
                 "found": True,
@@ -144,14 +144,14 @@ FORMAT_HEALTH_RECORD = Format(
         {
             "schema_version": 2,
             "format_id": "guardian.check-request",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
             "format_def": {
                 "id": "guardian.check-request",
                 "name": "Guardian Check Request",
                 "description": "触发守护检查管线的入口请求，携带待检查的项目根目录路径",
                 "parent": "requirement",
                 "tags": ["guardian", "input", "service"],
-                "examples": [{"project_root": "e:/WindowsWorkspace/omnicompany"}],
+                "examples": [{"project_root": "C:/workspace/omnicompany"}],
             },
             "checks": [
                 {"check": "sig_diff", "passed": True, "severity": "CRITICAL", "detail": "Format 对象定义存在"},
@@ -192,8 +192,8 @@ RTR_FORMAT_REQUEST = Format(
     examples=[
         {
             "router_class": "FormatExtractorRouter",
-            "source_file": "e:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_file": "C:/workspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
         },
     ],
 )
@@ -216,8 +216,8 @@ RTR_FORMAT_EXTRACTED = Format(
     examples=[
         {
             "router_class": "FormatExtractorRouter",
-            "source_file": "e:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_file": "C:/workspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
             "found": True,
             "description": "用 AST 从 formats.py 提取 Format 对象字段；扫描全部源码收集 FORMAT_IN/OUT 引用",
             "format_in": "doctor.material.request",
@@ -265,8 +265,8 @@ RTR_FORMAT_SIG_CHECKED = Format(
     examples=[
         {
             "router_class": "FormatExtractorRouter",
-            "source_file": "e:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_file": "C:/workspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
             "extracted": {
                 "found": True,
                 "description": "用 AST 从 formats.py 提取 Format 对象字段",
@@ -306,7 +306,7 @@ RTR_FORMAT_CONTEXT = Format(
     examples=[
         {
             "router_class": "FormatExtractorRouter",
-            "source_file": "e:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
+            "source_file": "C:/workspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
             "extracted": {"found": True, "format_in": "doctor.material.request", "format_out": "doctor.material.extracted"},
             "sig_ok": True,
             "context": {
@@ -379,7 +379,7 @@ RTR_FORMAT_AUDIT = Format(
                     "detail": {"overall_grade": "A", "key_findings": ["run() 边界处理完整"]},
                 },
             ],
-            "audit_path": "e:/WindowsWorkspace/omnicompany/data/doctor/audit/rtr_FormatExtractorRouter/abc1234.md",
+            "audit_path": "C:/workspace/omnicompany/data/doctor/audit/rtr_FormatExtractorRouter/abc1234.md",
         }
     ],
 )
@@ -404,8 +404,8 @@ RTR_FORMAT_HEALTH_RECORD = Format(
         {
             "schema_version": 2,
             "router_class": "FormatExtractorRouter",
-            "source_file": "e:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_file": "C:/workspace/omnicompany/src/omnicompany/packages/services/doctor/routers.py",
+            "source_root": "C:/workspace/omnicompany/src/omnicompany",
             "verdict": "unhealthy",
             "passed": False,
             "is_isolated": False,
@@ -423,7 +423,7 @@ RTR_FORMAT_HEALTH_RECORD = Format(
                 "total_checks": 3, "passed_checks": 1,
                 "critical": 1, "major": 0, "minor": 1,
             },
-            "audit_path": "e:/WindowsWorkspace/omnicompany/data/doctor/audit/rtr_FormatExtractorRouter/a5d1234.md",
+            "audit_path": "C:/workspace/omnicompany/data/doctor/audit/rtr_FormatExtractorRouter/a5d1234.md",
             "summary": "Router 'FormatExtractorRouter' 3 checks, 1 critical + 1 minor failing",
         }
     ],

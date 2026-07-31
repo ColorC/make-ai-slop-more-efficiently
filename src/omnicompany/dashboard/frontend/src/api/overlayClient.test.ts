@@ -20,7 +20,7 @@ describe('searchOverlayFiles', () => {
           {
             kind: 'file',
             name: 'PROJECT_INDEX.md',
-            path: 'E:\\WindowsWorkspace\\PROJECT_INDEX.md',
+            path: 'C:/workspace/PROJECT_INDEX.md',
             score: 9,
             tags: [],
             pinned: false,
@@ -36,7 +36,7 @@ describe('searchOverlayFiles', () => {
       {
         kind: 'file',
         name: 'PROJECT_INDEX.md',
-        path: 'E:\\WindowsWorkspace\\PROJECT_INDEX.md',
+        path: 'C:/workspace/PROJECT_INDEX.md',
         score: 9,
         tags: [],
         pinned: false,

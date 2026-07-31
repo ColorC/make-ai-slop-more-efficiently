@@ -1,10 +1,10 @@
-# [OMNI] origin=claude-code ts=2026-07-03T00:00:00Z type=module summary="token_ledger 项目归属解析器: 只认 E:\WindowsWorkspace\workspace.yaml 的 entries 名单(闭集即白名单)+ D:\P4\main\AIWorkSpace 特判, 其余(含 Temp/workdir/new-chat 类 cwd)一律返回 None 落未关联桶" why="overnight-run.md 第六节'首轮验收打回后的硬化'㈡: 默认 resolver 太宽松(取 cwd 末段当项目名), 生产数据里未关联桶恒空是归属造假的实证; 改为闭集白名单, 读法容错(文件不存在时全部落未关联)" tags=token-ledger,project-resolver,whitelist,unlinked
+# [OMNI] origin=claude-code ts=2026-07-03T00:00:00Z type=module summary="token_ledger 项目归属解析器: 只认 C:/workspace/workspace.yaml 的 entries 名单(闭集即白名单)+ C:/workspace/AIWorkSpace/ 特判, 其余(含 Temp/workdir/new-chat 类 cwd)一律返回 None 落未关联桶" why="overnight-run.md 第六节'首轮验收打回后的硬化'㈡: 默认 resolver 太宽松(取 cwd 末段当项目名), 生产数据里未关联桶恒空是归属造假的实证; 改为闭集白名单, 读法容错(文件不存在时全部落未关联)" tags=token-ledger,project-resolver,whitelist,unlinked
 """token_ledger 项目归属解析器 —— 闭集白名单, 禁猜。
 
 铁律(overnight-run.md 第六节"首轮验收打回后的硬化"㈡):
-    项目归属只认 E:\\WindowsWorkspace\\workspace.yaml 的 entries 名单(闭集即白名单)。
-    - cwd 在 E:\\WindowsWorkspace\\<登记名>\\ 之下 -> project = 登记名。
-    - cwd 在 D:\\P4\\main\\AIWorkSpace 之下(特判, 不在 workspace.yaml entries 里,
+    项目归属只认 C:/workspace/workspace.yaml 的 entries 名单(闭集即白名单)。
+    - cwd 在 C:/workspace/<登记名>\\ 之下 -> project = 登记名。
+    - cwd 在 C:/workspace/AIWorkSpace/ 之下(特判, 不在 workspace.yaml entries 里,
       是另一台工作区的已知例外) -> project = "AIWorkSpace"。
     - 其余一律返回 None(调用方按约定落"未关联"桶) —— 包括 Temp 目录、workdir 之类的
       cron/agent 临时工作目录、new-chat 等未登记路径。不允许对着 cwd 猜一个像样的项目名。
@@ -20,9 +20,9 @@ from typing import Callable, Iterable
 
 import yaml
 
-_DEFAULT_WORKSPACE_YAML = Path("E:/WindowsWorkspace/workspace.yaml")
-_DEFAULT_WORKSPACE_ROOT = "E:/WindowsWorkspace"
-_AIWORKSPACE_ROOT = "D:/P4/main/AIWorkSpace"
+_DEFAULT_WORKSPACE_YAML = Path("C:/workspace/workspace.yaml")
+_DEFAULT_WORKSPACE_ROOT = "C:/workspace/"
+_AIWORKSPACE_ROOT = "C:/workspace/AIWorkSpace/"
 _AIWORKSPACE_PROJECT_NAME = "AIWorkSpace"
 
 
@@ -68,7 +68,7 @@ def build_workspace_project_resolver(
 
     Args:
         entry_names: 显式注入的白名单(测试用假名单); 省略时从 workspace_yaml_path
-            (默认真实 E:\\WindowsWorkspace\\workspace.yaml)读取。
+            (默认真实 C:/workspace/workspace.yaml)读取。
         workspace_yaml_path: 仅在 entry_names 省略时生效, 供测试注入假路径。
 
     白名单是闭集: 不在名单里的顶层目录段一律不关联(返回 None), 由调用方落未关联桶。
@@ -91,7 +91,7 @@ def build_workspace_project_resolver(
 
         workspace_root_lower = _DEFAULT_WORKSPACE_ROOT.lower()
         if not (lower == workspace_root_lower or lower.startswith(workspace_root_lower + "/")):
-            return None  # 不在 E:\WindowsWorkspace 之下, 也不是 AIWorkSpace 特判 -> 未关联
+            return None  # 不在 C:/workspace/ 之下, 也不是 AIWorkSpace 特判 -> 未关联
 
         rest = normalized[len(_DEFAULT_WORKSPACE_ROOT):].lstrip("/")
         if not rest:

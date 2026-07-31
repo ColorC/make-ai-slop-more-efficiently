@@ -36,12 +36,12 @@ class Workspace:
       ws = Workspace(
           name="team_builder",
           write_prefixes=(
-              "e:/windowsworkspace/omnicompany/src/omnicompany/packages/services/team_builder/",
-              "e:/windowsworkspace/omnicompany/data/services/team_builder/",
+              "C:/workspace/omnicompany/src/omnicompany/packages/services/team_builder/",
+              "C:/workspace/omnicompany/data/services/team_builder/",
           ),
           read_prefixes=READ_ANY,
           bash_cwd_prefixes=(
-              "e:/windowsworkspace/omnicompany/",
+              "C:/workspace/omnicompany/",
           ),
       )
     """

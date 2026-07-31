@@ -122,37 +122,37 @@ MAY 用旧名：
 
 ---
 
-## §6 两层命名：protocol 保留 · omnicompany 用新名（2026-04-20 L1 修正）
-
-(2026-07-02 更正: 见 §13 第5条)
+## §6 当前协议名与组织名（2026-07-24 合并时效更正）
 
 ### §6.1 基本原则
 
-**协议层 (`src/omnicompany/protocol/`) 及核心标准规范 (`docs/standards/concepts/material.md` / `pipeline.md` / `router.md` / `llm_first.md` 等) 保留原抽象名字**: `Router` / `Format` / `Pipeline` / `EventBus`。
+当前代码的唯一 Team 协议名是 `TeamSpec` / `TeamNode` / `TeamEdge`，实现位于
+`src/omnicompany/protocol/team.py`。`protocol/pipeline.py` 及 `Pipeline*` 只保留兼容，
+不得解释成另一层或另一种 Team。
 
-**omnicompany 业务/组织层** 用新名: `Worker` / `Material` / `Team` / `Stock` / `Department`。
+其余仍存在底层契约名与组织叙述名的对应：
 
-两者是**同构对应**, 不是命名迁移后取代:
-
-| protocol 层 (不变) | omnicompany 层 (新) | 关系 |
+| 底层契约/运行类 | 组织叙述名 | 关系 |
 |---|---|---|
-| `Router` | `Worker` | Worker 本质是 Router 的子类 + omnicompany 术语包装 |
+| `Router` | `Worker` | Worker 是带组织语义和材料契约的 Router |
 | `Format` | `Material` | Material 是 Format 的一次实例化, 带 job_id / 生命周期语义 |
-| `Pipeline` | `Team` | Team 是一组 Worker 的 omnicompany 组织单位; protocol 层仍叫 Pipeline |
+| `TeamSpec` | `Team` | 同一概念的代码结构名与叙述名，不是两套类型 |
 | `EventBus` | `Stock` | Stock 是 bus 的 omnicompany 角色名, 强调"存货仓"语义 |
 
 ### §6.2 为什么分两层
 
-- **协议层要抽象稳定**: `Router` / `Format` 是数据契约, 命名应通用, 不贴业务组织学
+- **代码契约要稳定**: `TeamSpec` / `Router` / `Format` / `EventBus` 是可导入的精确类名
 - **omnicompany 层要贴业务**: 工人认领物料, 部门协作完成订单 — 这些词帮 LLM 建立高质量心智模型
 - **语义升级不是取代**: Material 比 Format 多了"可消费实体 + 生命周期 + 流通状态", 但底层仍是 Format schema
+- **兼容名不形成一层**: `PipelineSpec = TeamSpec` 只是迁移别名，不能据此再设计 Pipeline/Team 双轨
 
 ### §6.3 何处用哪个（2026-04-20 修正 · 规范也用新命名主体）
 
 **旧规范被新命名顶掉**, 不保留严格双轨, 旧命名仅**一句话带过**作兼容说明。
 
-**protocol 原名保留**（仅以下场景）:
-- `src/omnicompany/protocol/` 代码与 DESIGN.md （Python 类名: `Router` / `Format` / `PipelineSpec` 等）
+**精确代码类名保留**（仅以下场景）:
+- 代码和设计文档中的真实类引用：`TeamSpec` / `Router` / `Format` / `EventBus`
+- 兼容性说明或旧消费者迁移时可写 `PipelineSpec`，必须同时标注它是 `TeamSpec` 别名
 - 代码层类引用 (`class FooRouter(Router):` / `from omnicompany.protocol.format import Format`)
 - standards 文档**开头"术语"说明段一句话**: "Format 是 protocol 层类名, 读作 Material"
 
@@ -167,7 +167,8 @@ MAY 用旧名：
 - CLAUDE.md workspace 指引
 - Memory 文件
 
-**规则验证**: 新建文档时用新命名为主; 碰到代码 class 名时保留 protocol 原名。不造双轨噪音。
+**规则验证**: 新建文档时用 Team；碰到代码 class 时用 `TeamSpec`。新代码不得引入
+`ProjectTeam`、`AgentTeam`、第二个 Team registry 或 `PipelineSpec` 新消费者。
 
 ### §6.4 混用场景（合法）
 
@@ -204,9 +205,11 @@ MAY 用旧名：
 
 ---
 
-## §7 Agent Team（纯 bus 驱动的 Worker 组合 · 2026-04-20 Patch-7 修正）
+## §7 Agent Loop Team（TeamSpec 的一种拓扑 · 2026-07-24 消歧）
 
-**Agent Team** = 一组 Worker 通过**主 bus** 订阅激活, **不是单 Worker + 迷你 stock**（原 R-19 "Agent Worker" 设计作废）:
+**Agent Loop Team** = 一个 `TeamSpec`，其一组 Worker 通过**主 bus** 订阅激活并共同完成
+Agent loop。它不是 `AgentTeam` 新类型，也不是单 Worker + 迷你 stock（原 R-19
+"Agent Worker" 设计作废）:
 
 - `Context Script Worker` — 组装 LLM 上下文（无 LLM 调用）· FORMAT_IN_MODE=`"or"` 订阅 `agent.request` OR `agent.tool_result`
 - `LLM Worker` — 调 LLM 产 response（单轮调用, kind ∈ {tool_call, finish}）
@@ -217,7 +220,8 @@ MAY 用旧名：
 
 **每轮循环 = 一个子 job**: 发起者 = tool_result 产出（带 `_emit_as_new_job`）, parent_job_id 链 agent 内部因果。Q1 "worker 每 job 单次激活" 和 "agent 多轮循环" 天然兼容（不同 job_id 允许 worker 再激活）。
 
-**升级规则**: LLM Worker 不确定需要什么 material 时, **默认升级为 Agent Team**, 开放 workspace 供 Tool Script Worker 自取。
+**升级规则**: LLM Worker 不确定需要什么 material 时，默认升级为 **Agent Loop Team**
+拓扑，开放 workspace 供 Tool Script Worker 自取；产物仍为 `TeamSpec`。
 
 **Patch-7 pilot 实现**: [`packages/services/omnicompany/agent_team_demo.py`](../../../src/omnicompany/packages/services/_core/omnicompany/agent_team_demo.py) 4 Worker mock · 6 测试全过。
 
@@ -266,7 +270,7 @@ MAY 用旧名：
 | 类型 | 语义 | 实现 |
 |---|---|---|
 | **Source material** | 用户输入 / 外部事件 / 定时触发 | 外部 `publish` 初始 material event (kind=source) |
-| **Tool result** | Agent Team 内 tool 执行返回 | Worker output 带 `_emit_as_new_job: True` → dispatcher 用新 trace_id (parent=触发 event.id) |
+| **Tool result** | Agent Loop Team 内 tool 执行返回 | Worker output 带 `_emit_as_new_job: True` → dispatcher 用新 trace_id (parent=触发 event.id) |
 | **Validator 发起** | validator worker 判不合格 / 需补 material (Q1.C 已有) | validator Worker 产出带 `_emit_as_new_job` + 新 `job.request` material |
 | **Child job (显式)** | worker 显式请求子 job | 同 Tool result, 区分只在语义 |
 
@@ -284,7 +288,7 @@ MAY 用旧名：
 |---|---|---|---|
 | **A · 单体旧架构** | 内置 class (RuleEngine 等) + 旧入口文件 | 建 `workers/` + `materials.py` + 归档旧入口到 `_archive/` + 改外部 import | ~1.5 h |
 | **B · 原生 pipeline** | 已有 `pipeline.py` + `routers.py` + `formats.py` 三件套 | 标 Material kind + DESIGN.md 填充 | ~0.25 h |
-| **B 单体 AgentLoop** | 1 node pipeline 封装 while 循环 | 同 B + DESIGN 写明 R-19 Agent Team 迁移路径 | ~0.2 h |
+| **B 单体 AgentLoop** | 1 node Team 封装 while 循环 | 同 B + DESIGN 写明 R-19 Agent Loop Team 迁移路径 | ~0.2 h |
 | **C · 元服务库** | 无 Format/Router/Pipeline 三件套 | DESIGN.md 角色说明 + 概念映射表 + 零代码 | ~0.15 h |
 
 **彻底归档原则**（Patch-2, 类 A 专用）:
@@ -371,15 +375,16 @@ MAY 用旧名：
 
 **另注**：`protocol/DESIGN.md` 以及各 CLI 文档里出现的 `D1` / `D2` / `D3`，是它们各自文档内部的决策编号，跟 LAP 的 `D1-D9` 纯属字母撞车，两者没有关系，读到时别混为一谈。
 
-### §13.5 时效更正：§6 的 protocol 层"保留 Router / Pipeline 旧名"说法已不符现实
+### §13.5 历史更正已合并进 §6
 
-§6 中"protocol 层保留 Router / Format / Pipeline / EventBus 旧名"这句话，其中 **Router 与 Pipeline 两部分已不符现实**（2026-07-03 批4 复核坐实）：
+2026-07-03 已确认的以下事实，已于 2026-07-24 直接合并到 §6，避免读者同时维护
+“旧规则 + 后置更正”两套心智模型：
 
 - `Pipeline` 已于 **2026-04-21** 正名为 `Team`；`protocol/pipeline.py` 现在只是一个**兼容壳**（内部直接从 `protocol/team.py` 转出旧类名，供旧 import 路径继续用），并非活的实现。所以"protocol 层保留 Pipeline 旧名"已经不成立——旧名只剩废弃壳。
 - `Router` 的真身实际在 [`runtime/routing/router.py`](../../../src/omnicompany/runtime/routing/router.py)，**不在 `protocol/` 目录下**。所以"protocol 层保留 Router 旧名"也不准确——protocol 目录里并没有活的 Router 实现体。
 - `Format` / `EventBus` 部分仍如 §6 所述（Format 在 protocol 层是活契约类，Stock 是 EventBus 的 omnicompany 角色名）。
 
-新写文档时，涉及 protocol 层现状描述，以本条为准；§6 原文作为历史记录保留，不再回改。
+新写文档以 §6 为准；本节只保留迁移时间线，不再覆盖 §6。
 
 ---
 

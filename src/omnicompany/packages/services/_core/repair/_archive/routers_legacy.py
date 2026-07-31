@@ -21,7 +21,7 @@ from omnicompany.runtime.routing.router import Router
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnifactory/src/omnifactory")
+_DEFAULT_SOURCE_ROOT = Path("C:/workspace/omnifactory/src/omnifactory")
 
 
 # ════════════════════════════════════════════════════════════════

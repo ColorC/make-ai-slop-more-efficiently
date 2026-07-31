@@ -1,11 +1,9 @@
 /* ============================================================
    Shell A「侧栏主导」壳层样式 — 2026-07-19 零顶栏版(用户指令:删 30px 薄顶栏,
    全件收编进 rail;dashboard = 左 rail + 内容区(dockview 页签 + 页面))。
-   56px rail 悬停展开 200px + 右按需抽屉 + ⌘K 命令面板(rail 顶槽)。
-   几何硬规则(G.5 修①):收起态 rail 水平 padding 5px、.sha-ri padding:4px 居中 gap:0,
-   选中/hover 框精确包住"图标+36px 制图底衬"整体且水平居中;展开态(200px)同一套对齐
-   (padding:7px 8px、justify-content:flex-start)。label max-width 0→120px 过渡,
-   计数徽章 :not(:hover) 隐藏。
+   56px 固定 rail（平板防误触：悬停不展开）+ 右按需抽屉 + ⌘K 命令面板(rail 顶槽)。
+   几何硬规则(G.5 修①):rail 水平 padding 5px、.sha-ri padding:4px 居中 gap:0,
+   选中/hover 框精确包住"图标+36px 制图底衬"整体且水平居中。
    G.7 波四:rail/fab 从私有格纸改描图纸玻璃(--fp-glass .55 + blur8,与弹层/页签条同一档),
    透出 #bp-grid 全视口统一网格;网格唯一层在 index.html #bp-grid,本文件不再自铺格纸。
    波六裁决二(2026-07-19):rail 本体再透明化——背景 transparent + 1px 白线(α.2)右缘分隔,
@@ -14,33 +12,46 @@
    触控:桌面可点件 ≥24px(AA 硬线);浮层件(浮动汉堡/浮动退出)直接 44px 全档达标。
    ============================================================ */
 
-/* ===== 左 rail(56px;hover 展开 200px 带文字;波六裁决二:本体透明露网格,材质只在 icon 底衬) ===== */
+/* ===== 左 rail(固定 56px，不做 hover 展开；本体透明露网格,材质只在 icon 底衬) ===== */
 .sha-rail { flex: none; width: 56px; display: flex; flex-direction: column; gap: 4px; padding: 10px 5px;
-  overflow: hidden; box-sizing: border-box;
-  border-right: 1px solid rgba(235,245,255,.2);
-  background: transparent;
-  transition: width .22s var(--fp-ease); }
-.sha-rail:hover { width: 200px; }
+  position: relative; isolation: isolate; overflow: hidden; box-sizing: border-box;
+  border-right: 1px solid var(--fp-border-subtle);
+  background: color-mix(in srgb, var(--fp-bp-tracing) 82%, transparent);
+  backdrop-filter: var(--fp-bp-tracing-blur); -webkit-backdrop-filter: var(--fp-bp-tracing-blur);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--fp-border-strong) 18%, transparent), var(--fp-bp-shadow-sm);
+  transition: background var(--fp-t-fast); }
+.sha-rail:hover { background: color-mix(in srgb, var(--fp-bp-tracing-strong) 88%, transparent); }
 /* icon 底衬(rail 透明化后玻璃材质收到 36px 底衬一级:icon 本体有床,网格在底衬间隙透出) */
 .sha-rail .ico-c, .sha-rail .ico-s { width: 36px; height: 36px;
-  background: var(--fp-glass);
-  backdrop-filter: var(--fp-blur); -webkit-backdrop-filter: var(--fp-blur); }
+  flex: 0 0 36px; box-sizing: border-box;
+  position: relative;
+  background: color-mix(in srgb, var(--fp-bp-panel) 82%, transparent);
+  backdrop-filter: var(--fp-bp-panel-blur); -webkit-backdrop-filter: var(--fp-bp-panel-blur);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fp-text) 10%, transparent); }
+.sha-ri[data-linked="1"] .ico-c::after { content: ""; position: absolute; right: 3px; bottom: 3px;
+  width: 7px; height: 7px; border: 1px solid var(--fp-bp-solid); border-radius: 50%;
+  background: var(--fp-ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--fp-ok) 18%, transparent); }
 .sha-ri { display: flex; align-items: center; gap: 0; justify-content: center; padding: 4px;
-  border: 1px solid transparent; border-radius: var(--fp-r1); background: transparent;
+  min-width: 0; min-height: 46px;
+  position: relative; border: 1px solid transparent; border-radius: var(--fp-r1); background: transparent;
   color: var(--fp-text-3); white-space: nowrap; cursor: pointer; transition: all var(--fp-t-fast);
   text-align: left; font: inherit; width: 100%; box-sizing: border-box; flex: none; }
-.sha-ri:hover { background: var(--fp-bp-paper-2); color: var(--fp-text); }
+.sha-ri:hover { background: var(--fp-bp-panel-hover); border-color: var(--fp-border-subtle); color: var(--fp-text); }
 /* 选中 = hatch 结构标记 + 绘图线框(框住图标+底衬整体) */
-.sha-ri.on { color: var(--fp-text); background: var(--fp-bp-hatch); border-color: var(--fp-border-strong); }
-.sha-ri .lb { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap;
-  transition: max-width .2s .05s, opacity .15s .08s;
+.sha-ri.on { color: var(--fp-text);
+  background: var(--fp-bp-hatch), color-mix(in srgb, var(--fp-bp-panel-text) 78%, transparent);
+  border-color: var(--fp-border-strong);
+  box-shadow: inset 2px 0 0 rgba(255,255,255,.84);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+.sha-ri.on::after { content: ""; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
+  border-top: 1px solid var(--fp-bp-brass-hi); border-right: 1px solid var(--fp-bp-brass-hi);
+  pointer-events: none; opacity: .78; }
+.sha-ri .lb { display: none;
   font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); text-transform: uppercase; letter-spacing: .08em;
   text-shadow: 0 1px 2px rgba(9,26,62,.9); } /* 波六:文字直接落网格,软垫不加背景 */
 .sha-ri .ct { margin-left: auto; font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); color: var(--fp-bp-brass-hi);
   text-shadow: 0 1px 2px rgba(9,26,62,.9); }
-.sha-rail:not(:hover) .sha-ri .ct { display: none; }
-.sha-rail:hover .sha-ri { gap: 12px; justify-content: flex-start; padding: 7px 8px; }
-.sha-rail:hover .sha-ri .lb { max-width: 120px; opacity: 1; }
+.sha-rail .sha-ri .ct { display: none; }
 /* ⌘K 顶槽: 虚线测量底衬(语义=命令面板,与搜索虚线件同族) */
 .sha-ri-cmdk .ico-dashed { border-style: dashed; border-color: rgba(235,245,255,.55); }
 .sha-ri-cmdk:hover .ico-dashed { border-color: var(--fp-bp-brass); }
@@ -51,7 +62,6 @@
   font-size: var(--fp-fs-4); color: var(--fp-text-3); font-family: var(--fp-font-mono);
   letter-spacing: .12em; text-transform: uppercase; opacity: 0; white-space: nowrap; flex: none;
   text-shadow: 0 1px 2px rgba(9,26,62,.9); } /* 波六:展开态文字落网格,软垫不加背景 */
-.sha-rail:hover .sha-rail-h { opacity: 1; }
 /* rail 底部:全局状态细点 / 调试 chip(行式,展开态出文字) */
 .sha-status { display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 6px 4px 2px; border-top: 1px solid var(--fp-border-subtle); flex: none; }
@@ -60,8 +70,6 @@
   color: var(--fp-text-3); text-transform: uppercase; letter-spacing: .1em; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 0 1px 2px rgba(9,26,62,.9); }
-.sha-rail:hover .sha-status { justify-content: flex-start; padding-left: 8px; }
-.sha-rail:hover .sha-status .lb { display: inline; }
 /* 底槽 ⋯ 与首个 .sha-status 之间只要一条分隔线 */
 .sha-ri-bottom + .sha-status { border-top: 0; }
 
@@ -85,3 +93,15 @@
   color: var(--fp-text); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono);
   box-shadow: var(--fp-shadow-pop); }
 .sha-exit-float:hover { border-style: solid; }
+
+/* 圈选评论：输入面与蓝图纸同源，placeholder/focus 不再落回浏览器默认黑字。 */
+.omni-capture-textarea::placeholder { color: var(--fp-text-3); opacity: 1; }
+.omni-capture-textarea:focus {
+  border-style: solid !important;
+  border-color: var(--fp-bp-brass) !important;
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft);
+}
+.omni-capture-textarea::selection {
+  background: var(--fp-term-selection);
+  color: var(--fp-text);
+}

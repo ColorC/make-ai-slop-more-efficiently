@@ -1,5 +1,0 @@
-{
-  "domain": "game-observatory-ai-player-environment-lineage",
-  "goal": "只读审查并提出可证伪测试：登录前 immutable EnvironmentScope 在登录后出现账号名、州和职业时应如何晋级。必须保留旧对象和原始证据，current 只能选择 lineage leaf，祖先到后代只允许最小权限共享证据，无关环境和旁支继续拒绝，不自动复制或编造记忆。已知反例是三谋登录后 memory、task、capsule 暂存于 prelogin-unauthenticated 环境。不得修改代码、数据库、计划或事实标签。",
-  "max_iterations": 2
-}

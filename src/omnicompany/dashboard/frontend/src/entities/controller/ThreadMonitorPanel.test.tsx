@@ -18,7 +18,7 @@ describe('ThreadMonitorPanel', () => {
         id: 'chat-abc123',
         kind: 'chat',
         provider: 'codex',
-        cwd: 'E:/WindowsWorkspace/omnicompany',
+        cwd: 'C:/workspace/omnicompany',
         cmd: [],
         cols: 0,
         rows: 0,
@@ -35,7 +35,7 @@ describe('ThreadMonitorPanel', () => {
       {
         id: 'pty-1234567890',
         cmd: [],
-        cwd: 'E:/WindowsWorkspace/omnicompany',
+        cwd: 'C:/workspace/omnicompany',
         cols: 120,
         rows: 30,
         started_at: 1780271000,
@@ -49,7 +49,7 @@ describe('ThreadMonitorPanel', () => {
       cmd: ['codex', 'resume', 'codex-native-thread'],
       provider: 'codex',
       provider_session_id: 'codex-native-thread',
-      cwd: 'E:/WindowsWorkspace/omnicompany',
+      cwd: 'C:/workspace/omnicompany',
       cols: 120,
       rows: 30,
       started_at: 1780273000,
@@ -70,7 +70,7 @@ describe('ThreadMonitorPanel', () => {
       expect(resumeProvider).toHaveBeenCalledWith({
         provider: 'codex',
         provider_session_id: 'codex-native-thread',
-        cwd: 'E:/WindowsWorkspace/omnicompany',
+        cwd: 'C:/workspace/omnicompany',
       })
     })
     const tabs = usePanels.getState().tabs
@@ -83,7 +83,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
     vi.spyOn(ccApi, 'list').mockResolvedValue([])
     const create = vi.spyOn(ccApi, 'create').mockResolvedValue({
-      id: 'pty-codex-1', cmd: ['codex'], cwd: 'E:/WindowsWorkspace/omnicompany',
+      id: 'pty-codex-1', cmd: ['codex'], cwd: 'C:/workspace/omnicompany',
       cols: 120, rows: 30, started_at: 1780272000, alive: true,
     })
 
@@ -103,7 +103,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccApi, 'list').mockResolvedValue([])
     const create = vi.spyOn(ccApi, 'create').mockResolvedValue({
       id: 'pty-shell-1', cmd: ['powershell', '-NoLogo'], provider: 'shell',
-      cwd: 'E:/WindowsWorkspace/omnicompany', cols: 120, rows: 30,
+      cwd: 'C:/workspace/omnicompany', cols: 120, rows: 30,
       started_at: 1780272000, alive: true,
     })
 
@@ -159,17 +159,17 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
     vi.spyOn(ccApi, 'list').mockResolvedValue([
       {
-        id: '5da8c392-newer', cmd: ['opencode'], provider: 'opencode', cwd: 'E:/WindowsWorkspace',
+        id: '5da8c392-newer', cmd: ['opencode'], provider: 'opencode', cwd: 'C:/workspace/',
         cols: 120, rows: 30, started_at: 200, last_output_at: 240, alive: true,
         has_user_turn: true, subscribers: 0, status: 'alive',
       },
       {
-        id: '607b1d85-older', cmd: ['opencode'], provider: 'opencode', cwd: 'E:/WindowsWorkspace',
+        id: '607b1d85-older', cmd: ['opencode'], provider: 'opencode', cwd: 'C:/workspace/',
         cols: 120, rows: 30, started_at: 100, last_output_at: 180, alive: true,
         has_user_turn: true, subscribers: 1, status: 'alive',
       },
       {
-        id: '0340ee96-empty', cmd: ['opencode'], provider: 'opencode', cwd: 'E:/WindowsWorkspace',
+        id: '0340ee96-empty', cmd: ['opencode'], provider: 'opencode', cwd: 'C:/workspace/',
         cols: 120, rows: 30, started_at: 50, alive: true,
         has_user_turn: false, subscribers: 0, status: 'alive',
       },
@@ -236,7 +236,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccApi, 'list').mockResolvedValue([{
       id: 'pty-live-codex',
       cmd: ['codex'],
-      cwd: 'E:/WindowsWorkspace/omnicompany',
+      cwd: 'C:/workspace/omnicompany',
       cols: 120,
       rows: 30,
       started_at: 1780272000,
@@ -249,7 +249,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([{
       provider: 'codex',
       session_id: 'codex-transcript-1',
-      cwd: 'E:/WindowsWorkspace/omnicompany',
+      cwd: 'C:/workspace/omnicompany',
       mtime: Date.now() / 1000,
       preview: '修复页签状态',
       file: 'session.jsonl',
@@ -279,7 +279,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([{
       provider: 'claude_code',
       session_id: 'external-claude-session',
-      cwd: 'E:/WindowsWorkspace',
+      cwd: 'C:/workspace/',
       mtime: Date.now() / 1000,
       preview: 'resume existing session',
       file: 'external.jsonl',
@@ -290,7 +290,7 @@ describe('ThreadMonitorPanel', () => {
       cmd: ['claude', '--resume', 'external-claude-session'],
       provider: 'claude_code',
       provider_session_id: 'external-claude-session',
-      cwd: 'E:/WindowsWorkspace',
+      cwd: 'C:/workspace/',
       cols: 120,
       rows: 30,
       started_at: Date.now() / 1000,
@@ -304,7 +304,7 @@ describe('ThreadMonitorPanel', () => {
       expect(resumeProvider).toHaveBeenCalledWith({
         provider_session_id: 'external-claude-session',
         provider: 'claude_code',
-        cwd: 'E:/WindowsWorkspace',
+        cwd: 'C:/workspace/',
       })
       expect(usePanels.getState().tabs.map((tab) => tab.id)).toContain('cc_session:pty-resumed-session')
       expect(usePanels.getState().activeId).toBe('cc_session:pty-resumed-session')
@@ -330,7 +330,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'importable').mockResolvedValue([{
       provider: 'codex',
       session_id: '019f-search-native-session',
-      cwd: 'E:/WindowsWorkspace/search-target',
+      cwd: 'C:/workspace/search-target',
       mtime: Date.now() / 1000 - 1000,
       preview: 'unique historical needle',
       file: 'historical.jsonl',
@@ -341,7 +341,7 @@ describe('ThreadMonitorPanel', () => {
       cmd: ['codex', 'resume', '019f-search-native-session'],
       provider: 'codex',
       provider_session_id: '019f-search-native-session',
-      cwd: 'E:/WindowsWorkspace/search-target',
+      cwd: 'C:/workspace/search-target',
       cols: 120,
       rows: 30,
       started_at: Date.now() / 1000,
@@ -358,7 +358,7 @@ describe('ThreadMonitorPanel', () => {
       expect(resumeProvider).toHaveBeenCalledWith({
         provider_session_id: '019f-search-native-session',
         provider: 'codex',
-        cwd: 'E:/WindowsWorkspace/search-target',
+        cwd: 'C:/workspace/search-target',
       })
       expect(usePanels.getState().activeId).toBe('cc_session:pty-search-result')
     })
@@ -371,7 +371,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue(Array.from({ length: 50 }, (_, index) => ({
       provider: 'codex' as const,
       session_id: `native-${index}`,
-      cwd: 'E:/WindowsWorkspace',
+      cwd: 'C:/workspace/',
       mtime: Date.now() / 1000 - index,
       preview: `session ${index}`,
       file: `session-${index}.jsonl`,
@@ -389,7 +389,7 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([{
       provider: 'codex',
       session_id: '019f9dee-b673-7212-b948-3baa72c242f2',
-      cwd: 'E:/WindowsWorkspace',
+      cwd: 'C:/workspace/',
       mtime: Date.now() / 1000,
       preview: 'preview fallback',
       file: 'active.jsonl',

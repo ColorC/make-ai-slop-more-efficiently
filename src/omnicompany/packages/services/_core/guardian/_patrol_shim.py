@@ -88,7 +88,7 @@ class RuleEngine:
 
         return {"confirmed": confirmed, "needs_judgment": needs_judgment}
 
-_DEFAULT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
+_DEFAULT_ROOT = Path("C:/workspace/omnicompany")
 
 # ── patrol 非阻塞锁(2026-07-04 密度分层批1) ─────────────────────────────
 # patrol 提到心跳级(@every15m)后, 会话手动跑与 tick 顺带跑可能并发, 存在无锁并发

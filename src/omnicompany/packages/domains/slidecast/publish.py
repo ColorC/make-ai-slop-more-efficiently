@@ -20,7 +20,7 @@ from . import render as R
 from ._paths import runs_root, studio_root
 
 # colorc.cc 真源(memory: webworks/apps/personal-homepage 是 colorc.cc 真站)
-HOME = Path("E:/WindowsWorkspace/webworks/apps/personal-homepage")
+HOME = Path("C:/workspace/webworks/apps/personal-homepage")
 
 # 选定也出 demo 的 works(项目页,挑需要的;curated 已发布 posts 自动全收)
 WORKS_DEMOS: list[str] = ["aigc-lab"]

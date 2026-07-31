@@ -30,6 +30,7 @@ from .cockpit_actions import (
     resolve_action_target,
 )
 from .cockpit_workflow import build_workflow_summary
+from .ccusage_stats import build_ccusage_stats
 from .entity_registry import parse_entity_uri, resolve_entity_uri, search_entities
 from .llm_runtime_usage import build_llm_runtime_usage
 from .material_registry import build_material_registry
@@ -372,7 +373,7 @@ def _scan_session_activity() -> tuple[list[dict], dict, bool]:
         return sessions, totals, True
     last_overall: datetime | None = None
     for f in files:
-        # cwd 推断: 父目录名形如 "E--WindowsWorkspace-omnicompany" → "E:/WindowsWorkspace/omnicompany"
+        # cwd 推断: 父目录名形如 "E--WindowsWorkspace-omnicompany" → "C:/workspace/omnicompany"
         parent_name = f.parent.name
         cwd_guess = parent_name.replace("--", ":/", 1).replace("-", "/") if "--" in parent_name else parent_name
         first_ts: datetime | None = None
@@ -1511,6 +1512,29 @@ async def get_usage(force: bool = False) -> dict[str, Any]:
 @boss_sight_router.get("/llm-runtime")
 async def get_llm_runtime_usage() -> dict[str, Any]:
     return build_llm_runtime_usage()
+
+
+# ccusage 统计(设置>Token统计 页签): 首次真正接入 ccusage 取「按天×软件×模型」token+成本 + 5h 计费块。
+# ccusage 子进程扫 GB 级本地日志(阻塞且慢), 丢线程池跑 + 模块内 TTL 缓存; since/until = YYYYMMDD。
+# 会话归属统一设施状态(唯一入口=session_attribution; 各渠道禁止自建会话分类)
+@boss_sight_router.get("/session-attribution")
+async def get_session_attribution() -> dict[str, Any]:
+    """归属链状态 + LLM标注/词表规模(巡检与消费方自检用)。"""
+    from .session_attribution import attribution_summary
+    return attribution_summary()
+
+
+@boss_sight_router.get("/ccusage")
+async def get_ccusage_stats(
+    since: str | None = None,
+    until: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """各软件(agent) token 用量 + 成本(ccusage daily) + 当前 5h 计费块燃烧率(ccusage blocks)。"""
+    import asyncio
+    return await asyncio.get_running_loop().run_in_executor(
+        None, lambda: build_ccusage_stats(since, until, force)
+    )
 
 
 # token 记账(#6 监督设施追加件): claude/codex 会话用量 + 内部调用账三路归并, 只读不落盘。

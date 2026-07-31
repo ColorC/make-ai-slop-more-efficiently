@@ -31,7 +31,7 @@ from typing import Literal, Optional
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
+_DEFAULT_ROOT = Path("C:/workspace/omnicompany")
 _OMNI_DIR = ".omni"
 
 Disposition = Literal["warn", "stamp", "tombstone", "quarantine", "relocate", "evolve-signal"]

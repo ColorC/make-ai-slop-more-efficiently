@@ -46,6 +46,10 @@ test.describe('审阅台「更多」→ 复制材料路径', () => {
     await cleanup(request)
   })
 
+  test.afterEach(async ({ request }) => {
+    await cleanup(request)
+  })
+
   test('文件材料: 剪贴板 = 落盘绝对路径 + 可见反馈', async ({ page, request }) => {
     const m = await createMaterial(request, {
       kind: 'markdown', tier: 'important',
@@ -66,7 +70,7 @@ test.describe('审阅台「更多」→ 复制材料路径', () => {
     await expect(page.getByTestId('material-detail-more-menu')).toBeVisible()
     await page.getByTestId('review-copy-path').click()
 
-    await expect(page.getByTestId('surface-notice')).toContainText('已复制材料路径')
+    await expect(page.getByTestId('surface-notice')).toContainText('已复制文件路径')
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(file_abs_path)
   })
 

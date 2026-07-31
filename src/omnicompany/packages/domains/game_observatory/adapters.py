@@ -79,8 +79,8 @@ def resolve_adb(explicit: str | Path | None = None) -> Path:
     candidates = [
         Path(explicit) if explicit else None,
         Path(os.environ["OMNI_ADB_PATH"]) if os.environ.get("OMNI_ADB_PATH") else None,
-        Path("E:/WindowsWorkspace/lofa/tools/device/platform-tools/adb.exe"),
-        Path("E:/WindowsWorkspace/lofa/tools/android-sdk/platform-tools/adb.exe"),
+        Path("C:/workspace/lofa/tools/device/platform-tools/adb.exe"),
+        Path("C:/workspace/lofa/tools/android-sdk/platform-tools/adb.exe"),
         Path("C:/Program Files/Netease/MuMu/nx_main/adb.exe"),
         Path("C:/Program Files/Netease/MuMu/nx_device/15.0/shell/adb.exe"),
     ]

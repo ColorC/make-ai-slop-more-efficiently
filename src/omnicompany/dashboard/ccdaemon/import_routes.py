@@ -36,13 +36,12 @@ _log = logging.getLogger(__name__)
 # 请求 /api/cc/chat/importable 会落到这里。(与 chat.py 的 cc_chat_router 同前缀约定。)
 import_sessions_router = APIRouter(prefix="/cc/chat", tags=["cc-chat-import"])
 
-_MAX_FILES = 60
 _MAX_AGE_DAYS = 90
 _HEAD_LINES = 200
 _UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
 
-def _recent_files(root: Path, cap: int) -> list[tuple[float, Path]]:
+def _recent_files(root: Path, cap: int | None = None) -> list[tuple[float, Path]]:
     if not root.is_dir():
         return []
     cutoff = time.time() - _MAX_AGE_DAYS * 86400
@@ -59,7 +58,7 @@ def _recent_files(root: Path, cap: int) -> list[tuple[float, Path]]:
     except OSError:
         pass
     files.sort(key=lambda x: x[0], reverse=True)
-    return files[:cap]
+    return files if cap is None else files[:cap]
 
 
 def _clip(value: Any, limit: int = 160) -> str:
@@ -235,7 +234,7 @@ def _format_preamble(provider: str, session_id: str, title: str, cwd: str, messa
 def _scan_claude() -> list[dict]:
     root = Path.home() / ".claude" / "projects"
     out: list[dict] = []
-    for mtime, f in _recent_files(root, _MAX_FILES):
+    for mtime, f in _recent_files(root):
         cwd = ""
         preview = ""
         try:
@@ -306,9 +305,9 @@ def _is_codex_subagent_meta(meta: dict[str, Any]) -> bool:
 def _scan_codex() -> list[dict]:
     root = Path.home() / ".codex" / "sessions"
     out: list[dict] = []
-    # Subagent-heavy runs can consume most of the newest-file window.  Inspect
-    # a wider candidate set, but still return at most _MAX_FILES user sessions.
-    for mtime, f in _recent_files(root, _MAX_FILES * 4):
+    # Inspect the complete 90-day inventory.  Pagination belongs at the API
+    # boundary; truncating here made older user sessions impossible to search.
+    for mtime, f in _recent_files(root):
         sid = ""
         cwd = ""
         preview = ""
@@ -355,8 +354,6 @@ def _scan_codex() -> list[dict]:
             "preview": _clip(preview),
             "file": str(f),
         })
-        if len(out) >= _MAX_FILES:
-            break
     return out
 
 
@@ -621,10 +618,26 @@ async def list_active_sessions(window_sec: int = 600, limit: int = 30) -> dict[s
     return await asyncio.to_thread(_list_active_sync, window_sec, limit)
 
 
+def _importable_matches_query(item: dict[str, Any], query: str) -> bool:
+    normalized = " ".join(query.casefold().split())
+    if not normalized:
+        return True
+    haystack = " ".join(
+        str(item.get(key) or "")
+        for key in ("provider", "session_id", "cwd", "preview", "file")
+    ).casefold()
+    return normalized in haystack
+
+
 @import_sessions_router.get("/importable")
-async def list_importable_sessions(limit: int = 40) -> dict[str, Any]:
+async def list_importable_sessions(
+    limit: int = 40,
+    offset: int = 0,
+    q: str = "",
+) -> dict[str, Any]:
     """列出可载入续接的本机历史会话(Claude Code + Codex), 按最近修改排序。"""
     limit = max(1, min(int(limit), 120))
+    offset = max(0, int(offset))
     items = [
         dict(item)
         for item in await asyncio.to_thread(_scan_all_cached)
@@ -632,7 +645,17 @@ async def list_importable_sessions(limit: int = 40) -> dict[str, Any]:
     # 过滤掉抠不到 id 的(没法 resume), 再按 mtime 排序裁剪。
     items = [it for it in items if it.get("session_id")]
     items.sort(key=lambda it: it.get("mtime", 0), reverse=True)
-    return {"count": len(items), "items": items[:limit]}
+    items = [item for item in items if _importable_matches_query(item, q)]
+    total = len(items)
+    page = items[offset:offset + limit]
+    return {
+        "count": total,
+        "items": page,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + len(page) < total,
+        "query": q,
+    }
 
 
 class LoadContextBody(BaseModel):

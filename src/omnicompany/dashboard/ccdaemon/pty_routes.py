@@ -60,7 +60,7 @@ class CreateSessionBody(BaseModel):
     cmd: list[str] | None = Field(default=None, description="Override command; defaults to claude CLI on PATH.")
     cwd: str | None = Field(
         default=None,
-        description="Working directory; defaults to E:\\WindowsWorkspace. Other directories are preserved in session metadata.",
+        description="Working directory; defaults to C:/workspace/. Other directories are preserved in session metadata.",
     )
     cols: int = DEFAULT_COLS
     rows: int = DEFAULT_ROWS

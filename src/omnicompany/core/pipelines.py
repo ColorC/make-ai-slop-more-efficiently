@@ -80,7 +80,7 @@ def register_all() -> None:
             name="project-audit",
             description=(
                 "项目遍历 + 据真源(我的原始prompt + 真实代码内容 + 文件树)逐条核实完成度 — 不信报告/说明/复选框.\n"
-                "  omni run project-audit -i name=quant-lab -i root=E:/WindowsWorkspace/quant-lab\n"
+                "  omni run project-audit -i name=quant-lab -i root=C:/workspace/quant-lab\n"
                 "  产出: 真实规模 + 采到的原始 prompt + 读过的代码 + 每条计划项 done/partial/not_done/uncertain (claimed 与 verdict 不一致点是重点)"
             ),
             domain="project_audit",
@@ -116,7 +116,7 @@ def register_all() -> None:
             default_db_dir="data/services/project_audit",
             default_max_steps=5,
             cli_args=[
-                CliArg(name="repo_roots", help="仓库扫描根, 逗号分隔 (默认 E:/WindowsWorkspace,D:/P4/main/AIWorkSpace)"),
+                CliArg(name="repo_roots", help="仓库扫描根, 逗号分隔 (默认 C:/workspace/,C:/workspace/AIWorkSpace/)"),
                 CliArg(name="min_sessions", help="一个 cwd 至少出现几次会话才算项目 (默认 1)"),
             ],
         ))
@@ -129,7 +129,7 @@ def register_all() -> None:
             name="ux-audit",
             description=(
                 "前端 src 三维 UX 审计 — 交互/信息/跳转 确定性枚举 + 据频率×重要性矩阵/信息层级打错位标记(平铺/删除无保护/无层级/说明冗余).\n"
-                "  omni run ux-audit -i src_root=E:/WindowsWorkspace/omnicompany/src/omnicompany/dashboard/frontend/src -i app=omnidashboard\n"
+                "  omni run ux-audit -i src_root=C:/workspace/omnicompany/src/omnicompany/dashboard/frontend/src -i app=omnidashboard\n"
                 "  产出: 每界面交互/信息/跳转计数 + 错位界面清单 + markdown 总表(落 data/services/ux_audit/). 可复跑于 lofa/poof/whatnow.\n"
                 "  口径: frostpane/REBUILD-STANDARD.md + INTERACTION-AUDIT.md. 语义两轴(重要性/频率/含义)留 LLM 增补节点(SOFT 待加)."
             ),
@@ -823,7 +823,7 @@ def register_all() -> None:
                 CliArg(name="build_root", help="当前 build 根目录", default=""),
                 CliArg(name="design_sources", help="设计文档/目录路径（逗号分隔）", default=""),
                 CliArg(name="focus", help="可选：只下钻某子领域", default=""),
-                CliArg(name="project_root", help="只读寻址根", default="E:/WindowsWorkspace"),
+                CliArg(name="project_root", help="只读寻址根", default="C:/workspace/"),
             ],
         ))
     except Exception as e:
@@ -849,7 +849,7 @@ def register_all() -> None:
                 CliArg(name="game_name", help="游戏名", required=True),
                 CliArg(name="build_root", help="当前 build 根目录", default=""),
                 CliArg(name="design_sources", help="设计文档/目录路径（逗号分隔）", default=""),
-                CliArg(name="project_root", help="只读寻址根", default="E:/WindowsWorkspace"),
+                CliArg(name="project_root", help="只读寻址根", default="C:/workspace/"),
             ],
         ))
     except Exception as e:
@@ -875,7 +875,7 @@ def register_all() -> None:
                 CliArg(name="game_name", help="游戏名", required=True),
                 CliArg(name="design_sources", help="UI 设计规格路径（逗号分隔）", default=""),
                 CliArg(name="build_root", help="当前 build 根目录", default=""),
-                CliArg(name="project_root", help="只读寻址根", default="E:/WindowsWorkspace"),
+                CliArg(name="project_root", help="只读寻址根", default="C:/workspace/"),
             ],
         ))
     except Exception as e:
@@ -1421,7 +1421,7 @@ def register_all() -> None:
             default_db_dir="data/domains/publish",
             default_max_steps=10,
             cli_args=[
-                CliArg(name="src", help="AIWorkSpace 根(默认 d:/P4/main/AIWorkSpace 或 OMNI_AIWORKSPACE_ROOT)", default=""),
+                CliArg(name="src", help="AIWorkSpace 根(默认 C:/workspace/AIWorkSpace/ 或 OMNI_AIWORKSPACE_ROOT)", default=""),
                 CliArg(name="dry_run", help="只算清单+diff 预览, 不提交不推送", is_flag=True),
                 CliArg(name="push", help="提交后推送到 gitee(默认只本地提交, 显式 --push 才推)", is_flag=True),
                 CliArg(name="max_file_mb", help="单文件大小上限 MB(超过当数据跳过)", type=int, default=2),

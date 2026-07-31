@@ -5,7 +5,7 @@
     - cwd → 项目: 由外部注入的 project_resolver(cwd)->str|None 决定; 解析不出就是 None,
       不允许本模块自己编一个项目名顶上——一律落"未关联"桶。默认 resolver(未注入时)
       = _project_resolver.build_workspace_project_resolver() 的闭集白名单
-      (只认 E:\\WindowsWorkspace\\workspace.yaml 的 entries 名单 + D:\\P4\\main\\AIWorkSpace
+      (只认 C:/workspace/workspace.yaml 的 entries 名单 + C:/workspace/AIWorkSpace/
       特判), 不是任意 cwd 取末段的宽松启发式。
     - cron 任务名 ↔ meter caller: 见 _cron_link.py, 仅限白名单任务名参与, 结果标非强关联。
 
@@ -65,7 +65,7 @@ class TokenLedgerAggregate:
 
 
 def _default_project_resolver(cwd: str) -> str | None:
-    """默认 resolver: 闭集白名单(读真实 E:\\WindowsWorkspace\\workspace.yaml), 不是宽松
+    """默认 resolver: 闭集白名单(读真实 C:/workspace/workspace.yaml), 不是宽松
     启发式。惰性求值(每次调用现读一次 workspace.yaml, 不在模块导入时触碰真实文件系统,
     避免测试环境仅仅 import 本模块就意外依赖真实路径存在)。"""
     return build_workspace_project_resolver()(cwd)

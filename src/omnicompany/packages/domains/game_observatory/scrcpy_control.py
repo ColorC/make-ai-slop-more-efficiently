@@ -32,8 +32,8 @@ def resolve_scrcpy_server(explicit: str | Path | None = None) -> Path:
     )
     candidates.extend(
         [
-            Path("E:/WindowsWorkspace/lofa/tools/device/scrcpy-win64-v4.0/scrcpy-server"),
-            Path("E:/WindowsWorkspace/lofa/tools/devview/scrcpy-server"),
+            Path("C:/workspace/lofa/tools/device/scrcpy-win64-v4.0/scrcpy-server"),
+            Path("C:/workspace/lofa/tools/devview/scrcpy-server"),
         ]
     )
     for candidate in candidates:

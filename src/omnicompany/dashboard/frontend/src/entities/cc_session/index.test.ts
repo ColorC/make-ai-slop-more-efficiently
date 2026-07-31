@@ -6,7 +6,7 @@ function session(id: string): CcSessionMeta {
   return {
     id,
     cmd: ['codex'],
-    cwd: 'E:\\WindowsWorkspace',
+    cwd: 'C:/workspace/',
     cols: 80,
     rows: 24,
     started_at: 1,

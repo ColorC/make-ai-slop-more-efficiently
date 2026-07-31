@@ -21,7 +21,7 @@ from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
+_DEFAULT_SOURCE_ROOT = Path("C:/workspace/omnicompany/src/omnicompany")
 
 
 # ════════════════════════════════════════════════════════════════

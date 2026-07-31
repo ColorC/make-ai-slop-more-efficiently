@@ -53,6 +53,9 @@ docs/plans/<topic>/[YYYY-MM-DD]<plan-name>/
 
 ---
 
+> **进度唯一真源**: `status`、`completion/progress`、`current_step`、`next_step` 只存在 WhatNow。
+> `plan.md` 仅写稳定的 `authority: whatnow` 指针；历史进度必须带日期并标成“基线/当时记录”，不能冒充当前状态。
+
 ## 二 · 标准结构 (复制这份开始写)
 
 ```markdown
@@ -60,7 +63,7 @@ docs/plans/<topic>/[YYYY-MM-DD]<plan-name>/
 title: 【短称】完整中文标题            # 短称取归属项目 short 字段; 格式权威见 concepts/plan.md §3.0
 date: '<YYYY-MM-DD>'
 work_type: <refactor|infra-convergence|...>
-status: active
+authority: whatnow
 exit_criteria:
   - <退出条件 1>
 binding:
@@ -71,7 +74,7 @@ applicable_standards: []
 expected_completion: <YYYY-MM-DD>
 ---
 
-<!-- [OMNI] origin=<origin> domain=plans/<topic> ts=<ISO8601> type=plan status=<draft|active|done|archived> -->
+<!-- [OMNI] origin=<origin> domain=plans/<topic> ts=<ISO8601> type=plan authority=whatnow -->
 <!-- [OMNI] summary="<本计划 1 句话总结>" -->
 <!-- [OMNI] why="<立这计划为啥, 解决什么问题>" -->
 <!-- [OMNI] tags=plan,<topic>,<其他相关>... -->

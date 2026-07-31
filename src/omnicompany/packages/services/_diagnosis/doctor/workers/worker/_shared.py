@@ -11,7 +11,7 @@ logger = logging.getLogger("omnicompany.doctor.router")
 
 
 # 默认 source root (omnicompany 项目的 src/omnicompany/)
-DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
+DEFAULT_SOURCE_ROOT = Path("C:/workspace/omnicompany/src/omnicompany")
 
 
 # 已知模型名称模式 (R-11 检测硬编码模型名)

@@ -65,8 +65,8 @@ import { buildIndex } from '@user/obsidian-md';
 
 const index = await buildIndex({
   roots: [
-    { name: '系统组', path: 'D:/P4/main/AIWorkSpace/策划通用/系统组/docs/wiki' },
-    { name: '任务组', path: 'D:/P4/main/AIWorkSpace/策划通用/任务组/docs/wiki' },
+    { name: '系统组', path: 'C:/workspace/AIWorkSpace/策划通用/系统组/docs/wiki' },
+    { name: '任务组', path: 'C:/workspace/AIWorkSpace/策划通用/任务组/docs/wiki' },
   ],
   exclude: ['_audit', '.obsidian'],
 });

@@ -1,1 +1,0 @@
-{"action":{"type":"tap","x":280,"y":1605,"duration_ms":250},"target_name":"赛季职业装备入口","target_bounds":{"x":215,"y":1535,"width":135,"height":145},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

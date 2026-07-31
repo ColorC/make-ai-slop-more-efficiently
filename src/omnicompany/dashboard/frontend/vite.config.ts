@@ -20,6 +20,7 @@ const walkerGameTarget = process.env.OMNI_WALKER_GAME_URL || 'http://127.0.0.1:5
 // Vilo 当前 demo 是 tabletop-simulator 的静态 http.server, 不是以 /vilo-demo/ 为 base 的 Vite app。
 // 因此代理时要 strip prefix: /vilo-demo/turn-ui.js -> http://127.0.0.1:8892/turn-ui.js。
 const viloDemoTarget = process.env.OMNI_VILO_DEMO_URL || 'http://127.0.0.1:8892'
+const viloOsTarget = process.env.OMNI_VILO_OS_URL || 'http://127.0.0.1:5186'
 
 // Rollup's default content-hashed chunk names can form a hash-reference cycle:
 // two semantically identical builds may receive different names when chunks
@@ -52,6 +53,13 @@ export default defineConfig({
         target: `http://localhost:${dashboardProxyPort}`,
         changeOrigin: true,
       },
+      // FileBridge intentionally lives outside /api so the same route can be
+      // consumed by Dashboard and LOFA. Keep dev/E2E behavior identical to the
+      // production same-origin server instead of returning Vite's SPA fallback.
+      '/lofa/file-bridge': {
+        target: `http://localhost:${dashboardProxyPort}`,
+        changeOrigin: true,
+      },
       '/walker-game': {
         target: walkerGameTarget,
         changeOrigin: true,
@@ -63,11 +71,20 @@ export default defineConfig({
         ws: true,
         rewrite: (path) => path.replace(/^\/vilo-demo/, '') || '/',
       },
+      '/vilo-os': {
+        target: viloOsTarget,
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   build: {
     outDir: '../static',
     emptyOutDir: true,
+    // esbuild 0.21 corrupts xterm 6's requestMode enum initializer in a
+    // minified production chunk (undeclared variable at runtime). Terser keeps
+    // the lazy terminal chunk compact without changing xterm's semantics.
+    minify: 'terser',
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
@@ -76,12 +93,16 @@ export default defineConfig({
         // 纯动态引入的库(cytoscape/react-syntax-highlighter/xterm)**不要**写在这里 ——
         // 把动态库强行塞进具名 manualChunk 会把它钉回入口的静态图、被 index.html modulepreload,
         // 反而抵消懒加载(Vite 已知坑)。让 Rollup 按动态 import 自动拆它们的 async chunk 即可。
-        manualChunks: {
-          'monaco': ['@monaco-editor/react'],
-          'katex': ['katex', 'remark-math', 'rehype-katex'],
-          'reactflow': ['reactflow', '@reactflow/core'],
-          'kbar': ['kbar'],
-          'remark': ['react-markdown', 'remark-gfm', 'unist-util-visit'],
+        manualChunks(id: string) {
+          const match = /[\\/]node_modules[\\/](.*)/.exec(id)
+          if (!match) return
+          const pkg = match[1].replace(/\\/g, '/')
+          if (/^(react|react-dom|scheduler|zustand|use-sync-external-store)\//.test(pkg)) return 'vendor'
+          if (pkg.startsWith('@monaco-editor/')) return 'monaco'
+          if (pkg.startsWith('katex/') || pkg.startsWith('remark-math/') || pkg.startsWith('rehype-katex/')) return 'katex'
+          if (pkg.startsWith('reactflow/') || pkg.startsWith('@reactflow/')) return 'reactflow'
+          if (pkg.startsWith('kbar/')) return 'kbar'
+          if (pkg.startsWith('react-markdown/') || pkg.startsWith('remark-gfm/') || pkg.startsWith('unist-util-visit/')) return 'remark'
         },
       },
     },

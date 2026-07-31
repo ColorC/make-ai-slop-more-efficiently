@@ -68,11 +68,11 @@
 
 ### 5. 工作区根 / 盘根 / 仓根是闭集
 
-工作区根 (`E:\WindowsWorkspace`)、盘根 (`E:\`)、单项目仓根 (如 `omnicompany/`) 的**第一层**只允许出现已登记的条目: 已知项目、约定 dotfolder (`.git`/`.omni`/`.claude` 等)、约定归档 (`_archive`/`_scratch`)。任何没登记的新顶层目录/文件默认是污染, 必须当场解释清楚或清掉。
+工作区根 (`C:/workspace/`)、盘根 (`E:\`)、单项目仓根 (如 `omnicompany/`) 的**第一层**只允许出现已登记的条目: 已知项目、约定 dotfolder (`.git`/`.omni`/`.claude` 等)、约定归档 (`_archive`/`_scratch`)。任何没登记的新顶层目录/文件默认是污染, 必须当场解释清楚或清掉。
 
 判定 (出现下面任一即污染):
 - 顶层冒出一个不在闭集里的目录, 没人能说清它哪来的、归谁。
-- 一个目录该归属某个具体项目, 却散落在工作区根/盘根 (例: `E:\WindowsWorkspace\data\intent_traces.db` 本属 `omnicompany/data/`)。
+- 一个目录该归属某个具体项目, 却散落在工作区根/盘根 (例: `C:/workspace/data\intent_traces.db` 本属 `omnicompany/data/`)。
 - 参考项目 (别人的仓、上游源码) 直接铺在工作区根, 而不是收进 `参考项目/` 或所属项目的 vendor 子目录 (例: `affine`、`_vendor_tmp` 该进 `参考项目/`)。
 - 单项目仓根冒出未声明的 dotfolder (例: `omnicompany/.agent_state/` 该并进 `data/` 或 `.omni/`, 不单立一个根目录)。
 
@@ -83,12 +83,12 @@
 
 ### 6. 根因铁律: 绝不用相对路径写工作区根/盘根
 
-上面 §5 的污染**绝大多数是同一个根因**: agent 或命令在错误的工作目录 (盘根 `E:\` 或工作区根 `E:\WindowsWorkspace`) 下, 用了**相对路径**写文件, 于是垃圾长在了当前目录的顶层。
+上面 §5 的污染**绝大多数是同一个根因**: agent 或命令在错误的工作目录 (盘根 `E:\` 或工作区根 `C:/workspace/`) 下, 用了**相对路径**写文件, 于是垃圾长在了当前目录的顶层。
 
 真实证据 (2026-06-26 实扫):
-- `E:\e\WindowsWorkspace` — 在 `E:\` 下跑了形如 `xxx e/WindowsWorkspace/...` 的相对路径 (本该是绝对 `E:\WindowsWorkspace` 或 `/e/WindowsWorkspace`)。
+- `E:\e\WindowsWorkspace` — 在 `E:\` 下跑了形如 `xxx e/WindowsWorkspace/...` 的相对路径 (本该是绝对 `C:/workspace/` 或 `/e/WindowsWorkspace`)。
 - `E:\tmp\*.txt` — 在 `E:\` 下用相对 `tmp/` 当临时区 (本该用项目内 `var/tmp` 或沙盒)。
-- `E:\WindowsWorkspace\data\intent_traces.db`、`E:\WindowsWorkspace\AIWorkSpace\sandbox` — 在工作区根下用相对 `data/...`、`AIWorkSpace/...` (本该进 `omnicompany/data/`、真 AIWorkSpace)。
+- `C:/workspace/data\intent_traces.db`、`C:/workspace/AIWorkSpace\sandbox` — 在工作区根下用相对 `data/...`、`AIWorkSpace/...` (本该进 `omnicompany/data/`、真 AIWorkSpace)。
 
 铁律:
 - 写文件、建目录**一律用绝对路径**, 或**先 `cd` 进目标项目再用项目内相对路径**; 永不在盘根/工作区根直接用裸相对路径。
@@ -121,6 +121,6 @@
 
 Guardian 只负责警示和排队, 不默认删除。任何自动移动必须进入归档或隔离区, 并保留可审计记录。
 
-**工作区根 / 盘根本身也是扫描根** (§一·5): omnicompany 的 `.omni/hygiene-profile.yaml` 额外声明两个相对根 —— `workspace` (`path: ".."` = `E:\WindowsWorkspace`) 与 `drive` (`path: "../.."` = `E:\`), 各带顶层闭集 (`allowed_root_dirs`/`allowed_root_files`)。对这种巨大外部根**只走一层闭集判定, 绝不递归** (profile 里标 `closed_set_only: true`), 避免扫炸。闭集外的顶层条目会被带**根因分类**告警 (手误目录 / 错误相对写 / vendored 参考 / 游离副本)。
+**工作区根 / 盘根本身也是扫描根** (§一·5): omnicompany 的 `.omni/hygiene-profile.yaml` 额外声明两个相对根 —— `workspace` (`path: ".."` = `C:/workspace/`) 与 `drive` (`path: "../.."` = `E:\`), 各带顶层闭集 (`allowed_root_dirs`/`allowed_root_files`)。对这种巨大外部根**只走一层闭集判定, 绝不递归** (profile 里标 `closed_set_only: true`), 避免扫炸。闭集外的顶层条目会被带**根因分类**告警 (手误目录 / 错误相对写 / vendored 参考 / 游离副本)。
 
 **每天兜底**: 目录级 hygiene 扫描 (空目录 / 临时残留 / 老化 / 体积 / profile 闭集) 不在 `omni guardian patrol` 的 git-diff 链里, 必须由定时任务 `guard-hygiene-daily` (`omni guardian hygiene list`) 每天跑一次, 否则顶层污染会长期隐形 (2026-06-26 教训: `omnicompany/data/` 长期临时日志混永久库无人扫, 正因 hygiene 没进 cron)。

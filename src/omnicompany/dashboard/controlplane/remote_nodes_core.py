@@ -49,7 +49,7 @@ DEFAULT_HOME_CONFIG: dict[str, Any] = {
     "advertise_host": "",  # 本机 LAN IP; 空=自动探测; 引导包回连用
     "dashboard_port": 8210,
     "git_remote": "https://git-host.example.com/user/omnifactory-private.git",
-    "install_dir": "E:/WindowsWorkspace/omnicompany",
+    "install_dir": "C:/workspace/omnicompany",
     "tunnel_port": 8223,   # 主控 loopback 反向 SSH 隧道转发口(盒子 ssh -R 回连到这里)
     "master_user": "",    # 主控机 sshd 用户名; 渲染时为空则 getpass.getuser() 填
     "master_ssh_port": 22, # 主控机 sshd 端口(盒子 ssh -R 连它)

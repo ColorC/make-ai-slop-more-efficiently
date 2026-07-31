@@ -7,7 +7,7 @@ ssh_key_env: OMNI_HOME_SSH_KEY
 advertise_host: 10.3.43.246
 dashboard_port: 8210
 git_remote: https://git-host.example.com/user/omnifactory-private.git
-install_dir: E:/WindowsWorkspace/omnicompany
+install_dir: C:/workspace/omnicompany
 tunnel_port: 8223
 master_user: user
 master_ssh_port: 22

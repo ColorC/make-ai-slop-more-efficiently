@@ -298,7 +298,7 @@ def main() -> int:
 
         # ── 步骤 4c: 根硬编码探针 (会踩"原仓根硬编码"的命令) ───────
         # debt/guardian 这类命令历史上把默认 --root 写死成
-        # "e:/WindowsWorkspace/omnicompany"。修好后默认根应由
+        # "C:/workspace/omnicompany"。修好后默认根应由
         # omni_workspace_root() 从安装位置解析, 干净环境里绝不该指回开发机真仓。
         # 这些命令在干净环境通常"找不到 REGISTRY.md/git 仓"而非 0 退出, 属预期,
         # 故按"是否泄漏开发机真仓路径"判定, 不以退出码作阻断。
@@ -320,7 +320,7 @@ def main() -> int:
                 # 干净环境本就没有 REGISTRY.md / git 仓)。
                 repo_str_l = str(repo).replace("\\", "/").lower()
                 low = out.replace("\\", "/").lower()
-                leaked_here = ("e:/windowsworkspace" in low) or (repo_str_l in low)
+                leaked_here = ("C:/workspace/" in low) or (repo_str_l in low)
                 rep.add(f"root-probe: {label}", not leaked_here,
                         f"rc={r.returncode}; " +
                         ("默认根指向开发机真仓 (泄漏!)" if leaked_here
@@ -333,7 +333,7 @@ def main() -> int:
         # ── 步骤 5: 硬编码路径泄漏检测 ─────────────────────────────
         print("\n[5] 硬编码路径泄漏检测 (是否偷读开发机真仓)")
         repo_str = str(repo).replace("\\", "/").lower()
-        leak_markers = ["e:/windowsworkspace", repo_str]
+        leak_markers = ["C:/workspace/", repo_str]
         leaked: list[str] = []
         for label, out in outputs.items():
             low = out.replace("\\", "/").lower()

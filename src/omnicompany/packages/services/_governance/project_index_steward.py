@@ -147,7 +147,7 @@ def _is_external_path(p: str) -> bool:
 
 
 def _resolve_field_path(p: str, base: Path) -> Path:
-    """frontmatter 路径字段可能是仓内绝对路径(E:/WindowsWorkspace/omnicompany/...)或相对路径。"""
+    """frontmatter 路径字段可能是仓内绝对路径(C:/workspace/omnicompany/...)或相对路径。"""
     pp = Path(p)
     if pp.is_absolute():
         return pp
@@ -545,7 +545,7 @@ def _existing_candidate_lines(text: str) -> list[str]:
 
 # 路径/文件名 token(basename): 反引号包裹的代码/路径片段, 或裸的 a/b/c、a.py、
 # E:/x/y 这类(可选 Windows 盘符前缀 —— 2026-07-04 实测坐实: gpt-5.5 常直接写
-# 不带反引号的绝对路径如 "E:/WindowsWorkspace/omnicompany/...", 漏收盘符前缀会让
+# 不带反引号的绝对路径如 "C:/workspace/omnicompany/...", 漏收盘符前缀会让
 # 正则从冒号处断开, 整条路径 token 抽取失败, 去重形同虚设)。
 # 这是最强去重信号——LLM 每轮复述同一条发现措辞会大幅改写(整句都不同, 纯文本/整句
 # Jaccard 命中率极低), 但引用的具体路径/文件名/commit 摘要(来自同一份只读 git log

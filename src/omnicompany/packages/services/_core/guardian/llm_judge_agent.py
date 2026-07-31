@@ -198,7 +198,7 @@ class LLMJudgeAgent(AgentNodeLoop):
     输入 (传给 run() 的 dict):
         {
             "path":         "src/omnicompany/packages/services/knowledge/store.py",
-            "abs_path":     "E:/WindowsWorkspace/omnicompany/src/..." ,
+            "abs_path":     "C:/workspace/omnicompany/src/..." ,
             "change_type":  "A" | "M",
             "rule_hits":    ["OMNI-013", ...] (规则引擎已命中的规则),
             "file_lines":   401,   # 行数提示, agent 决定分段读取策略

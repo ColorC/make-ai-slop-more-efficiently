@@ -27,7 +27,7 @@ gateways:
     owner: aiworkspace
     service: AIWorkSpace App Portal(LAN 同事入口, /app/<id>/ 路径反代 + port:auto 懒启动)
     bind: wildcard          # 有意: 给 LAN 同事
-    registry: d:/P4/main/AIWorkSpace/app/ports.json
+    registry: C:/workspace/AIWorkSpace/app/ports.json
 
 # ── 常驻服务(独立端口, 一律回环) ─────────────────────────────────────────────
 services:

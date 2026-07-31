@@ -163,7 +163,7 @@ KB_AUDIT_REQUEST = Material(
     tags=["knowledge", "audit", "kind.source"],
     examples=[
         {},
-        {"project_root": "e:/WindowsWorkspace/omnicompany"},
+        {"project_root": "C:/workspace/omnicompany"},
     ],
 )
 

@@ -46,7 +46,7 @@ _D_DRIVE_ROOT_WHITELIST: frozenset[str] = frozenset({
 })
 
 
-# 工作区根 (e:/WindowsWorkspace/) 白名单
+# 工作区根 (C:/workspace/) 白名单
 _WORKSPACE_ROOT_WHITELIST: frozenset[str] = frozenset({
     ".claude",
     ".omni",
@@ -95,7 +95,7 @@ _WINDOWS_DEVICE_NAMES: frozenset[str] = frozenset({
 
 # 默认扫描根 (相对路径自动展开为绝对)
 _DEFAULT_SCAN_TARGETS = (
-    ("workspace_root", Path("e:/WindowsWorkspace"), _WORKSPACE_ROOT_WHITELIST),
+    ("workspace_root", Path("C:/workspace/"), _WORKSPACE_ROOT_WHITELIST),
     ("d_drive_root", Path("d:/"), _D_DRIVE_ROOT_WHITELIST),
 )
 
@@ -196,7 +196,7 @@ def scan_pollution(
         logger.debug("[workspace_pollution] 扫描根不存在: %s", scan_root)
         return []
 
-    omni_root = omni_root or Path("e:/WindowsWorkspace/omnicompany")
+    omni_root = omni_root or Path("C:/workspace/omnicompany")
     backup_root = _quarantine_dir(omni_root)
     now = datetime.now(timezone.utc).isoformat()
     tickets: list[PollutionTicket] = []

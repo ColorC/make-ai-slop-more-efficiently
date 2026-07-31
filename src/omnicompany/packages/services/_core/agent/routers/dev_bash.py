@@ -137,7 +137,7 @@ class DevBashRouter(SingleToolRouter):
                 raise ToolExecutionError(
                     f"cwd 参数必填 — bash 没默认 cwd 也没 ctx.cwd. 你必须传 cwd 字段 (绝对路径, 在 allowed_bash_roots 内).\n"
                     f"allowed_bash_roots 示例: {roots_hint}\n"
-                    f"示例: bash(command='ls', cwd='e:/WindowsWorkspace/demogame-knowledge-base/'). 重试, 带 cwd."
+                    f"示例: bash(command='ls', cwd='C:/workspace/demogame-knowledge-base/'). 重试, 带 cwd."
                 )
 
         # 黑名单 (骨架级 assert)
@@ -157,13 +157,13 @@ class DevBashRouter(SingleToolRouter):
                 "This Worker has no permission to run shell commands."
             )
         # cwd sanity check: 防 LLM 输出 bug 拼出无 separator 的怪串
-        # (例 "eWindowsWorkspace_scratchfigma_pull_abyssgJUhPyBeWrC6486sojoD6d" — 应是 "e:/WindowsWorkspace/_scratch/figma_pull_abyss/gJUhPyBeWrC..." 但分隔符被吞)
+        # (例 "eWindowsWorkspace_scratchfigma_pull_abyssgJUhPyBeWrC6486sojoD6d" — 应是 "C:/workspace/_scratch/figma_pull_abyss/gJUhPyBeWrC..." 但分隔符被吞)
         # 检测: 长字符串 (>20 char) 且无 / 也无 \ → 不是合法路径
         if len(raw_cwd) > 20 and "/" not in raw_cwd and "\\" not in raw_cwd:
             raise ToolExecutionError(
                 f"cwd 格式可疑 — `{raw_cwd}` 长度 {len(raw_cwd)} 但完全没路径分隔符 ('/' 或 '\\\\').\n"
                 f"看起来像 LLM 输出 bug 把分隔符吞了. 检查你拼接 cwd 时是否丢了 '/' 或 ':'.\n"
-                f"正确格式示例: 'e:/WindowsWorkspace/_scratch/figma_pull_abyss/<file_key>/'"
+                f"正确格式示例: 'C:/workspace/_scratch/figma_pull_abyss/<file_key>/'"
             )
         try:
             cwd_abs = Path(raw_cwd).resolve()

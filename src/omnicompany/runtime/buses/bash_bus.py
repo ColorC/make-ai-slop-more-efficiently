@@ -91,7 +91,7 @@ def _normalize(path: Path) -> str:
 
 # ─── Windows 防御层 (2026-05-04 加) ───────────────────────────────────
 #
-# 对齐参考项目 e:/WindowsWorkspace/参考项目/claude-code-analysis/src/utils/bash/shellQuoting.ts
+# 对齐参考项目 C:/workspace/参考项目/claude-code-analysis/src/utils/bash/shellQuoting.ts
 # 和 .../utils/windowsPaths.ts. 解决用户 2026-05-03 反馈的四类 bash 错误产物:
 #   1. nul 文件 (>nul / 2>nul 在 git bash 创建字面量文件)
 #   2. 反斜杠路径破坏 (mkdir "data\X\Y" 整串变单一目录名)

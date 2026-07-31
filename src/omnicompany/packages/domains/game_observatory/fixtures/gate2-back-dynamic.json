@@ -1,9 +1,0 @@
-{
-  "action": {
-    "type": "back"
-  },
-  "settle_threshold": 0.02,
-  "required_consecutive": 2,
-  "settle_timeout_seconds": 6.0,
-  "sample_interval_seconds": 0.25
-}

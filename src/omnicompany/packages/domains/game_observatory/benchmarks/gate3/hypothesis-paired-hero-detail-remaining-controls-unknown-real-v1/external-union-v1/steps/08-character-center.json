@@ -1,1 +1,0 @@
-{"action":{"type":"tap","x":540,"y":720,"duration_ms":250},"target_name":"罗万角色立绘中心","target_bounds":{"x":260,"y":300,"width":620,"height":930},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

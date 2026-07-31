@@ -20,8 +20,8 @@ def default_session_cwd() -> str:
     """Return the stable default for new dashboard CLI/chat sessions.
 
     In the normal checkout ``omni_workspace_root()`` is
-    ``E:\\WindowsWorkspace\\omnicompany``; its parent is therefore the requested
-    cross-project root ``E:\\WindowsWorkspace``. The environment override keeps
+    ``C:/workspace/omnicompany``; its parent is therefore the requested
+    cross-project root ``C:/workspace/``. The environment override keeps
     tests and non-standard deployments explicit without coupling the default to
     the ccdaemon process CWD.
     """

@@ -707,7 +707,7 @@ def _dashboard_claude_settings_path() -> Path | None:
 def _with_dashboard_claude_settings(cmd: list[str]) -> list[str]:
     """Load Omnicompany hooks even when the PTY cwd is above the repo root.
 
-    The dashboard defaults to ``E:\\WindowsWorkspace`` while the project hooks
+    The dashboard defaults to ``C:/workspace/`` while the project hooks
     live under ``omnicompany/.claude/settings.json``. Claude does not discover a
     child directory's project settings from that cwd, so pass them as additional
     settings for Claude commands only. Existing explicit ``--settings`` remains

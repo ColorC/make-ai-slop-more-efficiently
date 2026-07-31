@@ -1,1 +1,0 @@
-{"action":{"type":"tap","x":336,"y":184,"duration_ms":250},"target_name":"名称下方第四个圆形图标","target_bounds":{"x":311,"y":159,"width":51,"height":51},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

@@ -11,8 +11,8 @@ describe('fileBridgeApi', () => {
       ok: true,
       json: async () => ({
         root_id: 'workspace',
-        root_path: 'E:\\WindowsWorkspace',
-        path: 'E:\\WindowsWorkspace',
+        root_path: 'C:/workspace/',
+        path: 'C:/workspace/',
         relative_path: '',
         items: [],
         truncated: false,
@@ -46,8 +46,8 @@ describe('fileBridgeApi', () => {
       ok: true,
       json: async () => ({
         items: [],
-        history_path: 'E:\\WindowsWorkspace\\omnicompany\\data\\runtime\\file_bridge_uploads.jsonl',
-        staging_path: 'E:\\WindowsWorkspace\\temp\\omni-file-bridge',
+        history_path: 'C:/workspace/omnicompany\\data\\runtime\\file_bridge_uploads.jsonl',
+        staging_path: 'C:/workspace/temp\\omni-file-bridge',
         query_command: 'omni dashboard uploads --limit 12',
       }),
     }))
@@ -61,5 +61,14 @@ describe('fileBridgeApi', () => {
         headers: expect.objectContaining({ 'X-Omni-File-Bridge': '1' }),
       }),
     )
+  })
+
+  it('reports a useful error when a dev proxy returns the SPA document', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => { throw new SyntaxError('Unexpected token <') },
+    })))
+
+    await expect(fileBridgeApi.roots()).rejects.toThrow('读取文件桥根目录失败：服务返回了非 JSON 响应')
   })
 })

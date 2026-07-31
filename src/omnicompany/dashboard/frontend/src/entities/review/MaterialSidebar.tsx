@@ -242,7 +242,6 @@ export function MaterialSidebar({
                 if (unit.type === 'cluster') {
                   const cid = `${tier}|${unit.key}`
                   const expanded = expandedClusters.includes(cid)
-                  const newest = unit.items[0]
                   const header = (
                     <div
                       key={`cluster-${cid}`}
@@ -269,9 +268,6 @@ export function MaterialSidebar({
                         <span className="q-t" style={{ WebkitLineClamp: 1 }}>
                           {unit.project} · {KIND_LABELS[unit.kind]}
                         </span>
-                        {!expanded && (
-                          <span className="c-sub">最新: {newest.title}</span>
-                        )}
                       </span>
                       <span className="v2-count c-n" aria-label={`${unit.items.length} 条`}>{unit.items.length}</span>
                     </div>

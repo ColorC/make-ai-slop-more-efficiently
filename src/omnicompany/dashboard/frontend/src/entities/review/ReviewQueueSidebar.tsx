@@ -265,7 +265,6 @@ export function ReviewQueueSidebar({ onOpenMaterial, headerActions }: { onOpenMa
                     if (unit.type === 'cluster') {
                       const cid = `${tier}|${unit.key}`
                       const expanded = expandedClusters.includes(cid)
-                      const newest = unit.items[0]
                       const header = (
                         <div
                           key={`cluster-${cid}`}
@@ -286,7 +285,6 @@ export function ReviewQueueSidebar({ onOpenMaterial, headerActions }: { onOpenMa
                             background: 'color-mix(in srgb, var(--fp-violet) 14%, transparent)',
                             border: '1px solid color-mix(in srgb, var(--fp-violet) 38%, transparent)',
                           }}>{unit.items.length} 条</span>
-                          {!expanded && <span style={{ ...S.sub, marginTop: 0, flex: 1 }} title={newest.title}>最新: {newest.title}</span>}
                           {multiselectMode && (
                             <button
                               type="button"

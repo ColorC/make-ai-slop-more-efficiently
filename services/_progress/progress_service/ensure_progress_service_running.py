@@ -22,9 +22,9 @@ import subprocess
 import sys
 
 PORT = 8230
-BIN = r"E:\WindowsWorkspace\omnicompany\services\_progress\progress_service\target\debug\progressd.exe"
-CWD = r"E:\WindowsWorkspace\omnicompany\services\_progress\progress_service"
-DATA_DIR = r"E:\WindowsWorkspace\omnicompany\data\services\whatnow"
+BIN = r"C:/workspace/omnicompany\services\_progress\progress_service\target\debug\progressd.exe"
+CWD = r"C:/workspace/omnicompany\services\_progress\progress_service"
+DATA_DIR = r"C:/workspace/omnicompany\data\services\whatnow"
 LOG = os.path.join(DATA_DIR, "progressd.log")
 
 

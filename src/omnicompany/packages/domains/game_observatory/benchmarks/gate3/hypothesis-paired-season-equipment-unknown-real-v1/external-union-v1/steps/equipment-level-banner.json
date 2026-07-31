@@ -1,1 +1,0 @@
-{"action":{"type":"tap","x":910,"y":420,"duration_ms":250},"target_name":"右侧装备等级旗帜显示区域","target_bounds":{"x":770,"y":320,"width":280,"height":200},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

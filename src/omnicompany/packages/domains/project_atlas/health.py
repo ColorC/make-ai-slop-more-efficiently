@@ -35,7 +35,7 @@ _CODEX_SKILLS = Path.home() / ".codex" / "skills"
 _EXPORT_TARGETS: tuple[tuple[str, Path], ...] = (("claude", _CLAUDE_SKILLS), ("codex", _CODEX_SKILLS))
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
-# Windows 绝对路径: 盘符打头, 如 E:\WindowsWorkspace\... 或 E:/WindowsWorkspace/...
+# Windows 绝对路径: 盘符打头, 如 C:/workspace/... 或 C:/workspace/...
 # 反引号包裹的路径允许空格；裸路径仍在空白和常见标点处结束，避免吞入后续叙述。
 _ABS_PATH_RE = re.compile(
     r"`([A-Za-z]:[\\/][^`\r\n]+)`|"

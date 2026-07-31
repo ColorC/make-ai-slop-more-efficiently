@@ -12,10 +12,12 @@ controlplane/ 子模块. 本文件 ≤ 100 行 (lifespan + 路由装载 + 静态
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib
 import logging
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -350,16 +352,22 @@ app.add_middleware(
 )
 
 
-class ImmutableStaticFiles(StaticFiles):
-    """/assets 下的文件是 vite 产物, 文件名带内容哈希(改内容必改名), 可放心打永久缓存,
-    远程(WLAN)访问不必每次都重新拉 2.5MB 主 JS 包。"""
+class RevalidatingStaticFiles(StaticFiles):
+    """Serve Vite assets from cache, but always revalidate their ETag.
+
+    Not every emitted filename is content-addressed: ``vite.config.ts`` gives
+    lazy chunks a stable module-set name for reproducible builds.  Marking
+    those URLs ``immutable`` can therefore pin an old implementation to one
+    browser origin after a rebuild.  Revalidation normally costs only a 304,
+    while still allowing a changed file at the same URL to heal itself.
+    """
 
     def file_response(self, *args, **kwargs) -> Response:
         # 注意: 基类 file_response 是同步方法(被 async get_response 里同步调用、不 await),
         # 这里若误写成 async def, self.file_response(...) 会返回一个没被 await 的 coroutine
         # 而不是 Response, 静态文件请求会全部炸掉 —— 必须保持同步签名。
         response = super().file_response(*args, **kwargs)
-        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
         return response
 
 
@@ -390,7 +398,7 @@ app.add_middleware(PathScopedGZip)
 # Production build assets (output of `npm run build` in frontend/)
 _assets_dir = _STATIC_DIR / "assets"
 if _assets_dir.is_dir():
-    app.mount("/assets", ImmutableStaticFiles(directory=str(_assets_dir)), name="assets")
+    app.mount("/assets", RevalidatingStaticFiles(directory=str(_assets_dir)), name="assets")
 
 # 静态 icon (LLM provider logo SVG 等), 跟 claudecodeui 上游路径对齐 (/icons/*.svg)
 _icons_dir = _STATIC_DIR / "icons"
@@ -595,6 +603,39 @@ _BUNDLE_BUILDING_HTML = """<!doctype html>
 </script></body></html>"""
 
 
+_INDEX_ASSET_RE = re.compile(r'(?P<prefix>(?:src|href)=["\'])(?P<url>/assets/[^"\']+)(?P<suffix>["\'])')
+
+
+def _versioned_index(index_html: Path) -> str:
+    """Return the SPA entry with one build-generation query on root assets.
+
+    The generation includes the index bytes plus the size and nanosecond mtime
+    of every directly referenced asset.  Thus even a recovery build that
+    rewrites bytes under an accidentally reused filename gets a new browser
+    cache key without clearing cookies, local storage, or the global cache.
+    """
+    raw = index_html.read_bytes()
+    text = raw.decode("utf-8")
+    digest = hashlib.sha256(raw)
+    urls = {match.group("url").split("?", 1)[0] for match in _INDEX_ASSET_RE.finditer(text)}
+    for url in sorted(urls):
+        asset = _STATIC_DIR / url.lstrip("/")
+        try:
+            stat = asset.stat()
+        except OSError:
+            digest.update(f"{url}:absent".encode("utf-8"))
+        else:
+            digest.update(f"{url}:{stat.st_size}:{stat.st_mtime_ns}".encode("utf-8"))
+    token = digest.hexdigest()[:16]
+
+    def add_generation(match: re.Match[str]) -> str:
+        url = match.group("url")
+        separator = "&" if "?" in url else "?"
+        return f'{match.group("prefix")}{url}{separator}v={token}{match.group("suffix")}'
+
+    return _INDEX_ASSET_RE.sub(add_generation, text)
+
+
 @app.get("/")
 async def index() -> Response:
     """Serve the production vite build (output of `npm run build` in frontend/).
@@ -606,7 +647,14 @@ async def index() -> Response:
     index_html = _STATIC_DIR / "index.html"
     if not index_html.is_file():
         return HTMLResponse(_BUNDLE_BUILDING_HTML, status_code=503)
-    return FileResponse(str(index_html))
+    return HTMLResponse(
+        _versioned_index(index_html),
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.get("/omni-capture-beacon.js")

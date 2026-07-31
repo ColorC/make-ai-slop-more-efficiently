@@ -52,7 +52,7 @@ _SYSTEM_DENYLIST_PREFIXES = (
 
 # 允许的工作区前缀 (大小写不敏感). 超出范围即视为"非目标路径".
 #
-# 工作区顶层 = omni 仓根的父目录 (开发机 = e:\windowsworkspace), 由权威解析器
+# 工作区顶层 = omni 仓根的父目录 (开发机 = C:/workspace/), 由权威解析器
 # 派生而非写死. 额外的机器级工作区 (P4 工作区 / Users / Unix tmp) 通过
 # 环境变量 OMNI_ALLOWED_WORKSPACE_PREFIXES (os.pathsep 分隔) 外置覆盖;
 # 未配置时沿用开发机默认, 保证本机行为不变.

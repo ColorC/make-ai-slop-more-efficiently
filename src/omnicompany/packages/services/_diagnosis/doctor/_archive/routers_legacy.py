@@ -33,7 +33,7 @@ from omnicompany.runtime.routing.router import Router
 logger = logging.getLogger(__name__)
 
 # 默认 source root（omnifactory 项目的 src/omnifactory/）
-_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnifactory/src/omnifactory")
+_DEFAULT_SOURCE_ROOT = Path("C:/workspace/omnifactory/src/omnifactory")
 
 # ── HealthArchive 可选集成 ──────────────────────────────────────────────────
 try:
@@ -907,7 +907,7 @@ class FormatContextualAuditRouter(Router):
             seen_files.add(file_rel)
             try:
                 # file_rel 形如 "src/omnifactory/packages/services/doctor/routers.py"
-                # source_root 是 "e:/WindowsWorkspace/omnifactory/src/omnifactory"
+                # source_root 是 "C:/workspace/omnifactory/src/omnifactory"
                 # file_rel 由 FormatExtractorRouter 生成：相对于 source_root.parent（即 src/）
                 # 例: "omnifactory/packages/services/.../routers.py"
                 full_path = source_root.resolve().parent / file_rel

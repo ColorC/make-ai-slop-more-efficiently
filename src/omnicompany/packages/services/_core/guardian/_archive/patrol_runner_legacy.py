@@ -22,7 +22,7 @@ from .patrol_legacy import FileContext, RuleEngine, parse_omnimark
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_ROOT = Path("e:/WindowsWorkspace/omnifactory")
+_DEFAULT_ROOT = Path("C:/workspace/omnifactory")
 
 
 # ─── Git 变更文件收集 ──────────────────────────────────────────

@@ -8,12 +8,12 @@ from __future__ import annotations
 
 # tier: auto = 结构规整、本地常驻、可自动勘察; snapshot = 受控/漂移,结果标 checkout 时点、不保证全
 SPACES: dict[str, dict] = {
-    "omnicompany": {"root": r"E:\WindowsWorkspace\omnicompany", "tier": "auto", "group": "omnicompany"},
-    "quant-lab": {"root": r"E:\WindowsWorkspace\quant-lab", "tier": "auto", "group": "omnicompany"},
-    "webworks": {"root": r"E:\WindowsWorkspace\webworks", "tier": "auto", "group": "omnicompany"},
-    "overlay-shell": {"root": r"E:\WindowsWorkspace\overlay-shell", "tier": "auto", "group": "omnicompany"},
-    "aiworkspace": {"root": r"D:\P4\main\AIWorkSpace", "tier": "snapshot", "group": "demogame"},
-    "walker": {"root": r"E:\WindowsWorkspace\webworks\apps\walker-game", "tier": "auto", "group": "omnicompany"},
+    "omnicompany": {"root": r"C:/workspace/omnicompany", "tier": "auto", "group": "omnicompany"},
+    "quant-lab": {"root": r"C:/workspace/quant-lab", "tier": "auto", "group": "omnicompany"},
+    "webworks": {"root": r"C:/workspace/webworks", "tier": "auto", "group": "omnicompany"},
+    "overlay-shell": {"root": r"C:/workspace/overlay-shell", "tier": "auto", "group": "omnicompany"},
+    "aiworkspace": {"root": r"C:/workspace/AIWorkSpace/", "tier": "snapshot", "group": "demogame"},
+    "walker": {"root": r"C:/workspace/webworks\apps\walker-game", "tier": "auto", "group": "omnicompany"},
 }
 
 

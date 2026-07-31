@@ -12,8 +12,8 @@
   <body>
     <!-- G.7(2026-07-19 材质裁决波四):唯一全视口连续网格层 —— 全 app 只有这一张格纸,
          各页面/容器一律透明透出,消灭"网格断开"。承载蓝图底色 + 统一规格格纸 + 单 radial 顶部光;
-         顶缘横向刻度尺(40px 细 tick / 200px 长 tick + 尺寸数字)与左缘纵向字母尺(A/B/C…)
-         为 chrome 装饰 aria-hidden,样式在 frostpane.css「统一背景」节。 -->
+         下缘横向刻度尺(40px 细 tick / 200px 长 tick + 尺寸数字)与右缘纵向字母尺(A/B/C…)
+         为 chrome 装饰 aria-hidden；从审阅页头移开，内容贴边时由纸面自然遮住。样式在 frostpane.css「统一背景」节。 -->
     <div id="bp-grid" aria-hidden="true">
       <div class="bp-ruler-x" id="bpRulerX"></div>
       <div class="bp-ruler-y" id="bpRulerY"></div>

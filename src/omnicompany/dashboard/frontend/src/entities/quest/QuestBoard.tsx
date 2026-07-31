@@ -24,7 +24,7 @@ function txt(v: unknown): string { return v == null ? '' : typeof v === 'string'
 function stripTag(s: string): string { return s.replace(/^\s*\[[^\]]{1,40}\]\s*/, '') }
 // plan_id = omnicompany docs/plans 下的相对目录（whatnow 同步管线 _discover_plans 的约定）。
 // 本看板只在本机跑，直接拼绝对路径供「复制路径」粘给资源管理器/AI 对话。
-const PLANS_ROOT = 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans'
+const PLANS_ROOT = 'C:/workspace/omnicompany\\docs\\plans'
 function planPath(planId: string): string { return `${PLANS_ROOT}\\${planId.replace(/\//g, '\\')}` }
 /** 最后一次跟进时间 = 最新一条进度条目的时间（board 已按 ts 倒序）；无进度退回 updated_at。 */
 function lastFollowup(t: TaskNode): number { return t.progress?.[0]?.ts || t.updated_at || 0 }
@@ -400,7 +400,7 @@ export default function QuestBoard() {
       </div>
 
       {error && (
-        <div style={S.err}>进度服务通道不可用 progress-service（{error}）。dashboard 会尝试自动拉起；<br />手动启动：<code>E:\WindowsWorkspace\omnicompany\services\_progress\progress_service\start-progress-service.cmd</code></div>
+        <div style={S.err}>进度服务通道不可用 progress-service（{error}）。dashboard 会尝试自动拉起；<br />手动启动：<code>C:/workspace/omnicompany\services\_progress\progress_service\start-progress-service.cmd</code></div>
       )}
 
       {board && allGoals.map(({ g, clusterTitle }) => (

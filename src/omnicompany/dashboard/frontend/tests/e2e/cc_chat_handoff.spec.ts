@@ -79,7 +79,7 @@ test('B 普通 cc_session chat 页签 → chatui 落点卡(无 provider=controll
 
 async function createChatSession(request: APIRequestContext): Promise<{ id: string }> {
   const r = await request.post('/api/cc/chat/sessions', {
-    data: { provider: 'claude_code', cwd: 'E:/WindowsWorkspace/omnicompany' },
+    data: { provider: 'claude_code', cwd: 'C:/workspace/omnicompany' },
   })
   expect(r.ok(), `create chat session: ${r.status()} ${await r.text()}`).toBeTruthy()
   return await r.json()

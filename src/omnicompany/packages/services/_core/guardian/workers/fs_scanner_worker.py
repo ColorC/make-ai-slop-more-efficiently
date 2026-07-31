@@ -31,7 +31,7 @@ from omnicompany.packages.services._core.guardian.rules.runtime_hygiene import (
 logger = logging.getLogger(__name__)
 
 
-_DEFAULT_PROJECT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
+_DEFAULT_PROJECT_ROOT = Path("C:/workspace/omnicompany")
 
 # 项目根目录下允许的合法条目
 _ALLOWED_ROOT_ENTRIES = frozenset({

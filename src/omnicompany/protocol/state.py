@@ -82,7 +82,7 @@ class StateAnchor:
     Examples:
         # Git 提交（最可靠）
         StateAnchor(kind=StateKind.GIT_COMMIT, ref="abc123ef",
-                    path="e:/WindowsWorkspace")
+                    path="C:/workspace/")
 
         # 文件摘要（适合验证文件内容未被意外修改）
         StateAnchor(kind=StateKind.FILE_HASH, ref="sha256:abcdef...",

@@ -1,5 +1,5 @@
 # [OMNI] origin=ai-ide domain=research ts=2026-06-14T00:00:00Z type=scanner status=active
-# [OMNI] summary="参考项目扫描器:扫 E:\\WindowsWorkspace\\参考项目 的本地 repo/资料,确定性抽 名字/路径/来源URL/描述/别名,产 catalog 条目。"
+# [OMNI] summary="参考项目扫描器:扫 C:/workspace/参考项目 的本地 repo/资料,确定性抽 名字/路径/来源URL/描述/别名,产 catalog 条目。"
 # [OMNI] why="手写 INDEX.md 必馊必漏(漏 19/34)。扫目录不靠人记 —— 读 .git/config remote + README 首段 + package.json,自动盘点。"
 # [OMNI] tags=research,scan,catalog,reference
 """参考项目扫描器 —— 把仓外的本地参考资产盘成 catalog 条目(确定性,无模型)。

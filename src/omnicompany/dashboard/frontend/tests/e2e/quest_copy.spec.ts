@@ -7,7 +7,7 @@
 import { test, expect, type Page } from '@playwright/test'
 
 const PLAN_ID = 'agent-framework/[2026-05-26]MULTI-MACHINE-OMNICOMPANY'
-const PLAN_PATH = 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\agent-framework\\[2026-05-26]MULTI-MACHINE-OMNICOMPANY'
+const PLAN_PATH = 'C:/workspace/omnicompany\\docs\\plans\\agent-framework\\[2026-05-26]MULTI-MACHINE-OMNICOMPANY'
 
 const BOARD = {
   clusters: [{

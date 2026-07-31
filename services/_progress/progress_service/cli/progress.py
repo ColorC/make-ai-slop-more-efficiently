@@ -48,7 +48,7 @@ def _req(method: str, path: str, body: dict | None = None) -> dict:
         reason = getattr(e, "reason", e)
         sys.stderr.write(
             f"[progress] 连不上服务 {BASE}（{reason}）。\n"
-            f"          先启动：E:\\WindowsWorkspace\\omnicompany\\services\\_progress\\progress_service\\start-progress-service.cmd\n"
+            f"          先启动：C:/workspace/omnicompany\\services\\_progress\\progress_service\\start-progress-service.cmd\n"
         )
         sys.exit(2)
 
