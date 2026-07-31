@@ -25,12 +25,12 @@ import { extname, join, normalize } from 'path';
 
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
-const OUT = arg('out', 'E:/WindowsWorkspace/omnicompany/docs/plans/frontend-design/[2026-07-18]TRIFORM-UX-REDESIGN-V2/census');
+const OUT = arg('out', 'C:/workspace/omnicompany/docs/plans/frontend-design/[2026-07-18]TRIFORM-UX-REDESIGN-V2/census');
 const ONLY = arg('only', '');
 const VIEWS = (arg('views', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
 const DASH = arg('dash', 'http://127.0.0.1:8210');
 const LOFA_API = arg('lofa-api', 'https://10.3.43.246:12443');
-const WWW = arg('lofa-www', 'E:/WindowsWorkspace/lofa/app/www');
+const WWW = arg('lofa-www', 'C:/workspace/lofa/app/www');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 
 const manifest = { generatedAt: new Date().toISOString(), dash: DASH, lofaApi: LOFA_API, captures: [], unreachable: [] };

@@ -1,0 +1,7 @@
+import{B as e}from"./index-16bd2b7b.js";import"./vendor-9a8f0eee6000.js";import"./reactflow-23fb1a22e94c.js";import"./katex-90294a17e297.js";import"./remark-472189ed2908.js";
+/**
+ * @license lucide-react v1.14.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const t=[["path",{d:"M10 10.01h.01",key:"1e9xi7"}],["path",{d:"M10 14.01h.01",key:"ac23bv"}],["path",{d:"M14 10.01h.01",key:"2wfrvf"}],["path",{d:"M14 14.01h.01",key:"8tw8yn"}],["path",{d:"M18 6v12",key:"1bcixs"}],["path",{d:"M6 6v12",key:"vkc79e"}],["rect",{x:"2",y:"6",width:"20",height:"12",rx:"2",key:"1wpnh2"}]],a=e("bandage",t);export{t as __iconNode,a as default};

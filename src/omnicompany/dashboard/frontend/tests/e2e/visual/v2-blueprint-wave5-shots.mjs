@@ -23,7 +23,7 @@ const arg = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i
 const OUT = arg('out', join(process.cwd(), 'tests/e2e/visual/_shots/v2-blueprint-wave5'));
 const BASE = arg('base', 'http://localhost:8210');
 const LOFA_API = arg('lofa-api', 'https://10.3.43.246:12443');
-const WWW = arg('lofa-www', 'E:/WindowsWorkspace/lofa/app/www');
+const WWW = arg('lofa-www', 'C:/workspace/lofa/app/www');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 
 await mkdir(OUT, { recursive: true });

@@ -1,0 +1,1 @@
+import{_ as e}from"./mermaid.core-8bf16a315e79.js";import{s as o}from"./reactflow-23fb1a22e94c.js";var a=e((e,a)=>{let r;"sandbox"===a&&(r=o("#i"+e));return o("sandbox"===a?r.nodes()[0].contentDocument.body:"body").select(`[id="${e}"]`)},"getDiagramElement");export{a as g};
