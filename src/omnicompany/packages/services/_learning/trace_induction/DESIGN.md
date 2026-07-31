@@ -1,42 +1,113 @@
-<!-- [OMNI] origin=codex domain=services/trace_induction ts=2026-07-22T00:00:00+08:00 type=doc status=active -->
+<!-- [OMNI] origin=claude-code domain=services/trace_induction ts=2026-04-20T00:00:00Z type=doc status=active -->
 <!-- [OMNI] material_id="material:learning.trace_induction.pipeline_design_spec.md" -->
 
-# trace-induction
+# trace_induction · 设计文档
 
-## 定位
+## 状态
+- **版本**: V1 (Phase D Diamond shortcut 2026-04-20)
+- **成熟度**: active
+- **下一步**: 改进 noise_filter LLM 标注精度；接入 embedding 加速聚类
 
-把真实工作中已经重复出现的执行轨迹，按需压缩为可审阅的 SOP 与需求候选。它不是后台模式发现器，也不是自动造 pipeline 的入口。
+## 核心目的
+将历史执行 trace（intent_steps）转化为可复用的 SOP → 需求文档 → workflow-factory Pipeline。
 
-## 触发条件
+六节点管线：TraceReader (DB) → NoiseFilter (LLM) → SOPGenerator (LLM) → ReqWriter (LLM) → WFCaller (SubPipeline) → Registrar (DB)。
+由 `pattern_discovery` 触发（找到重复 pattern 后调用本管线），也可单独调用。
 
-- 已有真实重复操作或明确的复盘任务；
-- 有可追溯的 trace / 外部会话轨迹；
-- 预先说清预期消费者。
+## 核心接口
 
-缺少上述条件时不运行，候选继续留在原始记录中。
+- [workers/__init__.py](workers/__init__.py) — `ALL_WORKERS` (6 Worker, Diamond shortcut)
+- [formats.py](formats.py) — 7 个 Material 定义
+- [pipeline.py](pipeline.py) — `build_pipeline()`
+- [sop_extractor.py](sop_extractor.py) — SOP 提取工具函数
+- [requirement_writer.py](requirement_writer.py) — 需求文档生成工具
+- [_archive/routers_legacy.py](_archive/routers_legacy.py) — 原 Router 实现
 
-## 拓扑
+## 架构决策
 
-```text
-ti.task
-  -> TraceReader
-  -> NoiseFilter
-  -> SOPGenerator
-  -> ReqWriter
-  -> ti.requirement (emit)
+### D1 — Diamond Shortcut 迁移
+
+6 个 Router 中含 LLM 调用（NoiseFilter/SOPGenerator/ReqWriter）和 SubPipelineRouter（WFCaller），采用 Diamond shortcut: `class XxxWorker(Worker, _LegacyRouter)`. 业务逻辑保留在 `_archive/routers_legacy.py`。
+
+### D2 — 3 个 LLM 节点串行
+
+NoiseFilter → SOPGenerator → ReqWriter 三个 LLM 节点串行，每步基于上一步的结果。这个设计简单清晰，但三步 LLM 代价较高。
+
+### D3 — WFCaller 调用 workflow-factory
+
+WFCallerRouter（现 WFCallerWorker）继承 SubPipelineRouter，实际重写了 `run()` 调用 `dispatch("workflow-factory", ...)`。
+
+### D4 — Registrar 写入 pipeline_index
+
+RegistrarRouter（现 RegistrarWorker）确定性将 workflow-factory 产出的代码写入 pipeline_index 表，是整个归纳流程的最终落地点。
+
+### D5 — 被 pattern_discovery 触发
+
+pattern_discovery 的 InductionDispatcherWorker 通过 `dispatch("trace-induction", ...)` 调用本管线。两者通过 dispatch 解耦。
+
+## 数据流 / 拓扑
+
 ```
-
-管线只输出可审阅候选。是否把候选实现为 skill、脚本或工作流，由后续真实任务单独决定；不自动调用 `workflow-factory`，不自动写 pipeline index。
-
-## 权威边界
-
-- 原始运行事实：event / trace / ledger；
-- 可证伪陈述：decisions；
-- 本管线输出：可重建的 SOP / requirement 投影；
-- 注册与部署：不属于本管线。
+ti.task (source)
+  → TraceReaderWorker (DB读取)
+  → ti.trace-data (internal)
+  → NoiseFilterWorker (LLM标注)
+  → ti.essential (internal)
+  → SOPGeneratorWorker (LLM提炼)
+  → ti.sop (internal)
+  → ReqWriterWorker (LLM转化)
+  → ti.requirement (internal)
+  → WFCallerWorker (SubPipeline)
+  → ti.wf-result (internal)
+  → RegistrarWorker (DB写入)
+  → ti.done (sink)
+```
 
 ## 已知局限
 
-- 三个 LLM 步骤仍有成本，短轨迹应人工判断是否值得运行；
-- 历史 `wf_caller` / `registrar` 实现保留在源码 `_archive`，仅作历史证据；
-- 没有第二次真实消费前，不应把候选升级成长期设施。
+1. **3 LLM 节点代价高** — 噪音过滤 + SOP 生成 + 需求写作三次 LLM 调用。**升级路径**: 合并为 Agent Worker 一次性提炼（R-19）。
+
+2. **Diamond 体未真迁移** — 业务逻辑仍在 _archive/。**升级路径**: Stage 3 低优先级。
+
+3. **WFCaller 依赖 workflow-factory 可用性** — 若 workflow-factory 不可用则整链 FAIL。**升级路径**: 加入 WFCaller 的容错/重试逻辑。
+
+## 新哲学对齐（Phase D · 2026-04-20）
+
+### Material 层（F-16/17/18/19）
+
+| 条款 | 状态 | 说明 |
+|---|---|---|
+| F-16 kind 三分 | ✅ | task=source; trace-data/essential/sop/requirement/wf-result=internal; done=sink |
+| F-17 Workspace 大明文 | N/A | 无大 payload 走 workspace |
+| F-18 Job × Material 绑定 | N/A | 传统 pipeline，待新 Runtime |
+| F-19 kind.* tag 必填 | ✅ | Phase D 修正：7 条 Material 全部补 kind.* |
+
+### Worker 层（R-18~R-25）
+
+| 条款 | 状态 | 说明 |
+|---|---|---|
+| R-18 粒度 | ✅ | 6 Worker 各有完整职责 + FORMAT 边界 |
+| R-19 Agent Worker 升级 | ⚠️ 待评估 | 3 LLM 节点串行可合并为 Agent Worker；当前先 grandfathered |
+| R-20 Agent Worker 三件套 | ⚠️ 待评估 | 同上 |
+| R-21 Diagnosis Agent Worker | N/A | |
+| R-22 WorkspaceWriterWorker | N/A | 无 workspace 文件写入 |
+| R-23 Verdict.output 平铺 | ✅ | 所有 Worker 输出无嵌套 format_id |
+| R-24 FORMAT_IN_MODE | N/A | 所有 Worker FORMAT_IN 为单 str |
+| R-25 子 job | N/A | 无 _emit_as_new_job |
+
+### Team 层（P-13~P-17）
+
+| 条款 | 状态 | 说明 |
+|---|---|---|
+| P-13 声明即消费 | ✅ | 各 Worker 只消费 FORMAT_IN 声明的 Material |
+| P-14~17 Workspace 目录 | N/A | |
+
+**结论**: F-19 缺口已修正。Diamond shortcut 完成。R-19/R-20 LLM 节点合并升级为 grandfathered 记录。
+
+## 参考资料
+
+- [workers/](workers/) — 6 个 Worker (Diamond shortcut)
+- [formats.py](formats.py) — 7 个 Material
+- [_archive/routers_legacy.py](_archive/routers_legacy.py) — 原 Router 实现
+- ../pattern_discovery/ — 上游触发者
+- ../workflow_factory/ — WFCaller 调用目标

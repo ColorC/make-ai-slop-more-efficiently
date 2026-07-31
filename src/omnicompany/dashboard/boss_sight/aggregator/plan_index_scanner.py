@@ -11,7 +11,7 @@
 
 策略:
 1. 扫 docs/plans/{category}/project.md, 读 frontmatter `plans:` 字段
-2. 对每个 plan, 读 plan.md frontmatter + 顶部正文; status 只从 WhatNow 权威投影读取
+2. 对每个 plan, 读 plan.md frontmatter + 顶部正文 (拿 todo 进度 / status)
 3. 拼成 PlanIndexEntry 列表
 
 不修改任何文件, 纯读.
@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Iterable
 
 from omnicompany.dashboard.controlplane.plans import parse_plan_frontmatter
-from omnicompany.core.progress_authority import load_plan_authority_index
 from omnicompany.packages.services._core.omnicompany.formats import PLAN
 
 _log = logging.getLogger(__name__)
@@ -43,11 +42,11 @@ class PlanIndexEntry:
     """单条 plan 的索引信息."""
 
     plan_id: str                  # category/[timestamp]ID 形式
-    category: str                 # research / dashboard / cli 等
+    category: str                 # voxelcraft / dashboard / cli 等
     plan_path: str                # 相对 workspace 根的路径
     project_path: str | None = None  # 关联 project.md (如有)
     title: str | None = None
-    status: str | None = None     # 从 WhatNow 权威投影读
+    status: str | None = None     # 从 frontmatter 读
     todo_done: int = 0
     todo_total: int = 0
     last_modified_ts: str | None = None  # ISO 8601
@@ -82,15 +81,9 @@ def _count_todos(text: str) -> tuple[int, int]:
 class PlanIndexScanner:
     """扫 docs/plans/ 出索引."""
 
-    def __init__(
-        self,
-        workspace_root: str | Path,
-        *,
-        authority_index: dict[str, dict] | None = None,
-    ) -> None:
+    def __init__(self, workspace_root: str | Path) -> None:
         self.workspace_root = Path(workspace_root)
         self.plans_dir = self.workspace_root / "docs" / "plans"
-        self._authority_index = authority_index
 
     def scan(self) -> list[PlanIndexEntry]:
         if not self.plans_dir.is_dir():
@@ -98,10 +91,6 @@ class PlanIndexScanner:
             return []
 
         out: list[PlanIndexEntry] = []
-        if self._authority_index is None:
-            authority_index, authority_source = load_plan_authority_index(self.workspace_root)
-        else:
-            authority_index, authority_source = self._authority_index, "provided"
         for category_dir in self.plans_dir.iterdir():
             if not category_dir.is_dir():
                 continue
@@ -130,24 +119,16 @@ class PlanIndexScanner:
                     mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
                 except OSError:
                     mtime = None
-                plan_id = f"{category_dir.name}/{plan_dir.name}"
-                authority = authority_index.get(plan_id)
                 entry = PlanIndexEntry(
-                    plan_id=plan_id,
+                    plan_id=f"{category_dir.name}/{plan_dir.name}",
                     category=category_dir.name,
                     plan_path=entry_md.relative_to(self.workspace_root).as_posix(),
                     project_path=project_path_str,
                     title=fm.get("title") or plan_dir.name,
-                    status=str(authority.get("status")) if authority and authority.get("status") else None,
+                    status=fm.get("status"),
                     todo_done=done,
                     todo_total=total,
                     last_modified_ts=mtime,
-                    extra={
-                        "progress_authority": "whatnow",
-                        "authority_source": authority_source,
-                        "authority_task_id": authority.get("id") if authority else None,
-                        "completion": authority.get("completion") if authority else None,
-                    },
                 )
                 out.append(entry)
 

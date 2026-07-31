@@ -1,0 +1,69 @@
+{
+  "schema": "game-observatory.ai-player.stage-efficiency-metrics.v1",
+  "stage_id": "sanguo-terra-live15-dispatch5-20260718",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "canonical_session_id": "external-session.sanguo.terra.live15.20260718",
+  "native_provider_session_id": "019f7289-20e2-7702-91cb-cd73acce3695",
+  "dispatch_run_id": "explore-dispatch.3e861dc12a804786a750d7b87e3d2554",
+  "dispatch": {
+    "status": "completed",
+    "stop_reason": "max_turns",
+    "provider_turn_count": 5,
+    "semantic_action_count": 25,
+    "actions_per_turn": [4, 6, 6, 3, 6],
+    "turns_meeting_3_to_6_action_contract": 5,
+    "elapsed_seconds": 1415.687,
+    "provider_duration_seconds": 1318.345,
+    "driver_overhead_seconds": 97.342,
+    "driver_overhead_seconds_per_turn": 19.4684,
+    "state_ingest_information_gain_units": 10,
+    "candidate_state_count": 6,
+    "deferred_edge_count": 4,
+    "state_ingest_error_count": 1
+  },
+  "provider_usage_increment": {
+    "input_tokens": 14026312,
+    "cached_input_tokens": 13239040,
+    "uncached_input_tokens": 787272,
+    "output_tokens": 12268,
+    "reasoning_tokens": 2849,
+    "cache_ratio": 0.9438717747,
+    "input_tokens_per_action": 561052.48,
+    "uncached_input_tokens_per_action": 31490.88,
+    "output_tokens_per_action": 490.72
+  },
+  "action_quality_as_persisted": {
+    "sample_count": 25,
+    "confirmed_count": 24,
+    "failed_count": 1,
+    "evidence_complete_count": 24,
+    "expected_change_matched_count": 24,
+    "shared_batch_token_sample_count": 25,
+    "shared_usage_group_count": 5,
+    "latest_actions_10_assessment_id": "iteration.assessment.7bba225b8f3ce9f67962f1a2",
+    "latest_actions_10_status": "passed",
+    "latest_actions_10_highest_contiguous_passed_tier": 2,
+    "latest_execution_gate": "open"
+  },
+  "live14_comparison": {
+    "baseline_dispatch_run_id": "explore-dispatch.53cec133311e484db14d79b547347d38",
+    "baseline_actions_per_provider_turn": 1.0,
+    "current_actions_per_provider_turn": 5.0,
+    "provider_calls_per_action_reduction_rate": 0.8,
+    "input_tokens_per_action_reduction_rate": 0.3165933281,
+    "uncached_input_tokens_per_action_reduction_rate": 0.2897397439,
+    "output_tokens_per_action_reduction_rate": 0.1620934005,
+    "elapsed_seconds_per_action_reduction_rate": 0.3948086744
+  },
+  "post_stage_corrections": {
+    "ordinary_expectation_miss": "Future structurally complete Before/Action/After records are classified as no_effect rather than incomplete evidence or executor failure.",
+    "state_ingest": "Future failed expectation runs are retained in action-quality monitoring and skipped by semantic state ingest without a facility error.",
+    "immutable_history": "The one existing live15 failed sample and its historical assessments remain unchanged."
+  },
+  "evidence": {
+    "stdout_path": "data/domains/game_observatory/explore_dispatch_runs/runs/explore-dispatch.3e861dc12a804786a750d7b87e3d2554/stdout.log",
+    "stdout_sha256": "b1d8dd1309f5002a920510b0003f70061ca653093c166f2b680fcbd2802ec271",
+    "events_path": "data/domains/game_observatory/explore_dispatch_runs/runs/explore-dispatch.3e861dc12a804786a750d7b87e3d2554/events.jsonl",
+    "events_sha256": "cd7a6066fd70b6b410923d47f6072055a4f40a8e7d2c6723305da597e1f1e72a"
+  }
+}

@@ -109,7 +109,7 @@
 ## 参考资料
 - 重构计划: [docs/plans/[2026-04-18]AGENT-NODE-LOOP-ROUTERIZATION/plan.md](../../../docs/plans/[2026-04-18]AGENT-NODE-LOOP-ROUTERIZATION/plan.md)
 - 重构规则: [docs/plans/[2026-04-18]AGENT-NODE-LOOP-ROUTERIZATION/guardian_rules.md](../../../docs/plans/[2026-04-18]AGENT-NODE-LOOP-ROUTERIZATION/guardian_rules.md)
-- 路由协议: [src/omnicompany/protocol/anchor.py](../../../src/omnicompany/protocol/anchor.py)
+- 路由协议: src/omnicompany/protocol/anchor.py
 - 兄弟包架构: [runtime/agent/DESIGN.md](../agent/DESIGN.md) · [runtime/exec/DESIGN.md](../exec/DESIGN.md) · [runtime/routing/DESIGN.md](../routing/DESIGN.md)
 - 规范: docs/standards/distributed-docs.md (OMNI-034 结构合规)
 

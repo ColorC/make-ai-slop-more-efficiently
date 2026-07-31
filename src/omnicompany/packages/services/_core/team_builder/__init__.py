@@ -17,7 +17,7 @@ Clean Migration 硬规则:
   - 14 Worker 都继承自 omnicompany.Worker (见 workers/)
   - 每条 Material 标 kind.source / kind.internal / kind.sink (见 formats.py)
   - 旧 *Router 名通过 routers.py shim 保留兼容
-  - legacy 业务逻辑在 routers_legacy.py (2026-07-26 OMNI-040 Stage 3 迁回正式位置)
+  - legacy 业务逻辑暂存 _archive/routers_legacy.py (Diamond shortcut)
 """
 from __future__ import annotations
 

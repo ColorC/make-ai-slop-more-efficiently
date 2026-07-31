@@ -303,12 +303,6 @@ def cmd_task_update(task_id: str, note: str, plan_id: str | None) -> None:
     except KeyError as e:
         click.echo(f"ERROR: {e}", err=True)
         sys.exit(2)
-    try:  # 会话侧反向挂一条引用(这个会话给这个 task 记了进度)
-        from omnicompany.packages.services._core.identity import link_record_to_session
-        link_record_to_session(None, kind="task_note", record_id=t.id,
-                               ref_id=(f"plan:{t.plan_id}" if getattr(t, "plan_id", None) else None))
-    except Exception:
-        pass
     click.echo(f"✓ [{t.id}] 记下进度(共 {len(t.notes)} 条): {note[:50]}")
 
 

@@ -1,0 +1,69 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-hero-detail-home-known-answer-v1",
+  "benchmark_run_id": "pair.gate3.hero-detail-home.hypothesis.equal-input.05",
+  "adjudicator": "main-agent-independent-original-image-and-gate2-route-review",
+  "generated_at": "2026-07-14T03:19:00Z",
+  "items": [
+    {
+      "probe_id": "shadow.probe.ec004124b6654a53b0f720abaa25e9e3",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "战力信息目标、框、结果与证据一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.bf7aac88b9fe4be3afbd7e3c48bccc38"]
+    },
+    {
+      "probe_id": "shadow.probe.c00f55aae92e421799bd76b4c80cd5af",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "本轮明确把 +10 记录为左侧相邻图标，目标与邻接锚点归属正确。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.f22f534b0071418586cb8a215f7cc681"]
+    },
+    {
+      "probe_id": "shadow.probe.88f6b720d3684f9b84725c8e7062af06",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "信赖度标签、图标、框和结果正确；右上角是橙色礼物图标，原图没有红色“新”字。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.8627baee63704b649feb7663f57e037b"]
+    },
+    {
+      "probe_id": "shadow.probe.dde3779cd1f74abbb8fdbe4ab7890979",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "皮肤目标、框与结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.5aff4e3a3de34c098f749ff2186b576b"]
+    },
+    {
+      "probe_id": "shadow.probe.c44278c8b56645ec8cc5e8f339895c0c",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "头饰目标、框与结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.eaf526081d084542a8e803e0264c5c5b"]
+    },
+    {
+      "probe_id": "shadow.probe.730177b34484496486ed53fda0580e7c",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "下一英雄目标、框与结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.8fedf821e4ff4c69b0a1afa34d53ec54"]
+    }
+  ]
+}

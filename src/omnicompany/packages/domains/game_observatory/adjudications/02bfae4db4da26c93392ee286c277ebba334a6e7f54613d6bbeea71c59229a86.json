@@ -1,0 +1,196 @@
+{
+  "schema": "game-observatory.evidence-adjudications.v1",
+  "evidence_run_id": "evidence.run.5b65875ccb7b48128e08ee45aa234881",
+  "items": [
+    {
+      "step_id": "evidence.step.bfae2a32a3ec469480822fa820d482fe",
+      "step_index": 37,
+      "verdict": "needs_review",
+      "corrected_target_name": "技能演出结束页重播按钮",
+      "actual_from_state": "SkillDemoEnd",
+      "actual_to_state": "SkillDemoEnd",
+      "note": "终帧只能证明重新回到演出结束页；重播过程需要绑定相邻视频或中间帧。",
+      "artifact_ids": [
+        "art.device.1784018666202.0c08692f",
+        "art.device.1784018673392.f6274db5",
+        "art.video.1784018675568.6344c502"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.d1e277f8d02747389d1b0cd4add6a76a",
+      "step_index": 40,
+      "verdict": "facility_failure",
+      "corrected_target_name": "等待试用战斗加载",
+      "actual_from_state": "TrialLoading",
+      "note": "设备租约已失效，步骤没有 After；该步不进入游戏状态域。",
+      "artifact_ids": [
+        "art.device.1784019242515.28d091f0",
+        "art.video.1784019244924.9316cb60"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.00cca4c6c06840f38d6c69241224ac96",
+      "step_index": 43,
+      "verdict": "mislabelled",
+      "corrected_target_name": "暂停浮层左下区域点击",
+      "actual_from_state": "TrialPauseOverlay",
+      "actual_to_state": "TrialPauseOverlay",
+      "note": "动作发生在暂停浮层，不能证明继续战斗。",
+      "artifact_ids": [
+        "art.device.1784019780513.10d4e8cf",
+        "art.device.1784019787412.d3729506",
+        "art.video.1784019789686.7b574eef"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.6769efdd0de24836bf3722195ffc2878",
+      "step_index": 44,
+      "verdict": "mislabelled",
+      "corrected_target_name": "暂停浮层内速度区域点击",
+      "actual_from_state": "TrialPauseOverlay",
+      "actual_to_state": "TrialPauseOverlay",
+      "note": "动作发生在暂停浮层，不能证明四倍速按钮行为。",
+      "artifact_ids": [
+        "art.device.1784019792295.4950982f",
+        "art.device.1784019799254.a1eabe2f",
+        "art.video.1784019801522.62936c74"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.6d08b0c3519b479e919b41cef31517ee",
+      "step_index": 45,
+      "verdict": "mislabelled",
+      "corrected_target_name": "暂停浮层内速度区域点击",
+      "actual_from_state": "TrialPauseOverlay",
+      "actual_to_state": "TrialPauseOverlay",
+      "note": "动作发生在暂停浮层，不能证明二倍速按钮行为。",
+      "artifact_ids": [
+        "art.device.1784019804140.2b0d6416",
+        "art.device.1784019811026.8f5cfe62",
+        "art.video.1784019813283.980960c6"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.4e5222c15fe94cc9acbc8ef4d78cbac1",
+      "step_index": 46,
+      "verdict": "mislabelled",
+      "corrected_target_name": "暂停浮层内设置区域点击",
+      "actual_from_state": "TrialPauseOverlay",
+      "actual_to_state": "TrialPauseOverlay",
+      "note": "动作发生在暂停浮层，不能证明战斗设置按钮行为。",
+      "artifact_ids": [
+        "art.device.1784019815865.aee5903f",
+        "art.device.1784019822702.bdc115a0",
+        "art.video.1784019824974.e98bf092"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.29bd35295dc64c289a0770846a1a8795",
+      "step_index": 70,
+      "verdict": "mislabelled",
+      "corrected_target_name": "英雄主界面赛季职业装备入口",
+      "actual_from_state": "HeroMain",
+      "actual_to_state": "SeasonEquipmentWall",
+      "note": "实际动作重新打开赛季装备墙，没有点击第二张装备卡。",
+      "artifact_ids": [
+        "art.device.1784024707208.a2f9f5df",
+        "art.device.1784024715116.5dcf3eed",
+        "art.video.1784024717351.cbd7ea72"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.314bc06553b04109a79632762848b1db",
+      "step_index": 75,
+      "verdict": "invalid_context",
+      "corrected_target_name": "英雄主界面角色模型入口",
+      "actual_from_state": "HeroMain",
+      "actual_to_state": "ViewerNormal",
+      "note": "Before 是英雄主界面；动作打开角色查看器，与赛季装备卡三无关。",
+      "artifact_ids": [
+        "art.device.1784025165417.f725f435",
+        "art.device.1784025172301.50378a24",
+        "art.video.1784025174480.fcde31b2"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.2269765e93ec4dbcb5bd2414e0c33545",
+      "step_index": 86,
+      "verdict": "verified_no_change",
+      "corrected_target_name": "角色查看器放大状态返回按钮",
+      "actual_from_state": "ViewerZoomed",
+      "actual_to_state": "ViewerZoomed",
+      "note": "点击后仍停留在放大查看器，没有可辨退出或状态变化。",
+      "artifact_ids": [
+        "art.device.1784027350839.cb9a645b",
+        "art.device.1784027368235.e2cac15e",
+        "art.video.1784027370359.38d86e18"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.4a397850f749438397964c4aaf03568a",
+      "step_index": 87,
+      "verdict": "invalid_context",
+      "corrected_target_name": "角色查看器模型区域误点击",
+      "actual_from_state": "ViewerZoomed",
+      "actual_to_state": "ViewerZoomed",
+      "note": "Before 与 After 都是放大查看器；该步不能证明赛季装备入口。",
+      "artifact_ids": [
+        "art.device.1784027435273.1c9f8ab4",
+        "art.device.1784027443005.aada77fc",
+        "art.video.1784027445230.08f4f6dc"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.b7a9911b84634464bce089dcc74531a0",
+      "step_index": 88,
+      "verdict": "invalid_context",
+      "corrected_target_name": "角色查看器模型区域误点击",
+      "actual_from_state": "ViewerZoomed",
+      "actual_to_state": "ViewerZoomed",
+      "note": "Before 与 After 都是放大查看器；该步不能证明赛季装备卡三。",
+      "artifact_ids": [
+        "art.device.1784027674697.ba35dedc",
+        "art.device.1784027684792.94ee9505",
+        "art.video.1784027686989.3ac54840"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    },
+    {
+      "step_id": "evidence.step.fc666632562f48caa58ca6d2cfaeadc4",
+      "step_index": 89,
+      "verdict": "verified_no_change",
+      "corrected_target_name": "角色查看器放大状态返回按钮",
+      "actual_from_state": "ViewerZoomed",
+      "actual_to_state": "ViewerZoomed",
+      "note": "再次点击后仍停留在放大查看器，没有可辨退出或状态变化。",
+      "artifact_ids": [
+        "art.device.1784028035871.f044ccf8",
+        "art.device.1784028046760.2b798c5f",
+        "art.video.1784028048923.f667fdfb"
+      ],
+      "reviewer": "root-main-adjudicator",
+      "reviewed_at": "2026-07-14T11:40:00+00:00"
+    }
+  ]
+}

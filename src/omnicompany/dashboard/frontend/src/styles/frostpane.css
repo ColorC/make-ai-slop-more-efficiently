@@ -1,0 +1,226 @@
+/* ============================================================
+   frostpane 设计 token —— dashboard 消费层。
+   设计真源(唯一手工编辑处)= docs/projects/frontend-design/dashboard/theme.css(2026-07-18 裁决,
+   取代 [2026-07-04]§6 D5; 对账工具= _diagnosis/ux_audit/token_drift.py)。
+   这里命名空间为 --fp-*,避免和 index.css 的 shadcn HSL 变量(--card/--border/--accent)撞车。
+   值必须与真源暗/亮块一致(允许字体栈等已吸收的反向流动); 调主题改真源, 不改这里。
+   tokens.ts 的 colors.* 与内联样式都引用这套 var(--fp-*),不再写死 hex。
+
+   2026-07-19 · V2 阶段四第三波:暗块整体切换为主题 G「蓝图精制」(Blue Prince 做透版,用户拍板默认)。
+   三层深度:底图板 scene(格纸纹理)/ 图纸 paper(平滑纸面,文字面)/ 描图纸 tracing(悬浮物)。
+   纹理分区铁律:格纸纹理只落 scene/chrome/empty;content-text 区(行/卡/正文/按钮面)禁纹理。
+   字号地板 12px:G 全域功能文字 ≥--fp-fs-4(仅 chrome 区 aria-hidden 刻度类可 11px)。
+   亮块暂未跟随(亮模式 dashboard 未启用,留 C 配方作 A/B 对照后路,见 token-drift 报告备注)。
+
+   2026-07-19 · V2 阶段四第四波(G.7 材质裁决,用户原话:「有白色文字的区域建议使用玻璃面板;
+   界面上要有一定程度的网格露出;不同的地方不要用不一样的网格,应该是统一的网格背景,里面某些地方
+   会出现标尺、某些地方会出现数字;不要不同的地方网格断开;仅限面板和按钮那里使用玻璃材质;
+   适当压缩长宽,否则网格都没地方露出了。」):
+   ① 格纸唯一层 = index.html #bp-grid(position:fixed 全视口),各容器私有格纸全部清除改 transparent,
+      滚动/分栏处网格不再各自断开重铺;标尺/数字在网格层视口边缘带(chrome 装饰 aria-hidden)。
+   ② 内容面板/卡片/按钮 = 蓝图玻璃 --fp-bp-panel*(grid-through:网格透过面板模糊可见=连续感,
+      面板间隙网格清晰=露出感);rail/页签条/弹层沿用描图纸族;玻璃只限面板/按钮,大面积容器不上 blur。
+   ③ 长文阅读区(markdown 正文/米色文档卡/chat 气泡)保持高不透明,不动。
+   ============================================================ */
+:root {
+  /* type scale / motion */
+  --fp-fs-1: 18px; --fp-fs-2: 15px; --fp-fs-3: 13px; --fp-fs-4: 12px;
+  --fp-lh: 1.5;
+  /* spacing 4px 栅格 / radius 家族(自真源补齐;G:制图感=锐利,刻度 2/3/5) */
+  --fp-s1: 4px; --fp-s2: 8px; --fp-s3: 12px; --fp-s4: 16px; --fp-s5: 24px; --fp-s6: 32px;
+  --fp-r1: 2px; --fp-r2: 3px; --fp-r3: 5px; --fp-r-pill: 999px; --fp-r-sheet: 20px;
+  /* 形态断点(手机 <600 / 平板 600-1024 / 桌面 >1024) */
+  --fp-bp-phone: 600px; --fp-bp-desktop: 1024px;
+  --fp-ease: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  --fp-t-fast: 150ms; --fp-t-pop: 200ms; --fp-t-over: 300ms;
+  /* 三栈(G.3.1 + G.6 硬规则:mono/script 栈必须带 CJK 回落;script 栈首放本地已打包的 LXGW;
+     display LXGW 恒为第一。LXGW WenKai 本地打包 frontend/public/fonts/,@font-face 本地引用禁 CDN) */
+  --fp-font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', 'DengXian', system-ui, sans-serif;
+  --fp-font-mono: 'Berkeley Mono', ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, 'LXGW WenKai', 'Noto Serif SC', 'Microsoft YaHei', monospace;
+  --fp-font-display: 'LXGW WenKai', 'Noto Serif SC', 'Source Han Serif SC', 'STSong', 'SimSun', serif;
+  --fp-font-script: 'LXGW WenKai', 'Segoe Script', 'Kaiti SC', 'STKaiti', 'KaiTi', '楷体', 'Noto Serif SC', cursive;
+
+  /* ---------- 主题 G「蓝图精制」· 暗(dashboard 默认) ---------- */
+  --fp-bg: #091a3e;
+  /* 底图板 scene:晒图纸深蓝 + 格纸纹理(细格 .05/26px、主格 .08/130px,纯 CSS 零图片零动画)
+     + 单 radial 顶部光 .34。纹理只落 scene/chrome/empty;文字面=平滑纸面。 */
+  --fp-bg-grad:
+    repeating-linear-gradient(0deg, rgba(190,220,255,.05) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(90deg, rgba(190,220,255,.05) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(0deg, rgba(190,220,255,.08) 0 1px, transparent 1px 130px),
+    repeating-linear-gradient(90deg, rgba(190,220,255,.08) 0 1px, transparent 1px 130px),
+    radial-gradient(130% 110% at 50% -10%, rgba(36,80,146,.34), transparent 60%);
+  --fp-glass: rgba(16,28,52,.55);   /* 描图纸 tracing(本版的"玻璃",只给悬浮物;G.3① 深色描图纸) */
+  --fp-glass-2: rgba(16,28,52,.72);
+  --fp-surface: #133163;            /* 图纸 paper:一切文字面(行/卡/正文)平滑禁纹理 */
+  --fp-solid: #0d2450;              /* 深图板:表格/长列表/输入框/终端底 */
+  --fp-card: #133163;               /* 实色卡/输入框底(= paper) */
+  --fp-bg-doc: #0d2450;             /* 文档/写作区(深图板;G 米色文档卡由 --fp-bp-doc 单独承载) */
+  --fp-bg-overlay: #173a72;         /* 次级表面(= paper-2) */
+  --fp-border: rgba(235,245,255,.5);   /* 白色绘图线·主档(输入/筛选件用 dashed) */
+  --fp-border-strong: rgba(235,245,255,.75);
+  --fp-border-subtle: rgba(235,245,255,.2);
+  --fp-spec: 0 0 0 0 rgba(0,0,0,0);    /* G 无 rim 光;box-shadow 列表语法不接受 none,零影占位 */
+  --fp-shadow: 2px 2px 0 rgba(6,16,38,.55), 5px 5px 0 rgba(6,16,38,.28);  /* 纸叠纸硬错位影(按下 translateY(1px) 凹入) */
+  --fp-shadow-sm: 2px 2px 0 rgba(6,16,38,.5);
+  --fp-shadow-pop: 3px 3px 0 rgba(6,16,38,.5), 8px 8px 0 rgba(6,16,38,.25);
+  --fp-text: #eef4ff; --fp-text-2: #a3bce0; --fp-text-3: #6e8cb8;
+  --fp-accent: #eef4ff; --fp-accent-fg: #0d2450; --fp-accent-weak: rgba(238,244,255,.1);  /* accent=白线(强调=更亮的线,非色块) */
+  --fp-accent-2: #5ad0e0; --fp-link: #6fa8ff; --fp-violet: #a78bfa;
+  --fp-ok: #7fd4a8; --fp-warn: #e2c05a; --fp-err: #e0685f; --fp-idle: #6e8cb8;
+  --fp-blur: blur(8px);                /* 描图纸模糊档 */
+
+  /* ============================================================
+     V2 蓝图精制 --fp-bp-* token 系列(与真源同名块一一对账;
+     LOFA 侧消费为去 fp- 前缀的 --bp-*)。只增不并:核心 token 已切 G,
+     本块承载 G 专属语义(印章/黄铜/hatch/米色文档卡/厚框/图标尺寸)。
+     ============================================================ */
+  /* 层 1 · 底图板 scene(= 上方 --fp-bg/--fp-bg-grad,语义别名供蓝图组件直引) */
+  --fp-bp-scene: #091a3e;
+  --fp-bp-scene-grad:
+    repeating-linear-gradient(0deg, rgba(190,220,255,.05) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(90deg, rgba(190,220,255,.05) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(0deg, rgba(190,220,255,.08) 0 1px, transparent 1px 130px),
+    repeating-linear-gradient(90deg, rgba(190,220,255,.08) 0 1px, transparent 1px 130px),
+    radial-gradient(130% 110% at 50% -10%, rgba(36,80,146,.34), transparent 60%);
+  /* 层 2 · 图纸 sheet(平滑纸面,禁纹理) */
+  --fp-bp-paper: #133163;
+  --fp-bp-paper-2: #173a72;
+  --fp-bp-solid: #0d2450;
+  /* 层 3 · 描图纸 tracing(只给悬浮物;strong 为同系加深档) */
+  --fp-bp-tracing: rgba(16,28,52,.55);
+  --fp-bp-tracing-strong: rgba(16,28,52,.72);
+  --fp-bp-tracing-blur: blur(8px);
+  /* 层 2.5 · 蓝图玻璃面板(G.7 波四新增;与真源同名块一一对账):
+     内容面板/卡片/按钮专用 —— fill=#133163(=paper) α.58/hover .68 + blur(6px) saturate(150%),
+     网格透过面板模糊可见(连续感),面板间隙网格清晰(露出感);
+     text 档 .72 给文字重的行卡;长文阅读区/米卡/chat 气泡不用本族(保持高不透明)。 */
+  --fp-bp-panel: rgba(19,49,99,.58);
+  --fp-bp-panel-hover: rgba(19,49,99,.68);
+  --fp-bp-panel-text: rgba(19,49,99,.72);
+  --fp-bp-panel-blur: blur(6px) saturate(150%);
+  /* 白色绘图线档位(一切边界=绘图线;输入/筛选件用 dashed) */
+  --fp-bp-line: rgba(235,245,255,.5);
+  --fp-bp-line-strong: rgba(235,245,255,.75);
+  --fp-bp-line-subtle: rgba(235,245,255,.2);
+  /* 三级字(对 scene/paper 底均过 WCAG AA) */
+  --fp-bp-text: #eef4ff; --fp-bp-text-2: #a3bce0; --fp-bp-text-3: #6e8cb8;
+  /* accent = 白线(制图语言:强调=更亮的线,非色块) */
+  --fp-bp-accent: #eef4ff; --fp-bp-accent-fg: #0d2450; --fp-bp-accent-soft: rgba(238,244,255,.1);
+  /* 朱红 seal:印章/图钉/在跑/primary 专用 */
+  --fp-bp-seal: #d64541; --fp-bp-seal-soft: rgba(214,69,65,.2);
+  --fp-bp-stamp-idle: #8fa4c8;
+  /* 黄铜点缀:组头/计数徽章/搜索 focus 环 */
+  --fp-bp-brass: #b08d3e; --fp-bp-brass-hi: #d3ac62; --fp-bp-brass-soft: rgba(176,141,62,.16);
+  /* 状态色 */
+  --fp-bp-ok: #7fd4a8; --fp-bp-warn: #e2c05a; --fp-bp-err: #e0685f; --fp-bp-idle: #6e8cb8;
+  /* 45° 剖面 hatch:选中态结构标记;hatch-fill=进度/新鲜度填充(G.1)。
+     hatch-fill 颜色内联写死(不用 var(--fp-bp-ok)):token_drift 三方对账按字面值规范化比对,
+     LOFA --bp-hatch-fill 引用的是 --ok 而非 --fp-bp-ok,var 引用不等值会误判漂移。 */
+  --fp-bp-hatch: repeating-linear-gradient(45deg, rgba(255,255,255,.09) 0 2px, transparent 2px 7px);
+  --fp-bp-hatch-fill: repeating-linear-gradient(45deg, #7fd4a8 0 2px, rgba(127,212,168,.22) 2px 6px);
+  /* 牛皮纸目录卡 vellum / 米色文档卡 doc(阅读区暖纸、结构区蓝图) */
+  --fp-bp-vellum: #e8dcc0; --fp-bp-vellum-ink: #3a332a;
+  --fp-bp-doc: #efe8d8; --fp-bp-doc-ink: #2a2a26;
+  /* 厚框/刻度/图标尺寸(G.4/G.5) */
+  --fp-bp-frame-w: 2px;
+  --fp-bp-tick: 12px;
+  --fp-bp-icon-rail: 22px; --fp-bp-icon-tile: 40px; --fp-bp-icon-nav: 24px;
+  /* 纸叠纸硬错位影(= 上方 --fp-shadow*,语义别名) */
+  --fp-bp-shadow-sm: 2px 2px 0 rgba(6,16,38,.5);
+  --fp-bp-shadow: 2px 2px 0 rgba(6,16,38,.55), 5px 5px 0 rgba(6,16,38,.28);
+  --fp-bp-shadow-pop: 3px 3px 0 rgba(6,16,38,.5), 8px 8px 0 rgba(6,16,38,.25);
+  /* 圆角刻度(制图感=锐利) */
+  --fp-bp-r1: 2px; --fp-bp-r2: 3px; --fp-bp-r3: 5px;
+  /* 字体栈别名(= 上方 --fp-font-display/script,供蓝图组件直引) */
+  --fp-bp-font-display: 'LXGW WenKai', 'Noto Serif SC', 'Source Han Serif SC', 'STSong', 'SimSun', serif;
+  --fp-bp-font-script: 'LXGW WenKai', 'Segoe Script', 'Kaiti SC', 'STKaiti', 'KaiTi', '楷体', 'Noto Serif SC', cursive;
+}
+
+/* ---------- 冷色 · 亮(留接口,dashboard 暂暗色;未跟随 G,保留 C 配方作 A/B 对照后路) ---------- */
+[data-fp-mode="light"] {
+  --fp-bg: #eaeef5;
+  /* 亮块同配方收敛: 单色(accent 同 hue) α≤0.05 静态径向微光(比暗块再弱一档)。 */
+  --fp-bg-grad: radial-gradient(1200px 800px at 85% -10%, rgba(47,111,237,.05), transparent 60%);
+  --fp-glass: rgba(255,255,255,.55); --fp-glass-2: rgba(255,255,255,.42);
+  --fp-surface: rgba(255,255,255,.72); --fp-solid: #ffffff; --fp-card: #ffffff;
+  --fp-bg-doc: #f4f6fb; --fp-bg-overlay: #eef1f7;
+  --fp-border: rgba(20,30,55,.10); --fp-border-strong: rgba(20,30,55,.18); --fp-border-subtle: rgba(20,30,55,.06);
+  --fp-spec: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.5);
+  --fp-shadow: 0 10px 30px rgba(40,60,110,.15);
+  --fp-shadow-sm: 0 4px 16px rgba(40,60,110,.13);
+  --fp-shadow-pop: 0 14px 44px rgba(40,60,110,.18);
+  --fp-text: #18202e; --fp-text-2: #4a5566; --fp-text-3: #7b8696;
+  /* --fp-accent-fg/--fp-blur 亮块显式声明:暗块已切 G(#0d2450 / blur(8px)),真源亮块仍是
+     旧值(#ffffff / blur(20px)…);token_drift 亮色口径=暗色打底+亮块覆盖,缺这两条会被
+     暗块新值兜底成亮色漂移。 */
+  --fp-accent: #2f6fed; --fp-accent-fg: #ffffff; --fp-accent-weak: rgba(47,111,237,.12); --fp-accent-2: #1aa0b8;
+  --fp-link: #2f6fed; --fp-violet: #7c3aed;
+  --fp-ok: #1f9d6b; --fp-warn: #bb8a1e; --fp-err: #d65750; --fp-idle: #9aa3b2;
+  --fp-blur: blur(20px) saturate(180%) brightness(1.05);
+}
+
+/* 选中态:统一冷调高亮(对齐 demo) */
+::selection { background: var(--fp-accent-weak); }
+
+/* 统一背景(G.7 波四): 整个 app 坐在同一层底图板上 —— 格纸唯一层是 index.html 的
+   #bp-grid(position:fixed 全视口,零图片零动画),body 只铺底色兜底;
+   各页面/容器/rail/页签条一律 transparent 透出这同一张网格(消灭各容器各自铺格纸
+   在滚动/分栏处断开重铺的问题),文字面容器再用平滑纸面/蓝图玻璃盖字。
+   2026-07-18 W2: 去掉 !important —— 覆盖 shadcn bg 靠的是"本文件在 index.css 之后加载 + 无层叠上下文
+   冲突"这一机制, 而非 !important; 留着它会挡住 html.no-ambient 兜底(候选 B=纯实底, 供对比截图)。 */
+body {
+  background: var(--fp-bg);
+  min-height: 100vh;
+}
+
+/* #bp-grid 全视口连续网格层: 蓝图底色 + 统一规格格纸(细格 .05/26px、主格 .08/130px,token 原值)
+   + 单 radial 顶部光 .34;pointer-events:none 不抢交互,z-index 0 + #root z1 保证永远垫在最底。 */
+#bp-grid {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  background: var(--fp-bp-scene-grad), var(--fp-bp-scene);
+}
+#root { position: relative; z-index: 1; }
+
+/* 标尺/数字进网格层(chrome 装饰,aria-hidden;只画在"面板盖不到"的边缘带):
+   横向刻度尺贴内容视口顶缘(页签条 28px 之下——页签条/rail 是常驻宿主 chrome 玻璃,
+   画在视口 0/0 缘会被 blur 洗没;工具行/内容收边带透明,标尺在其下清晰可读),
+   40px 细 tick(α.45)/ 200px 长 tick(α.75,高 12px=--fp-bp-tick) + 尺寸数字 0/200/400…
+   (mono 带 CJK 回落,11px 刻度豁免档);纵向字母尺贴 rail(56px)右缘 A/B/C…(同族竖排)。 */
+#bp-grid .bp-ruler-x { position: absolute; top: 28px; left: 0; right: 0; height: 24px;
+  background:
+    repeating-linear-gradient(90deg, rgba(235,245,255,.45) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(235,245,255,.75) 0 1px, transparent 1px 200px);
+  background-size: auto 5px, auto var(--fp-bp-tick); background-repeat: repeat-x; }
+#bp-grid .bp-ruler-x span { position: absolute; top: 13px; padding-left: 4px;
+  font-family: var(--fp-font-mono); font-size: 11px; letter-spacing: .08em;
+  color: rgba(235,245,255,.6); white-space: nowrap; }
+#bp-grid .bp-ruler-y { position: absolute; top: 0; left: 56px; bottom: 0; width: 20px;
+  background:
+    repeating-linear-gradient(0deg, rgba(235,245,255,.45) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(0deg, rgba(235,245,255,.75) 0 1px, transparent 1px 130px);
+  background-size: 5px auto, var(--fp-bp-tick) auto; background-repeat: repeat-y; }
+#bp-grid .bp-ruler-y span { position: absolute; left: 8px; padding-top: 3px;
+  font-family: var(--fp-font-mono); font-size: 11px; letter-spacing: .08em;
+  color: rgba(235,245,255,.6); }
+/* 窄屏(<600)/reduced-motion: 标尺装饰自动隐藏(网格本体保留)。 */
+@media (max-width: 599px) {
+  #bp-grid .bp-ruler-x, #bp-grid .bp-ruler-y { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #bp-grid .bp-ruler-x, #bp-grid .bp-ruler-y { display: none; }
+}
+
+/* ambient 候选 B: 纯实底(无格纸纹理), 供 M1 成对截图评审对比; 评审拍板后二选一收敛。 */
+html.no-ambient #bp-grid { display: none; }
+
+/* markdown 正文内嵌图片可点击放大提示(MarkdownMaterialView 事件代理开 lightbox,
+   图片经 dangerouslySetInnerHTML 注入无法直接写内联 style, 靠此规则给 hover 反馈) */
+.wiki-prose img {
+  cursor: zoom-in;
+  transition: opacity .15s ease, box-shadow .15s ease;
+}
+.wiki-prose img:hover {
+  opacity: .88;
+  box-shadow: var(--fp-shadow-sm);
+}

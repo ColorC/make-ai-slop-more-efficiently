@@ -4,7 +4,7 @@
 
 **契约变更 #02 (2026-04-25)**: 去 health_score/health_grade · severity 归一.
 - 不打分
-- 用 health_record.build_health_record
+- 用 health_record_v2.build_health_record
 - 保留 format_def / extracted / sig_diff_ok 域字段
 
 Worker 协议:
@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from omnicompany.packages.services._diagnosis.doctor.health_record import build_health_record
+from omnicompany.packages.services._diagnosis.doctor.health_record_v2 import build_health_record
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 from ._shared import (

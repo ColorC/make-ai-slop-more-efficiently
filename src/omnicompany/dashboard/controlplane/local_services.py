@@ -67,8 +67,7 @@ def _registry() -> dict[str, dict[str, Any]]:
             "aliases": ["aigc", "aigc-lab"],
             "base": aigc_review_url,
             "health_path": "/api/health",
-            # configure via env var: 启动命令不再硬编码本机路径
-            "manual_start": os.environ.get("OMNI_AIGC_REVIEW_START_CMD", ""),
+            "manual_start": "node E:/WindowsWorkspace/webworks/apps/aigc-lab/server.mjs",
             "timeout": httpx.Timeout(10.0, read=120.0),
         },
     }

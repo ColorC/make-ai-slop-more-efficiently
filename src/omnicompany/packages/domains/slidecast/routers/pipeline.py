@@ -24,16 +24,13 @@ from .._paths import ensure_dirs, runs_root, studio_root
 
 _NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # 禁子进程弹前台控制台窗(本机硬规则)
 
-# 文章真源候选根(传相对路径时挨个试); 站点根由环境变量 SLIDECAST_PUBLISH_HOME
-# 配置, 不硬编码本机路径。未配置时只按传入路径本身找。
-_SITE_HOME = os.environ.get("SLIDECAST_PUBLISH_HOME", "").rstrip("/\\")
-_BASES = [""]
-if _SITE_HOME:
-    _BASES += [
-        f"{_SITE_HOME}/",
-        f"{_SITE_HOME}/data/curated/",
-        f"{_SITE_HOME}/data/works/",
-    ]
+# 文章真源候选根(传相对路径时挨个试)
+_BASES = [
+    "",
+    "E:/WindowsWorkspace/webworks/apps/personal-homepage/",
+    "E:/WindowsWorkspace/webworks/apps/personal-homepage/data/curated/",
+    "E:/WindowsWorkspace/webworks/apps/personal-homepage/data/works/",
+]
 
 
 def _slugify(s: str) -> str:

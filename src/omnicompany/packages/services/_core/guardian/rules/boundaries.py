@@ -91,10 +91,6 @@ def _check_async_router_run(ctx: FileContext) -> bool:
         return False
     if _is_external(ctx):
         return False
-    # 2026-07-26 锚定: 只查 src/omnicompany/ 活代码树 — data/ 下仓库快照树
-    # (data/_workspaces/*, repo_exporter staged) 里的 Router 副本是数据产物
-    if not ctx.path.replace("\\", "/").startswith("src/omnicompany/"):
-        return False
     # 豁免框架层自身（runtime/ 里的 Router 基类定义合法有 async）
     if "src/omnicompany/runtime/" in ctx.path:
         return False

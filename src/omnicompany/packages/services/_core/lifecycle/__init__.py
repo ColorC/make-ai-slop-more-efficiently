@@ -6,7 +6,7 @@
 """工作生命周期服务 (note / task / split)。
 
 设计铁律:
-- **note 不搞两套**: note 唯一真源是 overlay-note-store(<workspace-root>/overlay-note-store),
+- **note 不搞两套**: note 唯一真源是 overlay-note-store(E:/WindowsWorkspace/overlay-note-store),
   本服务只读它(read_note_source),绝不在 omni 另建 note 存储。
 - **task 也不搞两套**(TASK-SSOT-UNIFICATION 2026-07-05): 任务唯一真源是 progress-service(:8230),
   执行 task 以计划级 task 的子 task 形态存在 whatnow.json 里; TaskStore 只是它的客户端。

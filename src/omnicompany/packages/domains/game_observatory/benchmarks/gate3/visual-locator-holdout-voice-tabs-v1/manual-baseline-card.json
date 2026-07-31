@@ -1,0 +1,39 @@
+{
+  "schema": "game-observatory.manual-baseline-card.v1",
+  "id": "gate3.visual-locator.holdout.voice-tabs.v1",
+  "frozen_at": "2026-07-14T05:27:25.8571730+08:00",
+  "status": "frozen-before-visual-locator-inference",
+  "purpose": "在语音页激活状态与不同内容区复核三页签候选",
+  "input": {
+    "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-voice-tabs-holdout-v1.json",
+    "artifact_id": "art.device.1783965768007.811bb9cb",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783965768007.811bb9cb.png",
+    "sha256": "637670b0973845617fe441935f641bf4e8e6f3008ad9138f5ec43cb5083670a4",
+    "viewport": {"width": 1080, "height": 1920}
+  },
+  "manual_method": {
+    "sources": [
+      "完整原始截图",
+      "evidence.run.c5b9f3eef9f64ffea5278b5f81f7ea81",
+      "evidence.step.3540717cd86049f2894b58e6af3cbfe4",
+      "evidence.step.c83724e74e184719a8476bb717ddca07",
+      "evidence.step.14827aabf6d84a36965f47e1e78c91c0"
+    ],
+    "expected_interactions": 3,
+    "expected_ids": [
+      "rowan-voice-screen-tab-trust",
+      "rowan-voice-screen-tab-rumor",
+      "rowan-voice-screen-tab-voice"
+    ],
+    "locator_holdout_eligible": true,
+    "hypothesis_cost_comparison_eligible": false
+  },
+  "acceptance": {
+    "required_recall": 1.0,
+    "required_expected_matches": 3,
+    "maximum_missing_targets": 0,
+    "runtime_errors_allowed": false
+  },
+  "device_actions": false,
+  "fact_publication": false
+}

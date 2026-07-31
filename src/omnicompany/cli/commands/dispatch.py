@@ -81,14 +81,13 @@ def cmd_dispatch_route(message: str | None, context: str | None, input_b64: str 
 @click.option("--copy", "copy_text", default=None, help="顺手把这段文字放进剪贴板(粘贴即用)")
 @click.option("--paste", is_flag=True, help="激活后发 Ctrl+V 粘进聚焦输入框(复制到对话框里)")
 @click.option("--submit", is_flag=True, help="粘贴后自动提交，不需要用户再按回车")
-@click.option("--yes", is_flag=True, help="确认执行物理动作(激活窗口/写剪贴板/粘贴提交)；物理动作默认硬关闭，不带此 flag 一律拒绝")
 @click.option("--dry", is_flag=True, help="只找窗口不激活(验证用, 不抢焦点)")
 @click.option("--json", "as_json", is_flag=True)
 @any_caller
 def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str | None,
                           copy_text: str | None, paste: bool, submit: bool,
-                          yes: bool, dry: bool, as_json: bool) -> None:
-    """把某个 app 的窗口激活到最前(send_active_window 的执行端)。物理动作默认硬关闭，需显式 --yes。"""
+                          dry: bool, as_json: bool) -> None:
+    """把某个 app 的窗口激活到最前(send_active_window 的执行端)。"""
     from omnicompany.dashboard.boss_sight.services import winjump
 
     if not location and key:
@@ -104,7 +103,7 @@ def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str
 
     if copy_text:
         from omnicompany.dashboard.boss_sight.services import winjump as _wj
-        _wj.set_clipboard(copy_text, confirmed=yes)  # CF_UNICODETEXT, 中文不乱
+        _wj.set_clipboard(copy_text)  # CF_UNICODETEXT, 中文不乱
 
     if dry:
         # 只列出该位置匹配到的窗口, 不激活
@@ -119,10 +118,72 @@ def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str
             title_hint=title_hint,
             paste=paste or submit,
             submit=submit,
-            confirmed=yes,
         )
 
     click.echo(json.dumps(out, ensure_ascii=False) if as_json else json.dumps(out, ensure_ascii=False, indent=2))
+
+
+@cmd_dispatch.command("meegle")
+@click.option(
+    "--mode",
+    type=click.Choice(["observe", "route", "start"]),
+    default="observe",
+    show_default=True,
+    help="observe 只读盘点；route 只认领路由；start 才启动真实 Agent",
+)
+@click.option("--task-id", default=None, help="只处理一张 canonical Task；不填则取尚未路由的前几张")
+@click.option(
+    "--limit",
+    default=1,
+    type=click.IntRange(1, 20),
+    show_default=True,
+    help="每轮最多处理几张，避免首次接线误把历史收件箱批量启动",
+)
+@click.option("--json", "as_json", is_flag=True)
+@any_caller
+def cmd_dispatch_meegle(mode: str, task_id: str | None, limit: int, as_json: bool) -> None:
+    """从 Meegle 当前待办选择现有 Agent 与 Skill；默认只观察。"""
+    from omnicompany.packages.services._focus.meegle_dispatch import (
+        list_current_meegle_items,
+        observe_meegle_intake,
+        route_meegle_item,
+        start_routed_meegle_item_sync,
+    )
+
+    if mode == "observe":
+        result: dict | list = observe_meegle_intake()
+    else:
+        items = list_current_meegle_items()
+        if task_id:
+            items = [item for item in items if str(item.get("id") or "") == task_id]
+        else:
+            items = [item for item in items if not item.get("dispatch_status")]
+        items = items[:limit]
+        rows = []
+        for item in items:
+            decision = route_meegle_item(item, record=True)
+            if mode == "start" and decision.get("status") == "routed":
+                rows.append({
+                    "route": decision,
+                    "start": start_routed_meegle_item_sync(item, decision),
+                })
+            else:
+                rows.append({"route": decision})
+        result = {
+            "ok": bool(rows) and all(
+                row.get("route", {}).get("ok")
+                and (mode != "start" or row.get("start", {}).get("ok"))
+                for row in rows
+            ),
+            "mode": mode,
+            "matched": len(rows),
+            "rows": rows,
+        }
+
+    if as_json:
+        click.echo(json.dumps(result, ensure_ascii=False))
+        return
+    click.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 __all__ = ["cmd_dispatch"]

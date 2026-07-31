@@ -60,7 +60,10 @@ _READONLY_PERMISSION = {
     "question": "deny",
 }
 
-DEFAULT_OPENCODE_MODEL = os.environ.get("OPENCODE_DEFAULT_MODEL", "gpt-5.6-terra")
+DEFAULT_OPENCODE_MODEL = os.environ.get(
+    "OPENCODE_DEFAULT_MODEL",
+    "the_company/gpt-5.6-terra",
+)
 
 
 class OpenCodeRunWorker(ExternalAgentWorker):
@@ -546,10 +549,10 @@ def _select_final_text(
 def default_opencode_config_path() -> Path:
     current = Path(__file__).resolve()
     for parent in current.parents:
-        candidate = parent / "config" / "agents" / "opencode.jsonc"
+        candidate = parent / "config" / "agents" / "opencode-the_company.jsonc"
         if candidate.exists():
             return candidate
-    return Path("config/agents/opencode.jsonc")
+    return Path("config/agents/opencode-the_company.jsonc")
 
 
 def _metadata_flag(metadata: dict[str, Any], key: str) -> bool:

@@ -25,26 +25,12 @@ _STRAY_EXTS = frozenset({".md", ".json", ".yaml", ".yml"})
 # 对齐 distributed-docs.md v2 §四：
 #   - DESIGN.md 就近文档合法（v2 明示）
 #   - PROGRESS.md 唯一权威在 docs/PROGRESS.md，src/ 下不允许（由 OMNI-035e 报违规）
-# 2026-07-26 技术债裁决补:
-#   - SKILL.md 是技能包标准文档 (全仓通行的 object skill 契约), 就近合法
-#   - PROJECT_INDEX.md 依 docs/standards/concepts/project_index.md (2026-06-13
-#     用户裁决) 唯一权威契约: 放置位置=项目主根目录, 移动反而违约
-#   - testmap.yaml 是 testmap 设施的项目内真源 (discover_testmaps 只 walk src
-#     发现), 就近合法
-_ALLOWED_IN_SRC = frozenset({
-    "README.md", "py.typed", "CHANGELOG.md", "DESIGN.md", "SKILL.md",
-    "PROJECT_INDEX.md", "testmap.yaml",
-})
+_ALLOWED_IN_SRC = frozenset({"README.md", "py.typed", "CHANGELOG.md", "DESIGN.md"})
 _STRAY_PATH_EXEMPTIONS = frozenset({
     # LLM-CALL-UNIFICATION T9 (2026-06-13): runtime prompt material loaded by
     # dashboard.native_agent.NativeIdeAgent._PROMPT_PATH.
     "src/omnicompany/dashboard/native_agent_prompt.md",
 })
-# vendored 上游工程整树豁免 (2026-07-26 裁决): 目录内 VENDOR.md 明示为
-# 上游源码 vendored 副本, 其工程根文件/资源不应按散落配置处置
-_VENDORED_TREES = (
-    "/dashboard/chatui/",  # VENDOR.md: vendored claudecodeui 上游源码
-)
 
 # vite/typescript 项目的标准根文件 — frontend/ 下允许这些 well-known 名字
 _FRONTEND_PROJECT_FILES = frozenset({
@@ -71,28 +57,8 @@ def _check_stray_config_in_src(ctx: FileContext) -> bool:
     name = Path(p).name
     if name in _ALLOWED_IN_SRC:
         return False
-    # vendored 上游工程整树 (2026-07-26 裁决)
-    if any(tree in p for tree in _VENDORED_TREES):
-        return False
     # dashboard/frontend 项目根的标准 JS/TS 配置文件
-    # 2026-07-26 扩: 任何 */frontend/ 或 */webui/ 前端工程目录同样放行
-    # (narrative_studio/webui 等仓内 vite 工程同性质)
-    # 2026-07-26 再扩: */bot/ 下的 node 工程根文件 (业务域 mechanism
-    # mineflayer 探针 bot, 被 mechanism_load_checker.py 直接调用)
-    if ("/frontend/" in p or "/webui/" in p or "/dashboard/extensions/" in p or "/bot/" in p) and name in _FRONTEND_PROJECT_FILES:
-        return False
-    # 前端 i18n 语言资源 (2026-07-26 裁决): */i18n/ 下的 locale JSON 是标准
-    # 前端资产, 与代码就近放置是 i18n 框架通行布局, 非散落配置
-    if "/i18n/" in p and ext == ".json":
-        return False
-    # 就近 prompt 素材 (2026-07-26 裁决): *_prompt.md / prompts/ 目录下的 .md
-    # 是被代码运行时加载的 prompt 资源 (先例: native_agent_prompt.md 单文件豁免、
-    # knowledge/ 整目录豁免), 与代码 colocate 是有意设计
-    if ext == ".md" and (name.endswith("_prompt.md") or "/prompts/" in p):
-        return False
-    # 测试夹具 (2026-07-26 裁决): _test_fixtures/ 与 fixtures/ 下的数据文件
-    # 是测试消费的就近夹具
-    if "/_test_fixtures/" in p or "/fixtures/" in p:
+    if ("/dashboard/frontend/" in p or "/dashboard/extensions/" in p) and name in _FRONTEND_PROJECT_FILES:
         return False
     # knowledge/ 目录里的 .md 是语义节点的文档模板，故意和 routers/formats colocate
     if "/knowledge/" in p and ext == ".md":

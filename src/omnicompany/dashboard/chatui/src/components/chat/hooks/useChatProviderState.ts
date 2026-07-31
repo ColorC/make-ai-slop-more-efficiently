@@ -15,7 +15,6 @@ const FALLBACK_DEFAULT_MODEL: Record<LLMProvider, string> = {
   codex: 'gpt-5.4',
   gemini: 'gemini-3.1-pro-preview',
   opencode: 'anthropic/claude-sonnet-4-5',
-  kimi: 'kimi-code/k3',
   omni_agent: 'qwen3.6-plus',
   controller: 'opus',
 };
@@ -32,7 +31,6 @@ const FALLBACK_PERMISSION_MODES: Record<LLMProvider, PermissionMode[]> = {
   codex: ['default', 'acceptEdits', 'bypassPermissions'],
   gemini: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
   opencode: ['default'],
-  kimi: ['default'],
   omni_agent: ['default'],
   controller: ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'plan'],
 };
@@ -105,9 +103,6 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
   const [opencodeModel, setOpenCodeModel] = useState<string>(() => {
     return localStorage.getItem('opencode-model') || FALLBACK_DEFAULT_MODEL.opencode;
   });
-  const [kimiModel, setKimiModel] = useState<string>(() => {
-    return localStorage.getItem('kimi-model') || FALLBACK_DEFAULT_MODEL.kimi;
-  });
   const [omniAgentModel, setOmniAgentModel] = useState<string>(() => {
     return localStorage.getItem('omni_agent-model') || FALLBACK_DEFAULT_MODEL.omni_agent;
   });
@@ -169,12 +164,6 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
       return;
     }
 
-    if (targetProvider === 'kimi') {
-      setKimiModel(model);
-      localStorage.setItem('kimi-model', model);
-      return;
-    }
-
     if (targetProvider === 'omni_agent') {
       setOmniAgentModel(model);
       localStorage.setItem('omni_agent-model', model);
@@ -186,7 +175,7 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
   }, []);
 
   const loadProviderModels = useCallback(async (options: { bypassCache?: boolean } = {}) => {
-    const providers: LLMProvider[] = ['claude', 'cursor', 'codex', 'gemini', 'opencode', 'kimi', 'omni_agent', 'controller'];
+    const providers: LLMProvider[] = ['claude', 'cursor', 'codex', 'gemini', 'opencode', 'omni_agent', 'controller'];
     const requestId = providerModelsRequestIdRef.current + 1;
     providerModelsRequestIdRef.current = requestId;
     const isHardRefresh = options.bypassCache === true;
@@ -365,19 +354,6 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
   }, [providerModelCatalog.opencode, opencodeModel]);
 
   useEffect(() => {
-    const kimi = providerModelCatalog.kimi;
-    if (kimi) {
-      const next = pickStoredOrCurrent('kimi-model', kimiModel, kimi);
-      if (next !== kimiModel) {
-        setKimiModel(next);
-      }
-      if (localStorage.getItem('kimi-model') !== next) {
-        localStorage.setItem('kimi-model', next);
-      }
-    }
-  }, [providerModelCatalog.kimi, kimiModel]);
-
-  useEffect(() => {
     const omniAgent = providerModelCatalog.omni_agent;
     if (omniAgent) {
       const next = pickStoredOrCurrent('omni_agent-model', omniAgentModel, omniAgent);
@@ -519,8 +495,6 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
     setGeminiModel,
     opencodeModel,
     setOpenCodeModel,
-    kimiModel,
-    setKimiModel,
     omniAgentModel,
     setOmniAgentModel,
     controllerModel,

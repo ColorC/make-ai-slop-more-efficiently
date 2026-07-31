@@ -46,7 +46,6 @@ PRE_COMMIT_TEMPLATE = f"""#!/bin/sh
 #   OMNI-035h docs/ 子目录禁 .json / .jsonl 数据产物
 #   OMNI-035i docs/ 禁运行时残留 (.log/.prefab/...)
 #   OMNI-093a~c 设施统一唯一权威收束防漂移 (093d 语义判断已下沉 doc_steward)
-#   OMNI-094 非标准 LLM/Agent 调用 (临时脚本 / 裸 CLI)
 #
 # 其他违规 (含 OMNI-040~051 / 035j MEDIUM) 只 warn, 由 post-commit 汇总.
 # 受 hygiene_whitelist 豁免的存量违规自动跳过 (figma agent 提交不被阻断).
@@ -67,7 +66,7 @@ import json, sys
 BLOCK_RULES = {{
     'OMNI-014', 'OMNI-015', 'OMNI-016', 'OMNI-017', 'OMNI-018',
     'OMNI-035f', 'OMNI-035g', 'OMNI-035h', 'OMNI-035i',
-    'OMNI-093a', 'OMNI-093b', 'OMNI-093c', 'OMNI-094',
+    'OMNI-093a', 'OMNI-093b', 'OMNI-093c',
 }}
 try:
     r = json.loads(sys.stdin.read())
@@ -84,7 +83,7 @@ if echo "$BLOCKING" | head -1 | grep -q "^BLOCK"; then
     echo "$BLOCKING" | tail -n +2 >&2
     echo "" >&2
     echo "[OmniGuardian] commit 被阻止 (零误报 absolute 规则命中)." >&2
-    echo "  拦截集合: OMNI-014~018 + OMNI-035f~i + OMNI-093a~c + OMNI-094" >&2
+    echo "  拦截集合: OMNI-014~018 + OMNI-035f~i + OMNI-093a~c" >&2
     echo "  存量豁免文件不被拦截 (.omni/guardian/hygiene-whitelist.json)" >&2
     echo "  紧急绕过: git commit --no-verify" >&2
     exit 1

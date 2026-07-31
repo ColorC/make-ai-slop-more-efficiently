@@ -1,0 +1,1 @@
+{"action":{"type":"tap","x":140,"y":1035,"duration_ms":250},"target_name":"英雄厅罗万卡片","target_bounds":{"x":45,"y":900,"width":190,"height":265},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

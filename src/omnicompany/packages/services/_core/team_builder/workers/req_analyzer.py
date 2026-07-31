@@ -8,12 +8,12 @@ Worker 协议:
 
 职责: LLM 将自然语言需求解析为结构化需求规格 (goal/domain/input/output/约束/验证需求/错误场景).
 
-实现继承自 routers_legacy.ReqAnalyzerRouter (Diamond 继承, 业务逻辑不变).
+实现继承自 _archive/routers_legacy.ReqAnalyzerRouter (Diamond shortcut, 业务逻辑不变).
 """
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from ..routers_legacy import ReqAnalyzerRouter as _Legacy
+from .._archive.routers_legacy import ReqAnalyzerRouter as _Legacy
 
 
 class ReqAnalyzerWorker(Worker, _Legacy):

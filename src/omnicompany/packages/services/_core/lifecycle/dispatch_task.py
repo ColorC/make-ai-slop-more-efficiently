@@ -127,9 +127,8 @@ def dispatch_task(task_id: str, *, agent: str | None = None, plan_id: str | None
         _rec = _resolve_agent_session(agent)
         if _rec and _rec.get("session_id"):
             from omnicompany.packages.services._core.identity import bind_task_for_session
-            from omnicompany.packages.services._core.lifecycle.task import canonical_task_id
             bind_task_for_session(_rec.get("provider"), _rec.get("session_id"),
-                                  task_id=canonical_task_id(pid, t.id), plan_id=pid)
+                                  task_id=t.id, plan_id=pid)
     except Exception:  # noqa: BLE001
         pass
     try:

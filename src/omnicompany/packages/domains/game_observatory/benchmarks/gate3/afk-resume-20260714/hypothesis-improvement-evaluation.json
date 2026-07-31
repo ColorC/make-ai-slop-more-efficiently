@@ -1,0 +1,55 @@
+{
+  "schema": "game-observatory.hypothesis-improvement-evaluation.v1",
+  "fixture_id": "afk-resume-20260714-viewer-zoomed",
+  "evaluated_at": "2026-07-14T13:21:42Z",
+  "failure_run": {
+    "session_id": "d6c2d5e4-a06e-4a68-8cf8-52b3a1053b9a",
+    "coordinate_reference_required": false,
+    "region_inspections": 16,
+    "proposal_attempts": 10,
+    "tool_errors": 7,
+    "recorded_suggestions": 4,
+    "interaction_candidate_supported_geometry": 0,
+    "primary_return_candidate_recorded": false,
+    "elapsed_seconds": 231.46823,
+    "stop_reason": "tool_fuse:propose_probe:consecutive_errors=4"
+  },
+  "implementation_changes": [
+    "source_pixels shadow scenes now fail closed without a coordinate reference image and layout metadata",
+    "frame, coordinate-reference, and explicit required images are validated as a union",
+    "only one undelivered region crop may be queued at a time",
+    "the skill and Experimenter prompt now state the same source-pixel and sequential-crop contract"
+  ],
+  "corrected_run": {
+    "session_id": "470a157d-7f76-462c-a0cc-87bff7a3a854",
+    "coordinate_reference_required": true,
+    "coordinate_reference_sha256": "39ef1fe8a6d566d3d391c6e283719ae3b384b995f69a50d4292986d653ba52f7",
+    "region_inspections": 8,
+    "proposal_attempts": 4,
+    "tool_errors": 2,
+    "recorded_suggestions": 3,
+    "interaction_candidate_supported_geometry": 1,
+    "primary_return_candidate_recorded": true,
+    "elapsed_seconds": 456.974645,
+    "stop_reason": "finish_tool"
+  },
+  "regression_proof": {
+    "focused_tests": "35 passed",
+    "coordinate_drift_regression_fixed": true,
+    "region_batching_regression_fixed": true,
+    "important_candidate_recall_improved": true,
+    "runtime_cost_improved": false,
+    "overall_strictly_better_than_manual_baseline": false
+  },
+  "verdict": {
+    "change_is_materially_better_than_failure_run": true,
+    "hypothesis_permission": "shadow",
+    "remaining_defects": [
+      "eight sequential crop inspections still cost 456.97 seconds",
+      "one decorative eye pattern was promoted as an interaction candidate",
+      "the four-arrow target box remained vertically loose and clipped",
+      "camera arrows and two-finger gesture were still omitted",
+      "hypothesis still does not beat the seven-candidate manual baseline"
+    ]
+  }
+}

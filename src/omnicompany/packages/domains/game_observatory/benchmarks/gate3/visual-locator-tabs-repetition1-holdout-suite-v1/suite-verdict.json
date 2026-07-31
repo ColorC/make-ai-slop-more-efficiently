@@ -1,0 +1,23 @@
+{
+  "schema": "game-observatory.visual-locator-holdout-suite-verdict.v1",
+  "suite_id": "gate3.visual-locator.tabs-repetition1.holdout-suite.v1",
+  "manual_baseline": "manual-baseline-suite.json",
+  "case_count": 3,
+  "required_case_count": 3,
+  "expected_total": 9,
+  "matched_total": 9,
+  "missing_total": 0,
+  "recall_by_case": {
+    "gate3-afk-rowan-tabs-repetition1-trust-holdout-v1": 1.0,
+    "gate3-afk-rowan-tabs-repetition1-rumor-holdout-v1": 1.0,
+    "gate3-afk-rowan-tabs-repetition1-voice-holdout-v1": 1.0
+  },
+  "score_files": [
+    "trust-score/run-01-score.json",
+    "rumor-score/run-01-score.json",
+    "voice-score/run-01-score.json"
+  ],
+  "issues": [],
+  "passed": true,
+  "scope": "Frozen target geometry recall for three fresh screenshots. This does not establish complete-screen precision, semantic correctness, hypothesis dominance, device-action authority, or fact-publication authority."
+}

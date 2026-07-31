@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -21,8 +20,7 @@ from . import render as R
 from ._paths import runs_root, studio_root
 
 # colorc.cc 真源(memory: webworks/apps/personal-homepage 是 colorc.cc 真站)
-# 发布目标根由环境变量 SLIDECAST_PUBLISH_HOME 配置, 不硬编码本机路径。
-HOME = Path(os.environ.get("SLIDECAST_PUBLISH_HOME", ""))
+HOME = Path("E:/WindowsWorkspace/webworks/apps/personal-homepage")
 
 # 选定也出 demo 的 works(项目页,挑需要的;curated 已发布 posts 自动全收)
 WORKS_DEMOS: list[str] = ["aigc-lab"]

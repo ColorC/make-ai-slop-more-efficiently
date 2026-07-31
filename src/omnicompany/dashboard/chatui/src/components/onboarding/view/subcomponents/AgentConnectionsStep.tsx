@@ -45,13 +45,6 @@ const providerCards = [
     loginButtonClassName: 'bg-zinc-800 hover:bg-zinc-900 dark:bg-zinc-700 dark:hover:bg-zinc-600',
   },
   {
-    provider: 'kimi' as const,
-    title: 'Kimi',
-    connectedClassName: 'bg-zinc-100 dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-600',
-    iconContainerClassName: 'bg-zinc-100 dark:bg-zinc-800',
-    loginButtonClassName: 'bg-zinc-800 hover:bg-zinc-900 dark:bg-zinc-700 dark:hover:bg-zinc-600',
-  },
-  {
     provider: 'omni_agent' as const,
     title: 'Omni Agent',
     connectedClassName: 'bg-zinc-100 dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-600',

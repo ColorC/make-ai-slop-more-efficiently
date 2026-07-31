@@ -1,0 +1,165 @@
+/* ============================================================
+   V2 蓝图精制(主题 G)共享原子件 —— dashboard 消费层组件样式。
+   设计参数真源 = docs/plans/frontend-design/[2026-07-18]TRIFORM-UX-REDESIGN-V2/demo/theme.css
+   [data-theme="g"];token 全部消费 frostpane.css 的 --fp-* 与 --fp-bp-*(本文件零硬编码色值)。
+   收录:跨页面复用的原子件(seg/search/status/fresh/count/dim/filterbar/iconbtn/livetag/card/gsep)。
+   壳层(rail/薄顶栏)= shell/shellA.css;项目板页面形态 = entities/project/projectBoard.css。
+   纹理分区铁律:本文件不给任何文字面铺格纸纹理(卡片/行/按钮面一律平滑材质);
+   G.7 波四(用户裁决:有白色文字的区域用玻璃面板,玻璃只限面板/按钮):卡片/按钮组容器 =
+   蓝图玻璃 --fp-bp-panel*(grid-through,透出 #bp-grid 统一网格,本文件已入 glass-scope
+   sanctioned 清单);悬浮物(预览卡/picker 弹层)样式仍内联在各自白名单组件文件里
+   (HoverCard.tsx / PickerMenu.tsx)。
+   ============================================================ */
+
+/* ===== segmented(视图/分组切换,role=radiogroup;G.7 容器=蓝图玻璃按钮组) ===== */
+.v2-seg { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: var(--fp-r1);
+  background: var(--fp-bp-panel); border: 1px solid var(--fp-border-subtle);
+  backdrop-filter: var(--fp-bp-panel-blur); -webkit-backdrop-filter: var(--fp-bp-panel-blur); }
+.v2-seg .seg-i { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent;
+  color: var(--fp-text-3); font-size: var(--fp-fs-4); padding: 4px 11px; border-radius: 2px; cursor: pointer;
+  font-family: var(--fp-font-mono); text-transform: uppercase; letter-spacing: .09em; white-space: nowrap;
+  transition: color var(--fp-t-fast), background var(--fp-t-fast); }
+.v2-seg .seg-i:hover { color: var(--fp-text); }
+.v2-seg .seg-i:active { transform: scale(.97); }
+/* 选中态 = 45° 剖面 hatch(结构标记,非色块)+ 制图角缺口(G.4) */
+.v2-seg .seg-i[aria-checked="true"] {
+  background: var(--fp-bp-hatch), var(--fp-surface); color: var(--fp-text);
+  box-shadow: inset 0 0 0 1px var(--fp-border-strong);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+.v2-seg .seg-i .ct { font-size: var(--fp-fs-4); color: var(--fp-text-3); font-family: var(--fp-font-mono); font-weight: 400; }
+.v2-seg .seg-i[aria-checked="true"] .ct { color: var(--fp-bp-brass-hi); }
+.v2-seg .seg-i:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ===== 搜索(虚线测量件;focus 黄铜环;右端测量标注 G.4) ===== */
+.v2-search { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 160px; max-width: 340px;
+  padding: 6px 26px 6px 12px; position: relative;
+  background: transparent; border: 1px dashed var(--fp-border); border-radius: var(--fp-r1);
+  color: var(--fp-text-3); transition: border-color var(--fp-t-fast), box-shadow var(--fp-t-fast); }
+.v2-search:focus-within { border-style: solid; border-color: var(--fp-bp-brass); box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); }
+.v2-search input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--fp-text);
+  font-size: var(--fp-fs-3); font-family: inherit; min-width: 0; }
+.v2-search input::placeholder { color: var(--fp-text-3); }
+.v2-search::after { content: ""; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  width: 12px; height: 6px; pointer-events: none;
+  border-top: 1px solid rgba(235,245,255,.55); border-left: 1px solid rgba(235,245,255,.55); border-right: 1px solid rgba(235,245,255,.55); }
+
+/* ===== 筛选工具行(search + seg + picker 三段) ===== */
+.v2-filterbar { display: flex; align-items: center; gap: var(--fp-s3); flex-wrap: wrap; }
+
+/* ===== 状态徽章(色点+文字,六态;G 在跑=朱红 seal 点) ===== */
+.v2-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fp-fs-4); font-weight: 550;
+  padding: 2px 9px; border-radius: var(--fp-r-pill); line-height: 1.5; white-space: nowrap; }
+.v2-status .led { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.v2-status.st-ok { color: var(--fp-ok); background: color-mix(in srgb, var(--fp-ok) 13%, transparent); }
+.v2-status.st-warn { color: var(--fp-warn); background: color-mix(in srgb, var(--fp-warn) 13%, transparent); }
+.v2-status.st-err { color: var(--fp-err); background: color-mix(in srgb, var(--fp-err) 13%, transparent); }
+.v2-status.st-idle { color: var(--fp-text-3); background: var(--fp-bg-overlay); }
+.v2-status.st-accent { color: #ff8d85; background: var(--fp-bp-seal-soft); }
+.v2-status.st-hollow { color: var(--fp-text-2); background: transparent; box-shadow: inset 0 0 0 1px var(--fp-border-strong); }
+.v2-status.st-hollow .led { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* ===== 计数徽章(黄铜描边;hot=朱红实底) ===== */
+.v2-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+  padding: 0 6px; border-radius: var(--fp-r-pill); border: 1px solid var(--fp-bp-brass); color: var(--fp-bp-brass-hi);
+  font-size: var(--fp-fs-4); font-weight: 600; font-family: var(--fp-font-mono); line-height: 1; }
+.v2-count.hot { background: var(--fp-bp-seal); border-color: transparent; color: #fff; }
+
+/* ===== 新鲜度 7 方格 hatch 阵(G.3②:9×9 gap 2px,活跃=青白密纹/非活跃=暗纹) ===== */
+.v2-fresh { display: inline-flex; gap: 2px; align-items: center; flex: none; }
+.v2-fresh i { width: 9px; height: 9px; border-radius: 1px; border: 1px solid rgba(235,245,255,.32);
+  background: repeating-linear-gradient(45deg, rgba(235,245,255,.07) 0 1.5px, transparent 1.5px 4px); }
+.v2-fresh i.on { border-color: rgba(210,235,255,.7);
+  background: repeating-linear-gradient(45deg, rgba(200,235,255,.68) 0 1.5px, transparent 1.5px 4px); }
+
+/* ===== 尺寸标注线 ← N →(行时间/组头计数的蓝图表达;细线+端点竖杠) ===== */
+.bp-dim { display: inline-flex; align-items: center; gap: 5px; font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4); color: var(--fp-text-3); white-space: nowrap; }
+.bp-dim > i { display: inline-block; width: 14px; height: 5px; position: relative; border-top: 1px solid var(--fp-border); }
+.bp-dim > i::before { content: ""; position: absolute; top: -3px; width: 1px; height: 5px; background: var(--fp-border); }
+.bp-dim > i:first-child::before { left: 0; }
+.bp-dim > i:last-child::before { right: 0; }
+
+/* ===== 图签·筛选状态(唯一合法 title block:实时过滤条件+结果计数,无筛选即隐) ===== */
+.bp-livetag { display: none; align-items: center; }
+.bp-livetag.show { display: inline-flex; }
+.bp-titleblock { display: inline-grid; grid-auto-flow: column; border: 1px solid var(--fp-border-strong);
+  font-family: var(--fp-font-mono); }
+.bp-titleblock .tb { padding: 3px 10px; border-right: 1px solid var(--fp-border); font-size: var(--fp-fs-4);
+  letter-spacing: .12em; color: var(--fp-text-3); text-transform: uppercase; }
+.bp-titleblock .tb:last-child { border-right: 0; }
+.bp-titleblock .tb b { display: block; color: var(--fp-text-2); font-weight: 600; font-size: var(--fp-fs-4); }
+
+/* ===== 图例(新鲜度/在跑的读法说明) ===== */
+.v2-legend { display: inline-flex; align-items: center; gap: 12px; font-size: var(--fp-fs-4);
+  color: var(--fp-text-3); font-family: var(--fp-font-mono); letter-spacing: .06em; white-space: nowrap; }
+.v2-legend .lg-i { display: inline-flex; align-items: center; gap: 5px; }
+.v2-legend .led { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+
+/* ===== 34px 图标钮(G.4 iconbtn 30→34;G.7 hover=蓝图玻璃 hover 档) ===== */
+.v2-iconbtn { width: 34px; height: 34px; border-radius: var(--fp-r1); border: 1px solid transparent;
+  background: transparent; color: var(--fp-text-3); display: inline-grid; place-items: center;
+  cursor: pointer; transition: all var(--fp-t-fast); flex: none; padding: 0; }
+.v2-iconbtn:hover { background: var(--fp-bp-panel-hover); color: var(--fp-text); border-color: var(--fp-border-subtle); }
+.v2-iconbtn:active { transform: translateY(1px); }
+
+/* ===== 制图底衬圆/方(G.4:白线 α.35;rail 36px/行图标 40px) ===== */
+.ico-c, .ico-s { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
+  border: 1px solid rgba(235,245,255,.35); box-sizing: border-box; }
+.ico-c { border-radius: 50%; }
+.ico-s { border-radius: 2px; }
+
+/* ===== 厚框纸件卡(G.5:2px 白框 + 纸叠纸影 + 按压凹入;
+   G.7 波四:卡面改蓝图玻璃 --fp-bp-panel(.58/hover .68 + blur6 saturate150),
+   网格透过卡面模糊可见,卡与卡之间网格清晰露出;平滑禁纹理不变) ===== */
+.v2-card { background: var(--fp-bp-panel); border: var(--fp-bp-frame-w) solid var(--fp-border);
+  border-radius: var(--fp-r2); box-shadow: var(--fp-shadow-sm); position: relative;
+  backdrop-filter: var(--fp-bp-panel-blur); -webkit-backdrop-filter: var(--fp-bp-panel-blur);
+  transition: background var(--fp-t-fast), border-color var(--fp-t-fast), box-shadow var(--fp-t-fast), transform var(--fp-t-fast); }
+.v2-card:hover { background: var(--fp-bp-panel-hover); border-color: rgba(235,245,255,.78); box-shadow: var(--fp-shadow); }
+.v2-card:active { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(6,16,38,.5); }
+
+/* ===== 分组分隔线 + 中心十字对位标(G.4) ===== */
+.bp-gsep { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; pointer-events: none; }
+.bp-gsep i { flex: 1; height: 1px; background: rgba(235,245,255,.22); }
+.bp-gsep b { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); color: rgba(235,245,255,.55); font-weight: 400; }
+
+/* ===== 「新」标注框(细线小方框,与尺寸标注同族;G.6) ===== */
+.bp-newtag { display: inline-grid; place-items: center; min-width: 26px; height: 19px; padding: 0 5px; flex: none;
+  border: 1px solid var(--fp-bp-brass-hi); border-radius: 2px; color: var(--fp-bp-brass-hi);
+  font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); letter-spacing: .06em; line-height: 1; }
+
+/* ===== 整卡可点卡(G.5 厚框纸件;行/卡本身为主按钮,次动作 kebab hover 才现;
+   G.7 波四:padding 12→10 收薄,行卡总高 ≤64px,让网格有地方露出) ===== */
+.v2-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 10px 14px; cursor: pointer; font: inherit; color: inherit; box-sizing: border-box; }
+.v2-card .kebab { opacity: 0; width: 28px; height: 28px; border-radius: 3px; display: grid;
+  place-items: center; color: var(--fp-text-3); transition: all var(--fp-t-fast); flex: none; }
+.v2-card:hover .kebab, .v2-card .kebab:focus-visible, .v2-card .kebab[data-open="true"] { opacity: 1; }
+.v2-card .kebab:hover { background: var(--fp-border); color: var(--fp-text); }
+@media (pointer: coarse) { .v2-card .kebab { opacity: .7; } }
+
+/* ===== check row(多选行;白线方框 + 选中 45° hatch + 白勾,G.4) ===== */
+.v2-checkrow { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 10px; border: 0; background: transparent; color: var(--fp-text-2);
+  font-size: var(--fp-fs-3); cursor: pointer; border-radius: 2px; box-sizing: border-box; }
+.v2-checkrow:hover { background: var(--fp-bp-paper-2); color: var(--fp-text); }
+.v2-checkrow .cb { width: 17px; height: 17px; border: 1px solid rgba(235,245,255,.65); border-radius: 1px;
+  display: inline-grid; place-items: center; flex: none; color: transparent; background: transparent; box-sizing: border-box; }
+.v2-checkrow[aria-checked="true"] .cb {
+  background: repeating-linear-gradient(45deg, rgba(210,235,255,.55) 0 2px, transparent 2px 5px);
+  border-color: #fff; color: #fff; }
+.v2-checkrow .cr-t { flex: 1; min-width: 0; }
+.v2-checkrow .cr-d { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); flex: none; }
+
+/* ===== tag picker(按钮面=虚线件 + 黄铜计数徽章;弹层玻璃样式内联在 PickerMenu.tsx) ===== */
+.v2-picker { position: relative; display: inline-block; }
+.pk-btn { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: var(--fp-r1);
+  border: 1px dashed var(--fp-border); background: transparent; color: var(--fp-text-2);
+  font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); text-transform: uppercase;
+  letter-spacing: .09em; cursor: pointer; transition: all var(--fp-t-fast); white-space: nowrap; }
+.pk-btn:hover { border-color: var(--fp-border-strong); color: var(--fp-text); }
+.pk-btn[aria-expanded="true"] { border-style: solid; border-color: var(--fp-bp-brass);
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); color: var(--fp-text); }
+.pk-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--fp-bp-brass);
+  color: #fff; font-size: var(--fp-fs-4); display: inline-grid; place-items: center;
+  font-family: var(--fp-font-mono); box-sizing: border-box; }

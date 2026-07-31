@@ -1,0 +1,48 @@
+{
+  "name": "wiki-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "自用共用 wiki 核：Obsidian-flavor 渲染/索引（吸收 @user/obsidian-md，正本在此、改动经 tools/sync-obsidian-md.mjs 回写 P4）+ 免框架 viewer + CM6 双模编辑 + 段落评论 + 开发者模式桥。消费方：walker-game / tabletop-engine / omnicompany dashboard。",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./render": "./render.js",
+    "./viewer": "./viewer.js",
+    "./editor": "./editor.js",
+    "./comments": "./comments.js",
+    "./demo": "./demo.js",
+    "./demo-script": "./demo-script.js",
+    "./demo.css": "./demo.css",
+    "./dev-bridge": "./dev-bridge.js",
+    "./server/vite-wiki-middleware": "./server/vite-wiki-middleware.js",
+    "./obsidian-md": "./obsidian-md/index.js",
+    "./obsidian-md/renderer": "./obsidian-md/renderer.js",
+    "./obsidian-md/index-builder": "./obsidian-md/index-builder.js",
+    "./ui.css": "./ui.css"
+  },
+  "scripts": {
+    "test": "node tools/build-browser-renderer.mjs && node test/render-smoke.mjs && node test/demo-script-smoke.mjs",
+    "build:browser": "node tools/build-browser-renderer.mjs",
+    "sync:obsidian-md": "node tools/sync-obsidian-md.mjs"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.1",
+    "@lezer/highlight": "^1.2.3",
+    "@vscode/markdown-it-katex": "^1.1.1",
+    "fast-glob": "^3.3.3",
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.0.1",
+    "markdown-it-deflist": "^3.0.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-task-lists": "^2.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

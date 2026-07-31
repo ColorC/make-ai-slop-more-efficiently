@@ -132,13 +132,6 @@ def cmd_session_bind(
     provider = provider if provider is not None else existing.get("provider")
     claude_session_id = claude_session_id if claude_session_id is not None else existing.get("claude_session_id")
     pty_id = pty_id if pty_id is not None else existing.get("pty_id")
-    # task 规范成 progress-service 线上 id(p_<plan>.<n>), 前端 by_task 才对得齐
-    if task_id and active_plan:
-        try:
-            from omnicompany.packages.services._core.lifecycle.task import canonical_task_id
-            task_id = canonical_task_id(active_plan, task_id)
-        except Exception:
-            pass
 
     p = record_active_session(
         trace_id=trace_id,

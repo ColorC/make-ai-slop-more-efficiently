@@ -45,7 +45,7 @@ def cmd_registry():
 @click.option("--type", "type_filter", type=str, default=None,
               help="实体类型过滤（router / format / pipeline / ...），留空显示所有")
 @click.option("--package", "pkg_filter", type=str, default=None,
-              help="包路径前缀过滤（如 research.report_gen）")
+              help="包路径前缀过滤（如 demogame.table_learning）")
 @click.option("--json", "as_json", is_flag=True, default=False,
               help="以 JSON 格式输出")
 def cmd_registry_list(type_filter: str | None, pkg_filter: str | None, as_json: bool):
@@ -273,8 +273,8 @@ def cmd_registry_mark_strict(entity_id: str, unmark: bool):
     使用 --unmark 取消标记。
 
     示例:
-        omni registry mark-strict router:research.report_gen.ReportRouter
-        omni registry mark-strict format:research.report-schema --unmark
+        omni registry mark-strict router:demogame.table_learning.FieldClassifierRouter
+        omni registry mark-strict format:demogame.table-schema --unmark
     """
     from omnicompany.packages.services._core.registry import get_registry
 

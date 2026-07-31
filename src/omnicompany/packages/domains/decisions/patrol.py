@@ -82,11 +82,8 @@ def check_bidirectional_refs() -> dict[str, list[dict[str, Any]]]:
             issues["book_entry_missing_record"].append(
                 {"anchor": e["anchor"], "fix": "python scripts/sync_ontology_book.py"})
 
-    # B: 库 book_ref → 手册锚点。只约束现行记录:条目改名/收编后,旧蒸馏态按纪律
-    # 「作废不删除」保留(status=superseded/retired,取代链在新记录上),其 book_ref 必然悬空,不算违规。
+    # B: 库 book_ref → 手册锚点
     for r in recs:
-        if r.get("status") in ("superseded", "retired"):
-            continue
         if r.get("distilled") and (r.get("book_ref") or "").strip():
             if r["book_ref"] not in anchors:
                 issues["dangling_book_ref"].append(

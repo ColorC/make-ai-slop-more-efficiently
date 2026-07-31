@@ -6,15 +6,15 @@
   - ExperimenterWorker:    主探索 AgentNodeLoop (SOFT)
   - BeliefReflectorWorker: 总结 AgentNodeLoop,直接维护统一决策库 belief (SOFT)
 
-Diamond 继承: Worker + Router 双继承。Experimenter 业务逻辑在 ../routers_legacy.py
-(2026-07-26 OMNI-040 Stage 3 迁回正式位置);BeliefReflector 在 belief_reflector.py。
+Diamond shortcut: Worker + Router 双继承。Experimenter 业务逻辑在 _archive/routers_legacy.py
+(注意: _archive/ 内容是 Phase C 实现,非遗留旧代码);BeliefReflector 在 belief_reflector.py。
 旧 markdown 版 ReflectorWorker 与双脑 LockstepExperimenterWorker 已随决策本体合并清单#1
 退役(khyp 文档体系拆除,无生产调用方)。
 """
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from omnicompany.packages.services._learning.hypothesis.routers_legacy import (
+from omnicompany.packages.services._learning.hypothesis._archive.routers_legacy import (
     ExperimenterRouter as _Experimenter,
 )
 from .belief_reflector import BeliefReflectorRouter, BeliefReflectorWorker

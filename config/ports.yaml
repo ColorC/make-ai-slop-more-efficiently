@@ -41,11 +41,7 @@ services:
     service: omnidashboard(BOSS SIGHT 驾驶舱)
     bind: loopback
     started_by: omni-chat 扩展 supervisor
-    lan_bypass: Caddy 显式 bind 10.3.43.246:8210，仅 308 跳转到受保护 HTTPS 12443；不再反代明文 Dashboard
-  - port: 8223
-    owner: omnicompany
-    service: home-node 反向SSH隧道转发口(盒子 ssh -R 回连; 主控 loopback 监听, 盒子离线则无)
-    bind: loopback
+    lan_bypass: Caddy 显式 bind 10.3.43.246:8210 反代(旧版 LOFA OTA 过渡, 旧版清零后删)
   - port: 8230
     owner: omnicompany
     service: progressd(计划进度唯一真源)
@@ -76,11 +72,11 @@ services:
     started_by: dashboard app.py 反代按需拉起(python E:/MinecraftWorkspace/proto-world/tools/console/app.py)
   - port: 8333
     owner: voxelcraft
-    service: voxelcraft 局域网客户端分发(下载页+客户端zip+packwiz自动更新清单 /pack/)
+    service: voxelcraft 局域网客户端分发页(初形之岛客户端.zip 下载, 供他机部署进服)
     bind: lan
-    host: 独立进程(唯一例外的 LAN 绑定: 分发本职就是给局域网他机用; 只服务静态文件目录)
+    host: 独立进程(唯一例外的 LAN 绑定: 分发页本职就是给局域网他机用; 只服务静态文件目录)
     gateway: 直连 http://<本机LAN IP>:8333/
-    started_by: voxelcraft 检阅台(8332)自身启动或"起服"动作时自动拉起(不在才拉); 手动=python E:/MinecraftWorkspace/proto-world/tools/client_dist/serve_dist.py
+    started_by: python E:/MinecraftWorkspace/proto-world/tools/client_dist/serve_dist.py(手动/会话内拉起)
   - port: 8077
     owner: webworks
     service: aigc-lab 审阅台

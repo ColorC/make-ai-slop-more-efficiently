@@ -1,5 +1,5 @@
 # [OMNI] origin=claude-code domain=services/_core/lifecycle ts=2026-06-25T00:00:00Z type=infra status=active
-# [OMNI] summary="note→plan 调研澄清: 生成 plan.md 草稿+brief, 歧义标 NEEDS CLARIFICATION 并在当前对话直接返回"
+# [OMNI] summary="note→plan 调研澄清: 读 poof note→统一 run_json_agent 调研+结构化→渲染符合模板的 plan.md 草稿+brief, 歧义标 NEEDS CLARIFICATION 并入 human inbox"
 # [OMNI] why="WORK-LIFECYCLE-AND-DISPATCH N-research: note(poof真源) 经调研澄清成可执行 plan"
 # [OMNI] tags=lifecycle,note,plan,promote,clarify,unified-agent
 # [OMNI] material_id="material:services._core.lifecycle.note_to_plan.py"
@@ -7,7 +7,7 @@
 
 读 poof note 正文 → run_json_agent 在仓里调研 + 结构化成 plan 骨架 →
 渲染成符合 plan 模板的 plan.md + brief.md 草稿 → 歧义用 [NEEDS CLARIFICATION: ...]
-标记并直接返回当前命令/agent 对话。产出的草稿要过 omni plan gate 才能投递。
+标记并(best-effort)入 omni human inbox。产出的草稿要过 omni plan gate 才能投递。
 """
 from __future__ import annotations
 
@@ -88,7 +88,7 @@ def _render_plan_md(spec: dict[str, Any], *, plan_id: str, date: str, short: str
     lines.append(f"title: 【{short}】{title}")
     lines.append(f"date: '{date}'")
     lines.append(f"work_type: {work_type}")
-    lines.append("authority: whatnow")
+    lines.append("status: pending-review")
     lines.append("exit_criteria:")
     lines.append(fm_ec)
     lines.append("binding:")
@@ -99,7 +99,7 @@ def _render_plan_md(spec: dict[str, Any], *, plan_id: str, date: str, short: str
     lines.append(f"source_note: 'note:poof-note://{note_id}'")
     lines.append("---")
     lines.append("")
-    lines.append(f"<!-- [OMNI] origin=note-promote domain=plans ts={date}T00:00:00Z type=plan authority=whatnow -->")
+    lines.append(f"<!-- [OMNI] origin=note-promote domain=plans ts={date}T00:00:00Z type=plan status=pending-review -->")
     lines.append(f"<!-- [OMNI] summary=\"{spec.get('purpose','')[:120]}\" -->")
     lines.append(f"<!-- [OMNI] why=\"由 poof note {note_id} 经 omni notes promote 调研澄清生成\" -->")
     lines.append("<!-- [OMNI] tags=plan,promoted,note -->")
@@ -173,6 +173,27 @@ def _render_brief(spec: dict[str, Any]) -> str:
         "- 进度: 待用户审路线图 + 清零 NEEDS CLARIFICATION\n\n"
         "## 执行约束\n- 过 omni plan gate 才能 omni plan split / dispatch。\n"
     )
+
+
+def _push_clarifications(clar: list[str], plan_id: str) -> int:
+    """best-effort: 把澄清问题入 omni human inbox。失败不阻断。"""
+    if not clar:
+        return 0
+    try:
+        from omnicompany.runtime.buses.human_bus import HumanBus, HumanKind
+        bus = HumanBus()
+        n = 0
+        for c in clar:
+            try:
+                bus.ask(c, kind=HumanKind.HUMAN_BLOCKING, default="",
+                        context={"plan_id": plan_id, "anchor": "note_promote"},
+                        source="note_promote")
+                n += 1
+            except Exception:
+                pass
+        return n
+    except Exception:
+        return 0
 
 
 async def _run_research(note_title: str, note_body: str, model: str | None,
@@ -263,8 +284,9 @@ def promote_note_to_plan(note_id: str, *, category: str = "inbox",
     plan_md.write_text(_render_plan_md(spec, plan_id=plan_id, date=date, short=short,
                                        note_id=note_id), encoding="utf-8")
     (plan_dir / "brief.md").write_text(_render_brief(spec), encoding="utf-8")
+    pushed = _push_clarifications(clar, plan_id)
     return {"ok": True, "plan_id": plan_id, "path": str(plan_md), "source": source,
-            "clarifications": clar,
+            "clarifications": clar, "clarifications_pushed_to_inbox": pushed,
             "next": f"omni plan gate '{plan_id}' (清零 NEEDS CLARIFICATION 后才能过)"}
 
 

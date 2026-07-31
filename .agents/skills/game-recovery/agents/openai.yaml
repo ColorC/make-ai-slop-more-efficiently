@@ -1,6 +1,0 @@
-interface:
-  display_name: "游戏会话恢复"
-  short_description: "重观察未决动作并安全恢复代理、游戏或模拟器中断"
-  default_prompt: "Use $game-recovery to resolve the pending action and resume without blind replay."
-policy:
-  allow_implicit_invocation: true

@@ -167,10 +167,7 @@ def scan_plan_binding_violations(
             if not isinstance(item, dict):
                 continue
             item_name = item.get("id") or item.get("name") or "(未命名件)"
-            # 兼容旧登记里的 review="tests" 等非对象形态；脏数据不享受豁免，
-            # 但也不能阻断其他计划的巡检结果。
-            raw_item_review = item.get("review")
-            item_review = raw_item_review if isinstance(raw_item_review, dict) else {}
+            item_review = item.get("review") or {}
             item_exempt = (
                 item_review.get("mode") == "exempt"
                 and bool((item_review.get("reason") or "").strip())

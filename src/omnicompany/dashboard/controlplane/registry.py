@@ -95,7 +95,7 @@ def list_instances(
 
 @registry_router.get("/registry/instances/{entity_id:path}")
 def get_instance(entity_id: str) -> dict[str, Any]:
-    """单 entity 详情. entity_id 形如 router:research.report_gen.ReportRouter ."""
+    """单 entity 详情. entity_id 形如 router:demogame.team_table.SchemaAssembler ."""
     reg = get_registry()
     entry = reg.read(entity_id)
     if entry is None:

@@ -39,7 +39,7 @@ class ExternalAgentRunBody(BaseModel):
     model: str | None = None
     model_policy: Literal["none", "cheap"] = "cheap"
     profile: str | None = None
-    timeout_s: float | None = Field(default=None, gt=0)
+    timeout_s: float = Field(default=600.0, gt=0, le=3600)
     attached_context: list[str] = Field(default_factory=list)
     output_schema_path: str | None = None
     env: dict[str, str] = Field(default_factory=dict)

@@ -8,7 +8,7 @@ TEXT_INPUT = Format(
     name="文本统计输入意图",
     description="用户提交的包含待统计文本的意图对象，结构为 {\"text\": string}。验证标准为 JSON 结构合法且包含 text 字段。下游将作为验证节点的输入源。",
     parent="requirement",
-    tags=["sw", "kind.source"],
+    tags=["sw"],
     json_schema={
         "type": "object",
         "properties": {
@@ -29,7 +29,7 @@ INPUT_CHECK_RESULT = Format(
     name="输入验证结果",
     description="验证节点对输入文本的非空与合法性检查结果。验证标准为：若输入为空字符串或 null 必须标记为 FAIL，非空标记为 PASS。下游用于控制统计节点是否执行或直接返回错误。",
     parent="requirement",
-    tags=["sw", "kind.internal"],
+    tags=["sw"],
     json_schema={
         "type": "object",
         "properties": {
@@ -59,7 +59,7 @@ STATS_METRICS = Format(
     name="文本统计指标",
     description="对通过验证的文本执行的确定性统计结果，包含字数、行数、字符数。验证标准为数值非负且符合统计逻辑（如 'Hello world' 对应 word_count=2）。下游作为最终输出返回给用户。",
     parent="requirement",
-    tags=["sw", "kind.sink"],
+    tags=["sw"],
     json_schema={
         "type": "object",
         "properties": {

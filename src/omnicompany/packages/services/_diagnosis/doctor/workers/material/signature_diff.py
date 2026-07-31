@@ -42,7 +42,7 @@ class MaterialSignatureDiffWorker(Worker):
             )
             # 契约变更 #02 (2026-04-25): 不塞 health_score=0.0 / health_grade='F' 占位
             # 直接产 v2 schema 的最小 health_record · 含 1 条 critical check
-            from omnicompany.packages.services._diagnosis.doctor.health_record import build_health_record
+            from omnicompany.packages.services._diagnosis.doctor.health_record_v2 import build_health_record
             record = build_health_record(
                 [{"check": "sig_diff", "passed": False, "severity": "CRITICAL", "observation": detail}],
                 summary_base=f"Format '{material_id}' ",

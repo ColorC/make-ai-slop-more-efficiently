@@ -77,7 +77,7 @@ doctor 现含两套并存子域:
 
 ### 二 · 假设系统 + 元诊断 (V0→V12, 2026-05-07 立)
 
-跟旧 World V3 子域并行, 走"假设撰写 → 优先怀疑排序 → LLM 真证否 → finding 反向链 → 自动升级 confidence" 闭环. **完整架构汇报**: [`docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/reports/challenge_agent_architecture_final_2026-05-07.md`](../../../../../../docs/plans/diagnosis/%5B2026-05-05%5DDIAGNOSIS-RECONSOLIDATION/challenge_agent_architecture_final_2026-05-07.md).
+跟旧 World V3 子域并行, 走"假设撰写 → 优先怀疑排序 → LLM 真证否 → finding 反向链 → 自动升级 confidence" 闭环. **完整架构汇报**: [`docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/reports/challenge_agent_v7_architecture_final_2026-05-07.md`](../../../../../../docs/plans/diagnosis/%5B2026-05-05%5DDIAGNOSIS-RECONSOLIDATION/challenge_agent_v7_architecture_final_2026-05-07.md).
 
 | 子域 | 组件 | 职责 |
 |---|---|---|
@@ -90,7 +90,7 @@ doctor 现含两套并存子域:
 
 ```bash
 # 1. V1 升级假设 yaml + 反向链 archive (V5.2 默认接通)
-python -m omnicompany.packages.services._diagnosis.doctor.builders.hypothesis_upgrader \
+python -m omnicompany.packages.services._diagnosis.doctor.builders.hypothesis_v1_upgrader \
   --hypotheses-dir data/services/doctor/hypotheses \
   --map-path docs/plans/.../canonical_anchors/standards_authority_map.yaml
 

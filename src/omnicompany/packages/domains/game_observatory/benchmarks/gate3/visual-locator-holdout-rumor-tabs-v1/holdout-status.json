@@ -1,0 +1,18 @@
+{
+  "schema": "game-observatory.holdout-status.v1",
+  "fixture_id": "gate3-afk-rowan-rumor-tabs-holdout-v1",
+  "first_inference_run": "run-01/result.json",
+  "first_score": "scores/run-01-score.json",
+  "first_result": {
+    "expected_count": 3,
+    "matched_count": 1,
+    "expected_recall": 0.3333333333333333,
+    "missing_expected_ids": [
+      "rowan-rumor-screen-tab-trust",
+      "rowan-rumor-screen-tab-rumor"
+    ]
+  },
+  "status": "consumed-failed-holdout-now-development-regression",
+  "reason": "All three tab labels were OCR-visible as a horizontal row, but two remained non-candidates. Any later aligned-text-row rule makes this a development regression case.",
+  "next_requirement": "Freeze a different screenshot and manual baseline before the next generalization claim."
+}

@@ -1,0 +1,36 @@
+{
+  "schema": "game-observatory.exploration-benchmark.v1",
+  "id": "gate3-afk-rowan-hero-detail-remaining-controls-unknown-real-v1",
+  "title": "AFK Journey 罗万英雄详情剩余可见控件未知真实交互",
+  "phase": "real",
+  "game_id": "afk-journey",
+  "build_scope_id": "afk-cn-1.7.21-versionCode-10750-20260714",
+  "start_state": "罗万英雄详情主页，赛季等级 357，已知六个安全导航目标可见",
+  "goal": "复核已知六个导航目标以外的可见候选；只提出可逆或只读动作，不执行升级、赠礼、支付、删除、账号操作或一键装备。",
+  "observation": {
+    "artifact_id": "art.device.1783965415082.ad7f66d8",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783965415082.ad7f66d8.png",
+    "sha256": "7fcb73a60359365d1eb945760c4699f0769d9ab00b62f01356ec1a09de0c432a",
+    "viewport_width": 1080,
+    "viewport_height": 1920
+  },
+  "allowed_action_types": ["tap"],
+  "forbidden_target_terms": ["升级", "赠礼", "礼物", "领取", "购买", "支付", "删除", "账号", "一键装备"],
+  "max_suggestions": 12,
+  "prior_verified_targets": [],
+  "expected_probes": [
+    {"id":"rank-label","target_names":["左上巅峰+标签","巅峰+标签"],"action_type":"tap","target_bounds":{"x":14,"y":19,"width":108,"height":53},"importance":"normal","tags":["identity","unknown"]},
+    {"id":"identity-icon-1","target_names":["名称下方第一个圆形图标","火焰圆形图标"],"action_type":"tap","target_bounds":{"x":143,"y":160,"width":56,"height":53},"importance":"normal","tags":["identity-strip","unknown"]},
+    {"id":"identity-icon-2","target_names":["名称下方第二个圆形图标","四芒星圆形图标"],"action_type":"tap","target_bounds":{"x":203,"y":160,"width":51,"height":53},"importance":"normal","tags":["identity-strip","unknown"]},
+    {"id":"identity-icon-3","target_names":["名称下方第三个圆形图标","蓝绿色徽记圆形图标"],"action_type":"tap","target_bounds":{"x":256,"y":161,"width":52,"height":51},"importance":"normal","tags":["identity-strip","unknown"]},
+    {"id":"identity-icon-4","target_names":["名称下方第四个圆形图标","白色斜纹圆形图标"],"action_type":"tap","target_bounds":{"x":311,"y":159,"width":51,"height":51},"importance":"normal","tags":["identity-strip","unknown"]},
+    {"id":"identity-icon-5","target_names":["名称下方数字3圆形标记","数字3圆形标记"],"action_type":"tap","target_bounds":{"x":368,"y":160,"width":49,"height":50},"importance":"normal","tags":["identity-strip","unknown"]},
+    {"id":"pin-control","target_names":["右上未置顶按钮","未置顶按钮"],"action_type":"tap","target_bounds":{"x":948,"y":42,"width":101,"height":114},"importance":"normal","tags":["reversible-state","rollback-required"]},
+    {"id":"middle-icon-button","target_names":["右侧中部蓝色波纹图标按钮","蓝色波纹图标按钮"],"action_type":"tap","target_bounds":{"x":955,"y":544,"width":114,"height":158},"importance":"important","tags":["navigation","unknown"]},
+    {"id":"lower-icon-button","target_names":["右侧下部白色星形图标按钮","白色星形图标按钮"],"action_type":"tap","target_bounds":{"x":955,"y":701,"width":124,"height":164},"importance":"important","tags":["navigation","unknown"]},
+    {"id":"regular-equipment-control","target_names":["左下圆形装备图","左下加10装备图"],"action_type":"tap","target_bounds":{"x":25,"y":1490,"width":188,"height":225},"importance":"important","tags":["equipment","navigation"]},
+    {"id":"season-level-number","target_names":["赛季等级357数字区域","赛季等级数字区域"],"action_type":"tap","target_bounds":{"x":711,"y":1483,"width":169,"height":110},"importance":"normal","tags":["level-display","unknown"]},
+    {"id":"character-center","target_names":["罗万角色立绘中心","角色立绘中心"],"action_type":"tap","target_bounds":{"x":260,"y":300,"width":620,"height":930},"importance":"normal","tags":["character","unknown"]}
+  ],
+  "tags": ["gate3", "saturation-pass", "manual-first", "unknown-real", "mumu-evidence-required"]
+}

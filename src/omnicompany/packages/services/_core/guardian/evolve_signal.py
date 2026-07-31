@@ -25,9 +25,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from omnicompany.core.config import omni_workspace_root
-
 logger = logging.getLogger(__name__)
+
+_DEFAULT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
 
 # 可被 OmniEvolve 追溯的内部管线来源
 INTERNAL_PIPELINE_ORIGINS = frozenset({
@@ -130,11 +130,10 @@ class OmniEvolve:
 
     def __init__(
         self,
-        project_root: str | Path | None = None,
+        project_root: str | Path = _DEFAULT_ROOT,
         use_llm: bool = True,
     ):
-        # project_root 缺省 (None) 时懒解析 omni_workspace_root()
-        self._root = Path(project_root) if project_root else omni_workspace_root()
+        self._root = Path(project_root)
         self._evo_dir = self._root / ".omni" / "evolution"
         self._use_llm = use_llm   # False 时跳过 LLM 调用（测试 / 离线环境）
 

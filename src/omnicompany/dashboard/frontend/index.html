@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>omnifactory observer</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Consolas', 'Menlo', monospace; background: #0f0f0f; color: #e0e0e0; }
+    </style>
+  </head>
+  <body>
+    <!-- G.7(2026-07-19 材质裁决波四):唯一全视口连续网格层 —— 全 app 只有这一张格纸,
+         各页面/容器一律透明透出,消灭"网格断开"。承载蓝图底色 + 统一规格格纸 + 单 radial 顶部光;
+         顶缘横向刻度尺(40px 细 tick / 200px 长 tick + 尺寸数字)与左缘纵向字母尺(A/B/C…)
+         为 chrome 装饰 aria-hidden,样式在 frostpane.css「统一背景」节。 -->
+    <div id="bp-grid" aria-hidden="true">
+      <div class="bp-ruler-x" id="bpRulerX"></div>
+      <div class="bp-ruler-y" id="bpRulerY"></div>
+    </div>
+    <script>
+      // 标尺数字/字母一次性静态生成(零动画零依赖):横尺数字每 200px(=长 tick 位),
+      // 纵尺字母每 130px(=主格一行);超出视口的部分被 overflow 裁掉,无需响应式重算。
+      (function () {
+        var x = document.getElementById('bpRulerX');
+        if (x) for (var i = 0; i <= 30; i++) {
+          var s = document.createElement('span');
+          s.textContent = String(i * 200);
+          s.style.left = (i * 200) + 'px';
+          x.appendChild(s);
+        }
+        var y = document.getElementById('bpRulerY');
+        if (y) for (var j = 0; j < 26; j++) {
+          var t = document.createElement('span');
+          t.textContent = String.fromCharCode(65 + j);
+          t.style.top = (j * 130) + 'px';
+          y.appendChild(t);
+        }
+      })();
+    </script>
+    <div id="root"></div>
+    <!-- 统一捕获信标: 让 poof 截图能认出本页上的 omni 实体(material/plan/note/project/task)。 -->
+    <script src="/omni-capture-beacon.js" defer></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

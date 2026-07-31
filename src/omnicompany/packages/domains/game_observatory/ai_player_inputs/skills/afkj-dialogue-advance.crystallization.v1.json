@@ -1,0 +1,30 @@
+{
+  "environment_id": "environment.afkj.mumu0.preidentity.1_7_21",
+  "creator_id": "ai-player-skill-crystallizer",
+  "skill_id": "skill.afkj.dialogue.advance",
+  "title": "推进普通线性剧情对白",
+  "level": "L2",
+  "transition_ids": [
+    "edge.evidence.6fefba910e00a5f2b6612cfa432092a7"
+  ],
+  "applicability": "当前语义状态为普通线性剧情对白，画面存在无选项的对白推进区域，且没有付费、身份资料或不可逆分支提示。",
+  "safety_level": "progression",
+  "parameters_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "success_checks": [
+    "对白文本、说话人或下一项剧情交互至少一项发生有效变化",
+    "动作后的语义状态仍可识别为对白状态或进入已知剧情交互状态"
+  ],
+  "failure_checks": [
+    "画面只发生人物待机动画变化，剧情内容没有推进",
+    "出现选项、付费、身份资料或不可逆操作提示"
+  ],
+  "recovery_skill_version_ids": [],
+  "visual_variant_ids": [],
+  "executor_kind": "normalized_actions",
+  "executor_ref": null,
+  "perception_tier": "P2"
+}

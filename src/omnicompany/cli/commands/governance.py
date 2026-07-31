@@ -20,16 +20,12 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import click
 
 from omnicompany.runtime.llm.structured import DEFAULT_STRUCTURED_MODEL, DEFAULT_STRUCTURED_MODEL_ENV
 
 from .._access import any_caller, external_or_controller
-
-# commit_steward 是隐私排除域外的治理服务, 直接取常量给 help 文案用(服务本体仍在命令体内惰性导入)
-from omnicompany.packages.services._governance.commit_steward.steward import MAX_FILES_ENV
 
 
 def _optional_service(mod: str):
@@ -67,16 +63,11 @@ def cmd_plans_run(model: str | None, limit: int | None, only_missing: bool, work
 @click.option("--all", "all_", is_flag=True, help="不只处理变动的, 全量重评估(贵)")
 @click.option("--limit", type=int, default=None, help="只处理前 N 个(冒烟用)")
 @click.option("--dry-run", is_flag=True, help="只列出待新建/刷新的计划, 不评估不落地")
-@click.option("--audit", is_flag=True, help="同步完成后立即跑进度唯一真源审计并提交变化后的合并审阅材料")
-def cmd_plans_sync(all_: bool, limit: int | None, dry_run: bool, audit: bool) -> None:
+def cmd_plans_sync(all_: bool, limit: int | None, dry_run: bool) -> None:
     """计划→whatnow 同步: 新计划自动建 task, 进度过时的重评估刷新(进度集中在 whatnow 一处管)。"""
     from omnicompany.packages.services._focus.plan_progress_recorder.sync import run_sync
     summary = run_sync(only_changed=not all_, limit=limit, dry_run=dry_run, echo=click.echo)
-    output: dict[str, Any] = {"sync": summary}
-    if audit and not dry_run:
-        from omnicompany.packages.services._governance.progress_steward.ssot import run_progress_ssot_audit
-        output["ssot"] = run_progress_ssot_audit(submit_review=True, fix=True)
-    click.echo(json.dumps(output if audit else summary, ensure_ascii=False, indent=2))
+    click.echo(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 @cmd_governance.group("bind")
@@ -374,38 +365,19 @@ def cmd_progress_scan(include_docs: bool, include_code: bool, include_projects: 
         click.echo(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
-@cmd_governance.command("progress-ssot")
-@any_caller
-@click.option("--summary", is_flag=True, help="只打印分类计数与报告路径")
-@click.option("--review/--no-review", "submit_review", default=True,
-              help="有变化时提交一份合并审阅材料; 内容不变不重复提交")
-@click.option("--fix", is_flag=True, help="自动移除 OmniMark/YAML 中的进度副本; 正文候选绝不自动删除")
-def cmd_progress_ssot(summary: bool, submit_review: bool, fix: bool) -> None:
-    """确定性检查 plan.md 是否复制了 WhatNow 当前进度真源。"""
-    from omnicompany.packages.services._governance.progress_steward.ssot import run_progress_ssot_audit
-    payload = run_progress_ssot_audit(submit_review=submit_review, fix=fix)
-    if summary:
-        payload = {key: payload.get(key) for key in (
-            "scan_state", "clean", "scanned_plans", "authority_tasks",
-            "violation_count", "counts", "authority_source", "_latest", "fix", "review_material",
-        )}
-    click.echo(json.dumps(payload, ensure_ascii=False, indent=2))
-
-
 @cmd_governance.command("progress-review")
 @external_or_controller
 @click.option("--limit", type=int, default=None, help="只精判前 N 个文档(冒烟用)")
 @click.option("--model", default=None, help="覆盖模型(默认性价比模型)")
 @click.option("--only-ref", is_flag=True, help="只判死链(确定性, 不调模型)")
-@click.option("--no-review", is_flag=True, help="只出报告, 不提交合并审阅材料")
-def cmd_progress_review(limit: int | None, model: str | None, only_ref: bool, no_review: bool) -> None:
-    """轨一·里程碑二: 对探针候选三态精判, 可处置项合并进审阅台。"""
+@click.option("--no-inbox", is_flag=True, help="不推 human-inbox, 只出报告")
+def cmd_progress_review(limit: int | None, model: str | None, only_ref: bool, no_inbox: bool) -> None:
+    """轨一·里程碑二: 对探针候选三态精判(进度漂移/决策设计/误报), 可处置项进 human-inbox。"""
     from omnicompany.packages.services._governance.progress_steward.review import run_progress_review
     payload = run_progress_review(limit=limit, model=model, only_ref=only_ref,
-                                  submit_review=not no_review, echo=click.echo)
+                                  push_inbox=not no_inbox, echo=click.echo)
     click.echo(json.dumps({k: payload[k] for k in
-                           ("reviewed_docs", "failed_docs", "drift_total", "decision_total", "review_material")
-                           if k in payload},
+                           ("reviewed_docs", "failed_docs", "drift_total", "decision_total", "inbox_opened")},
                           ensure_ascii=False, indent=2))
 
 
@@ -446,15 +418,14 @@ def cmd_progress_strip(plan_id: str, lines: str, annotate: bool) -> None:
 @click.option("--code", "include_code", is_flag=True, help="也扫 src/**/*.py 注释")
 @click.option("--limit", type=int, default=None, help="只扫前 N 个文件(冒烟用)")
 @click.option("--model", default=None, help="覆盖模型(默认性价比模型)")
-@click.option("--review", "submit_review", is_flag=True, help="把有证据的发现合并成一份审阅材料")
-def cmd_prose_lang(include_code: bool, limit: int | None, model: str | None, submit_review: bool) -> None:
+@click.option("--inbox", is_flag=True, help="把'建议改中文'推 human-inbox")
+def cmd_prose_lang(include_code: bool, limit: int | None, model: str | None, inbox: bool) -> None:
     """轨二·里程碑四: 非中文泄漏(中文段里的非白名单英文)→ LLM 判该保留/改中文。只报不改。"""
     from omnicompany.packages.services._governance.prose_steward.lang import run_lang_scan
     payload = run_lang_scan(include_code=include_code, limit=limit, model=model,
-                            submit_review=submit_review, echo=click.echo)
+                            push_inbox=inbox, echo=click.echo)
     click.echo(json.dumps({k: payload[k] for k in
-                           ("scanned_files", "candidate_tokens", "counts", "review_material")
-                           if k in payload},
+                           ("scanned_files", "candidate_tokens", "counts", "inbox_opened")},
                           ensure_ascii=False, indent=2))
 
 
@@ -718,24 +689,18 @@ def cmd_docs_report() -> None:
 @click.option("--model", default=None, help="覆盖默认性价比模型")
 @click.option("--apply", "apply_", is_flag=True, help="真提交(默认 dry-run 只出批次计划)")
 @click.option("--workers", type=int, default=4)
-@click.option("--max-files", "max_files", type=int, default=None,
-              help=f"每轮只处理前 N 个文件(也读 {MAX_FILES_ENV}; 积压期分批稳步清, 不设限省略)")
-def cmd_commit_run(model: str | None, apply_: bool, workers: int, max_files: int | None) -> None:
+def cmd_commit_run(model: str | None, apply_: bool, workers: int) -> None:
     """性价比模型严格分批 git 提交: 低重复明文必读、禁盲目全量、逐批显式 add+commit。
 
     默认 dry-run 只出批次计划供抽查; 加 --apply 才真提交(pre-commit 卫士逐批兜底)。
-    积压上千文件时务必给 --max-files: 一轮只处理前 N 个并完整跑完, 判过留工作区的
-    进暂缓名单下轮跳过, 让积压每天稳步下降而不是每次全量 map 撞超时被掐。
     """
     from omnicompany.packages.services._governance.commit_steward import run_commit
-    res = run_commit(model=model, dry_run=not apply_, workers=workers, max_files=max_files,
-                     echo=click.echo)
+    res = run_commit(model=model, dry_run=not apply_, workers=workers, echo=click.echo)
     if res.get("changes") == 0:
         click.echo(res.get("message", "工作区干净"))
         return
-    backlog = f", 积压余 {res['backlog_remaining']}" if res.get("backlog_remaining") else ""
     click.echo(f"改动 {res['changes']} 文件 → {res['batches']} 批"
-               f"(map 失败 {res['map_failed']}{backlog}); {'真提交' if apply_ else 'DRY-RUN 计划'}")
+               f"(map 失败 {res['map_failed']}); {'真提交' if apply_ else 'DRY-RUN 计划'}")
     for b in res["plan"]:
         click.echo(f"\n■ {b['subject']}  ({len(b['files'])} 文件)")
         if b.get("body"):
@@ -886,8 +851,7 @@ _GOVERNANCE_CATALOG = [
     {"verb": "plans-run", "what": "计划→项目归属 + 中文标题 + 格式检查", "cadence": "每日(--only-missing)", "kind": "语义"},
     {"verb": "plans-sync", "what": "计划→whatnow 同步: 新计划自动建 task + 进度过时则重评估刷新", "cadence": "每日", "kind": "语义"},
     {"verb": "progress-scan", "what": "轨一: 确定性圈出 plan.md/注释里的进度型自述候选(进度归 whatnow)", "cadence": "每日", "kind": "确定性"},
-    {"verb": "progress-ssot", "what": "计划进度唯一真源: 对照 whatnow 报本地状态副本/冲突→合并审阅材料", "cadence": "每日(plans-sync --audit)", "kind": "确定性"},
-    {"verb": "progress-review", "what": "轨一: 进度型候选三态精判(漂移/决策/误报)→ 合并审阅材料", "cadence": "每周", "kind": "语义"},
+    {"verb": "progress-review", "what": "轨一: 进度型候选三态精判(漂移/决策/误报)→ human-inbox", "cadence": "每周", "kind": "语义"},
     {"verb": "prose-lang", "what": "轨二: 非中文泄漏(中文段里非白名单英文)→ LLM 判保留/改中文", "cadence": "每周", "kind": "语义"},
     {"verb": "prose-term", "what": "轨二: 术语不一致/代称/易过时 + 从单一真源生成 Vale/CSpell", "cadence": "每周", "kind": "确定性"},
     {"verb": "prose-compress", "what": "轨二: 惜字如金(缩写展开 + 可疑段 LLM 建议)", "cadence": "每周", "kind": "语义"},
@@ -916,13 +880,6 @@ def cmd_catalog(json_output: bool) -> None:
     gov = omni_workspace_root() / "data" / "governance"
     last_runs = {
         "plans-run": gov / "plan_steward",
-        "plans-sync": omni_workspace_root() / "data" / "services" / "whatnow" / "whatnow.json",
-        "progress-scan": gov / "progress_steward" / "progress_scan.json",
-        "progress-ssot": gov / "progress_steward" / "progress_ssot-latest.json",
-        "progress-review": gov / "progress_steward" / "progress_review-latest.json",
-        "prose-lang": gov / "prose_steward" / "prose_lang-latest.json",
-        "prose-term": gov / "prose_steward" / "prose_term-latest.json",
-        "prose-compress": gov / "prose_steward" / "prose_compress-latest.json",
         "history-run": gov / "work_history" / "latest.json",
         "docs-refs": gov / "doc_steward" / "reference_audit.json",
         "docs-timeliness": gov / "doc_steward" / "timeliness-latest.json",

@@ -41,33 +41,6 @@ STATE_GENERATIONS_TO_KEEP = 4
 
 logger = logging.getLogger(__name__)
 
-# Dashboard/ccdaemon can itself be launched from Codex or Claude Code. Those
-# parent-session markers must never leak into a new, independent provider CLI:
-# Claude otherwise treats the PTY as a nested child session (disabling transcript
-# persistence and tying lifecycle assumptions to the parent), while Codex can
-# associate the terminal with the wrong native thread. Keep global provider
-# configuration/auth variables, but remove only per-session runtime identity.
-_PARENT_RUNTIME_ENV_KEYS = {
-    "CLAUDECODE",
-    "CLAUDE_CODE_CHILD_SESSION",
-    "CLAUDE_CODE_ENTRYPOINT",
-    "CLAUDE_CODE_SESSION_ID",
-    "CLAUDE_CODE_SSE_PORT",
-    "CLAUDE_PID",
-    "CODEX_THREAD_ID",
-    "OMNI_CC_PTY_ID",
-}
-
-
-def _isolated_child_environment(pty_id: str) -> dict[str, str]:
-    env = dict(os.environ)
-    for key in _PARENT_RUNTIME_ENV_KEYS:
-        env.pop(key, None)
-    env["OMNI_CC_PTY_ID"] = pty_id
-    env.setdefault("CLAUDE_CODE_FORCE_SYNC_OUTPUT", "1")
-    return env
-
-
 _TERMINAL_QUERY_RE = re.compile(
     r"\x1b\](?P<osc>10|11|12);\?(?:\x07|\x1b\\)"
     r"|\x1b\[\?(?P<mode>\d+)\$p"
@@ -223,7 +196,6 @@ class PtyHost:
         self.last_output_at = self.started_at
         self.last_input_at = 0.0
         self.exit_reason: str | None = None
-        self.exit_code: int | None = None
         self.done = asyncio.Event()
         self.reader_task: asyncio.Task[None] | None = None
         self._state_write_task: asyncio.Task[bool] | None = None
@@ -263,7 +235,6 @@ class PtyHost:
             "replay_truncated": self.replay_truncated,
             "terminal_query_responder": True,
             "exit_reason": self.exit_reason,
-            "exit_code": self.exit_code,
             "updated_at": time.time(),
         }
 
@@ -392,7 +363,9 @@ class PtyHost:
 
             self._pty_factory = PTY
         self.pty = self._pty_factory(self.cols, self.rows)
-        env = _isolated_child_environment(self.id)
+        env = dict(os.environ)
+        env["OMNI_CC_PTY_ID"] = self.id
+        env.setdefault("CLAUDE_CODE_FORCE_SYNC_OUTPUT", "1")
         env_str = "".join(f"{key}={value}\0" for key, value in env.items()) + "\0"
         appname = self.cmd[0]
         cmdline = " ".join(_quote_arg(arg) for arg in self.cmd[1:]) if len(self.cmd) > 1 else None
@@ -427,15 +400,6 @@ class PtyHost:
             await self.server.wait_closed()
         for client in list(self.clients):
             await self._drop_client(client)
-
-    def _capture_exit_code(self) -> None:
-        if self.exit_code is not None or self.pty is None:
-            return
-        try:
-            self.exit_code = int(self.pty.get_exitstatus())
-        except Exception:
-            # Older/fake PTY implementations may not expose an exit status.
-            pass
 
     async def _reader_loop(self) -> None:
         exit_reason: str | None = None
@@ -486,7 +450,6 @@ class PtyHost:
                 await asyncio.sleep(READ_IDLE_SLEEP_S)
         finally:
             if not self.done.is_set():
-                self._capture_exit_code()
                 self.exit_reason = exit_reason or "process-exit"
                 self.done.set()
                 await self._broadcast({"type": "exit", "reason": self.exit_reason})
@@ -602,34 +565,17 @@ class PtyHost:
 async def run_from_config(path: Path) -> int:
     config = json.loads(path.read_text(encoding="utf-8"))
     host = PtyHost(config)
-    started = False
     try:
         await host.start()
-        started = True
-        logger.info(
-            "pty_host started id=%s host_pid=%s child_pid=%s provider=%s",
-            host.id,
-            os.getpid(),
-            host.child_pid,
-            host.provider,
-        )
         await host.done.wait()
         await asyncio.sleep(0.25)
-        logger.info(
-            "pty_host ended id=%s reason=%s exit_code=%s",
-            host.id,
-            host.exit_reason,
-            host.exit_code,
-        )
         return 0
     except Exception as exc:
-        phase = "runtime" if started else "start"
-        host.exit_reason = f"host-{phase}-failed: {type(exc).__name__}: {exc}"
-        logger.exception("pty_host %s failed during %s", host.id, phase)
+        host.exit_reason = f"host-start-failed: {type(exc).__name__}: {exc}"
         try:
             host._write_state(force=True)
         except Exception:
-            logger.exception("pty_host %s could not persist failure state", host.id)
+            pass
         return 1
     finally:
         await host.stop_server()
@@ -639,10 +585,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     args = parser.parse_args()
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
     return asyncio.run(run_from_config(Path(args.config)))
 
 

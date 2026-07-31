@@ -1,0 +1,105 @@
+/* ============================================================
+   项目板 · 蓝图 G 页面形态(2026-07-19 阶段四第三波;1:1 对照 demo ?theme=g#/board 页签内形态)。
+   页签内口径(G.3⑤): 页面无大标题顶栏,从功能工具行开始;工具行=chrome 区铺格纸。
+   分组折叠头=空心描边大字(G.4 19px)+⊢N⊣ 计数标注(bp-dim 黄铜)+组间十字对位标(.bp-gsep)。
+   行=厚框纸件整卡可点(2px 白框+按压凹入);搁置=dashed 未探索;在跑=朱红 seal 点徽章;
+   pinned=左缘朱红条。D 密度收敛:行默认只留 图标/名称/在跑/新鲜度/时间,
+   描述/链接/活跃度详情收进 hover 预览卡(.pv-*,深色描图纸)。
+   G.7 波四:.pb-page/.pb-tools 私有格纸清除改 transparent,透出 #bp-grid 全视口统一连续网格
+   (全 app 只有那一张格纸,滚动处不再断开);卡片=蓝图玻璃 --fp-bp-panel(grid-through);
+   列表体 max-width 1280 + padding 16/20 收边,卡片间距/分组间距放大,让网格有地方露出。
+   ============================================================ */
+
+.pb-page { position: relative; height: 100%; overflow: auto; color: var(--fp-text);
+  background: transparent; box-sizing: border-box; } /* G.7:透出 #bp-grid 统一网格 */
+
+/* 筛选工具行(chrome 区:透统一网格 + 收薄 padding,左右与列表体 20px 对齐) */
+.pb-tools { display: flex; align-items: center; gap: 10px; padding: 8px 20px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--fp-border-subtle);
+  background: transparent; } /* G.7:透出 #bp-grid 统一网格 */
+.pb-tools .tools-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+/* 列表体(透出统一网格,玻璃卡浮在格上;G.7 行宽 max 1280 居中 + 16/20 收边) */
+.pb-body { flex: 1; padding: 16px 20px 40px; max-width: 1280px; width: 100%; margin: 0 auto;
+  box-sizing: border-box; position: relative; }
+
+/* 分组折叠头(整行可点;空心描边大字 + chevron + 计数尺寸标注;G.7 组间距 ≥24px) */
+.pb-ghead { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 24px 4px 8px; color: var(--fp-text-2); background: transparent; border: 0;
+  cursor: pointer; font: inherit; box-sizing: border-box; }
+.pb-ghead:hover { color: var(--fp-text); }
+.pb-ghead .chev { display: inline-flex; align-items: center; color: var(--fp-text-3); flex: none;
+  transition: transform var(--fp-t-fast) var(--fp-ease); }
+.pb-ghead[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+/* 空心描边节区标题(Blue Prince "INVENTORY" 式;字本身是组名信息) */
+.pb-ghead .gh-name { color: transparent; -webkit-text-stroke: 1px rgba(235,245,255,.68);
+  font-family: var(--fp-font-mono); font-weight: 600; letter-spacing: .22em;
+  text-transform: uppercase; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-ghead .bp-dim { color: var(--fp-bp-brass-hi); flex: none; }
+
+.pb-gitems { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-bottom: 6px; } /* G.7 卡片间距 ≥10px */
+.pb-gitems.hidden { display: none; }
+
+/* 项目卡(整卡可点;D 密度:默认只见 图标/名称/在跑/新鲜度/时间/kebab) */
+.pb-card .pc-icon { width: 40px; height: 40px; border-radius: 2px; border: 1px solid rgba(235,245,255,.45);
+  display: grid; place-items: center; font-size: 17px; flex: none; color: var(--fp-text-2);
+  box-sizing: border-box; font-family: var(--fp-bp-font-display); }
+.pb-card .pc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pb-card .pc-t { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--fp-text);
+  font-size: var(--fp-fs-2); font-family: var(--fp-bp-font-display); min-width: 0; }
+.pb-card .pc-t .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 描述/链接行默认隐藏 → hover 预览卡(D 密度收敛,MAPPING 项目板默认可见清单) */
+.pb-card .pc-d, .pb-card .pc-links { display: none; }
+.pb-card .pc-side { display: flex; align-items: center; gap: 12px; flex: none; }
+.pb-card .pc-time { display: flex; justify-content: flex-end; min-width: 86px; }
+/* 搁置 = dashed 未探索区(边界语言) */
+.pb-card[data-act="idle"] { border-style: dashed; opacity: .78; }
+/* kebab 次动作 hover 才现(触屏恒 .7;焦点在菜单内时保持可见) */
+.pb-card .kebab-wrap { opacity: 0; transition: opacity var(--fp-t-fast); flex: none; display: inline-flex; }
+.pb-card:hover .kebab-wrap, .pb-card .kebab-wrap:focus-within { opacity: 1; }
+@media (pointer: coarse) { .pb-card .kebab-wrap { opacity: .7; } }
+/* 置顶 = 左缘朱红条 + 强框(G 限定) */
+.pb-card.pinned { border-color: var(--fp-border-strong); box-shadow: inset 3px 0 0 var(--fp-bp-seal), var(--fp-shadow-sm); }
+.pb-card .pc-pin { opacity: 0; width: 26px; height: 26px; border-radius: 2px; display: grid;
+  place-items: center; color: var(--fp-text-3); transition: all var(--fp-t-fast); flex: none;
+  border: 0; background: transparent; cursor: pointer; padding: 0; }
+.pb-card:hover .pc-pin, .pb-card .pc-pin:focus-visible { opacity: 1; }
+.pb-card .pc-pin:hover { color: var(--fp-text); }
+.pb-card .pc-pin:active { transform: translateY(1px); }
+.pb-card.pinned .pc-pin { color: var(--fp-bp-seal); opacity: 1; }
+@media (pointer: coarse) { .pb-card .pc-pin { opacity: .7; } }
+
+/* hover 预览卡内容(容器玻璃在 HoverCard.tsx;这里只管排版) */
+.pv-t { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: var(--fp-fs-2);
+  font-family: var(--fp-bp-font-display); color: var(--fp-text); }
+.pv-badge-sub { margin: 4px 0 6px; color: var(--fp-text-3); font-size: var(--fp-fs-4); }
+.pv-d { color: var(--fp-text-2); margin-top: 6px; }
+.pv-d.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pv-more { margin-top: 4px; border: 0; background: transparent; color: var(--fp-bp-brass-hi);
+  font-size: var(--fp-fs-4); cursor: pointer; padding: 0; font-family: var(--fp-font-mono); }
+.pv-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--fp-text-3);
+  font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); flex-wrap: wrap; }
+.pv-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pv-links .lk-chip { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fp-fs-4);
+  padding: 2px 9px; border: 1px dashed var(--fp-border); border-radius: var(--fp-r1);
+  color: var(--fp-text-2); background: transparent; cursor: pointer; font-family: inherit; }
+.pv-links .lk-chip:hover { border-style: solid; color: var(--fp-text); }
+
+/* 平板档(600–1023): 内容收边 12px(G.7 密度表)。 */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .pb-body { padding: 12px 12px 36px; }
+}
+
+/* 窄屏(phone <600): 工具行/列表 padding 收窄到 8px(G.7);时间列让位(少字,手机只留核心)。 */
+@media (max-width: 599px) {
+  .pb-tools { padding: 8px; gap: 8px; }
+  /* 分组 seg 整组可横滑, 不把页面撑出横向溢出(390 上 5 组 seg 天然超宽) */
+  .pb-tools .v2-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .pb-tools .v2-seg::-webkit-scrollbar { display: none; }
+  .pb-body { padding: 8px 8px 32px; }
+  .pb-card { padding: 10px 10px; gap: 10px; }
+  .pb-card .pc-side { gap: 8px; }
+  .pb-card .pc-time { min-width: 0; }
+  .pb-card .pc-time .bp-dim > i { display: none; }
+  .pb-ghead .gh-name { font-size: 16px; }
+}

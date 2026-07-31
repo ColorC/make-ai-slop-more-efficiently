@@ -1,0 +1,39 @@
+{
+  "schema": "game-observatory.exploration-benchmark.v1",
+  "id": "gate3-afk-cecia-hero-detail-holdout-v2",
+  "title": "AFK Journey 瑟西娅英雄详情视觉定位第二保留集",
+  "phase": "holdout",
+  "game_id": "afk-journey",
+  "build_scope_id": "afk-cn-1.7.21-versionCode-10750-20260714",
+  "start_state": "英雄详情：瑟西娅，赛季等级 357，左侧切换英雄与战力信息按钮可见",
+  "goal": "定位同一界面的两个历史验证控件并控制候选增量；不执行设备动作",
+  "observation": {
+    "artifact_id": "art.device.1783965313821.9cdc4799",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783965313821.9cdc4799.png",
+    "sha256": "5719e92491398b4e706fc432b652f6806a22a4f2593a505c6d67d3f9fc5c7871",
+    "viewport_width": 1080,
+    "viewport_height": 1920
+  },
+  "allowed_action_types": ["tap"],
+  "forbidden_target_terms": ["升级", "赠礼", "礼包", "支付", "删除", "账号"],
+  "max_suggestions": 6,
+  "expected_probes": [
+    {
+      "id": "cecia-v2-combat-attributes",
+      "target_names": ["战力信息按钮", "属性信息"],
+      "action_type": "tap",
+      "target_bounds": {"x": 900, "y": 1625, "width": 58, "height": 82},
+      "importance": "important",
+      "tags": ["hero-detail", "attributes", "verified-route"]
+    },
+    {
+      "id": "cecia-v2-previous-hero",
+      "target_names": ["上一个英雄", "左侧切换英雄"],
+      "action_type": "tap",
+      "target_bounds": {"x": 25, "y": 1015, "width": 95, "height": 145},
+      "importance": "important",
+      "tags": ["hero-detail", "hero-switch", "verified-route"]
+    }
+  ],
+  "tags": ["mobile", "portrait", "hero-detail", "holdout", "external-evidence"]
+}

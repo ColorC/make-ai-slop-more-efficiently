@@ -2,7 +2,7 @@
 # [OMNI] material_id="material:runtime.llm.multi_protocol_client.registry_and_dispatcher.implementation.py"
 """多协议 LLM 客户端 + 多模型注册表
 
-V4: 自动检测 Anthropic / OpenAI 协议。DashScope 用 Anthropic SDK，聚合代理用 OpenAI SDK。
+V4: 自动检测 Anthropic / OpenAI 协议。DashScope 用 Anthropic SDK，the_company proxy 用 OpenAI SDK。
 模型分配本身也是可进化参数 — 元进化可以调整哪个角色用哪个模型。
 """
 
@@ -142,7 +142,7 @@ class RateLimiter:
     """Per-endpoint rate limiter with **dual constraint**: token bucket + min interval.
 
     2026-04-10 重构: 原来的纯 token bucket 允许 burst (120/min 令牌可以瞬间打光),
-    聚合 API 的 per-model quota 经常被并发 burst 打爆 (sentinel 后台巡逻 +
+    the_company 聚合 API 的 per-model quota 经常被并发 burst 打爆 (sentinel 后台巡逻 +
     workflow-factory 主线程 + LLMJudgeAgent 并发时表现尤其明显)。
 
     新方案 — 两个约束必须同时满足才放行:
@@ -208,14 +208,13 @@ class RateLimiter:
 
 # OpenAI SDK 会在 base_url 后追加 ``chat/completions``；代理的当前标准接口在 /v1。
 # 少 /v1 会落到旧兼容入口,同一把有效 key 会被误报为 models=['limited']。
-# 通过 OMNI_LLM_BASE_URL 配置你的 OpenAI-compatible 聚合代理（如 LiteLLM / One API）。
-_DEFAULT_LLM_URL = os.environ.get("OMNI_LLM_BASE_URL", "")
+_THE_COMPANY_URL = "https://internal-llm-proxy.example.com/v1"
 _KIMI_URL = os.environ.get("KIMI_BASE_URL", "https://api.kimi.com/coding/v1")
 
 
 # key_env → default value（环境变量未设置时使用）
 _KEY_DEFAULTS: dict[str, str] = {
-    "OMNI_LLM_API_KEY": os.environ.get("OMNI_LLM_API_KEY", os.environ.get("THE_COMPANY_API_KEY", "")),
+    "THE_COMPANY_API_KEY": os.environ.get("THE_COMPANY_API_KEY", ""),
     "KIMI_API_KEY": os.environ.get("KIMI_API_KEY", ""),
 }
 
@@ -249,11 +248,11 @@ class ModelRegistry:
     ## Fallback 链
 
     任何 role 的 chain = [policy-selected primary, *universal_fallbacks]。
-    兜底只使用聚合代理；不再使用外部失效 endpoint。
+    兜底只使用 the_company proxy；不再使用外部失效 endpoint。
     """
 
     # ── 模型目录（raw model configs）──────────────────────────────────────
-    # 聚合 API 定价对照（$ per 1M tokens, input/output）—— 2026-06-23 用户同步最新价目表：
+    # the_company 聚合 API 定价对照（$ per 1M tokens, input/output）—— 2026-06-23 用户同步最新价目表：
     #   gpt-5.5-expensive     5.00 / 30.00   quality 顶配(贵)
     #   gpt-image-2           5.00 / 10.00   图像
     #   gemini-3-pro-image    2.00 / 12.00   图像(pro)
@@ -279,57 +278,57 @@ class ModelRegistry:
     #   text-embedding-3-large 0.13 / 0.00   embedding
     #   qwen-flash            0.02 / 0.21    ultra-cheap
     _MODELS: dict[str, dict[str, str]] = {
-        # ── 聚合代理 (OMNI_LLM_API_KEY) — 2026-06-23 同步最新价目表 ──
+        # ── the_company proxy (THE_COMPANY_API_KEY) — 2026-06-23 同步最新价目表 ──
         # 旧型号(claude-opus/sonnet/glm-5/kimi-k2.5/qwen3.5-* 等)仍保留: 历史 policy/fallback 引用,
         # 不在新表内的按旧价兜底估算; 新表以下方"★最新"段为权威。
         # quality tier (claude / gpt / opus)
-        "claude-opus-4-6":      {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "claude-opus-4-7":      {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "claude-sonnet-4-6":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "claude-haiku-4-5-20251001": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "claude-haiku-4-5@20251001": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gpt-5.3-codex":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gpt-5.4":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gpt-5.5":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gpt-5.5-expensive":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gpt-5.6-terra":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "claude-opus-4-6":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "claude-opus-4-7":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "claude-sonnet-4-6":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "claude-haiku-4-5-20251001": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "claude-haiku-4-5@20251001": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.3-codex":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.4":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.5":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.5-expensive":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.6-terra":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # standard tier (glm / kimi / qwen-max)
-        "glm-5":                {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "glm-5.1":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "glm-5.2":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "kimi-k2.5":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "kimi-k2.6":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "kimi-k2.7-code":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        # Kimi Code direct endpoint. Keep these IDs separate from the aggregation
+        "glm-5":                {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "glm-5.1":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "glm-5.2":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "kimi-k2.5":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "kimi-k2.6":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "kimi-k2.7-code":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        # Kimi Code direct endpoint. Keep these IDs separate from the the_company
         # aliases above so a caller can explicitly choose its credential path.
         "k3":                    {"base_url": _KIMI_URL, "key_env": "KIMI_API_KEY"},
         "kimi-for-coding":       {"base_url": _KIMI_URL, "key_env": "KIMI_API_KEY"},
         "kimi-for-coding-highspeed": {"base_url": _KIMI_URL, "key_env": "KIMI_API_KEY"},
-        "qwen3-max":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "qwen3.7-max":          {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "qwen3.5-plus":         {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "qwen3.6-max-preview":  {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "qwen3.6-plus":         {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen3-max":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen3.7-max":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen3.5-plus":         {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen3.6-max-preview":  {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen3.6-plus":         {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # cheap / fast tier (deepseek / qwen-flash)
-        "deepseek-v3-2-251201": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "deepseek-v4-flash":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "deepseek-v4-pro":      {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "qwen3.5-flash":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "qwen-flash":           {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "deepseek-v3-2-251201": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "deepseek-v4-flash":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "deepseek-v4-pro":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen3.5-flash":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen-flash":           {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # vision tier
-        "qwen3-vl-flash":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-3.1":                   {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-3-flash-preview":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-3.5-flash":             {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-3.1-flash-lite-preview": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-3.1-pro-preview":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen3-vl-flash":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.1":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3-flash-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.5-flash":             {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.1-flash-lite-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.1-pro-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # image / embedding（非对话, 计价用; role 一般不选）
-        "gpt-image-2":                   {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-3-pro-image-preview":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-3.1-flash-image-preview": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-embedding-001":          {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "gemini-embedding-2":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
-        "text-embedding-3-large":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gpt-image-2":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3-pro-image-preview":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.1-flash-image-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-embedding-001":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-embedding-2":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "text-embedding-3-large":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
     }
 
     # ── Policies: tier → model (每个 policy 定义四个 tier 的首选模型) ─────
@@ -380,7 +379,7 @@ class ModelRegistry:
         "pain_classify":        "cheap",     # 分类任务用便宜模型
         "vision":               "vision",
         "vision_quality":       "quality",   # 高质量视觉：用 qwen3.6-plus
-        "field_discovery":      "quality",   # 业务域字段公式自主发现 AgentNodeLoop
+        "field_discovery":      "quality",   # demogame 字段公式自主发现 AgentNodeLoop
     }
 
     # role-level override：忽略 policy 的 tier→model 映射，强制特定 role 用指定模型
@@ -394,17 +393,17 @@ class ModelRegistry:
 
     # ── Universal fallback chain: 所有 tier 共享的末位兜底 ──────────────
     _UNIVERSAL_FALLBACK: list[str] = [
-        "glm-5",                          # 聚合代理最稳定的中端
-        "qwen3.5-flash",                  # 聚合代理最便宜
+        "glm-5",                          # the_company 最稳定的中端
+        "qwen3.5-flash",                  # the_company 最便宜
     ]
 
-    # 2026-04-10: 聚合代理从 120 降到 40 RPM (1.5 秒/次最小间隔)。
+    # 2026-04-10: the_company 从 120 降到 40 RPM (1.5 秒/次最小间隔)。
     # 原值 120 允许 2 req/sec burst, 在主管线 + sentinel 后台巡逻并发时经常把
     # 聚合 API 的 per-model quota 打成 429。40 RPM + 强制最小间隔 (见 RateLimiter)
     # 错峰后稳定多了, 单跑 workflow-factory 的 7 次调用仍远低于上限。
-    # 可通过 OMNICOMPANY_LLM_RPM env 覆盖。
+    # 可通过 OMNICOMPANY_THE_COMPANY_RPM env 覆盖。
     _RATE_LIMITS: dict[str, int] = {
-        _DEFAULT_LLM_URL: int(os.environ.get("OMNICOMPANY_LLM_RPM", "40")),
+        _THE_COMPANY_URL: int(os.environ.get("OMNICOMPANY_THE_COMPANY_RPM", "40")),
     }
 
     _DEFAULT_POLICY = "production"
@@ -465,11 +464,11 @@ class ModelRegistry:
         return policy.get(tier) or self._POLICIES[self._DEFAULT_POLICY].get(tier) or "glm-5"
 
     def _model_config(self, model: str) -> dict[str, str]:
-        """根据模型名查 base_url + api_key。未知模型默认走聚合代理。"""
+        """根据模型名查 base_url + api_key。未知模型默认走 the_company。"""
         cfg = self._MODELS.get(model)
         if not cfg:
-            logger.warning("ModelRegistry: unknown model '%s', defaulting to aggregation endpoint", model)
-            cfg = {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"}
+            logger.warning("ModelRegistry: unknown model '%s', defaulting to the_company endpoint", model)
+            cfg = {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"}
         return {
             "model": model,
             "base_url": cfg["base_url"],
@@ -540,7 +539,7 @@ class ModelRegistry:
 # Protocol detection
 # ---------------------------------------------------------------------------
 
-_OPENAI_ENDPOINTS = frozenset([_DEFAULT_LLM_URL, _KIMI_URL])
+_OPENAI_ENDPOINTS = frozenset([_THE_COMPANY_URL, _KIMI_URL])
 
 
 def _is_openai_endpoint(base_url: str) -> bool:
@@ -659,7 +658,7 @@ class _UnifiedResponse:
 
 # ── LLM 计量设施 ──
 
-# 每百万 token 价格（美元），来源: 聚合 API 定价 (2026-04-07)
+# 每百万 token 价格（美元），来源: the_company 聚合 API 定价 (2026-04-07)
 _MODEL_PRICING: dict[str, tuple[float, float]] = {
     # (input_per_M, output_per_M)
     # ── ★2026-06-23 用户同步最新价目表（权威）──
@@ -1073,7 +1072,7 @@ def _add_cache_control_to_tools(tools: list[dict]) -> list[dict]:
 
 
 class LLMClient:
-    """多协议 LLM 客户端 — Anthropic (DashScope) + OpenAI-compatible (聚合代理)。
+    """多协议 LLM 客户端 — Anthropic (DashScope) + OpenAI-compatible (the_company proxy)。
 
     支持两种构造方式：
       1. 直接传参: LLMClient(model=..., base_url=..., api_key=...)
@@ -1138,7 +1137,7 @@ class LLMClient:
             base_url = base_url or model_cfg["base_url"]
             api_key = api_key or model_cfg["api_key"]
 
-        # 默认模型按 endpoint 类型选取：聚合代理/OpenAI-compatible endpoint 用聚合模型
+        # 默认模型按 endpoint 类型选取：the_company/OpenAI-compatible endpoint 用 the_company 模型
         # 注意：此处 base_url 已经被 role chain 或显式参数设置好了
         _effective_base = base_url or os.environ.get("ANTHROPIC_BASE_URL") or ""
         if model:
@@ -1187,7 +1186,7 @@ class LLMClient:
         if _is_openai_endpoint(resolved_base or ""):
             resolved_key = (
                 api_key
-                or os.environ.get("OMNI_LLM_API_KEY")
+                or os.environ.get("THE_COMPANY_API_KEY")
                 or os.environ.get("OPENAI_API_KEY")
                 or "no-key"  # 防止测试环境 None 导致 OpenAI SDK 初始化崩溃
             )
@@ -1273,7 +1272,7 @@ class LLMClient:
         if not api_key:
             raise RuntimeError(
                 f"LLM call failed: no api_key for role={self.role or 'default'} "
-                f"model={model} base_url={base_url}. Set OMNI_LLM_API_KEY."
+                f"model={model} base_url={base_url}. Set THE_COMPANY_API_KEY."
             )
 
         # ── Phase 3 预落: 全局信息审计开关 (env override) ──

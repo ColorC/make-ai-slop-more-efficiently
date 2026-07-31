@@ -72,7 +72,7 @@ class MissingInfoItem(BaseModel):
     """缺这个是否会让当前节点产出不可靠 (True = 关键)。"""
 
     suggested_source: str | None = None
-    """建议去哪里找。例: 'inspect.getsource(Router)' / 'data/domains/my_domain/...'
+    """建议去哪里找。例: 'inspect.getsource(Router)' / 'data/domains/demogame/...'
     / 'ask human' 等。可为 None 表示 LLM 自己也不知道。"""
 
     confidence: float = 0.5

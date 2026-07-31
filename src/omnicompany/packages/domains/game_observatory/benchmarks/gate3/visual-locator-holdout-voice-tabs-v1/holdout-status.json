@@ -1,0 +1,15 @@
+{
+  "schema": "game-observatory.holdout-status.v1",
+  "fixture_id": "gate3-afk-rowan-voice-tabs-holdout-v1",
+  "first_inference_run": "run-01/result.json",
+  "first_score": "scores/run-01-score.json",
+  "first_result": {
+    "expected_count": 3,
+    "matched_count": 2,
+    "expected_recall": 0.6666666666666666,
+    "missing_expected_ids": ["rowan-voice-screen-tab-trust"]
+  },
+  "status": "consumed-failed-holdout-now-development-regression",
+  "reason": "Two adjacent right-side tab controls were candidates while the aligned left OCR label remained non-candidate. Any later control-sequence completion rule makes this a development regression case.",
+  "next_requirement": "Freeze screenshots from another evidence repetition before the next tab-generalization claim."
+}

@@ -5,7 +5,7 @@
 覆盖 agent "执行命令"能力. 收归散落的 `subprocess.run/Popen/check_output` / `os.system` 调用.
 
 与 Disk / Web Bus 同层次: 虽然 bash 本质为 disk+web 的载体, 但因其作为独立能力出现频率高
-(git / npm / dotnet / Unity / PowerShell 调用), 单独一条 bus 便于审计与审核.
+(git / p4 / npm / dotnet / Unity / PowerShell 调用), 单独一条 bus 便于审计与审核.
 
 **基本审核** (拦明显危险, 运行时硬拦截):
   - 危险指令黑名单 (rm -rf / / format C: / mkfs / dd if=/dev/zero / fork bomb)
@@ -32,7 +32,7 @@ import threading
 import time
 import weakref
 from pathlib import Path
-from typing import Callable, Union
+from typing import Union
 
 from omnicompany.core.config import omni_workspace_root
 from omnicompany.runtime.buses.base import ServiceBus
@@ -60,8 +60,8 @@ _DANGEROUS_PATTERNS = (
 # cwd 允许的工作区前缀 (大小写不敏感, 前缀匹配).
 #
 # 工作区顶层 = omni 仓根的父目录, 由权威解析器派生而非写死. 额外机器级工作区
-# 通过环境变量 OMNI_ALLOWED_WORKSPACE_PREFIXES
-# (os.pathsep 分隔) 外置覆盖; 未配置时沿用通用默认.
+# (P4 / Users / Unix tmp) 通过环境变量 OMNI_ALLOWED_WORKSPACE_PREFIXES
+# (os.pathsep 分隔) 外置覆盖; 未配置时沿用开发机默认, 保证本机行为不变.
 def _default_allowed_cwd_prefixes() -> tuple[str, ...]:
     prefixes: list[str] = [str(omni_workspace_root().parent)]
     env = os.environ.get("OMNI_ALLOWED_WORKSPACE_PREFIXES", "")
@@ -69,7 +69,7 @@ def _default_allowed_cwd_prefixes() -> tuple[str, ...]:
         prefixes.extend(p for p in env.split(os.pathsep) if p)
     else:
         # 开发机兜底 (可被上面的 env 覆盖)
-        prefixes.extend(["c:\\users"])
+        prefixes.extend(["d:\\p4", "c:\\users"])
     prefixes.extend(["/tmp", "/var/tmp", "/home"])
     return tuple(prefixes)
 
@@ -91,7 +91,7 @@ def _normalize(path: Path) -> str:
 
 # ─── Windows 防御层 (2026-05-04 加) ───────────────────────────────────
 #
-# 对齐参考项目 claude-code-analysis 的 utils/bash/shellQuoting.ts
+# 对齐参考项目 e:/WindowsWorkspace/参考项目/claude-code-analysis/src/utils/bash/shellQuoting.ts
 # 和 .../utils/windowsPaths.ts. 解决用户 2026-05-03 反馈的四类 bash 错误产物:
 #   1. nul 文件 (>nul / 2>nul 在 git bash 创建字面量文件)
 #   2. 反斜杠路径破坏 (mkdir "data\X\Y" 整串变单一目录名)
@@ -196,8 +196,8 @@ def _check_dash_as_dir(cmd: str) -> str | None:
 # 4.6 双层盘符检测 (omnicompany 独有)
 #
 # 错误形式: 命令含 POSIX 风格 /x/Y 后又紧接 Windows 风格 X:/Y
-# 例: cd /e/work && mkdir e:/X (在 cd 后已经在 e: 盘, 又拼绝对盘符)
-# 例: 拼接路径产生 /e/work/e:/X 这种字面量
+# 例: cd /e/WindowsWorkspace && mkdir e:/X (在 cd 后已经在 e: 盘, 又拼绝对盘符)
+# 例: 拼接路径产生 /e/WindowsWorkspace/e:/X 这种字面量
 _DOUBLE_DRIVE_RE = re.compile(r"/[a-zA-Z]/[^/\s]+(?:/[^/\s]+)*/[a-zA-Z]:/")
 
 
@@ -216,7 +216,7 @@ def _check_double_drive(cmd: str) -> str | None:
 # 背景:
 #   find 在 Windows + git bash 下 + subprocess.run(timeout=) 触发 TimeoutExpired
 #   不会真杀子进程 (CreateProcess 后子进程独立). 23 个僵尸 find 跑了最久 30 小时,
-#   累计 CPU 100k 秒, 严重拖累机器. 加上很多 find 命令是巨慢扫描 (find / / find /d/large-dir/ 等),
+#   累计 CPU 100k 秒, 严重拖累机器. 加上很多 find 命令是巨慢扫描 (find / / find /d/P4/ 等),
 #   即使能正常退出也是性能黑洞.
 # 替代:
 #   - 文件名匹配 → GlobRouter (pathlib.rglob 安全有界)
@@ -499,15 +499,13 @@ class BashBus(ServiceBus):
         check: bool = False,
         dry_run: bool = False,
         shell: bool | None = None,
-        progress_callback: Callable[[dict], None] | None = None,
     ) -> subprocess.CompletedProcess:
         """执行命令 · 返回 CompletedProcess.
 
         Args:
           cmd: str (shell=True) 或 list[str] (shell=False, 默认).
           cwd: 工作目录, 必须在允许的工作区内.
-          timeout: 调用方选择的总超时秒数；None 表示无总时限.
-          progress_callback: 长命令仍运行时约每 10 秒回调一次，只含运行时长.
+          timeout: 超时秒数.
           env: 环境变量 (None 继承).
           input: stdin 输入.
           capture_output: True 则 capture stdout+stderr.
@@ -569,39 +567,11 @@ class BashBus(ServiceBus):
         _register_process(proc)
 
         try:
-            # communicate 在 10 秒观测窗口中推进。窗口结束仅发进度，绝不把
-            # “仍在运行”误判成超时；只有调用方显式 timeout 到期才终止。
+            # communicate 处理 input + 读 stdout/stderr + 等 wait, 一次搞定
             try:
-                deadline = time.monotonic() + timeout if timeout is not None else None
-                pending_input = input
-                while True:
-                    now = time.monotonic()
-                    remaining = deadline - now if deadline is not None else None
-                    if remaining is not None and remaining <= 0:
-                        raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout)
-                    observation_window = 10.0
-                    wait_for = (
-                        min(observation_window, remaining)
-                        if remaining is not None
-                        else observation_window
-                    )
-                    try:
-                        stdout, stderr = proc.communicate(
-                            input=pending_input,
-                            timeout=wait_for,
-                        )
-                        returncode = proc.returncode
-                        timed_out = False
-                        break
-                    except subprocess.TimeoutExpired:
-                        pending_input = None
-                        now = time.monotonic()
-                        if deadline is not None and now >= deadline:
-                            raise
-                        if progress_callback is not None:
-                            progress_callback(
-                                {"runtime_ms": int((now - start) * 1000)}
-                            )
+                stdout, stderr = proc.communicate(input=input, timeout=timeout)
+                returncode = proc.returncode
+                timed_out = False
             except subprocess.TimeoutExpired:
                 # 真杀进程树 (子 + 孙都杀)
                 _kill_process_tree(proc, timeout=5.0)

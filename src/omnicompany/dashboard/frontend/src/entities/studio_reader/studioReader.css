@@ -1,0 +1,129 @@
+/* ============================================================
+   studio_reader 阅读视图 · 蓝图 G 页面形态(2026-07-19 阶段四第四波;
+   合同=TRIFORM-UX-REDESIGN-V2/demo/MAPPING.md;demo 未覆盖本页,按 MAPPING 推导)。
+   左栏=chrome/scene 区铺格纸(空心描边栏题/视图 seg/分区头 mono 大写+⊢N⊣);
+   材料行=整行可点纸面(类型 icon + 标题 + 版本收拢 pill/▾ + 状态);行文字面平滑禁纹理。
+   ============================================================ */
+
+/* 左栏壳(chrome 区:格纸;替代旧玻璃 rail) */
+.sr-rail { background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */
+  border-right: 1px solid var(--fp-border-subtle); }
+
+/* 栏题(空心描边节区标题,G.2:字本身是栏名信息,chrome 区) */
+.sr-brand { color: transparent; -webkit-text-stroke: 1px rgba(235,245,255,.68);
+  font-family: var(--fp-font-mono); font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 视图双段(材料/轨迹):v2-seg 撑满,段均分 */
+.sr-viewseg { display: flex; width: 100%; }
+.sr-viewseg .seg-i { flex: 1; justify-content: center; }
+
+/* 内容运营主体层级: project → subject → revision → stage。真值来自 Material 正式字段。
+   默认只露当前档案路径；其它视频和历史版本进入树状描图纸弹层，禁止横向平铺。 */
+.sr-scope { flex: none; padding: 10px 12px 11px; border-bottom: 1px solid var(--fp-border-subtle);
+  background: color-mix(in srgb, var(--fp-surface) 48%, transparent); }
+.sr-locator-menu, .sr-locator-menu > span { display: flex!important; width: 100%; min-width: 0; }
+.sr-locator { display: grid; grid-template-columns: 42px minmax(0, 1fr) 16px; align-items: center; gap: 10px;
+  width: 100%; min-width: 0; min-height: 52px; padding: 7px 9px; cursor: pointer; text-align: left;
+  color: var(--fp-text); border: 1px solid var(--fp-border-strong); border-radius: 2px;
+  background: var(--fp-bp-hatch), color-mix(in srgb, var(--fp-surface) 70%, transparent); }
+.sr-locator:hover { border-color: var(--fp-bp-brass-hi); background: var(--fp-bp-hatch), var(--fp-bg-overlay); }
+.sr-locator-mark { width: 38px; height: 34px; display: grid; place-items: center; border: 1px solid var(--fp-bp-brass);
+  color: var(--fp-bp-brass-hi); font: 700 12px var(--fp-font-mono); letter-spacing: .04em;
+  background: color-mix(in srgb, var(--fp-bp-brass) 10%, transparent); }
+.sr-locator-copy { display: grid; min-width: 0; gap: 3px; }
+.sr-locator-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; }
+.sr-locator-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--fp-text-3); font: 11px var(--fp-font-mono); }
+.sr-locator > svg { color: var(--fp-text-3); transition: transform .16s ease; }
+.sr-locator[aria-expanded="true"] > svg { transform: rotate(180deg); color: var(--fp-bp-brass-hi); }
+
+.sr-archive-tree { min-width: 0; max-height: min(62vh, 540px); overflow: auto; padding: 2px; }
+.sr-archive-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px 8px;
+  border-bottom: 1px solid var(--fp-border); color: var(--fp-text-3); font: 11px var(--fp-font-mono);
+  letter-spacing: .12em; text-transform: uppercase; }
+.sr-archive-node { position: relative; padding-top: 3px; }
+.sr-archive-subject { display: grid; grid-template-columns: 14px 42px minmax(0, 1fr) 14px; gap: 7px; align-items: center;
+  width: 100%; padding: 8px 7px; border: 0; border-left: 2px solid transparent; background: transparent;
+  color: var(--fp-text-2); text-align: left; cursor: pointer; }
+.sr-archive-subject:hover { background: var(--fp-bp-paper-2); color: var(--fp-text); }
+.sr-archive-subject[aria-current="true"] { border-left-color: var(--fp-bp-brass-hi); color: var(--fp-text);
+  background: var(--fp-bp-hatch), color-mix(in srgb, var(--fp-bp-brass) 8%, transparent); }
+.sr-tree-elbow { color: var(--fp-border-strong); font: 12px var(--fp-font-mono); }
+.sr-archive-id { color: var(--fp-bp-brass-hi); font: 700 11px var(--fp-font-mono); }
+.sr-archive-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.sr-archive-arrow { color: var(--fp-text-3); }
+.sr-archive-subject[aria-current="true"] .sr-archive-arrow { transform: rotate(90deg); }
+.sr-archive-revisions { margin: 2px 7px 5px 31px; padding-left: 12px; border-left: 1px dashed var(--fp-border); }
+.sr-archive-revision { position: relative; display: grid; grid-template-columns: 12px 36px minmax(0, 1fr) auto;
+  gap: 6px; align-items: center; width: 100%; min-height: 30px; padding: 4px 6px; border: 0;
+  background: transparent; color: var(--fp-text-3); text-align: left; cursor: pointer; }
+.sr-archive-revision:hover { color: var(--fp-text); background: var(--fp-bg-overlay); }
+.sr-archive-revision[aria-checked="true"] { color: var(--fp-text); }
+.sr-rev-node { width: 7px; height: 7px; border: 1px solid var(--fp-border-strong); background: var(--fp-bg); transform: rotate(45deg); }
+.sr-archive-revision[aria-checked="true"] .sr-rev-node { border-color: var(--fp-bp-brass-hi); background: var(--fp-bp-brass-hi); }
+.sr-archive-revision strong { color: var(--fp-bp-brass-hi); font: 700 11px var(--fp-font-mono); }
+.sr-archive-revision span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.sr-archive-revision small { color: var(--fp-text-3); font: 10px var(--fp-font-mono); }
+.sr-archive-history { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 29px; padding: 4px 7px;
+  border: 0; border-top: 1px dashed var(--fp-border); background: transparent; color: var(--fp-text-3);
+  font: 10.5px var(--fp-font-mono); cursor: pointer; }
+.sr-archive-history:hover { color: var(--fp-text); background: var(--fp-bg-overlay); }
+.sr-archive-history svg:last-child { margin-left: auto; transition: transform .16s ease; }
+.sr-archive-history[aria-expanded="true"] svg:last-child { transform: rotate(180deg); color: var(--fp-bp-brass-hi); }
+
+/* 分区头(mono 大写 + 域层级序号黄铜片 + ⊢N⊣ 计数 + 细分隔线) */
+.sr-sechead { display: flex; align-items: center; gap: 7px; padding: 6px 8px 4px;
+  font-family: var(--fp-font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--fp-text-3); }
+.sr-sechead .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-sechead .seq { width: 17px; height: 17px; border-radius: 2px; flex: none; display: inline-grid; place-items: center;
+  font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--fp-bp-brass-hi); border: 1px solid var(--fp-bp-brass); box-sizing: border-box; }
+.sr-sechead .bp-dim { color: var(--fp-bp-brass-hi); flex: none; }
+.sr-sechead .ln { flex: 1; height: 1px; background: rgba(235,245,255,.22); min-width: 10px; }
+.sr-laneempty { padding: 4px 9px 6px; font-size: 12px; color: var(--fp-text-3); font-style: italic; }
+
+/* 材料/入口行(整行可点;选中=剖面 hatch + 强描边,非色块) */
+.sr-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 9px; margin: 1px 0; border-radius: 2px; cursor: pointer; position: relative;
+  border: 1px solid transparent; background: transparent; color: inherit; font: inherit; box-sizing: border-box; }
+.sr-row:hover { background: var(--fp-bg-overlay); }
+.sr-row:active { transform: scale(.995); }
+.sr-row[aria-current="true"] { background: var(--fp-bp-hatch), var(--fp-accent-weak);
+  box-shadow: inset 0 0 0 1px var(--fp-border-strong); }
+.sr-row .t { flex: 1; min-width: 0; font-size: 13px; color: var(--fp-text); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+.sr-row .ic { flex: none; display: inline-flex; align-items: center; }
+.sr-row .st { flex: none; width: 15px; height: 15px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* 版本 pill(单选 button;选中=hatch + 实线;>3 收拢为「vN ▾」弹层,弹层壳在 TraceMenu) */
+.sr-ver { display: inline-flex; gap: 3px; flex: none; align-items: center; }
+.sr-verpill, .sr-vermore { font-family: var(--fp-font-mono); font-size: 12px; padding: 0 7px; height: 20px; line-height: 18px;
+  border-radius: 2px; background: transparent; border: 1px dashed var(--fp-border-subtle); color: var(--fp-text-3);
+  font-variant-numeric: tabular-nums; cursor: pointer; box-sizing: border-box; }
+.sr-verpill:hover, .sr-vermore:hover { color: var(--fp-text); border-color: var(--fp-border); }
+.sr-verpill[aria-checked="true"] { color: var(--fp-text); border-style: solid; border-color: var(--fp-border-strong);
+  background: var(--fp-bp-hatch), var(--fp-surface); }
+.sr-ver .sr-vermore { color: var(--fp-bp-brass-hi); }
+
+/* 历史版本开关(虚线件;mono) */
+.sr-hist { display: inline-flex; align-items: center; gap: 3px; flex: none;
+  font-family: var(--fp-font-mono); font-size: 12px; padding: 0 6px; height: 20px; line-height: 18px;
+  border-radius: 2px; color: var(--fp-text-3); background: transparent; border: 1px dashed var(--fp-border);
+  cursor: pointer; font-variant-numeric: tabular-nums; box-sizing: border-box; }
+.sr-hist:hover { color: var(--fp-text); }
+.sr-hist[aria-expanded="true"] { color: var(--fp-text); border-style: solid; border-color: var(--fp-border-strong); }
+
+/* 域层级降级横条(warn 虚线注意件) */
+.sr-fallback { margin: 4px 4px 2px; padding: 7px 10px; border-radius: 2px; font-size: 12px; line-height: 1.5;
+  color: var(--fp-text-2); background: transparent; border: 1px dashed color-mix(in srgb, var(--fp-warn) 45%, transparent); }
+
+/* 决策过程面板(主区): 分节头 mono 大写;卡=厚框纸件 */
+.sr-dec-sechead { display: flex; align-items: center; gap: 8px; margin: 18px 0 12px;
+  font-family: var(--fp-font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--fp-text-3); }
+.sr-dec-sechead .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.sr-decblock { background: var(--fp-surface); border: var(--fp-bp-frame-w) solid var(--fp-border);
+  border-left: 3px solid var(--fp-accent-2); border-radius: 2px; box-shadow: var(--fp-shadow-sm);
+  padding: 14px 16px; margin-bottom: 12px; }

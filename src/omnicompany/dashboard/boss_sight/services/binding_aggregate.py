@@ -41,18 +41,13 @@ def _compact(r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _bucket(residents: list[dict[str, Any]], keyfn: Callable[[dict[str, Any]], Any],
-            *, casefold: bool = False) -> dict[str, dict[str, Any]]:
-    """按 keyfn 分桶。casefold=True 时把只差大小写的键并成一桶(首见拼写作显示),
-    治项目名 Omnicompany/omnicompany 碎片化。"""
+def _bucket(residents: list[dict[str, Any]], keyfn: Callable[[dict[str, Any]], Any]) -> dict[str, dict[str, Any]]:
     groups: dict[str, dict[str, Any]] = {}
-    canon: dict[str, str] = {}  # casefold -> 首见显示键
     for r in residents:
         raw = keyfn(r)
         if raw is None or raw == "":
             continue
-        s = str(raw)
-        k = canon.setdefault(s.casefold(), s) if casefold else s
+        k = str(raw)
         g = groups.setdefault(k, {"key": k, "active": 0, "total": 0, "sessions": []})
         g["total"] += 1
         if _is_active(r):
@@ -72,7 +67,7 @@ def aggregate(*, build: Callable[[], dict[str, Any]] | None = None) -> dict[str,
     residents = [r for r in payload.get("residents", []) if not r.get("is_controller")]
 
     by_plan = _bucket(residents, lambda r: r.get("active_plan"))
-    by_project = _bucket(residents, lambda r: r.get("project"), casefold=True)
+    by_project = _bucket(residents, lambda r: r.get("project"))
     by_task = _bucket(residents, lambda r: r.get("task_id"))
     total_active = sum(1 for r in residents if _is_active(r))
 

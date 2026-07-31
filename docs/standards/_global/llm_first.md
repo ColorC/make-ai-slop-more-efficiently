@@ -75,60 +75,6 @@ LLM 调用层的设施缺位常被绕开成 band-aid. 下面 4 条都是反模�
 
 **正修**: 把 LLM 工作做进 J 管线的 team yaml (例 file_scanner → MaterialIdAgent → header_patcher → report_aggregator), 走 `omni run mass_materialization_pipeline`.
 
-#### 标准入口与文件产物闭环（2026-07-14 加固）
-
-业务 LLM 工作先使用 Atlas 的 `llm-workflow` Skill 选型，再进入下面的唯一设施：
-
-| 任务 | 唯一入口 | 产物处理 |
-|---|---|---|
-| 单次、固定 schema 的判断 | 注册 Team/Worker 内的 `runtime/llm/structured.py::call_json` | 原生 tool/structured output；不得用 prompt 模拟 JSON |
-| 批量、可续跑的判断 | 注册 Team/Worker 内的 `runtime/llm/batch.py` | 由 batch 设施负责并发、失败隔离和续跑 |
-| 需要读资料、写文件、执行命令、反复修订 | 统一 `AgentNodeLoop` / `ConfigurableAgent`，或受审计的 `omni worker run` | Agent 直接写目标文件并在同一会话内完成 lint 修复闭环 |
-
-禁止在 `docs/`、`scripts/`、`.omni/sandbox/` 或仓根新建临时 Python 包装器来调用 `LLMClient`、`call_json`、batch 或 agent 启动器。实验也必须进入沙盒 Team/Worker/Agent；如果工作会再次运行，就注册为可 `omni run` 的 Team。
-
-文件型任务的完成协议固定为：
-
-1. Agent 读取真源和允许写入边界。
-2. Agent 直接创建或修改目标文件。
-3. Agent 用 Bash 运行任务声明的 lint / test 命令。
-4. lint 失败时，错误输出回到**当前 Agent 会话**；Agent 修改同一批文件后再次运行 lint。
-5. 只有 lint 通过，Agent 才能调用 finish 或结束外部 worker。
-
-外层编排不得把 lint 失败转换成一次全新的 LLM 调用，也不得重新生成整份产物。结构化工具只约束参数形状；字段值、正文完整性和文件语义仍由 lint/test 与同会话修订负责。
-
-#### 生产级中文唯一作者（2026-07-17 加固）
-
-任何会被外部用户看到或作为正式产品资产交付的中文文字，统一遵守 `config/publication_common/production-copy-authorship.md`。个人网站、小红书、游戏文本、产品界面、运营文案和对外报告的中文成文只交给本次显式选定且已登记的 writer model；ChatGPT/Codex、Claude Opus/Fable 及其他未被选为作者的 Agent 只允许建立中立静态材料目录、定位证据、做事实核验或实现非文字视觉与代码。
-
-禁止让其他模型先写母稿、事实稿、内容 brief、提纲、标题、建议句或图卡文字，再交给成文作者润色。成文作者应从目的、规范和静态材料目录独立回源、组织与成文。语义返修继续原作者会话；检查者只提交问题位置与一手证据，不提供替换句。
-
-#### Agent 执行时限与重复熔断
-
-- 30/60 秒可作为前台观测周期，不是所有命令或 LLM 调用的硬上限。长任务转为后台作业并用事件流、日志或健康探针暴露进度；聊天轮次在确认首个心跳后即可返回。
-- 流式 LLM 默认不设累计执行时长上限。reasoning、text、tool args 或协议事件仍在正常增长就允许继续，禁止为满足固定秒数而机械拆文件或重启会话。
-- 只有出现连接断开、进程退出、状态文件失效、连续无返回或计数长时间完全不变等可观测异常，才进入超时处置。真实超时后杀掉进程树、写入 `agent.tool_timeout` 并结束当前路径；禁止原样重试。
-- 同一 Agent 会话内，工具名与原生参数完全相同的调用若已经失败，下一次在 dispatch 前拒绝，并写入 `agent.tool_repeat_blocked`。
-- Agent Bash 只能执行本节点声明的确定性命令。审阅 Agent、下游 Team 和其他 `omni run` 管线由外层注册工作流直接调用，禁止在 Bash 中套娃启动。
-- 每次 Agent 结束时，Verdict 与 `agent.loop.finish` 必须包含 wall time、turn 数、工具调用数、错误数、超时数与重复拦截数。发现异常耗时后先修公共设施，再继续业务重跑。
-
-#### Shell 方言、路径与编码硬门
-
-- 每个 Shell 工具必须声明 `bash` 或 `powershell` 方言；不得把 Bash 的花括号展开、heredoc、`&&`、`mkdir -p`、`rm -rf` 发送到 Windows PowerShell，也不得把 PowerShell cmdlet 或 `$env:` 发送到 Bash。
-- Agent Shell 禁止 `head`、`find`、自由 `rg` 和递归 `ls/Get-ChildItem`（含管道后的调用）；文件发现、内容检索和分段读取分别走受约束的 Glob、Grep、Read，并声明精确根与排除目录，避免 stdin 等待、Windows 遗留子进程和 `.tmp/data` 级噪声爆炸。
-- Agent Shell 禁止创建目录和写文本：`mkdir`、`New-Item`、重定向、`tee`、`sed -i`、`Set-Content`、`Add-Content`、`Out-File` 都必须改走声明精确目标路径的 Write/Edit 设施。父目录不存在时停止，不得猜路径后顺手创建。
-- Windows PowerShell 与其子进程必须显式设置 UTF-8，Python 子进程必须设置 `PYTHONUTF8=1` 与 `PYTHONIOENCODING=utf-8`。输出或写后读回出现 Unicode replacement character 时，本次证据无效并立即停止。
-- 复杂 PowerShell 在真实执行前必须通过同方言解析或最小只读 dry-run；不得把 Bash/CMD 中可用的拼接格式当作 PowerShell 已验证格式。
-
-#### Agent 可观测性缺口零容忍
-
-- 每个 `AgentNodeLoop` 在开始读取资料或调用模型前，必须先落盘一份独立于 EventBus 的运行状态，至少包含 PID、父 PID、trace id、Agent 名、当前阶段、启动时间和最近心跳。
-- 等待模型首包也必须持续刷新 `llm_waiting` 心跳；收到流式事件后记录 `llm_streaming`。不能把“模型尚未返回内容”当成不可观测的理由。
-- 状态文件无法创建、更新失败、监督端发现心跳停止，均视为可观测性缺口。立即终止整个进程树，不继续盲等，也不并发启动第二个写入者。
-- 重启前先修复观测通道；确认旧进程树消失后，从目标工作区最新的已落盘文件续跑。重启不等于从头生成，也不抹掉同一任务已有证据。
-- stdout、stderr、EventBus、状态文件是互相独立的证据面。任一单独缺失不应制造黑箱；状态文件是进程监督的最低强制契约，EventBus 继续承担语义审计。
-- Windows 上监督端读取状态文件可能与原子替换发生短暂共享冲突；写端只允许做有上限的毫秒级替换重试。持续失败仍按可观测性缺口终止，不能无限重试。
-
 ### 反模式 E · finish() + 文本 JSON + 手解析 (json.loads / regex / markdown fence)
 
 **最容易撞**. agent 输出需要结构化消费 (例 `{entries: [...], by_kind: {...}}`) 时:
@@ -141,7 +87,7 @@ LLM 调用层的设施缺位常被绕开成 band-aid. 下面 4 条都是反模�
 
 **手解必失败**: LLM 偶尔输出 narrative + JSON / 单引号 / unescaped 特殊字符, regex 接不住. function call 走 API schema 强校验, 不可能撞这些.
 
-**正修参考**: [`design_validator.py`](../../../src/omnicompany/packages/services/_core/team_builder/workers/design_validator.py) `SubmitDesignReportRouter` + `_DesignValidatorExtractResult`. 跟 [`material_id_agent.py`](../../../src/omnicompany/packages/services/_authoring/mass_materialization/agents/material_id_agent.py) `SubmitMaterialIdProposalsRouter` 同模式.
+**正修参考**: [`design_validator.py`](../../../src/omnicompany/packages/services/_core/team_builder/workers/design_validator.py) `SubmitDesignReportRouter` + `_DesignValidatorExtractResult`. 跟 `material_id_agent.py` `SubmitMaterialIdProposalsRouter` 同模式.
 
 **实施清单**:
 1. 立 `SubmitXxxRouter(SingleToolRouter)`, 含 `TOOL_NAME / DESCRIPTION / INPUT_SCHEMA`
@@ -297,10 +243,10 @@ LLM 调用层的设施缺位常被绕开成 band-aid. 下面 4 条都是反模�
 
 ### 规则
 
-**默认长任务 Agent 不使用固定轮数作为结束条件**。
+**默认 LLM 调用/agent loop 轮数预算必须宽松到"触发即明确是 bug"**。
 
 参考基线：
-- 需要写文件、lint 和同会话修订的 agent loop 默认 `max_turns=None`
+- agent loop max_turns 默认 **1000 轮**（不是 30/50/80）
 - LLM 调用重试 默认 **充分**（不是 5 次）
 - pipeline max_steps 默认 **1000 步**（不是 50）
 
@@ -317,7 +263,7 @@ max_steps: int = 50  # 担心管线循环
 ### 正确默认
 
 ```python
-max_turns: int | None = None  # 由完成协议和可观测异常结束
+max_turns: int = 1000     # 触发 = bug，而非任务需求
 max_steps: int = 1000
 _RETRY_MAX_ATTEMPTS = 10  # 除非明确是 pathological case
 ```
@@ -327,7 +273,6 @@ _RETRY_MAX_ATTEMPTS = 10  # 除非明确是 pathological case
 ### 真实案例
 
 - `agent_node_loop.py` `max_turns=80` / `max_turns=30` — hermes-agent 学习任务在第 77 轮强制终止，下游 LearningExtractor 收到不完整 trace
-- `xiaohongshu.author` `max_turns=24` — 正文、内容块和视觉源已经修改，但未来得及重跑 lint 就被伪装成完成态
 - `spec_parser.py` 暗含 LLM 产出 ≤10 条 hardcap — LLM 想产 20 条也不行
 
 ### 判断启发

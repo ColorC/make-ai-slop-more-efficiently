@@ -41,7 +41,7 @@ ItemStartedEvent / ItemUpdatedEvent 当前 MVP 不映射 — 等 ItemCompletedEv
 - 本地装: codex CLI (`npm i -g @openai/codex` 或 SDK 自带 install)
 - 认证: codex 走 OpenAI 账号登录 (codex login), 跟 claude binary 走订阅认证类似
 - ProviderOptions 扩展 (TypedDict extras):
-  - `codex_path`: codex CLI 绝对路径, 默认 shutil.which("codex")
+  - `codex_path`: codex CLI 绝对路径, 默认 'C:/Users/user/AppData/Roaming/npm/codex.cmd'
 """
 
 from __future__ import annotations
@@ -50,7 +50,6 @@ import asyncio
 import json
 import logging
 import os
-import shutil
 import subprocess
 from types import SimpleNamespace
 from typing import Any, AsyncIterator
@@ -62,7 +61,7 @@ from .base import BaseProvider, ProviderOptions
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_CODEX_PATH = shutil.which("codex") or shutil.which("codex.cmd") or "codex"
+DEFAULT_CODEX_PATH = "C:/Users/user/AppData/Roaming/npm/codex.cmd"
 
 
 def _env_float(name: str, default: float) -> float:

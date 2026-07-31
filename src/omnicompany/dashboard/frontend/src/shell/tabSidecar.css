@@ -1,0 +1,93 @@
+.tab-sidecar-layout {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tab-sidecar-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tab-sidecar-aside {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--fp-border);
+  background: var(--fp-bg);
+}
+
+.tab-sidecar-resize {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  width: 10px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.tab-sidecar-resize:hover::after,
+.tab-sidecar-resize:focus-visible::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  background: var(--fp-accent-2);
+}
+
+.tab-sidecar-toggle {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-r1);
+  background: transparent;
+  color: var(--fp-text-2);
+  cursor: pointer;
+  transition:
+    color var(--fp-t-fast),
+    border-color var(--fp-t-fast),
+    background var(--fp-t-fast);
+}
+
+.tab-sidecar-toggle:hover,
+.tab-sidecar-toggle:focus-visible {
+  color: var(--fp-text);
+  border-color: var(--fp-border-strong);
+  background: var(--fp-bp-panel-hover);
+  outline: none;
+}
+
+.tab-sidecar-scrim {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  border: 0;
+  background: rgba(4, 12, 28, .48);
+  cursor: default;
+}
+
+.tab-sidecar-layout[data-sidecar-drawer="1"] .tab-sidecar-aside {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  box-shadow: var(--fp-shadow-pop);
+}

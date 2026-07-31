@@ -48,8 +48,8 @@ def _infer_package(py_file: Path, source_root: Path) -> str:
 
     示例：
       source_root = src/omnicompany
-      py_file = src/omnicompany/packages/domains/example_domain/example_team/workers/schema_assembler.py
-      → "example_domain.example_team"
+      py_file = src/omnicompany/packages/domains/demogame/team_table/workers/schema_assembler.py
+      → "demogame.team_table"
 
     过滤规则：
       - 去掉架构基础目录（packages/domains/services/protocol/runtime）

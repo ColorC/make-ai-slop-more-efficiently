@@ -1,0 +1,30 @@
+{
+  "schema": "game-observatory.ai-player.sanguo-daily-duty-candidate.v1",
+  "candidate_id": "sanguo.20260720.reachable-business.campaign.v1",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "continuity_run_id": "sanguo-daily-continuity.pure-ai-campaign.20260720",
+  "duty": "reachable_business_progress",
+  "session_ids": [
+    "external-session.sanguo.terra.live96.20260720"
+  ],
+  "task_ids": [
+    "task.sanguo.day1.main-force-and-military-stage-seven.20260720"
+  ],
+  "evidence_refs": [
+    {
+      "artifact_ids": [
+        "art.device.1784497116550.92f5c09f",
+        "art.probe-terminal.1784497123753.98491e25"
+      ],
+      "evidence_run_ids": [
+        "evidence.run.d5e54a7f31c848208ec2b8d2b8b807f1"
+      ],
+      "evidence_step_ids": [
+        "evidence.step.b71cca296d8546abb2b51fe5af27b60f"
+      ]
+    }
+  ],
+  "summary": "当天已从城建链路切换到征战玩法并进入军演关卡图，确认下一段可达业务需要先解决主队兵力。已建立带动作预算和退出条件的主队成长任务，后续会在成长后返回军演继续挑战。",
+  "actor": "ai-player-supervisor",
+  "reason": "把当天可达业务的实机结果和下一步成长动作绑定到同一条可审计任务链。"
+}

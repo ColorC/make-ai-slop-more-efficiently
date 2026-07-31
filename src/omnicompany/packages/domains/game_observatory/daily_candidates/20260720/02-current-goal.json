@@ -1,0 +1,30 @@
+{
+  "schema": "game-observatory.ai-player.sanguo-daily-duty-candidate.v1",
+  "candidate_id": "sanguo.20260720.current-goal.residence-eight.v1",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "continuity_run_id": "sanguo-daily-continuity.pure-ai-campaign.20260720",
+  "duty": "current_goal_update",
+  "session_ids": [
+    "external-session.sanguo.terra.live96.20260720"
+  ],
+  "task_ids": [
+    "task.sanguo.day1.ruler-hall-six-and-residence-eight.20260720"
+  ],
+  "evidence_refs": [
+    {
+      "artifact_ids": [
+        "art.device.1784496943470.3d942aca",
+        "art.probe-terminal.1784496945943.45e0e546"
+      ],
+      "evidence_run_ids": [
+        "evidence.run.5a049c1e0477425686b54f758cb31f6f"
+      ],
+      "evidence_step_ids": [
+        "evidence.step.1c73ba9678cb4db69ca7e72fe9a32f86"
+      ]
+    }
+  ],
+  "summary": "民居当前为7级，升至8级会把繁荣度由140提高到180、每小时铜币产量由2100提高到2400；三类资源均已满足，界面显示的未满足前置为君王殿6级。当前目标已更新为先提升君王殿，再返回验证民居8级。",
+  "actor": "ai-player-supervisor",
+  "reason": "依据当天民居升级条件原图，把宽泛成长目标收敛为可执行并带退出条件的任务。"
+}

@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:team_builder.workers.scale_evaluator.agent_loop.py"
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """ScaleAssessorWorker — Phase 2 · AgentNodeLoop (2026-04-23).
 
 Worker 协议 (composite fan-in and):
@@ -58,7 +57,7 @@ _SYSTEM_PROMPT = """你是 team_builder 第 2 阶段 · ScaleAssessor agent.
 
 **若落 large**: 必须判拆分维度
 - by_capability: 能力边界明确 (分析 / 生成 / 验证)
-- by_domain: 业务子领域明确 (research / decisions)
+- by_domain: 业务子领域明确 (demogame / voxelcraft)
 - by_phase: 阶段明确 (ingest / process / output)
 
 ## 产出 (finish 的 result 字段应为 JSON 字符串)

@@ -73,15 +73,6 @@ async def lifespan(app: FastAPI):
     lifecycle.write_pid(pid)
     lifecycle.write_port(port)
     lifecycle.install_atexit_hook()
-    # P0 性能批 (2026-07): 事件落库改批量 — emit_event 原实现每条事件新建连接+
-    # insert+commit, 每条聊天消息 ≥2 次, 同步 sqlite IO 堵事件循环。启用后 push 进
-    # 队列, 后台线程 ~100ms/50 条批量 executemany (hooks/_shared.py, atexit 兜底 flush)。
-    # hooks 子进程不经过这里, 保持同步直写不变。
-    try:
-        from .hooks._shared import enable_batched_events
-        enable_batched_events()
-    except Exception:  # noqa: BLE001
-        logger.exception("ccdaemon: enable_batched_events failed (事件落库退回同步直写)")
     started_at = time.time()
     app.state.started_at = started_at
     app.state.daemon_pid = pid
@@ -179,17 +170,6 @@ async def lifespan(app: FastAPI):
             try:
                 from ..boss_sight.material_registry import build_material_registry
                 build_material_registry(limit=1)
-            except Exception:  # noqa: BLE001
-                pass
-            # 顺手把首屏三大慢扫描端点的快照建好(routes._snapshot_cached 首建即入缓存):
-            # 否则 daemon 冷启后第一个访问者要现付全套冷扫(实测可达 20s+)。
-            try:
-                from ..boss_sight import routes as _bs_routes
-                _bs_routes._snapshot_cached("plans", 15.0, _bs_routes._list_plans_sync)
-                _bs_routes._snapshot_cached("briefing", 15.0, _bs_routes._get_briefing_sync)
-                _bs_routes._snapshot_cached(
-                    "workflow-summary:40", 15.0, lambda: _bs_routes._get_workflow_summary_sync(40)
-                )
             except Exception:  # noqa: BLE001
                 pass
 

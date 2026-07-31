@@ -53,14 +53,17 @@ _SYSTEM_DENYLIST_PREFIXES = (
 # 允许的工作区前缀 (大小写不敏感). 超出范围即视为"非目标路径".
 #
 # 工作区顶层 = omni 仓根的父目录 (开发机 = e:\windowsworkspace), 由权威解析器
-# 派生而非写死. 额外的机器级工作区通过
+# 派生而非写死. 额外的机器级工作区 (P4 工作区 / Users / Unix tmp) 通过
 # 环境变量 OMNI_ALLOWED_WORKSPACE_PREFIXES (os.pathsep 分隔) 外置覆盖;
-# 未配置时沿用通用默认.
+# 未配置时沿用开发机默认, 保证本机行为不变.
 def _default_allowed_workspace_prefixes() -> tuple[str, ...]:
     prefixes: list[str] = [str(omni_workspace_root().parent)]
     env = os.environ.get("OMNI_ALLOWED_WORKSPACE_PREFIXES", "")
     if env:
         prefixes.extend(p for p in env.split(os.pathsep) if p)
+    else:
+        # 开发机兜底 (可被上面的 env 覆盖)
+        prefixes.extend(["d:\\p4", "c:\\users"])
     # Unix-like tmp (跨平台始终允许)
     prefixes.extend(["/tmp", "/var/tmp", "/home"])
     return tuple(prefixes)

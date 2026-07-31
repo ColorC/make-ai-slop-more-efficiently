@@ -51,7 +51,7 @@ _验证来源: [code] `src/omnicompany/core/dispatch.py::dispatch`（registry �
 每条注册的管线由一个 `PipelineEntry` 描述：
 ```python
 PipelineEntry(
-    name="trace-induction",  # CLI 名 / dispatch key
+    name="absorption-module-driven",  # CLI 名 / dispatch key
     description="...",
     domain="absorption",           # data/ 路径分隔用
     build_pipeline=lambda: ...,    # () → PipelineSpec

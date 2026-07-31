@@ -1,0 +1,15 @@
+{
+  "schema": "game-observatory.holdout-status.v1",
+  "fixture_id": "gate3-afk-rowan-affinity-tabs-holdout-v1",
+  "first_inference_run": "run-01/result.json",
+  "first_score": "scores/run-01-score.json",
+  "first_result": {
+    "expected_count": 3,
+    "matched_count": 2,
+    "expected_recall": 0.6666666666666666,
+    "missing_expected_ids": ["rowan-affinity-tab-rumor"]
+  },
+  "status": "consumed-failed-holdout-now-development-regression",
+  "reason": "The missed middle tab exposed a missing aligned-text navigation pattern. Any implementation changed after this result may only use this fixture as a regression case; it cannot be reported as a fresh holdout victory.",
+  "next_requirement": "Freeze a different screenshot and manual baseline before the next generalization claim."
+}

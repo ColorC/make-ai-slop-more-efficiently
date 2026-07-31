@@ -1,0 +1,58 @@
+{
+  "domain": "game-observatory-afk-attributes-scroll",
+  "goal": "在完整截图和 A/B 同时已知的既有路线事实中，复核英雄属性列表，并提交唯一一条已验证的向下滑动建议。只观察并记账，不操作设备，不扩展既有结果含义。",
+  "max_iterations": 1,
+  "scene": {
+    "mode": "shadow",
+    "kind": "game-ui-exploration",
+    "benchmark_run_id": "pair.gate3.attributes-scroll.hypothesis.holdout.equal-input.self-crop.06",
+    "fixture_id": "gate3-afk-rowan-attributes-scroll-holdout-v1",
+    "allowed_output_root": "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\benchmarks\\gate3\\hypothesis-paired-attributes-scroll-holdout-v1\\hypothesis-run-06",
+    "suggestion_ledger": "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\benchmarks\\gate3\\hypothesis-paired-attributes-scroll-holdout-v1\\hypothesis-run-06\\suggestions.jsonl",
+    "allowed_image_roots": [
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\artifacts",
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\benchmarks\\gate3\\hypothesis-paired-attributes-scroll-holdout-v1"
+    ],
+    "allowed_action_types": ["swipe"],
+    "forbidden_target_terms": ["购买", "支付", "删除", "账号"],
+    "max_suggestions": 1,
+    "coordinate_space": "source_pixels",
+    "prior_fact_contract_mode": "exact",
+    "require_region_inspection": true,
+    "grounding_image_paths": [
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\benchmarks\\gate3\\hypothesis-paired-attributes-scroll-holdout-v1\\source-coordinate-bands.png"
+    ],
+    "required_grounding_image_paths": [
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\artifacts\\art.device.1783965421613.9181407f.png",
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\benchmarks\\gate3\\hypothesis-paired-attributes-scroll-holdout-v1\\source-coordinate-bands.png"
+    ],
+    "coordinate_reference_layout": {
+      "layout": "source_bands_2_columns",
+      "source_width": 1080,
+      "source_height": 1920,
+      "coordinate_origin": "source_image_top_left"
+    },
+    "prior_verified_targets": [
+      {
+        "id": "fact.route.02-scroll-attributes-down",
+        "target_name": "英雄属性列表",
+        "action_type": "swipe",
+        "action": {
+          "x": 760,
+          "y": 1640,
+          "x2": 760,
+          "y2": 880,
+          "duration_ms": 600
+        },
+        "observed_change": "属性列表向下滚动并显示更下方属性条目",
+        "evidence_ids": ["evidence.step.cf890d262045405db24777777d0ad88b"]
+      }
+    ],
+    "observation": {
+      "artifact_id": "art.device.1783965421613.9181407f",
+      "frame_path": "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\artifacts\\art.device.1783965421613.9181407f.png",
+      "sha256": "9f8d17655221bc796b06c54b3b52ccc664bab0ee80e5e8790b23a1243622c1eb",
+      "viewport": {"width": 1080, "height": 1920}
+    }
+  }
+}

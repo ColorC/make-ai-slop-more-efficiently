@@ -5,7 +5,7 @@
 # [OMNI] material_id="material:services._core.lifecycle.note_source.py"
 """overlay-note-store 浅路径 **只读** 读取器。
 
-overlay-shell 已把笔记从 AppData 的 IndexedDB 落到浅路径 `<workspace-root>/overlay-note-store/`:
+overlay-shell 已把笔记从 AppData 的 IndexedDB 落到浅路径 `E:/WindowsWorkspace/overlay-note-store/`:
 - `index.json`  —— 笔记清单 (id / title / createDate / updatedDate / ydoc / md)
 - `docs/<id>.md`   —— 人可读正文 (懒导出: 笔记被打开/编辑过才有)
 - `docs/<id>.ydoc` —— Yjs 二进制快照 (完整但需解码, 本读取器不碰)
@@ -38,8 +38,10 @@ def overlay_note_store_dir() -> Path:
             return canonical
         return workspace / "overlay-note-store"
     except Exception:
-        env_root = os.environ.get("OVERLAY_NOTE_STORE_ROOT", "")
-        return Path(env_root) if env_root else Path("overlay-note-store")
+        canonical = Path("E:/WindowsWorkspace/overlay-note-store")
+        if canonical.exists():
+            return canonical
+        return Path("E:/WindowsWorkspace/overlay-note-store")
 
 
 @dataclass

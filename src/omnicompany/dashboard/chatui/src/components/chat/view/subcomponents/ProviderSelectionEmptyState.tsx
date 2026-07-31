@@ -29,7 +29,6 @@ const PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "gemini", name: "Google" },
   { id: "cursor", name: "Cursor" },
   { id: "opencode", name: "OpenCode" },
-  { id: "kimi", name: "Kimi" },
   { id: "omni_agent", name: "Omni Agent" },
   { id: "controller", name: "总控" },
 ];
@@ -53,8 +52,6 @@ type ProviderSelectionEmptyStateProps = {
   setGeminiModel: (model: string) => void;
   opencodeModel: string;
   setOpenCodeModel: (model: string) => void;
-  kimiModel: string;
-  setKimiModel: (model: string) => void;
   omniAgentModel: string;
   setOmniAgentModel: (model: string) => void;
   controllerModel: string;
@@ -88,7 +85,6 @@ function getCurrentModel(
   co: string,
   g: string,
   o: string,
-  k: string,
   oa: string,
   ctrl: string,
 ) {
@@ -96,7 +92,6 @@ function getCurrentModel(
   if (p === "codex") return co;
   if (p === "gemini") return g;
   if (p === "opencode") return o;
-  if (p === "kimi") return k;
   if (p === "omni_agent") return oa;
   if (p === "controller") return ctrl;
   return cu;
@@ -107,7 +102,6 @@ function getProviderDisplayName(p: LLMProvider) {
   if (p === "cursor") return "Cursor";
   if (p === "codex") return "Codex";
   if (p === "opencode") return "OpenCode";
-  if (p === "kimi") return "Kimi";
   if (p === "omni_agent") return "Omni Agent";
   if (p === "controller") return "总控";
   return "Gemini";
@@ -129,8 +123,6 @@ export default function ProviderSelectionEmptyState({
   setGeminiModel,
   opencodeModel,
   setOpenCodeModel,
-  kimiModel,
-  setKimiModel,
   omniAgentModel,
   setOmniAgentModel,
   controllerModel,
@@ -164,7 +156,6 @@ export default function ProviderSelectionEmptyState({
     codexModel,
     geminiModel,
     opencodeModel,
-    kimiModel,
     omniAgentModel,
     controllerModel,
   );
@@ -191,9 +182,6 @@ export default function ProviderSelectionEmptyState({
       } else if (providerId === "opencode") {
         setOpenCodeModel(modelValue);
         localStorage.setItem("opencode-model", modelValue);
-      } else if (providerId === "kimi") {
-        setKimiModel(modelValue);
-        localStorage.setItem("kimi-model", modelValue);
       } else if (providerId === "omni_agent") {
         setOmniAgentModel(modelValue);
         localStorage.setItem("omni_agent-model", modelValue);
@@ -205,7 +193,7 @@ export default function ProviderSelectionEmptyState({
         localStorage.setItem("cursor-model", modelValue);
       }
     },
-    [setClaudeModel, setCursorModel, setCodexModel, setGeminiModel, setOpenCodeModel, setKimiModel, setOmniAgentModel, setControllerModel],
+    [setClaudeModel, setCursorModel, setCodexModel, setGeminiModel, setOpenCodeModel, setOmniAgentModel, setControllerModel],
   );
 
   const handleModelSelect = useCallback(
@@ -354,10 +342,6 @@ export default function ProviderSelectionEmptyState({
                 opencode: t("providerSelection.readyPrompt.opencode", {
                   model: opencodeModel,
                   defaultValue: "Ready with OpenCode {{model}}",
-                }),
-                kimi: t("providerSelection.readyPrompt.kimi", {
-                  model: kimiModel,
-                  defaultValue: "Ready with Kimi {{model}}",
                 }),
                 omni_agent: t("providerSelection.readyPrompt.omni_agent", {
                   model: omniAgentModel,

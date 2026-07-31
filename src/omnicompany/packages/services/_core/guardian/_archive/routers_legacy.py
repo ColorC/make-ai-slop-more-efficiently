@@ -1,6 +1,5 @@
 # [OMNI] origin=omnifactory domain=omnifactory/guardian ts=2026-04-05T17:04:51Z
 # [OMNI] material_id="material:core.guardian.fs_scanner_arch_auditor_health_reporter.routers_legacy.py"
-# OMNI-024 ALLOW: 归档冻结留档(legacy 快照), 仅历史参考不再演进, 迁移无意义(同仓内其它 _archive ALLOW 先例)
 """guardian.routers — 守护检查管线的 Router 实现
 
   FsScannerRouter      (HARD) 扫描文件系统污染，收集事实
@@ -17,7 +16,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from omnicompany.core.config import omni_workspace_root
 from omnifactory.protocol.anchor import Verdict, VerdictKind
 from omnifactory.runtime.agent.agent_loop_config import LoopConfig, CompactConfig, PermissionConfig
 from omnifactory.runtime.agent.agent_loop_tools import ReadFileTool, GrepTool, GlobTool, ListDirTool, ThinkTool
@@ -28,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 # ── 默认配置 ──
 
+_DEFAULT_PROJECT_ROOT = Path("e:/WindowsWorkspace/omnifactory")
+
 # 项目根目录下允许的合法条目
 _ALLOWED_ROOT_ENTRIES = frozenset({
     "src", "scripts", "data", "config", "tests", "docs", "tmp", "venv", ".venv",
@@ -37,7 +37,7 @@ _ALLOWED_ROOT_ENTRIES = frozenset({
 
 # data/ 下允许的顶级子目录
 _ALLOWED_DATA_DIRS = frozenset({
-    "rewrite", "api_msg_data", "internal_data", "debug", "test",
+    "rewrite", "feishu_data", "demogame_data", "debug", "test",
     "autonomous", "sw", "workflow", "predicted_164",
     "_archive_agent_loop", "_archive", "guardian", "equiv",
 })
@@ -76,7 +76,7 @@ class FsScannerRouter(Router):
     FORMAT_OUT = "guardian.fs-report"
 
     def __init__(self, project_root: str | None = None):
-        self._root = Path(project_root) if project_root else omni_workspace_root()
+        self._root = Path(project_root) if project_root else _DEFAULT_PROJECT_ROOT
 
     def run(self, input_data: Any) -> Verdict:
         if isinstance(input_data, dict):
@@ -240,7 +240,7 @@ class ArchAuditorRouter(Router):
         if not isinstance(input_data, dict):
             input_data = {}
 
-        project_root = Path(input_data.get("project_root", str(omni_workspace_root())))
+        project_root = Path(input_data.get("project_root", str(_DEFAULT_PROJECT_ROOT)))
         src_root = project_root / "src" / "omnifactory"
         fs_issues = input_data.get("fs_issues", [])
 

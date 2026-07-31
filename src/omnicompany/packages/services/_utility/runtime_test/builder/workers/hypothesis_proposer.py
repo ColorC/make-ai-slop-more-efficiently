@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=services/runtime_test_builder/workers ts=2026-04-27T00:00:00Z type=worker
 # [OMNI] material_id="material:utility.runtime_test.builder.hypothesis_proposer.agent.py"
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """HypothesisProposerWorker — Worker #2 (AGENT, 真 meta 层 v2 核心创新).
 
 接 target_profile (上游 TargetExplorer 产), 综合 hypothesis_library (4 通用 + 5 模式)

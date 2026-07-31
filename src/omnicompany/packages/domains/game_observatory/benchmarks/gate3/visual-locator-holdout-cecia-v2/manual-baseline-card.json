@@ -1,0 +1,35 @@
+{
+  "schema": "game-observatory.manual-baseline-card.v1",
+  "id": "gate3.visual-locator.holdout.cecia.v2",
+  "frozen_at": "2026-07-14T05:27:25.8571730+08:00",
+  "status": "frozen-before-visual-locator-inference",
+  "purpose": "在另一轮独立录制截图上复核微型字形与配对边缘导航，并检查数值行误候选是否消失",
+  "input": {
+    "fixture": "data/domains/game_observatory/fixtures/gate3-afk-cecia-hero-detail-holdout-v2.json",
+    "artifact_id": "art.device.1783965313821.9cdc4799",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783965313821.9cdc4799.png",
+    "sha256": "5719e92491398b4e706fc432b652f6806a22a4f2593a505c6d67d3f9fc5c7871",
+    "viewport": {"width": 1080, "height": 1920}
+  },
+  "manual_method": {
+    "sources": [
+      "完整原始截图",
+      "evidence.run.860e8b96b2f142f699f9a1177b8f5262",
+      "evidence.step.c5315f138f084111b0c89a27ca517df3",
+      "evidence.step.1ec94d02f24748ad915b7c1c0224e382"
+    ],
+    "expected_interactions": 2,
+    "expected_ids": ["cecia-v2-combat-attributes", "cecia-v2-previous-hero"],
+    "locator_holdout_eligible": true,
+    "hypothesis_cost_comparison_eligible": false
+  },
+  "acceptance": {
+    "required_recall": 1.0,
+    "required_expected_matches": 2,
+    "maximum_missing_targets": 0,
+    "maximum_aligned_text_navigation_candidates": 0,
+    "runtime_errors_allowed": false
+  },
+  "device_actions": false,
+  "fact_publication": false
+}

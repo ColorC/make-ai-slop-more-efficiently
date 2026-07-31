@@ -582,7 +582,7 @@ def cmd_sandbox_archive(keep_drafts: bool) -> None:
 @click.option("--target", default=None,
               help="目标位置 (默认沙盒 drafts/<kind>/<name>/, 设此参数则直接落正式区)")
 @click.option("--domain", default=None,
-              help="业务域 (例如 research / software_engineering), 替换骨架里的 <domain> 占位符")
+              help="业务域 (例如 demogame / voxelcraft), 替换骨架里的 <domain> 占位符")
 @click.option("--no-substitute", is_flag=True,
               help="跳过 OmniMark 头身份注入 (调试用)")
 @click.option("--form", default=None,

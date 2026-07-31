@@ -1,0 +1,117 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-hero-detail-calibration-v1",
+  "benchmark_run_id": "gate3.calibration.hypothesis.06",
+  "adjudicator": "main-agent-independent-visual-review-20260714",
+  "generated_at": "2026-07-14T04:05:00+00:00",
+  "items": [
+    {
+      "probe_id": "shadow.probe.de4ca07c163e4ba6b0aafa32fe70daba",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "左下角白色返回按钮真实存在；点击点 (60,1730) 落在按钮内。返回后的具体页面尚未执行验证。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.9faba835d35f4dc8b278d774c6d1e213",
+      "visible_target_supported": true,
+      "geometry_supported": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "右上角未置顶控件真实存在，但点击点 (915,95) 位于控件左侧；实际控件约从 x=950 开始。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.11bb143d524e484a973ba44ef77e07c7",
+      "visible_target_supported": true,
+      "geometry_supported": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "信赖度入口真实存在，但点击点 (915,285) 位于入口左下方；目标框也未覆盖右侧真实入口。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.cc59b1304b8e4f7493e634a3217c50b8",
+      "visible_target_supported": true,
+      "geometry_supported": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "皮肤入口真实存在于右侧上方，点击点 (915,475) 位于其左下方并落到英雄头饰高度。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.fb7bdcd52daa40ac9e710eeaa7030191",
+      "visible_target_supported": true,
+      "geometry_supported": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "英雄头饰入口真实存在，但点击点 (915,665) 位于入口左下方，已进入下一个白色图标区域的高度。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.245b3b821e8b45dc8fd4383e3c2241be",
+      "visible_target_supported": true,
+      "geometry_supported": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "右侧带绿色“新”角标的白色入口真实存在，但点击点 (915,855) 位于入口左下方；其功能仍待执行确认。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.c1441c605ce94bf5a06390cd70edfd87",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "右侧中部切换箭头真实存在，点击点 (1030,1050) 落在其可见区域内；切换结果尚未在本轮执行。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.dd3a2f61b8d34f61b7d5a8abef33577d",
+      "visible_target_supported": true,
+      "geometry_supported": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "英雄名下方存在金色圆形语义图标，但点击点 (160,240) 位于图标下方；点击后是否切换英雄列表尚无证据。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.d2ca36c36c334d28b1ee9626637bc418",
+      "visible_target_supported": false,
+      "geometry_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "所述星形图标可见，但截图没有证据支持“野性阵营”语义；罗万画面也不支持同时把相邻图标解释为两个阵营。点击点 (250,240) 位于图标下方。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.ea12d08415a14823b40cbc9d20b4a037",
+      "visible_target_supported": false,
+      "geometry_supported": true,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "点击点 (270,1595) 落在左下方标有 305级 的赛季职业装备入口上；将它命名为英雄等级详情并预测打开等级详情缺少证据。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.34f95c384ea14e539ea831f794e3ac44",
+      "visible_target_supported": true,
+      "geometry_supported": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "赛季等级面板右下角的信息按钮真实存在，但点击点 (835,1665) 位于信息按钮左侧。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.7efef442ae5c4dbab79c6e5bdd3bb73e",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "左上角巅峰+徽章真实存在，点击点 (60,90) 落在徽章内；是否可点击及后续页面尚未执行验证。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    }
+  ]
+}

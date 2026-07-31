@@ -394,7 +394,7 @@ class TeamSpec(BaseModel):
     purpose: str = ""
     """Team 业务目标（一两句话，面向 LLM 补全工具和自动修复系统）。
     回答：这条 Team 要完成什么业务价值？输入是什么，输出是什么？
-    示例: '从 my_domain CSV diff 自动发现字段规律，产出 process_*.py 配置脚本'
+    示例: '从 demogame CSV diff 自动发现字段规律，产出 process_*.py 配置脚本'
     """
 
     nodes: list[TeamNode]
@@ -408,11 +408,11 @@ class TeamSpec(BaseModel):
 
     group: str | None = None
     """Team 所属组。同组 Team 共享事件空间，组外消费者不消费。
-    例: "example-domain-benchmark"。"""
+    例: "demogame-benchmark"。"""
 
     tags: list[str] = Field(default_factory=list)
     """Team 的语义标签。发射的事件会自动继承这些标签。
-    例: ["example_domain.benchmark.battle", "unity.lua"]"""
+    例: ["demogame.benchmark.battle", "unity.lua"]"""
 
     min_core_version: str | None = None
     """声明此 Team 所需的最低核心版本。

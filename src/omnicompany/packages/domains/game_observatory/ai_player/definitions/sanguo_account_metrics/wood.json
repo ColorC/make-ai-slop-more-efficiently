@@ -1,0 +1,14 @@
+{
+  "schema": "game-observatory.ai-player.account-metric-definition.v1",
+  "id": "metric-definition.sanguo.resource.wood.v1",
+  "game_id": "sanguo-mouding-tianxia",
+  "metric_key": "sanguo.resource.wood",
+  "label": "木材",
+  "category": "resource",
+  "unit": "count",
+  "numeric_format": "integer",
+  "improvement_direction": "higher_is_favorable",
+  "minimum_value": 0,
+  "maximum_value": 10000000000,
+  "minimum_ocr_confidence": 0.95
+}

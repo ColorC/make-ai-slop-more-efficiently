@@ -70,6 +70,12 @@ KIMI_RUNTIME_PROFILES: dict[str, dict[str, str]] = {
         "default_model": "qwen3.7-max",
         "display_name": "Alibaba DashScope PAYG",
     },
+    "the_company": {
+        "base_url": "https://internal-llm-proxy.example.com/v1",
+        "key_env": "THE_COMPANY_API_KEY",
+        "default_model": "gpt-5.6-terra",
+        "display_name": "the_company API",
+    },
 }
 
 

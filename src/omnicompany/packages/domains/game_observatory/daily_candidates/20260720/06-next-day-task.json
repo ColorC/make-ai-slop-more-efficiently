@@ -1,0 +1,30 @@
+{
+  "schema": "game-observatory.ai-player.sanguo-daily-duty-candidate.v1",
+  "candidate_id": "sanguo.20260720.next-day.growth-and-inventory.v1",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "continuity_run_id": "sanguo-daily-continuity.pure-ai-campaign.20260720",
+  "duty": "next_day_task_generation",
+  "session_ids": [
+    "external-session.sanguo.terra.live96.20260720"
+  ],
+  "task_ids": [
+    "task.sanguo.day2.continue-growth-and-business-inventory.20260721"
+  ],
+  "evidence_refs": [
+    {
+      "artifact_ids": [
+        "art.device.1784496786988.6e495fff",
+        "art.probe-terminal.1784496789429.f951cc47"
+      ],
+      "evidence_run_ids": [
+        "evidence.run.819bda978b5d48d4b8eec888b3f0c954"
+      ],
+      "evidence_step_ids": [
+        "evidence.step.340800bb84e347e1a7874c57412f1e8a"
+      ]
+    }
+  ],
+  "summary": "下一自然日先复用今天的城建、民居、征战和军演路径，核对君王殿、民居、主队兵力与军演进度；完成至少一项账号成长后，再盘点由成长带来的新入口和玩法变化。",
+  "actor": "ai-player-supervisor",
+  "reason": "以今天已经访问和理解的路径作为明日快速起点，避免再次逐屏探索。"
+}

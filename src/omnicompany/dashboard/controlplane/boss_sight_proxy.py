@@ -20,10 +20,8 @@ import logging
 import httpx
 import websockets
 from fastapi import APIRouter, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import RedirectResponse
 from starlette.websockets import WebSocketState
 
-from omnicompany.dashboard.boss_sight.reviewstage.links import review_material_open_path
 from omnicompany.dashboard.ccdaemon import lifecycle
 
 logger = logging.getLogger(__name__)
@@ -57,32 +55,6 @@ _HOP_BY_HOP = {
 
 def _filter_headers(headers: dict[str, str]) -> dict[str, str]:
     return {k: v for k, v in headers.items() if k.lower() not in _HOP_BY_HOP}
-
-
-def _reviewstage_markdown_navigation_id(
-    path: str,
-    *,
-    method: str,
-    sec_fetch_dest: str,
-    raw: str | None,
-    status_code: int,
-    content_type: str,
-) -> str | None:
-    """Return the material id when a proxied Markdown carrier should open in Dockview."""
-    parts = path.split("/")
-    if (
-        method.upper() != "GET"
-        or sec_fetch_dest.lower() != "document"
-        or raw == "1"
-        or not 200 <= status_code < 300
-        or content_type.split(";", 1)[0].strip().lower() not in {"text/markdown", "application/markdown"}
-        or len(parts) != 3
-        or parts[0] != "reviewstage"
-        or parts[2] != "file"
-        or not parts[1]
-    ):
-        return None
-    return parts[1]
 
 
 # ── WebSocket 透传 (catch-all 之前注册, 否则被 HTTP catch-all 抢) ─────────
@@ -182,20 +154,6 @@ async def http_proxy(path: str, request: Request) -> Response:
         raise HTTPException(status_code=503, detail=f"ccdaemon unreachable: {e}")
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {e}")
-
-    material_id = _reviewstage_markdown_navigation_id(
-        path,
-        method=request.method,
-        sec_fetch_dest=request.headers.get("sec-fetch-dest", ""),
-        raw=request.query_params.get("raw"),
-        status_code=upstream.status_code,
-        content_type=upstream.headers.get("content-type", ""),
-    )
-    if material_id is not None:
-        # Reviewstage lives in ccdaemon, which intentionally stays alive across dashboard
-        # restarts. Intercept the proxied carrier response here so historical /file links
-        # migrate immediately without restarting active chat sessions.
-        return RedirectResponse(review_material_open_path(material_id), status_code=307)
 
     return Response(
         content=upstream.content,

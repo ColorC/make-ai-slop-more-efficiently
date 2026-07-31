@@ -1,0 +1,17 @@
+{
+  "schema": "game-observatory.hypothesis-shadow-run-contract.v1",
+  "benchmark_run_id": "pair.gate3.hero-detail-home.hypothesis.equal-input.04",
+  "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-hero-detail-home-known-answer-v1.json",
+  "same_input_verified_facts": true,
+  "visual_locator_result": "data/domains/game_observatory/benchmarks/gate3/hypothesis-paired-hero-detail-home-known-answer-v1/visual-locator-run/result.json",
+  "coordinate_reference": "data/domains/game_observatory/benchmarks/gate3/hypothesis-paired-hero-detail-home-known-answer-v1/source-coordinate-bands.png",
+  "changes_under_test": [
+    "candidate provenance source-bounds overlap validator",
+    "prior_verified_targets A/B input parity contract",
+    "legible-text-only visible cue constraint"
+  ],
+  "max_iterations": 1,
+  "device_actions": false,
+  "fact_publication": false,
+  "output_root": "data/domains/game_observatory/benchmarks/gate3/hypothesis-paired-hero-detail-home-known-answer-v1/hypothesis-run-04"
+}

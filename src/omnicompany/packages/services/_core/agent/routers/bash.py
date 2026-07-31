@@ -2,17 +2,17 @@
 # [OMNI] material_id="material:core.agent.routers.bash.executor.py"
 """BashRouter · 通用 Bash SingleTool, 底层走 BashBus.
 
-与 `packages/domains/example_domain/ux/routers/_safe_bash.py::SafeBashRouter` 的关系:
-  - SafeBashRouter 是成熟的业务域特化版 (白名单命令 / 路径白名单 / 50KB 截断).
+与 `packages/domains/demogame/ux/routers/_safe_bash.py::SafeBashRouter` 的关系:
+  - SafeBashRouter 是成熟的 demogame/ux 业务特化版 (白名单命令 / 路径白名单 / 50KB 截断).
   - 本 Router 是 `services/agent` 层的**通用基类** — 底层复用 BashBus 获得:
     * 工作区安全网 (workspace.bash_cwd_prefixes 硬限 cwd)
     * 危险命令 regex 黑名单 (rm -rf / / format C: / mkfs / dd / fork bomb)
     * 审计回流 EventBus
   - 子类 override `_validate_command` 加业务白名单 (例: config_service 只允 p4/python/git).
-  - 不强制统一 SafeBashRouter — 业务域迁移可选, 不在本 Phase 做.
+  - 不强制统一 SafeBashRouter — demogame/ux 迁移可选, 不在本 Phase 做.
 
 **输出策略** (对齐 `feedback_no_defensive_truncation` 铁律):
-  - 默认**不截断** stdout/stderr. 大输出应由专用 Read/Glob/Grep 工具缩窄.
+  - 默认**不截断** stdout/stderr. 大输出由调用者 (LLM) 自己 pipe `head`/`tail`/`grep` 精确过滤.
   - 命令超时 raise `TIMEOUT after N s` (诚实报错, 不静默).
 
 **示例子类** (config_service 用):
@@ -35,20 +35,9 @@ import logging
 import subprocess
 from typing import Any, ClassVar
 
-from omnicompany.packages.services._core.agent.event_bridge import (
-    publish_agent_event_sync,
-)
 from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
     ToolExecutionError,
-)
-from omnicompany.packages.services._core.agent.routers.execution_limits import (
-    FACILITY_TIMEOUT_MARKER,
-    SHELL_POLICY_MARKER,
-    ShellCommandPolicyError,
-    reject_decode_replacement,
-    resolve_shell_timeout,
-    validate_shell_command,
 )
 from omnicompany.runtime.agent.agent_loop_tools import ToolContext
 from omnicompany.runtime.buses import BashBus, BusRejection
@@ -61,7 +50,7 @@ logger = logging.getLogger(__name__)
 # 来源: 参考项目/claude-code-analysis/src/tools/BashTool/prompt.ts L275-369
 # 适配:
 #   - 工具名引用改 omnicompany 命名 (Glob 大写 / glob 小写 / Grep 大写 / grep 小写 / Read / Edit / write_file)
-#   - timeout 只由调用方在存在真实 deadline 时显式设置
+#   - timeout 数值用 omnicompany BashRouter 实际默认 (60s / 600s)
 #   - 跳过 sandbox 段 (claude.ai 沙盒特有, omnicompany 走 BashBus + workspace.bash_cwd_prefixes)
 #   - 跳过 undercover / claude.ai 商品特有段
 #   - 跳过 background task / run_in_background 段 (omnicompany 没该设施)
@@ -83,10 +72,10 @@ _DEFAULT_DESCRIPTION = (
     "While the Bash tool can do similar things, it's better to use the built-in tools as they provide a better user experience and make it easier to review tool calls and give permission.\n"
     "\n"
     "# Instructions\n"
-    " - Shell directory creation and text redirection are rejected. Declare exact paths and use guarded Write/Edit tools.\n"
+    " - If your command will create new directories or files, first use this tool to run `ls` to verify the parent directory exists and is the correct location.\n"
     " - Always quote file paths that contain spaces with double quotes in your command (e.g., cd \"path with spaces/file.txt\")\n"
     " - Try to maintain your current working directory throughout the session by using absolute paths and avoiding usage of `cd`. You may use `cd` if the User explicitly requests it.\n"
-    " - You may specify a total timeout when the task has a real deadline. Without one, long work remains observable and externally abortable.\n"
+    " - You may specify an optional timeout in seconds (up to 600s / 10 minutes). By default, your command will timeout after 60s.\n"
     " - When issuing multiple commands:\n"
     "  - If the commands are independent and can run in parallel, make multiple Bash tool calls in a single message. Example: if you need to run \"git status\" and \"git diff\", send a single message with two Bash tool calls in parallel.\n"
     "  - If the commands depend on each other and must run sequentially, use a single Bash call with '&&' to chain them together.\n"
@@ -105,8 +94,8 @@ _DEFAULT_DESCRIPTION = (
     "\n"
     "# omnicompany-specific constraints\n"
     " - The `find` command is REJECTED at the BashBus layer (357 zombie process incident 2026-05-04). Use Glob (file names) or Grep (file contents) instead.\n"
-    " - Path arguments containing unquoted backslashes are unsafe in Bash; use forward slashes or the PowerShell tool.\n"
-    " - `mkdir`, `install -d`, shell text redirection, `tee`, and `sed -i` are REJECTED. Use guarded Write/Edit tools with exact paths.\n"
+    " - Path arguments containing unquoted backslashes (e.g. `mkdir data\\X\\Y`) are REJECTED — bash treats `\\X` as escape. Use forward slashes (`data/X/Y`) or single-quote the whole argument.\n"
+    " - `mkdir \"-p\"` (option as quoted directory name) is REJECTED. Use `mkdir -p <dir>` without quoting the option.\n"
     " - Mixed POSIX/Windows path drive (e.g. `cd /e/X && mkdir e:/X`) is REJECTED. Pick one path style per command.\n"
     " - cwd must be within the project workspace (`workspace.bash_cwd_prefixes`); commands outside the workspace will be rejected by BashBus.\n"
     "\n"
@@ -139,7 +128,7 @@ _DEFAULT_DESCRIPTION = (
     "\n"
     "# Output\n"
     "\n"
-    "On success, returns the command's stdout (and stderr if any), with the exit code prefixed when non-zero. Output is NOT silently truncated — use dedicated Read/Glob/Grep tools to keep context small."
+    "On success, returns the command's stdout (and stderr if any), with the exit code prefixed when non-zero. Output is NOT silently truncated — if the output is large, narrow with `head -n N`, `tail -n N`, or `grep PATTERN` to keep the agent context small."
 )
 
 
@@ -173,7 +162,8 @@ class BashRouter(SingleToolRouter):
             "timeout_sec": {
                 "type": "integer",
                 "minimum": 1,
-                "description": "Optional caller-selected total deadline in seconds; omitted means none.",
+                "maximum": 600,
+                "description": "Timeout in seconds. Default 60.",
             },
             "persistent": {
                 "type": "boolean",
@@ -206,18 +196,9 @@ class BashRouter(SingleToolRouter):
         command = args.get("command", "")
         if not command or not isinstance(command, str):
             raise ToolExecutionError("command is required (non-empty string)")
-        try:
-            command = validate_shell_command(command, dialect="bash")
-        except ShellCommandPolicyError as exc:
-            raise ToolExecutionError(
-                f"{SHELL_POLICY_MARKER} bash REFUSED: {exc}"
-            ) from exc
 
         cwd = args.get("cwd")
-        try:
-            timeout = resolve_shell_timeout(args)
-        except ValueError as exc:
-            raise ToolExecutionError(str(exc)) from exc
+        timeout = int(args.get("timeout_sec", 60))
         persistent = bool(args.get("persistent", False))
 
         ok, reason = self._validate_command(command)
@@ -237,39 +218,25 @@ class BashRouter(SingleToolRouter):
                 shell=True,
                 capture_output=True,
                 check=False,
-                progress_callback=lambda payload: self._emit_progress_material(ctx, payload),
             )
         except BusRejection as exc:
             raise ToolExecutionError(f"BLOCKED by BashBus: {exc}") from exc
         except subprocess.TimeoutExpired as exc:
-            raise ToolExecutionError(
-                f"{FACILITY_TIMEOUT_MARKER} TIMEOUT after {timeout}s; "
-                "stop this Agent path and do not retry the same command"
-            ) from exc
+            raise ToolExecutionError(f"TIMEOUT after {timeout}s") from exc
 
         stdout = result.stdout or ""
         stderr = result.stderr or ""
-        try:
-            reject_decode_replacement(stdout, stderr)
-        except ShellCommandPolicyError as exc:
-            raise ToolExecutionError(
-                f"{SHELL_POLICY_MARKER} bash REFUSED: {exc}"
-            ) from exc
-        if result.returncode != 0:
-            raise ToolExecutionError(
-                f"bash command failed with exit code {result.returncode}.\n"
-                f"stdout:\n{stdout[:4000]}\n"
-                f"stderr:\n{stderr[:4000]}"
-            )
         parts: list[str] = []
         if stdout:
             parts.append(stdout.rstrip("\n"))
         if stderr:
             parts.append(f"[stderr]\n{stderr.rstrip(chr(10))}")
+        if result.returncode != 0:
+            parts.append(f"[returncode={result.returncode}]")
         return "\n".join(parts) if parts else "(no output)"
 
     def _run_persistent(
-        self, command: str, *, cwd: str | None, timeout: int | None, ctx: ToolContext,
+        self, command: str, *, cwd: str | None, timeout: int, ctx: ToolContext,
     ) -> str:
         """走 PersistentShellSession 跑命令, cwd / env 跨调用持久.
 
@@ -301,9 +268,8 @@ class BashRouter(SingleToolRouter):
         try:
             stdout, stderr, rc = self._persistent_session.run(
                 command,
-                timeout=float(timeout) if timeout is not None else None,
+                timeout=float(timeout),
                 abort_event=abort_event,
-                progress_callback=lambda payload: self._emit_progress_material(ctx, payload),
             )
         except RuntimeError as exc:
             # PersistentShellSession 在 closed / aborted 时 raise RuntimeError
@@ -311,47 +277,15 @@ class BashRouter(SingleToolRouter):
                 raise ToolExecutionError(f"ABORTED by external signal: {exc}")
             raise ToolExecutionError(f"persistent shell error: {exc}")
         except subprocess.TimeoutExpired:
-            raise ToolExecutionError(
-                f"{FACILITY_TIMEOUT_MARKER} TIMEOUT after {timeout}s (persistent session); "
-                "stop this Agent path and do not retry the same command"
-            )
-
-        if rc != 0:
-            raise ToolExecutionError(
-                f"persistent bash command failed with exit code {rc}.\n"
-                f"stdout:\n{stdout[:4000]}\n"
-                f"stderr:\n{stderr[:4000]}\n"
-                f"session_cwd={self._persistent_session.cwd}"
-            )
+            raise ToolExecutionError(f"TIMEOUT after {timeout}s (persistent session)")
 
         parts: list[str] = []
         if stdout:
             parts.append(stdout.rstrip("\n"))
         if stderr:
             parts.append(f"[stderr]\n{stderr.rstrip(chr(10))}")
+        if rc != 0:
+            parts.append(f"[returncode={rc}]")
         # Hint: 当前 session cwd (LLM 可见, 知道 cd 已生效)
         parts.append(f"[session_cwd={self._persistent_session.cwd}]")
         return "\n".join(parts) if parts else "(no output)"
-
-    def _emit_progress_material(self, ctx: ToolContext, payload: dict[str, Any]) -> None:
-        trace_id = str(getattr(ctx, "trace_id", "") or "")
-        if not trace_id:
-            return
-        publish_agent_event_sync(
-            trace_id=trace_id,
-            parent_id=str(getattr(ctx, "tool_use_id", "") or "") or None,
-            event_type="agent.tool.heartbeat",
-            source="agent.tool.bash",
-            payload={
-                "material_kind": "tool-heartbeat",
-                "tool": self.TOOL_NAME,
-                "turn": int(getattr(ctx, "turn", 0) or 0),
-                **payload,
-            },
-            tags=[
-                "omni.material",
-                "agent.material",
-                "material:tool-heartbeat",
-                "tool:bash",
-            ],
-        )

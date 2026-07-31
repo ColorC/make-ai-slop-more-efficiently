@@ -1,0 +1,1091 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 驾驶舱按钮/卡片 hover 反馈: 这些元素用 inline 样式(没有 :hover)。用 filter:brightness
+   不跟 inline 的 background/color 冲突, 给所有交互元素一个统一的悬浮高亮(2026-06-06 用户反馈
+   "悬浮没高亮")。transition 让它顺滑。 */
+[data-testid^="cockpit-nav-"],
+[data-testid^="side-toggle-"],
+[data-testid="cockpit-toggle-spine"],
+[data-testid="cockpit-notifications-toggle"],
+[data-testid="cockpit-element-comment"],
+[data-testid="cockpit-page-snapshot"],
+[data-testid="cockpit-more"],
+[data-testid="projects-panel-card"],
+[data-testid="projects-panel-board"],
+[data-testid="projects-panel-refresh"],
+[data-testid="cockpit-mq-item"] {
+  transition: filter 0.12s ease;
+}
+[data-testid^="cockpit-nav-"]:hover,
+[data-testid^="side-toggle-"]:hover,
+[data-testid="cockpit-toggle-spine"]:hover,
+[data-testid="cockpit-notifications-toggle"]:hover,
+[data-testid="cockpit-element-comment"]:hover,
+[data-testid="cockpit-page-snapshot"]:hover,
+[data-testid="cockpit-more"]:hover,
+[data-testid="projects-panel-card"]:hover,
+[data-testid="projects-panel-board"]:hover,
+[data-testid="projects-panel-refresh"]:hover,
+[data-testid="cockpit-mq-item"]:hover {
+  filter: brightness(1.32);
+  cursor: pointer;
+}
+
+/* dockview tab 标签字号(主题默认 ~13px)抬到全 app 字体地板 14px(2026-06-06 用户: 折中14)。 */
+.dv-tab .dv-default-tab-content,
+.dockview-theme-abyss .dv-tab {
+  font-size: 14px;
+}
+
+/* 全屏审阅(maximize 某个页签)时, 隐藏 dockview 的页签条, 内容铺满整组。
+   data-review-maximized 由 EditorArea 在 store.maximizedTabId 非空时挂上。 */
+[data-review-maximized='true'] .dv-tabs-and-actions-container {
+  display: none !important;
+}
+
+/* ===== frostpane: dockview 编辑区透出统一网格 + 页签对齐 shadcn(我们的参考) =====
+   shadcn Tabs 范式: 无底部分割线; 页签各自成 chip, 条体透明(波六裁决二)。
+   内容区透明(透出 #bp-grid 统一网格), 页签 chip=描图纸玻璃, active=hatch 剖面+白竖标。 */
+.dockview-theme-abyss {
+  --dv-group-view-background-color: transparent;
+  --dv-tabs-and-actions-container-background-color: transparent;
+  --dv-tabs-container-background-color: transparent;
+  /* 页签底色走 dockview 变量通道(dockview 自带 (0,5,0) 组级规则消费这四个变量,
+     低优先级选择器压不过;波六:四格统一描图纸玻璃,active 另由 hatch !important 规则覆盖) */
+  --dv-activegroup-visiblepanel-tab-background-color: var(--fp-glass);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--fp-glass);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--fp-glass);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--fp-glass);
+  --dv-tab-divider-color: transparent;
+  --dv-separator-border: transparent;
+  --dv-paneview-active-outline-color: var(--fp-accent);
+}
+/* 去顶部页签条分割线(shadcn 无), 留一点上呼吸 */
+.dockview-theme-abyss .dv-tabs-and-actions-container { padding-top: 4px; border-bottom: 0 !important; }
+/* 未选中页签 = 描图纸玻璃 chip(波六裁决二:材质收到页签本体,条透明) + 弱灰字, 圆角矩形, 不无缝 */
+.dockview-theme-abyss .dv-tab {
+  border-radius: 8px 8px 0 0; margin: 0 3px; padding: 0 12px; min-height: 30px;
+  background: var(--fp-glass); color: var(--fp-text-3);
+  backdrop-filter: var(--fp-blur); -webkit-backdrop-filter: var(--fp-blur);
+  border: 1px solid transparent; border-bottom: 0;
+  transition: background .15s ease, color .15s ease;
+}
+/* 未选中 hover 加深一档(需压过 dockview 自带 (0,5,0) 组级规则,选择器与其同构 + :hover) */
+.dockview-theme-abyss .dv-groupview > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab:hover {
+  background-color: var(--fp-glass-2); color: var(--fp-text-2);
+}
+/* 选中页签 = hatch 下划线 + 白竖标,叠在描图纸 chip 上(仍与条内空隙的网格区分) */
+.dockview-theme-abyss .dv-tab.dv-active-tab {
+  color: var(--fp-text);
+  border: 1px solid var(--fp-border); border-bottom: 0;
+}
+/* 2026-07-19 蓝图 G(壳层 A): 页签条收薄到 28px;active = hatch 下划线 + 左 2px 白竖标(G.4)。
+   G.7 波四: 页签条从私有格纸改描图纸玻璃(与 rail/弹层同一档 .55+blur8),
+   透出 #bp-grid 全视口统一网格 —— 全 app 只有那一张格纸,不再各容器自铺。
+   波六裁决二: 条本体再透明化(background transparent,不再 backdrop-filter),
+   描图纸玻璃 chip 收到每个页签/关闭钮/溢出钮本体,页签之间的空隙露出网格。 */
+.dockview-theme-abyss .dv-tabs-and-actions-container {
+  min-height: 28px; max-height: 32px;
+  background: transparent;
+}
+.dockview-theme-abyss .dv-tab { min-height: 26px; border-radius: 2px 2px 0 0; font-size: 12px; }
+.dockview-theme-abyss .dv-tab.dv-active-tab {
+  position: relative;
+  background: var(--fp-bp-hatch), var(--fp-glass) !important;
+  box-shadow: inset 2px 0 0 rgba(255,255,255,.85);
+}
+.dockview-theme-abyss .dv-tab.dv-active-tab::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; pointer-events: none;
+  background: repeating-linear-gradient(45deg, rgba(235,245,255,.55) 0 2px, transparent 2px 5px);
+}
+/* 关闭钮/溢出钮本体保留描图纸材质(条透明后小钮不悬空;hover 加深一档) */
+.dockview-theme-abyss .dv-default-tab-action,
+.dockview-theme-abyss .dv-right-actions-container button {
+  border-radius: 2px; background: var(--fp-glass);
+  backdrop-filter: var(--fp-blur); -webkit-backdrop-filter: var(--fp-blur);
+}
+.dockview-theme-abyss .dv-default-tab-action:hover,
+.dockview-theme-abyss .dv-right-actions-container button:hover { background: var(--fp-glass-2); }
+
+/* 代码块字号不低于地板 14(Prism / oneDark 主题内联会把 code 压到 ~12px)。
+   code 容器由 codeTagProps 设 14px; .token 强制继承容器, 杜绝主题把单 token 压小。 */
+code[class*="language-"],
+pre[class*="language-"] {
+  font-size: 14px !important;
+}
+.token {
+  font-size: inherit !important;
+}
+
+/* Global spinner animation - defined early to ensure it loads */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes spin {
+  0% {
+    -webkit-transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+
+    /* Nav design tokens */
+    --nav-glass-bg: 0 0% 100% / 0.7;
+    --nav-glass-blur: 20px;
+    --nav-glass-saturate: 1.8;
+    --nav-tab-glow: 221.2 83.2% 53.3% / 0.18;
+    --nav-tab-ring: 221.2 83.2% 53.3% / 0.10;
+    --nav-float-shadow: 0 0% 0% / 0.06;
+    --nav-float-ring: 214.3 31.8% 91.4% / 0.5;
+    --nav-divider-color: 214.3 31.8% 91.4% / 0.5;
+    --nav-input-bg: 210 40% 96.1% / 0.5;
+    --nav-input-focus-ring: 221.2 83.2% 53.3% / 0.22;
+
+    /* Safe area CSS variables */
+    --safe-area-inset-top: env(safe-area-inset-top);
+    --safe-area-inset-right: env(safe-area-inset-right);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-left: env(safe-area-inset-left);
+
+    /* Mobile navigation dimensions - Single source of truth */
+    /* Floating nav: ~52px bar + 8px bottom margin + 12px px-3 top spacing */
+    --mobile-nav-height: 52px;
+    --mobile-nav-padding: 20px;
+    --mobile-nav-total: calc(var(--mobile-nav-height) + var(--mobile-nav-padding) + env(safe-area-inset-bottom, 0px));
+
+    /* Header safe area dimensions */
+    --header-safe-area-top: env(safe-area-inset-top, 0px);
+    --header-base-padding: 8px;
+    --header-total-padding: calc(var(--header-safe-area-top) + var(--header-base-padding));
+  }
+  
+  /* Fallback for older iOS versions */
+  @supports (padding-top: constant(safe-area-inset-top)) {
+    :root {
+      --safe-area-inset-top: constant(safe-area-inset-top);
+      --safe-area-inset-right: constant(safe-area-inset-right);
+      --safe-area-inset-bottom: constant(safe-area-inset-bottom);
+      --safe-area-inset-left: constant(safe-area-inset-left);
+    }
+  }
+
+  .dark {
+    /* 2026-06 重做: 对齐 tokens.ts 标准深色(消除"shadcn 暗色 vs tokens"两套深色不一致)。
+       底色提亮(不再纯黑), 文字/muted 对比度达 AA。 */
+    --background: 240 4% 11%;          /* tokens.bg #0b0f17 */
+    --foreground: 240 3% 93%;          /* tokens.text #eef1f6 */
+    --card: 240 5% 13%;                /* tokens.bgPanel #141925 */
+    --card-foreground: 240 3% 93%;
+    --popover: 240 5% 13%;
+    --popover-foreground: 240 3% 93%;
+    --primary: 234 71% 66%;            /* tokens.accent #4c8dff */
+    --primary-foreground: 240 6% 96%;
+    --secondary: 240 5% 17%;           /* tokens.bgCard #1b2230 */
+    --secondary-foreground: 240 3% 93%;
+    --muted: 240 5% 17%;
+    --muted-foreground: 222 6% 65%;    /* tokens.textMuted #aab2c0, AA */
+    --accent: 240 5% 17%;
+    --accent-foreground: 240 3% 93%;
+    --destructive: 355 65% 55%;
+    --destructive-foreground: 240 6% 96%;
+    --border: 240 5% 23%;              /* tokens.border #2a3343 */
+    --input: 240 5% 30%;
+    --ring: 234 71% 66%;
+
+    /* Nav design tokens — dark overrides */
+    --nav-glass-bg: 217.2 91.2% 8% / 0.55;
+    --nav-glass-blur: 24px;
+    --nav-glass-saturate: 1.6;
+    --nav-tab-glow: 217.2 91.2% 59.8% / 0.25;
+    --nav-tab-ring: 217.2 91.2% 59.8% / 0.15;
+    --nav-float-shadow: 0 0% 0% / 0.35;
+    --nav-float-ring: 217.2 32.6% 17.5% / 0.3;
+    --nav-divider-color: 217.2 32.6% 17.5% / 0.5;
+    --nav-input-bg: 217.2 32.6% 17.5% / 0.5;
+    --nav-input-focus-ring: 217.2 91.2% 59.8% / 0.25;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+    transition: none;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    /* 2026-06 重做: 字体对齐 tokens.fonts.ui(Inter→中文回落), 基线抬到 15px, 全局行距 1.5
+       —— 修"字看不清"(原 14px 无行距)。文档/写作区在组件里用 16px/1.6。 */
+    font-family: 'Inter', 'Inter Variable', '等线', 'DengXian', '微软雅黑', 'Microsoft YaHei', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Root element with safe area padding for PWA */
+  #root {
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  /* Apply safe area padding in standalone mode */
+  @supports (padding-top: env(safe-area-inset-top)) {
+    @media (display-mode: standalone) {
+      #root {
+        padding-top: var(--safe-area-inset-top);
+        padding-left: var(--safe-area-inset-left);
+        padding-right: var(--safe-area-inset-right);
+      }
+    }
+  }
+
+  /* PWA mode detected by JavaScript - more reliable */
+  body.pwa-mode #root {
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Adjust fixed inset positioning in PWA mode */
+  body.pwa-mode .fixed.inset-0 {
+    top: var(--header-total-padding);
+    left: var(--safe-area-inset-left);
+    right: var(--safe-area-inset-right);
+    bottom: 0;
+  }
+  
+  /* Global transition defaults */
+  button, 
+  a, 
+  input, 
+  textarea, 
+  select,
+  [role="button"],
+  .transition-all {
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Color transitions for theme switching - exclude interactive elements */
+  body, div, section, article, aside, header, footer, nav, main,
+  h1, h2, h3, h4, h5, h6, p, span, blockquote,
+  ul, ol, li, dl, dt, dd,
+  table, thead, tbody, tfoot, tr, td, th,
+  form, fieldset, legend, label {
+    transition: background-color 200ms ease-in-out, 
+                border-color 200ms ease-in-out,
+                color 200ms ease-in-out;
+  }
+  
+  /* Transform transitions */
+  .transition-transform {
+    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Opacity transitions */
+  .transition-opacity {
+    transition: opacity 200ms ease-in-out;
+  }
+  
+  /* Scale transitions for interactions */
+  .transition-scale {
+    transition: transform 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Shadow transitions */
+  .transition-shadow {
+    transition: box-shadow 200ms ease-in-out;
+  }
+  
+  /* Respect reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Smooth hover transitions for interactive elements */
+  button:hover,
+  a:hover,
+  [role="button"]:hover {
+    transition-duration: 100ms;
+  }
+  
+  /* Active state transitions */
+  button:active,
+  a:active,
+  [role="button"]:active {
+    transition-duration: 50ms;
+  }
+  
+  /* Focus transitions */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    transition: outline-offset 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  
+  /* Sidebar transitions */
+  .sidebar-transition {
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 300ms ease-in-out;
+  }
+
+  /* Nav glass surface — uses theme tokens */
+  .nav-glass {
+    background: hsl(var(--nav-glass-bg));
+    backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
+    -webkit-backdrop-filter: blur(var(--nav-glass-blur)) saturate(var(--nav-glass-saturate));
+  }
+
+  /* Nav tab active pill glow — uses theme tokens */
+  .nav-tab-active {
+    box-shadow: 0 1px 8px hsl(var(--nav-tab-glow)),
+                0 0 0 1px hsl(var(--nav-tab-ring));
+  }
+
+  /* Floating mobile nav bar — uses theme tokens */
+  .mobile-nav-float {
+    box-shadow: 0 -1px 20px hsl(var(--nav-float-shadow)),
+                0 0 0 1px hsl(var(--nav-float-ring));
+  }
+
+  /* Subtle sidebar divider — uses theme tokens */
+  .nav-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--nav-divider-color)) 20%, hsl(var(--nav-divider-color)) 80%, transparent);
+  }
+
+  /* Nav search input surface — uses theme tokens */
+  .nav-search-input {
+    background: hsl(var(--nav-input-bg));
+    border: none;
+  }
+
+  .nav-search-input:focus-within {
+    background: hsl(var(--background));
+    box-shadow: 0 0 0 2px hsl(var(--nav-input-focus-ring));
+  }
+  
+  /* Modal and dropdown transitions */
+  .modal-transition {
+    transition: opacity 200ms ease-in-out,
+                transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Chat message transitions */
+  .message-transition {
+    transition: opacity 300ms ease-in-out,
+                transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Height transitions for expanding elements */
+  .height-transition {
+    transition: height 200ms ease-in-out,
+                max-height 200ms ease-in-out;
+  }
+  
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground)) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground));
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.8);
+  }
+  
+  /* Dark mode scrollbar styles */
+  .dark .scrollbar-thin {
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+  
+  .dark .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.3);
+  }
+  
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 3px;
+  }
+  
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.7);
+  }
+  
+  /* Global scrollbar styles for main content areas */
+  .dark::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .dark::-webkit-scrollbar-track {
+    background: rgba(31, 41, 55, 0.5);
+  }
+  
+  .dark::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.5);
+    border-radius: 4px;
+  }
+  
+  .dark::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.7);
+  }
+  
+  /* Firefox scrollbar styles */
+  .dark {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(107, 114, 128, 0.5) rgba(31, 41, 55, 0.5);
+  }
+  
+  /* Ensure checkbox styling is preserved */
+  input[type="checkbox"] {
+    @apply accent-blue-600;
+    opacity: 1;
+  }
+  
+  input[type="checkbox"]:focus {
+    opacity: 1;
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+  
+  /* Fix checkbox appearance in dark mode */
+  .dark input[type="checkbox"] {
+    background-color: rgb(31 41 55); /* gray-800 */
+    border-color: rgb(138 141 149); /* gray-600 */
+    color: rgb(37 99 235); /* blue-600 */
+    color-scheme: dark;
+  }
+  
+  .dark input[type="checkbox"]:checked {
+    background-color: rgb(37 99 235); /* blue-600 */
+    border-color: rgb(37 99 235); /* blue-600 */
+  }
+  
+  .dark input[type="checkbox"]:focus {
+    --tw-ring-color: rgb(59 130 246); /* blue-500 */
+    --tw-ring-offset-color: rgb(31 41 55); /* gray-800 */
+  }
+  
+  /* Fix radio button appearance in dark mode */
+  .dark input[type="radio"] {
+    background-color: rgb(31 41 55); /* gray-800 */
+    border-color: rgb(138 141 149); /* gray-600 */
+    color: rgb(37 99 235); /* blue-600 */
+    color-scheme: dark;
+  }
+  
+  .dark input[type="radio"]:checked {
+    background-color: rgb(37 99 235); /* blue-600 */
+    border-color: rgb(37 99 235); /* blue-600 */
+  }
+  
+  .dark input[type="radio"]:focus {
+    --tw-ring-color: rgb(59 130 246); /* blue-500 */
+    --tw-ring-offset-color: rgb(31 41 55); /* gray-800 */
+  }
+  
+  /* Ensure textarea text is always visible in dark mode */
+  textarea {
+    color-scheme: light dark;
+  }
+  
+  .dark textarea {
+    color: rgb(243 244 246) !important; /* gray-100 */
+    -webkit-text-fill-color: rgb(243 244 246) !important;
+    caret-color: rgb(243 244 246) !important;
+    /* 2026-06: 深色下裸 textarea 默认深底, 杜绝白框(.bg-transparent 等更具体规则仍可覆盖)。 */
+    background-color: #26262a;
+  }
+  
+  /* Fix for focus state in dark mode */
+  .dark textarea:focus {
+    color: rgb(243 244 246) !important;
+    -webkit-text-fill-color: rgb(243 244 246) !important;
+  }
+  
+  /* Fix for iOS/Safari dark mode textarea issues */
+  @supports (-webkit-touch-callout: none) {
+    .dark textarea {
+      background-color: transparent !important;
+      color: rgb(243 244 246) !important;
+      -webkit-text-fill-color: rgb(243 244 246) !important;
+    }
+    
+    .dark textarea:focus {
+      background-color: transparent !important;
+      color: rgb(243 244 246) !important;
+      -webkit-text-fill-color: rgb(243 244 246) !important;
+    }
+  }
+  
+  /* Ensure parent container doesn't override textarea styles */
+  .dark .bg-gray-800 textarea {
+    color: rgb(243 244 246) !important;
+    -webkit-text-fill-color: rgb(243 244 246) !important;
+  }
+  
+  /* Fix focus-within container issues in dark mode */
+  .dark .focus-within\:ring-2:focus-within {
+    background-color: rgb(31 41 55) !important; /* gray-800 */
+  }
+  
+  /* Ensure textarea remains transparent with visible text */
+  .dark textarea.bg-transparent {
+    background-color: transparent !important;
+    color: rgb(243 244 246) !important;
+    -webkit-text-fill-color: rgb(243 244 246) !important;
+  }
+  
+  /* Fix placeholder text color to be properly gray */
+  textarea::placeholder {
+    color: rgb(156 163 175) !important; /* gray-400 */
+    opacity: 1 !important;
+  }
+  
+  .dark textarea::placeholder {
+    color: rgb(138 141 149) !important; /* gray-600 - darker gray */
+    opacity: 1 !important;
+  }
+  
+  /* More specific selector for chat input textarea */
+  .dark .bg-gray-800 textarea::placeholder,
+  .dark textarea.bg-transparent::placeholder {
+    color: rgb(138 141 149) !important; /* gray-600 - darker gray */
+    opacity: 1 !important;
+    -webkit-text-fill-color: rgb(138 141 149) !important;
+  }
+  
+  /* Custom class for chat input placeholder */
+  .chat-input-placeholder::placeholder {
+    color: rgb(156 163 175) !important;
+    opacity: 1 !important;
+  }
+
+  .dark .chat-input-placeholder::placeholder {
+    color: rgb(138 141 149) !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: rgb(138 141 149) !important;
+  }
+
+  .chat-input-placeholder::-webkit-input-placeholder {
+    color: rgb(156 163 175) !important;
+    opacity: 1 !important;
+  }
+
+  .dark .chat-input-placeholder::-webkit-input-placeholder {
+    color: rgb(138 141 149) !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: rgb(138 141 149) !important;
+  }
+  
+  /* WebKit specific placeholder styles */
+  textarea::-webkit-input-placeholder {
+    color: rgb(156 163 175) !important;
+    opacity: 1 !important;
+  }
+  
+  .dark textarea::-webkit-input-placeholder {
+    color: rgb(138 141 149) !important; /* gray-600 - darker gray */
+    opacity: 1 !important;
+  }
+  
+  /* Mozilla specific placeholder styles */
+  textarea::-moz-placeholder {
+    color: rgb(156 163 175) !important;
+    opacity: 1 !important;
+  }
+  
+  .dark textarea::-moz-placeholder {
+    color: rgb(138 141 149) !important; /* gray-600 - darker gray */
+    opacity: 1 !important;
+  }
+  
+  /* IE/Edge specific placeholder styles */
+  textarea:-ms-input-placeholder {
+    color: rgb(156 163 175) !important;
+    opacity: 1 !important;
+  }
+  
+  .dark textarea:-ms-input-placeholder {
+    color: rgb(138 141 149) !important; /* gray-600 - darker gray */
+    opacity: 1 !important;
+  }
+}
+
+/* Mobile optimizations and components */
+@layer components {
+  /* Mobile touch optimization and safe areas */
+  @media (max-width: 768px) {
+    * {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Allow vertical scrolling in scroll containers */
+    .overflow-y-auto, [data-scroll-container] {
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Preserve checkbox visibility */
+    input[type="checkbox"] {
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+      opacity: 1 !important;
+    }
+    
+    button, 
+    [role="button"],
+    .clickable,
+    a,
+    .cursor-pointer {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    
+    /* Better mobile touch targets */
+    .mobile-touch-target {
+      @apply min-h-[44px] min-w-[44px];
+    }
+    
+    /* Chat message improvements */
+    .chat-message.user {
+      @apply justify-end;
+    }
+    
+    .chat-message.user > div {
+      @apply max-w-[85%];
+    }
+    
+    .chat-message.assistant > div,
+    .chat-message.error > div {
+      @apply w-full sm:max-w-[95%];
+    }
+    
+    /* Session name truncation on mobile */
+    .session-name-mobile {
+      @apply truncate;
+      max-width: calc(100vw - 120px); /* Account for sidebar padding and buttons */
+    }
+    
+    /* Enable text selection on mobile for terminal */
+    .xterm,
+    .xterm .xterm-viewport {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+    }
+    
+    /* Fix mobile scrolling */
+    .overflow-y-auto {
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .chat-message {
+      touch-action: pan-y;
+    }
+    
+    /* Fix hover states on mobile */
+    .group:active .group-hover\:opacity-100,
+    .group .group-hover\:opacity-100 {
+      opacity: 1 !important;
+    }
+    
+    @media (hover: none) and (pointer: coarse) {
+      .group-hover\:opacity-100 {
+        opacity: 1 !important;
+      }
+      
+      .hover\:bg-gray-50:hover,
+      .hover\:bg-gray-100:hover,
+      .hover\:bg-red-200:hover,
+      .dark\:hover\:bg-gray-700:hover,
+      .dark\:hover\:bg-red-900\/50:hover {
+        background-color: inherit;
+      }
+    }
+  }
+  
+  /* Touch device optimizations for all screen sizes */
+  @media (hover: none) and (pointer: coarse) {
+    .touch\:opacity-100 {
+      opacity: 1 !important;
+    }
+    
+    /* Completely disable hover states on touch devices */
+    * {
+      -webkit-tap-highlight-color: transparent !important;
+    }
+    
+    /* Preserve checkbox visibility on touch devices */
+    input[type="checkbox"] {
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1) !important;
+      opacity: 1 !important;
+    }
+    
+    /* Only disable hover states for interactive elements, not containers */
+    button:hover,
+    [role="button"]:hover,
+    .cursor-pointer:hover,
+    a:hover,
+    .hover\:bg-gray-50:hover,
+    .hover\:bg-gray-100:hover,
+    .hover\:text-gray-900:hover,
+    .hover\:opacity-100:hover {
+      background-color: inherit !important;
+      color: inherit !important;
+      opacity: inherit !important;
+      transform: inherit !important;
+    }
+    
+    /* Force buttons to be immediately clickable */
+    button, [role="button"], .cursor-pointer {
+      cursor: pointer !important;
+      pointer-events: auto !important;
+    }
+    
+    /* Keep active states for immediate feedback */
+    .active\:scale-\[0\.98\]:active,
+    .active\:scale-95:active {
+      transform: scale(0.98) !important;
+    }
+  }
+  
+  /* Safe area support for iOS devices */
+  .ios-bottom-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* PWA specific header adjustments - uses CSS variables for consistency */
+  .pwa-header-safe {
+    padding-top: var(--header-base-padding);
+  }
+
+  /* When PWA mode is detected by JavaScript */
+  body.pwa-mode .pwa-header-safe {
+    /* Reset padding since #root already handles safe area */
+    padding-top: 0px !important;
+  }
+
+  /* For mobile PWA, add bottom padding for better spacing */
+  @media screen and (max-width: 768px) {
+    body.pwa-mode .pwa-header-safe {
+      padding-bottom: 8px;
+    }
+  }
+  
+  @media screen and (max-width: 768px) {
+    .chat-input-mobile {
+      padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Text wrapping improvements */
+  .chat-message {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+
+  /* Force wrap long URLs and code */
+  .chat-message pre,
+  .chat-message code {
+    white-space: pre-wrap !important;
+    word-break: break-all;
+    overflow-wrap: break-word;
+  }
+
+  /* Prevent horizontal scroll in chat area */
+  .chat-message * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Hide scrollbar utility for horizontal scroll */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Hide markdown backticks in prose content */
+.prose code::before,
+.prose code::after {
+  content: "" !important;
+  display: none !important;
+}
+
+/* Custom spinner animation for mobile compatibility */
+@layer utilities {
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+  
+  /* Force hardware acceleration for smoother animation on mobile */
+  .loading-spinner {
+    animation: spin 1s linear infinite;
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  
+  /* Improved textarea styling */
+  .chat-input-placeholder {
+    display: block !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+  }
+
+  /* Ensure container fits textarea tightly */
+  .chat-input-placeholder:not(:focus) {
+    height: auto;
+  }
+  
+  .chat-input-placeholder::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .chat-input-placeholder::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+  }
+  
+  .chat-input-placeholder::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.3);
+    border-radius: 3px;
+    transition: background-color 0.2s;
+  }
+  
+  .chat-input-placeholder::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.5);
+  }
+  
+  .dark .chat-input-placeholder {
+    scrollbar-color: rgba(107, 114, 128, 0.3) transparent;
+  }
+  
+  .dark .chat-input-placeholder::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.3);
+  }
+  
+  .dark .chat-input-placeholder::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.5);
+  }
+  
+  /* Enhanced box shadow when textarea expands */
+  .chat-input-expanded {
+    box-shadow: 0 -5px 15px -3px rgba(0, 0, 0, 0.1), 0 -4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .dark .chat-input-expanded {
+    box-shadow: 0 -5px 15px -3px rgba(0, 0, 0, 0.3), 0 -4px 6px -2px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Fix focus ring offset color in dark mode */
+  .dark [class*="ring-offset"] {
+    --tw-ring-offset-color: rgb(31 41 55); /* gray-800 */
+  }
+  
+  /* Ensure buttons don't show white backgrounds in dark mode */
+  .dark button:focus {
+    --tw-ring-offset-color: rgb(31 41 55); /* gray-800 */
+  }
+  
+  /* Fix mobile select dropdown styling */
+  @supports (-webkit-touch-callout: none) {
+    select {
+      font-size: 16px !important;
+      -webkit-appearance: none;
+    }
+  }
+  
+  /* Improve select appearance in dark mode */
+  .dark select {
+    /* 2026-06: 深色下 select 默认深底深字, 杜绝白底白字。 */
+    background-color: #1b2230;
+    color: #eef1f6;
+    border: 1px solid #2a3343;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+  
+  select {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+  
+  /* Fix select option text in mobile */
+  select option {
+    font-size: 16px !important;
+    padding: 8px !important;
+    background-color: var(--background) !important;
+    color: var(--foreground) !important;
+  }
+  
+  .dark select option {
+    background-color: rgb(31 41 55) !important;
+    color: rgb(243 244 246) !important;
+  }
+
+  /* Tool details chevron animation */
+  details[open] .details-chevron,
+  details[open] summary svg[class*="group-open"] {
+    transform: rotate(180deg);
+  }
+
+  /* Smooth chevron transition */
+  .details-chevron,
+  summary svg[class*="transition-transform"] {
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Settings content fade-in transition */
+  @keyframes settings-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .settings-content-enter {
+    animation: settings-fade-in 150ms ease-out;
+  }
+
+  /* Search result highlight flash */
+  .search-highlight-flash {
+    animation: search-flash 4s ease-out;
+  }
+
+  @keyframes search-flash {
+    0%, 50% {
+      outline: 3px solid hsl(var(--primary));
+      outline-offset: 4px;
+      border-radius: 8px;
+      background-color: hsl(var(--primary) / 0.06);
+    }
+    100% {
+      outline: 3px solid transparent;
+      outline-offset: 4px;
+      background-color: transparent;
+    }
+  }
+}
+
+/* ── 任务窗口 quest board：行/按钮的悬浮与点击反馈 ────────────────────────────
+   QuestBoard 用纯内联样式，:hover/:active 做不到，统一在这里给 .qb-* 类加交互态。
+   图标按钮不在内联里写 color/background，让这里的 hover 能生效（内联色会压过 CSS）。 */
+.qb-row { transition: background .12s ease; border-radius: 6px; }
+.qb-row:hover { background: rgba(255,255,255,.05); }
+/* 置顶的任务：原地浮到列表最前，给一点冷琥珀底标明它是置顶（不是单独一块） */
+.qb-pinned-row { background: color-mix(in srgb, var(--fp-warn) 8%, transparent); }
+.qb-pinned-row:hover { background: color-mix(in srgb, var(--fp-warn) 14%, transparent); }
+.qb-ibtn {
+  border: 0; background: transparent; color: var(--fp-text-3); cursor: pointer;
+  padding: 3px; border-radius: 5px; display: inline-flex; align-items: center;
+  transition: color .12s ease, background .12s ease, transform .08s ease;
+}
+.qb-ibtn:hover { color: var(--fp-text); background: color-mix(in srgb, var(--fp-warn) 16%, transparent); }
+.qb-ibtn:active { transform: scale(.86); }
+.qb-pin-on { color: var(--fp-warn); }
+.qb-pin-on:hover { color: var(--fp-warn); filter: brightness(1.15); }
+/* 文字按钮（刷新/同步）：内联已带色，这里只加不冲突的亮度+按压反馈 */
+.qb-btn { transition: filter .12s ease, transform .08s ease; }
+.qb-btn:not(:disabled):hover { filter: brightness(1.08); }
+.qb-btn:not(:disabled):active { transform: scale(.96); }
+/* 可点击跳转/展开的标题：悬浮加下划线，跟旁边的展开箭头区分开（两者另有 Tooltip 说明各自行为） */
+.qb-task-title:hover { text-decoration: underline; text-underline-offset: 3px; }

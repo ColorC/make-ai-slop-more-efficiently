@@ -1,0 +1,121 @@
+{
+  "schema": "game-observatory.evidence-route.v1",
+  "id": "gate2-afk-hero-detail-cycle-v1",
+  "title": "AFK Journey 英雄详情安全证据闭环",
+  "target_id": "device://mumu/0",
+  "viewport_width": 1080,
+  "viewport_height": 1920,
+  "game_id": "afk-journey",
+  "build_scope_id": "afk-cn-1.7.21-versionCode-10750-20260714",
+  "scope_id": "hero-detail-evidence-recorder-gate2",
+  "start_state": "英雄详情：罗万，赛季等级 357，升级按钮可见",
+  "end_state": "英雄详情：罗万，赛季等级 357，升级按钮可见",
+  "excluded_actions": [
+    "升级",
+    "赠礼",
+    "换装确认",
+    "一键装备",
+    "支付",
+    "删除",
+    "账号操作"
+  ],
+  "steps": [
+    {
+      "id": "01-open-combat-attributes",
+      "action": {"type": "tap", "x": 929, "y": 1665},
+      "target_name": "战力信息按钮",
+      "target_bounds": {"x": 900, "y": 1625, "width": 58, "height": 82}
+    },
+    {
+      "id": "02-scroll-attributes-down",
+      "action": {
+        "type": "swipe",
+        "x": 760,
+        "y": 1640,
+        "x2": 760,
+        "y2": 880,
+        "duration_ms": 600
+      },
+      "target_name": "英雄属性列表"
+    },
+    {
+      "id": "03-scroll-attributes-up",
+      "action": {
+        "type": "swipe",
+        "x": 760,
+        "y": 900,
+        "x2": 760,
+        "y2": 1660,
+        "duration_ms": 600
+      },
+      "target_name": "英雄属性列表"
+    },
+    {"id": "04-return-from-attributes", "action": {"type": "back"}},
+    {
+      "id": "05-open-season-equipment",
+      "action": {"type": "tap", "x": 280, "y": 1605},
+      "target_name": "赛季职业装备入口",
+      "target_bounds": {"x": 215, "y": 1535, "width": 135, "height": 145}
+    },
+    {"id": "06-return-from-season-equipment", "action": {"type": "back"}},
+    {
+      "id": "07-open-affinity",
+      "action": {"type": "tap", "x": 1000, "y": 210},
+      "target_name": "信赖度入口",
+      "target_bounds": {"x": 950, "y": 145, "width": 105, "height": 120}
+    },
+    {
+      "id": "08-open-rumor-tab",
+      "action": {"type": "tap", "x": 545, "y": 1035},
+      "target_name": "信赖度页签：传闻",
+      "target_bounds": {"x": 430, "y": 985, "width": 235, "height": 100}
+    },
+    {
+      "id": "09-open-voice-tab",
+      "action": {"type": "tap", "x": 850, "y": 1035},
+      "target_name": "信赖度页签：语音",
+      "target_bounds": {"x": 730, "y": 985, "width": 250, "height": 100}
+    },
+    {
+      "id": "10-return-to-affinity-tab",
+      "action": {"type": "tap", "x": 250, "y": 1035},
+      "target_name": "信赖度页签：信赖度",
+      "target_bounds": {"x": 130, "y": 985, "width": 260, "height": 100}
+    },
+    {"id": "11-return-from-affinity", "action": {"type": "back"}},
+    {
+      "id": "12-open-skin",
+      "action": {"type": "tap", "x": 1000, "y": 325},
+      "target_name": "皮肤入口",
+      "target_bounds": {"x": 950, "y": 270, "width": 105, "height": 115}
+    },
+    {"id": "13-return-from-skin", "action": {"type": "back"}},
+    {
+      "id": "14-open-headwear-condition",
+      "action": {"type": "tap", "x": 1000, "y": 455},
+      "target_name": "英雄头饰入口",
+      "target_bounds": {"x": 945, "y": 390, "width": 115, "height": 125}
+    },
+    {"id": "15-close-headwear-condition", "action": {"type": "back"}},
+    {
+      "id": "16-show-next-hero",
+      "action": {"type": "tap", "x": 1000, "y": 1090},
+      "target_name": "下一个英雄",
+      "target_bounds": {"x": 955, "y": 1015, "width": 95, "height": 145}
+    },
+    {
+      "id": "17-open-next-hero-combat-attributes",
+      "action": {"type": "tap", "x": 929, "y": 1665},
+      "target_name": "战力信息按钮",
+      "target_bounds": {"x": 900, "y": 1625, "width": 58, "height": 82}
+    },
+    {"id": "18-return-from-next-hero-attributes", "action": {"type": "back"}},
+    {
+      "id": "19-show-previous-hero",
+      "action": {"type": "tap", "x": 70, "y": 1090},
+      "target_name": "上一个英雄",
+      "target_bounds": {"x": 25, "y": 1015, "width": 95, "height": 145}
+    },
+    {"id": "20-confirm-end-state", "action": {"type": "wait", "seconds": 0.5}}
+  ]
+}

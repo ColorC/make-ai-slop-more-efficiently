@@ -1,0 +1,54 @@
+{
+  "schema": "game-observatory.exploration-benchmark.v1",
+  "id": "gate3-afk-rowan-tabs-repetition2-rumor-known-answer-v1",
+  "title": "AFK Journey 罗万信赖界面传闻状态安全可见交互",
+  "phase": "calibration",
+  "game_id": "afk-journey",
+  "build_scope_id": "afk-cn-1.7.21-versionCode-10750-20260714",
+  "start_state": "罗万信赖界面，传闻页签选中，第三轮 Gate 2 证据路线",
+  "goal": "列出当前完整画面中直接可见且不会消耗资源的安全交互",
+  "observation": {
+    "artifact_id": "art.device.1783965755678.49724c34",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783965755678.49724c34.png",
+    "sha256": "633dd8f00faf5cfe5bf64e0805afec891c8f37a20dca5c5253be0698add8c65a",
+    "viewport_width": 1080,
+    "viewport_height": 1920
+  },
+  "allowed_action_types": ["tap", "back"],
+  "forbidden_target_terms": ["赠礼", "礼物", "领取", "购买", "升级", "一键装备"],
+  "max_suggestions": 8,
+  "expected_probes": [
+    {
+      "id": "trust-tab",
+      "target_names": ["信赖度页签", "左侧信赖度页签"],
+      "action_type": "tap",
+      "target_bounds": {"x": 130, "y": 985, "width": 260, "height": 100},
+      "importance": "important",
+      "tags": ["tab", "known-route"]
+    },
+    {
+      "id": "rumor-tab",
+      "target_names": ["传闻页签", "中央信赖传闻页签"],
+      "action_type": "tap",
+      "target_bounds": {"x": 430, "y": 985, "width": 235, "height": 100},
+      "importance": "normal",
+      "tags": ["tab", "selected", "known-route"]
+    },
+    {
+      "id": "voice-tab",
+      "target_names": ["右侧页签", "语音页签", "右侧浅色标记页签"],
+      "action_type": "tap",
+      "target_bounds": {"x": 730, "y": 985, "width": 250, "height": 100},
+      "importance": "important",
+      "tags": ["tab", "partially-rendered-label", "known-route"]
+    },
+    {
+      "id": "back",
+      "target_names": ["返回", "左下返回按钮"],
+      "action_type": "back",
+      "importance": "important",
+      "tags": ["navigation", "known-route"]
+    }
+  ],
+  "tags": ["gate3", "manual-first", "known-answer", "hypothesis-unseen-image"]
+}

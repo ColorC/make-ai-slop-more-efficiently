@@ -1,0 +1,105 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-hero-detail-calibration-v1",
+  "benchmark_run_id": "gate3.calibration.hypothesis.01",
+  "adjudicator": "main-agent-independent-visual-review-20260714",
+  "generated_at": "2026-07-14T03:00:00+00:00",
+  "items": [
+    {
+      "probe_id": "shadow.probe.a2b8a02da70f42039270c8b90134791c",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (30,30,70,70) 位于左上巅峰+品质标识区域；返回箭头实际位于左下。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.fc6de0d2a5b648d68340f31d028f57af",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (280,1740,80,80) 位于底部升级区域，画面中没有盾牌技能图标。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.6239569028ff429083293b6fa16da61a",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (420,1750,60,60) 位于升级按钮上，画面中没有火焰技能图标。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.aefca887273a4186a692b37a12f25ea7",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (540,1750,60,60) 位于升级按钮上，画面中没有第三个技能图标。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.b7ed6f8193eb43d2b14c52c0be5e226a",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (150,1850,120,50) 位于底部留白与升级按钮边缘，画面没有英雄故事标签。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.8d378d2cc7464419b912fe9879805db8",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (320,1850,120,50) 位于底部升级按钮，画面没有共鸣标签。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.6ed36080eaee46c38bd3eadfbb2d5eee",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (500,1850,120,50) 位于底部升级按钮，画面没有专属武器标签。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.bff16ee847684ea5a9b0926123110b50",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (700,1850,120,50) 位于底部升级按钮，画面没有进阶路线标签。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.7457b0ce15b1442481a1a1d60055a65b",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (920,1850,120,50) 位于底部升级按钮右端，画面没有遗物标签。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.56a0a7a9a63f4211a2b8220e03d7f70f",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (50,110,50,50) 位于左侧品质徽记内部；英雄名下的语义图标组位于 x=150..435，所述蓝绿色盾牌不在该框内。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.68e27435ef5e4389ac674208b1e77d00",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (880,400,150,200) 是英雄头饰与右侧图标区域，画面没有属性数值面板。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    },
+    {
+      "probe_id": "shadow.probe.779ef9a36f1a4994ab216ca6691bfa0a",
+      "visible_target_supported": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标框 (660,1750,60,60) 位于升级按钮上，画面中没有第四个技能图标。",
+      "evidence_ids": ["art.device.1783965916793.da7b51be"]
+    }
+  ]
+}

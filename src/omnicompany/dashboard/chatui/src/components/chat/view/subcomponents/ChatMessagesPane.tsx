@@ -37,8 +37,6 @@ interface ChatMessagesPaneProps {
   setGeminiModel: (model: string) => void;
   opencodeModel: string;
   setOpenCodeModel: (model: string) => void;
-  kimiModel: string;
-  setKimiModel: (model: string) => void;
   omniAgentModel: string;
   setOmniAgentModel: (model: string) => void;
   controllerModel: string;
@@ -93,8 +91,6 @@ export default function ChatMessagesPane({
   setGeminiModel,
   opencodeModel,
   setOpenCodeModel,
-  kimiModel,
-  setKimiModel,
   omniAgentModel,
   setOmniAgentModel,
   controllerModel,
@@ -186,8 +182,6 @@ export default function ChatMessagesPane({
           setGeminiModel={setGeminiModel}
           opencodeModel={opencodeModel}
           setOpenCodeModel={setOpenCodeModel}
-          kimiModel={kimiModel}
-          setKimiModel={setKimiModel}
           omniAgentModel={omniAgentModel}
           setOmniAgentModel={setOmniAgentModel}
           controllerModel={controllerModel}

@@ -32,7 +32,7 @@ def resolve_db_dir(domain: str = "default") -> Path:
     默认为项目根 data/ 下（基于本文件位置，不依赖 cwd）。
 
     Args:
-        domain: 领域标识（如 "unity-qa", "my_domain", "evolution"）
+        domain: 领域标识（如 "unity-qa", "demogame", "evolution"）
 
     Returns:
         Path 对象，指向 data/<domain>/ 目录
@@ -64,7 +64,7 @@ def resolve_domain_data_dir(domain: str) -> Path:
       落在 archmap ``data.allowed_subdirs.domains/`` 白名单下，不触告警。
 
     Args:
-        domain: domain 名（如 ``"my_domain"``），与 ``packages/domains/<domain>/`` 同名。
+        domain: domain 名（如 ``"demogame"``），与 ``packages/domains/<domain>/`` 同名。
 
     Returns:
         ``<project_root>/data/domains/<domain>/`` 目录（保证存在）。
@@ -138,7 +138,7 @@ def resolve_db_path(domain: str = "default") -> Path:
 
     Move 8 之后：所有事件统一写入两个文件：
       - data/ide_events.db   ← domain in {"ide", "ide.agent", "ide_agent"}
-      - data/events.db       ← 其他所有（factory / pipeline / guardian / my_domain ...）
+      - data/events.db       ← 其他所有（factory / pipeline / guardian / demogame ...）
 
     domain 仍然有意义：作为 FactoryEvent.source 字段写入 events 表，
     dashboard 仍可按 source LIKE 'pkg.X%' 过滤。但路径不再分叉。
@@ -219,3 +219,49 @@ def _project_root() -> Path:
     return omni_workspace_root()
 
 
+# ── demogame SDK 路径 ──────────────────────────────────────────────────────────────
+
+def demogame_sdk_dir() -> Path:
+    """demogame-auto-config-sdk 的根目录。
+
+    由 demogame_SDK_DIR 环境变量（绝对路径）注入；缺失即清晰报错，
+    不返回猜测路径。开发机在 .env 配置 demogame_SDK_DIR 维持现用法
+    （见 .env.example）。
+    """
+    raw = os.environ.get("demogame_SDK_DIR", "")
+    if raw:
+        return Path(raw)
+    raise RuntimeError(
+        "未设置 demogame_SDK_DIR, 无法定位 demogame SDK: 请在 .env 配置 demogame_SDK_DIR "
+        "(见 .env.example)。"
+    )
+
+
+def p4_root() -> Path:
+    """Perforce 客户端工作区根 (开发机 = D:\\P4\\main)。
+
+    由 P4_ROOT 环境变量注入；缺失即清晰报错，不返回猜测路径。
+    demogame 各域的 Client/Excel/Binary 等子路径都应从本根派生。
+    开发机在 .env 配置 P4_ROOT 维持现用法（见 .env.example）。
+    """
+    raw = os.environ.get("P4_ROOT", "")
+    if raw:
+        return Path(raw)
+    raise RuntimeError(
+        "未设置 P4_ROOT, 无法定位 Perforce 工作区: 请在 .env 配置 P4_ROOT "
+        "(见 .env.example)。"
+    )
+
+
+def p4_client() -> str:
+    """Perforce 客户端名 (项目代号, 弱身份)。
+
+    优先 P4_CLIENT, 兼容历史 EXPLORE_P4_CLIENT; 缺失即报错, 不写死代号。
+    """
+    raw = os.environ.get("P4_CLIENT") or os.environ.get("EXPLORE_P4_CLIENT")
+    if raw:
+        return raw
+    raise RuntimeError(
+        "未设置 P4_CLIENT, 无法定位 Perforce 客户端: 请在 .env 配置 P4_CLIENT "
+        "(见 .env.example)。"
+    )

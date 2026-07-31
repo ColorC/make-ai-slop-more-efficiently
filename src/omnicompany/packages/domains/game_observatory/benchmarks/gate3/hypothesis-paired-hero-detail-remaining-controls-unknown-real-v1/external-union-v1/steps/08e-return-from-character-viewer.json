@@ -1,0 +1,1 @@
+{"action":{"type":"tap","x":101,"y":1804,"duration_ms":250},"target_name":"角色查看器返回按钮","target_bounds":{"x":17,"y":1722,"width":173,"height":148},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

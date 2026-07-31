@@ -1,0 +1,96 @@
+/* markdown-extras.css — small additions on top of github-markdown-css.
+ * GitHub's stylesheet doesn't know about: callouts, wikilinks, mermaid containers.
+ */
+
+/* Wikilinks (custom, dashed underline so they're visually distinct from external links) */
+.markdown-body a.wikilink {
+  color: var(--fp-link);
+  border-bottom: 1px dashed #4a5a6a;
+  text-decoration: none;
+}
+.markdown-body a.wikilink:hover {
+  border-bottom-style: solid;
+  text-decoration: none;
+}
+
+/* Mermaid containers — center the SVG and make it responsive */
+.markdown-body div[data-mermaid='true'] {
+  background: var(--fp-bg);
+  padding: 12px;
+  border-radius: 6px;
+  overflow: auto;
+  text-align: center;
+  margin: 12px 0;
+}
+.markdown-body div[data-mermaid='true'] svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Callouts — color/bg are inline in JSX (drived from CALLOUT_COLORS),
+ * here just mild structural tweaks. */
+.markdown-body .callout {
+  margin: 12px 0;
+}
+
+/* GitHub's stylesheet sets a white background on .markdown-body — override for our dark shell. */
+.markdown-body {
+  background: transparent !important;
+}
+
+/* Anchor on hover — GitHub's stylesheet uses a "#" link; we don't generate those. */
+.markdown-body .anchor {
+  display: none;
+}
+
+/* S20: Obsidian highlight `==text==` → <mark> */
+.markdown-body mark.obs-highlight,
+.markdown-body mark[data-obs-highlight] {
+  background: #4a3d00;
+  color: #ffe082;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
+/* S20: HTML inline (rehype-raw) — make kbd / details visible on dark theme */
+.markdown-body kbd {
+  background: #2d333b;
+  border: 1px solid #444c56;
+  color: #adbac7;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'Consolas', 'Menlo', monospace;
+}
+.markdown-body details {
+  background: var(--fp-bg);
+  border: 1px solid #1f2933;
+  border-radius: 4px;
+  padding: 6px 12px;
+  margin: 8px 0;
+}
+.markdown-body details summary {
+  cursor: pointer;
+  color: var(--fp-link);
+  font-weight: 600;
+}
+.markdown-body sup, .markdown-body sub {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+/* github-markdown-css 把行内 code 设成 85%(于 14px 基线 = 11.9px, 低于字体地板 14)。
+   行内代码是正文, 拉回 1em(= 正文字号); 代码块(pre>code)不受影响, 由高亮器单独定。 */
+.markdown-body :not(pre) > code,
+.markdown-body :not(pre) > tt {
+  font-size: 1em;
+}
+
+/* S20: footnotes — remark-gfm adds them; style for dark theme */
+.markdown-body .footnotes {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid #1f2933;
+  font-size: 0.9em;
+  color: #8a9ba8;
+}

@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=services/absorption_runtime_test/workers ts=2026-04-26T00:00:00Z type=worker
 # [OMNI] material_id="material:utility.runtime_test.absorption.cross_run_stability_verifier.agent.py"
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """CrossRunStabilityVerifierWorker — Worker #3 (路 1).
 
 文件层重叠 (确定性集合) + 主题层重叠 (LLM 单步 submit), 综合判稳定性.

@@ -239,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI 入口 — 批量升级假设 yaml.
 
     用法:
-        python -m omnicompany.packages.services._diagnosis.doctor.builders.hypothesis_upgrader \\
+        python -m omnicompany.packages.services._diagnosis.doctor.builders.hypothesis_v1_upgrader \\
           --hypotheses-dir data/services/doctor/hypotheses/ \\
           --map-path docs/plans/.../canonical_anchors/standards_authority_map.yaml \\
           [--output-dir <out>]            # 不传写回原 dir
@@ -252,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     返:
         0 = 成功, 1 = 输入路径错, 2 = 加载 map 失败.
     """
-    parser = argparse.ArgumentParser(prog="hypothesis_upgrader")
+    parser = argparse.ArgumentParser(prog="hypothesis_v1_upgrader")
     parser.add_argument("--hypotheses-dir", required=True, help="假设 yaml 所在目录")
     parser.add_argument("--map-path", required=True, help="standards_authority_map.yaml 路径")
     parser.add_argument("--output-dir", default=None, help="输出目录 (默认写回原 dir)")

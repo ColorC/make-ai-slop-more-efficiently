@@ -1,0 +1,90 @@
+{
+  "schema": "game-observatory.ai-player.exploration-baseline-fixture.v1",
+  "id": "fixture.ai-player.exploration-runner-control.v1",
+  "title": "ExplorationRunner deterministic three-state control",
+  "environment_id": "environment.fixture.ai-player-control.v1",
+  "game_id": "fixture-game",
+  "build_scope_id": "build.fixture.ai-player-control.v1",
+  "target_id": "fixture://ai-player-exploration-runner-control-v1",
+  "start_state_id": "state.control.start",
+  "goal_state_id": "state.control.goal",
+  "states": [
+    {
+      "id": "state.control.start",
+      "frame_seed": "ai-player-control-start",
+      "ui_tree": {"screen": "start", "controls": ["continue"]},
+      "runtime_state": {"phase": 0}
+    },
+    {
+      "id": "state.control.middle",
+      "frame_seed": "ai-player-control-middle",
+      "ui_tree": {"screen": "middle", "controls": ["continue"]},
+      "runtime_state": {"phase": 1}
+    },
+    {
+      "id": "state.control.goal",
+      "frame_seed": "ai-player-control-goal",
+      "ui_tree": {"screen": "goal", "controls": []},
+      "runtime_state": {"phase": 2}
+    }
+  ],
+  "transitions": [
+    {
+      "from_state_id": "state.control.start",
+      "action": {"type": "wait", "seconds": 0},
+      "to_state_id": "state.control.middle",
+      "action_result": {"ok": true, "control_step": 1}
+    },
+    {
+      "from_state_id": "state.control.middle",
+      "action": {"type": "wait", "seconds": 0},
+      "to_state_id": "state.control.goal",
+      "action_result": {"ok": true, "control_step": 2}
+    }
+  ],
+  "task": {
+    "id": "task.ai-player.exploration-runner-control.v1",
+    "title": "Reach the frozen control goal",
+    "start_state": "state.control.start",
+    "goal": "state.control.goal",
+    "allowed_actions": ["wait"],
+    "reset_method": "fixture reset",
+    "checks": [
+      {
+        "id": "goal_state",
+        "description": "goal fixture state is current",
+        "expected": true
+      }
+    ]
+  },
+  "policy": {
+    "allowed_action_types": ["wait"],
+    "max_steps": 3,
+    "max_seconds": 30,
+    "max_state_visits": 2
+  },
+  "planner_name": "scripted-exploration-baseline",
+  "planner_decisions": [
+    {
+      "surface_summary": "control start",
+      "safe_to_act": true,
+      "action": {"type": "wait", "seconds": 0},
+      "rationale": "Advance the frozen control fixture.",
+      "expected_change": "Reach the middle control state.",
+      "provider": "scripted-exploration-baseline"
+    },
+    {
+      "surface_summary": "control middle",
+      "safe_to_act": true,
+      "action": {"type": "wait", "seconds": 0},
+      "rationale": "Advance the frozen control fixture.",
+      "expected_change": "Reach the goal control state.",
+      "provider": "scripted-exploration-baseline"
+    }
+  ],
+  "metadata": {
+    "purpose": "Measure the unchanged ExplorationRunner before semantic state and task changes.",
+    "state_metric": "raw_state_count",
+    "game_fact_claims": false
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "schema": "game-observatory.ai-player.live-stage-metrics.v1",
+  "run_id": "explore-dispatch.53cec133311e484db14d79b547347d38",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "canonical_session_id": "external-session.sanguo.terra.live14.20260718",
+  "native_provider_session_id": "019f7289-20e2-7702-91cb-cd73acce3695",
+  "task_id": "task.sanguo.chapter4-and-beyond.20260718",
+  "provider": "codex-cli",
+  "model": "gpt-5.6-terra",
+  "effort": "medium",
+  "facility_contract_sha256": "67b42afd5934e052136006b80c25361cf6a260fe886745947f4d0524f6420794",
+  "invocation_sequence": {
+    "first": 34,
+    "last": 53,
+    "count": 20
+  },
+  "stage": {
+    "started_at": "2026-07-18T05:07:33.603327+00:00",
+    "finished_at": "2026-07-18T05:38:45.335850+00:00",
+    "state": "completed",
+    "exit_code": 0,
+    "stop_reason": "max_turns",
+    "elapsed_seconds": 1871.391,
+    "provider_duration_seconds": 1488.965,
+    "driver_overhead_seconds": 382.426,
+    "driver_overhead_seconds_per_invocation": 19.1213
+  },
+  "execution": {
+    "semantic_actions": 20,
+    "invocations_with_actions": 18,
+    "actions_per_invocation": 1.0,
+    "elapsed_seconds_per_action": 93.56955,
+    "provider_seconds_per_action": 74.44825,
+    "expected_effects": 20,
+    "expected_effect_rate": 1.0,
+    "passed_action_evidence": 20,
+    "failed_action_evidence": 0,
+    "state_ingest_errors": 0,
+    "candidate_states_added": 27,
+    "deferred_edges_added": 17,
+    "information_gain_units": 44
+  },
+  "provider_usage": {
+    "input_tokens": 16419286,
+    "cached_input_tokens": 15532544,
+    "uncached_input_tokens": 886742,
+    "output_tokens": 11713,
+    "reasoning_tokens": 2853,
+    "cache_ratio": 0.9459938757385674,
+    "input_tokens_per_action": 820964.3,
+    "uncached_input_tokens_per_action": 44337.1,
+    "output_tokens_per_action": 585.65
+  },
+  "anomalies": [
+    {
+      "kind": "device_command_timeout_recovered",
+      "count": 2,
+      "effect": "Both actions were reconciled from a fresh terminal capture; neither was replayed and both canonical EvidenceSteps passed."
+    },
+    {
+      "kind": "zero_action_provider_turn",
+      "count": 2,
+      "sequences": [50, 53],
+      "classification": [
+        "A locator parser error caused no game side effect and the next turn changed route.",
+        "The canonical action budget was exhausted after the profession-data check."
+      ]
+    },
+    {
+      "kind": "one_action_provider_pattern",
+      "count": 16,
+      "effect": "The stage was correct but inefficient; the superseding A2 micro-stage contract requires three to six meaningful actions for a normal handoff."
+    }
+  ],
+  "root_entry_audit_evidence": {
+    "evidence_run_id": "evidence.run.ca732dc847ca4a3abdfd745db21ea502",
+    "evidence_step_id": "evidence.step.bf6f4be6013c41d29b10733314566eb7",
+    "summary": "Returned from the market to the stable inner-city root; confirmed throne hall level 4, built market, visible warehouse/residence/quarry/lumber mill/mill, and bottom general/alliance/profession/conquest entries."
+  },
+  "business_observations": [
+    "Conquest exposes military exercise, drill and expedition; military exercise is at chapter 9 and stage 1-5 shows level-16/4800 defenders, so the 3600-power level-12 main team did not attack.",
+    "The level-3 conscription office was automatically recruiting with about 4h46m remaining; the Agent switched business instead of polling.",
+    "Sun Ce is level 12 with 6440/14000 experience, 191/200 stamina, skill levels 1 and 4, and a third skill unlock at level 20.",
+    "The residence level-1 location was found, but its management menu was not opened.",
+    "The warehouse profession is tier 1; military farm unlocks at level 15, the two production lines at levels 20 and 30, and current talent points are 0."
+  ],
+  "superseding_runtime_changes": [
+    "Normal A2 micro-stages now continue across clear expected interfaces and target three to six meaningful actions per provider invocation.",
+    "Every handoff now emits a machine-audited stop reason, actual action count and Chinese micro-stage summary.",
+    "External action quality now enters the ten-action iteration monitor.",
+    "Multi-action invocations retain exact shared-batch usage instead of fabricating per-click token values.",
+    "Future drive results expose exact invocation token totals, cache ratio and token-per-action metrics."
+  ],
+  "raw_evidence": {
+    "dispatch_state": "data/domains/game_observatory/explore_dispatch_runs/runs/explore-dispatch.53cec133311e484db14d79b547347d38/state.json",
+    "dispatch_result": "data/domains/game_observatory/explore_dispatch_runs/runs/explore-dispatch.53cec133311e484db14d79b547347d38/stdout.log",
+    "dispatch_events": "data/domains/game_observatory/explore_dispatch_runs/runs/explore-dispatch.53cec133311e484db14d79b547347d38/events.jsonl",
+    "provider_ledger": "data/domains/game_observatory/external_agent_sessions/external-session.sanguo.terra.live14.20260718"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "schema": "game-observatory.ai-player.live-step-request.v1",
+  "target_id": "device://mumu/0",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "session_id": "ai-player-session.sanguo.post-launch-observe.20260716.v1",
+  "task_id": "task.sanguo.post-launch-observe.20260716.v1",
+  "bootstrap_session": true,
+  "initial_evidence": {
+    "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+    "artifact_ids": ["art.device.1784202823775.226596ee"],
+    "evidence_run_ids": ["evidence.run.f8cc8c2cea6e456caf17f5e38bae2028"],
+    "evidence_step_ids": ["evidence.step.ab56557589ad4fe385bbca2219d7d29e"],
+    "trace_run_ids": ["run.action.1784202821896.9e84e600"],
+    "note": "启动包动作后的游戏启动图。"
+  },
+  "viewport_width": 1920,
+  "viewport_height": 1080,
+  "game_id": "sanguo-mouding-tianxia",
+  "build_scope_id": "nslg-bilibili-1.31.0-versionCode-13100-20260715",
+  "action": {"type": "wait", "seconds": 0.5},
+  "target_name": "启动完成状态观察",
+  "account_action_intent": {
+    "id": "intent.sanguo.post-launch-observe.20260716.v1",
+    "category": "native_game_automation",
+    "summary": "等待半秒并记录启动完成后的当前画面。",
+    "game_internal": true
+  },
+  "expectation": {
+    "summary": "游戏保持在一个可辨认的稳定前台画面；若仍在加载，保存其最新终态并停止后续点击。",
+    "kind": "visual_no_change",
+    "min_visual_distance": 0.02,
+    "stop_conditions": [
+      "画面仍在加载或持续变化。",
+      "出现登录冲突、真实支付、外部身份或语义不明选择。",
+      "动作运行达到60秒。"
+    ]
+  },
+  "actor": "sanguo-player-day1",
+  "holder": "sanguo-player-day1",
+  "lease_ttl_seconds": 120,
+  "max_runtime_seconds": 60,
+  "settle_threshold": 0.01,
+  "required_consecutive": 2,
+  "settle_timeout_seconds": 5.0,
+  "sample_interval_seconds": 0.4,
+  "capture_profile": "compact_static"
+}

@@ -14,7 +14,6 @@
 import asyncio
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -221,7 +220,7 @@ def cmd_guardian_report(out_path: str | None, with_llm_prose: bool, quiet: bool)
 @click.option("--llm-all", "llm_all", is_flag=True, default=False,
               help="LLM 审查所有变更文件（而非仅新增文件，配合 --llm 使用）")
 @click.option("--pilot", "pilot_path", type=str, default=None,
-              help="LLM 试点路径前缀（例: src/omnicompany/packages/domains/research/）")
+              help="LLM 试点路径前缀（例: src/omnicompany/packages/domains/demogame/）")
 @click.option("--json-out", "json_output", is_flag=True, default=False,
               help="以 JSON 格式输出（便于机器处理）")
 def cmd_guardian_patrol(
@@ -245,7 +244,7 @@ def cmd_guardian_patrol(
       omni guardian patrol --commits 5              # 回溯 5 个 commit
       omni guardian patrol --llm                    # 规则 + LLM 审查新增文件
       omni guardian patrol --llm --llm-all          # LLM 审查所有变更文件
-      omni guardian patrol --llm --pilot src/omnicompany/packages/domains/research/
+      omni guardian patrol --llm --pilot src/omnicompany/packages/domains/demogame/
       omni guardian patrol --json-out               # JSON 输出
     """
     from omnicompany.packages.services._core.guardian import (
@@ -1078,31 +1077,6 @@ def cmd_archmap_diff(root: str):
 
 # ─── guardian metadata-report（Format/Router 描述质量）──────
 
-def _persist_metadata_report(root_path: Path, rendered_text: str) -> Path:
-    """把 metadata-report 纯文本落盘到 data/services/guardian/metadata/。
-
-    写 metadata-report-<ts>.md + latest.md 两份 (latest 供 omni guardian report 聚合)。
-    返回 latest.md 路径。写失败抛 OSError 由调用方决定 (CLI 场景直接让它冒泡,
-    避免"看起来跑了其实没落盘"的假成功)。
-    """
-    ts_iso = datetime.now(timezone.utc).isoformat()
-    ts_name = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    out_dir = root_path / "data" / "services" / "guardian" / "metadata"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    md = (
-        f'<!-- [OMNI] origin=omni-cli domain=services/guardian/metadata ts={ts_iso} type=doc status=active -->\n\n'
-        f"# Format/Router metadata 质量周报 · {ts_iso}\n\n"
-        "数据源: `omni guardian metadata-report` (cron: guard-metadata-weekly)\n\n"
-        "```text\n"
-        f"{rendered_text}\n"
-        "```\n"
-    )
-    (out_dir / f"metadata-report-{ts_name}.md").write_text(md, encoding="utf-8")
-    latest = out_dir / "latest.md"
-    latest.write_text(md, encoding="utf-8")
-    return latest
-
-
 @cmd_guardian.command("metadata-report")
 @click.option("--root", type=str, default=_DEFAULT_ROOT,
               help="项目根目录")
@@ -1205,28 +1179,17 @@ def cmd_guardian_metadata_report(root: str, by_package: bool):
             else:
                 st.poor += 1
 
-    # 渲染 (同步收集纯文本行, 供落盘消费面 · 2026-07-26: cron 周报从只打 stdout
-    # 改为落 data/services/guardian/metadata/, 并接进 omni guardian report 摘要)
-    plain_lines: list[str] = [
-        f"扫描 formats.py: {fmt_files}  |  routers.py: {rtr_files}",
-        "",
-    ]
-
+    # 渲染
     click.echo(click.style("═" * 70, fg="cyan"))
     click.echo(click.style("OmniCompany Metadata Quality Report", fg="cyan", bold=True))
     click.echo(click.style("═" * 70, fg="cyan"))
-    click.echo(f"  {plain_lines[0]}")
+    click.echo(f"  扫描 formats.py: {fmt_files}  |  routers.py: {rtr_files}")
     click.echo()
 
     def _print_table(title: str, stats: dict):
         click.echo(click.style(title, fg="yellow", bold=True))
-        header = f"  {'package':45} {'full':>6} {'medium':>6} {'poor':>6} {'total':>6}"
-        sep = f"  {'-'*45} {'-'*6:>6} {'-'*6:>6} {'-'*6:>6} {'-'*6:>6}"
-        click.echo(header)
-        click.echo(sep)
-        plain_lines.append(title)
-        plain_lines.append(header)
-        plain_lines.append(sep)
+        click.echo(f"  {'package':45} {'full':>6} {'medium':>6} {'poor':>6} {'total':>6}")
+        click.echo(f"  {'-'*45} {'-'*6:>6} {'-'*6:>6} {'-'*6:>6} {'-'*6:>6}")
         total_full = total_medium = total_poor = total_total = 0
         for key in sorted(stats.keys()):
             st = stats[key]
@@ -1243,18 +1206,12 @@ def cmd_guardian_metadata_report(root: str, by_package: bool):
                 color = "green"
             line = f"  {key:45} {st.full:>6} {st.medium:>6} {st.poor:>6} {st.total:>6}"
             click.echo(click.style(line, fg=color))
-            plain_lines.append(line)
-        click.echo(sep)
-        plain_lines.append(sep)
-        total_line = f"  {'TOTAL':45} {total_full:>6} {total_medium:>6} {total_poor:>6} {total_total:>6}"
-        click.echo(total_line)
-        plain_lines.append(total_line)
+        click.echo(f"  {'-'*45} {'-'*6:>6} {'-'*6:>6} {'-'*6:>6} {'-'*6:>6}")
+        click.echo(f"  {'TOTAL':45} {total_full:>6} {total_medium:>6} {total_poor:>6} {total_total:>6}")
         if total_total > 0:
             pct = total_full * 100 // total_total
             click.echo(f"  full %: {pct}%")
-            plain_lines.append(f"  full %: {pct}%")
         click.echo()
-        plain_lines.append("")
 
     _print_table("Format 描述质量", fmt_stats)
     _print_table("Router 描述质量", rtr_stats)
@@ -1267,10 +1224,6 @@ def cmd_guardian_metadata_report(root: str, by_package: bool):
     click.echo("  Router 满分:  DESCRIPTION ≥ 50 字符 + FORMAT_IN + FORMAT_OUT")
     click.echo("  Router 中档:  DESCRIPTION 20-49 字符")
     click.echo("  Router 差档:  DESCRIPTION < 20 字符")
-
-    latest = _persist_metadata_report(root_path, "\n".join(plain_lines))
-    click.echo()
-    click.echo(f"落盘: {latest} (供 omni guardian report 聚合)")
 
 
 # ─── guardian trace-violation（违规溯源）─────────────────────

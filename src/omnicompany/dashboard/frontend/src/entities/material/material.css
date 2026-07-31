@@ -1,0 +1,45 @@
+/* ============================================================
+   material 实体页 · 蓝图 G(2026-07-19 阶段四第四波;对照 analysis/material.md 病灶清单):
+   · 页签内形态(G.3⑤): 页面从功能工具行开始(身份信息+视图 seg+⋯), 无大标题顶栏。
+   · 页头结构化: 名称(衬线)+ status 状态徽章 + type 标注框 + 面包屑路径(mono,不假装可点),
+     替代"灰字长路径平铺"; OMNI frontmatter 从源码注释提取成字段, 不泄漏原文。
+   · DESIGN/源码 = segmented(role=radiogroup); 默认落在人读的 DESIGN。
+   · CodeFileEditor(shell 共享件,不可改)自带的页头/双按钮 tab 行由本文件按位隐藏
+     (.mat-frame 前两子节点), 只对本实体生效; 视图切换经 defaultView prop 驱动(数据流未改)。
+   纹理分区铁律: 工具行=chrome 铺 scene 格纸; 正文/代码区=文字面平滑纸面(本文件零纹理)。
+   ============================================================ */
+
+.mat-page { display: flex; flex-direction: column; height: 100%; overflow: hidden;
+  color: var(--fp-text);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+
+/* 功能工具行(chrome 区: 格纸 + 收薄) */
+.mat-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 16px; flex: none; border-bottom: 1px solid var(--fp-border-subtle);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+.mat-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* 材料名 = 该行主焦点(衬线标题, G 排版) */
+.mat-name { font-family: var(--fp-bp-font-display); font-size: var(--fp-fs-2); font-weight: 700;
+  color: var(--fp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* type = 细线标注框(与 bp-newtag/尺寸标注同族) */
+.mat-tag { display: inline-grid; place-items: center; height: 19px; padding: 0 6px; flex: none;
+  border: 1px solid var(--fp-border-strong); border-radius: 2px; color: var(--fp-text-2);
+  font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); letter-spacing: .08em;
+  text-transform: uppercase; line-height: 1; }
+/* 面包屑路径: mono 弱字分段, 整串 title 悬浮见全路径(不可点的诚实形态——无跳转目标) */
+.mat-crumb { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1;
+  color: var(--fp-text-3); font-family: var(--fp-font-mono); font-size: var(--fp-fs-4);
+  overflow: hidden; white-space: nowrap; }
+.mat-crumb .seg-part { overflow: hidden; text-overflow: ellipsis; }
+.mat-crumb .sep { color: var(--fp-border-strong); flex: none; }
+.mat-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* 共享 CodeFileEditor 的壳: 隐藏其自带页头与双按钮 tab 行(语义已由上方工具行承接)。
+   只选中本实体容器内的实例, 不外溢到 worker/team。 */
+.mat-frame { flex: 1; min-height: 0; position: relative; }
+.mat-frame > div > div:nth-child(-n + 2) { display: none; }
+
+@media (max-width: 599px) {
+  .mat-tools { padding: 8px 12px; gap: 8px; }
+  .mat-crumb { display: none; } /* 窄屏路径让位, 全路径在 ⋯ 菜单可复制 */
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "game-observatory.hypothesis-shadow-run-contract.v1",
+  "benchmark_run_id": "pair.gate3.season-equipment.hypothesis.unknown-real.07",
+  "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-season-equipment-unknown-real-v1.json",
+  "same_input_verified_facts": true,
+  "coordinate_reference": "data/domains/game_observatory/benchmarks/gate3/hypothesis-paired-season-equipment-unknown-real-v1/source-coordinate-bands.png",
+  "visual_locator_result": "data/domains/game_observatory/benchmarks/gate3/hypothesis-paired-season-equipment-unknown-real-v1/visual-locator-run/result.json",
+  "visual_candidate_manifest": "data/domains/game_observatory/benchmarks/gate3/hypothesis-paired-season-equipment-unknown-real-v1/visual-candidate-manifest.json",
+  "visual_candidate_manifest_sha256": "4038f93a5613e7ae744be9b5f4da9f10fd87e4b3ee41ad692f663355a5d98356",
+  "change_under_test": "require locator provenance for unknown taps and visual-neutral target naming",
+  "max_iterations": 1,
+  "max_suggestions": 12,
+  "max_region_inspections": 24,
+  "device_actions": false,
+  "fact_publication": false,
+  "manual_candidate_access": false,
+  "visual_locator_access": true,
+  "output_root": "data/domains/game_observatory/benchmarks/gate3/hypothesis-paired-season-equipment-unknown-real-v1/hypothesis-run-07"
+}

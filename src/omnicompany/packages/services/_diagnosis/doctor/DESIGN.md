@@ -49,7 +49,7 @@
 
 - [`agents/spec_diagnostic.py`](agents/spec_diagnostic.py) `SpecDiagnosticAgent` (id: `doctor.spec_diagnostic`) — 规范型诊断
   - 跑路径: `doctor.spec_diagnosis.request → SpecDiagnosticAgent → doctor.spec_diagnosis.verdict + list[doctor.health_finding]`
-  - dogfood 跑通 × 3 (step 7, 8.4, 9.1-9.2). 见 dogfood_step7_report.md + dogfood_step8-4_report.md
+  - dogfood 跑通 × 3 (step 7, 8.4, 9.1-9.2). 见 dogfood_step7_report.md + dogfood_step8_4_report.md
   - prompt 在 [`agents/spec_diagnostic_prompt.md`](agents/spec_diagnostic_prompt.md)
   - override hooks: `build_tool_context` 注入 task_id (= trace_id) + agent_id + scratch / `build_extract_result` verdict event payload 走 submit_verdict args (跨 turn 持久化, 不依赖 ctx 短生命)
 
@@ -129,7 +129,7 @@
 - [x] **HypothesisDeriverAgent** (2026-05-05 完, dogfood × 1 跑通, 5 条新假设入 data/services/doctor/hypotheses/. 加 write_hypothesis + submit_derivation_report 2 个派生专属业务工具)
 - [x] **registry HealthArchive 接通 doctor.health_finding** (2026-05-06 完, V0 走 FindingArchive JSONL 双轨: yaml 按 task_id 分桶 + JSONL 按 entity 分桶. write_finding 工具自动双落, registry 失败不阻断主路径. V1 走 bus 事件)
 - [x] **finding 聚合 V3 snapshot** (2026-05-06 完, 立 FindingArchive.aggregate_to_snapshot 方法. schema v3 拒打分铁律: 不打 severity, 不打 verdict='healthy/unhealthy'. 跟 V2 HealthSnapshot 双轨独立 — V2 含 severity 跟铁律冲突, 不强行兼容. 字段: finding_count + by_finding_kind 分桶 + applied_* union + findings_summary 各 commentary 前 200 字. 健康判定靠人/agent 读 commentary+concern, 不靠数字)
-- [x] **A 类 8 上下文准备 worker 评估** (2026-05-06 完, 结论: 不应订阅, 现状 read_file 自取最优. 详 workers_inventory_and_classification.md §五附)
+- [x] **A 类 8 上下文准备 worker 评估** (2026-05-06 完, 结论: 不应订阅, 现状 read_file 自取最优. 详 v3_workers_inventory_and_classification.md §五附)
 - [ ] **现 V3 30 worker 收编**: 评估哪些可归为"规范型/假设型"实例, 重写或保留 (大工作)
 - [ ] **测试基线 red/green**: 四 agent SPEC.test_baseline 现 () 占位, 待真用更多场景后校准
 - [ ] **prompt/context engineering 规范统一**: 用户 2026-05-05 提的元任务, 留单独议
@@ -189,7 +189,7 @@
 - `routers.py` — 22 个 `*Router` 名的 alias re-export，外加 AST 工具函数（`_is_format_call` 等）re-export 自 `_archive/routers_legacy.py`
 - `pipeline_topology.py` — 2 个 `*Router` alias + `Finding/CheckContext/run_pipeline_checks/PipelineLineage/...` re-export 自 `_archive/pipeline_topology_legacy.py`
 
-### 检查引擎（原 `pipeline_topology.py`，现归档到 _archive/pipeline_topology_legacy.py）
+### 检查引擎（原 `pipeline_topology.py`，现归档到 [_archive/pipeline_topology_legacy.py](_archive/pipeline_topology_legacy.py)）
 - **`Finding`** dataclass — check_id / level / location / observation / implication / cross_refs
 - **`CheckContext`** — 一次计算、所有检查共享的图结构
 - **`run_pipeline_checks(spec, enabled=None, disabled=None) -> list[Finding]`** — 带注册表模式的 11 条检查

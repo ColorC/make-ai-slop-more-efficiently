@@ -1,0 +1,30 @@
+{
+  "schema": "game-observatory.ai-player.sanguo-daily-duty-candidate.v1",
+  "candidate_id": "sanguo.20260720.memory-consolidation.live96.v1",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "continuity_run_id": "sanguo-daily-continuity.pure-ai-campaign.20260720",
+  "duty": "end_of_day_memory_consolidation",
+  "session_ids": [
+    "external-session.sanguo.terra.live96.20260720"
+  ],
+  "memory_record_ids": [
+    "memory.external-turn.4ac266c624d6e71efa80ad76"
+  ],
+  "evidence_refs": [
+    {
+      "artifact_ids": [
+        "art.device.1784497056382.c384ae4a",
+        "art.probe-terminal.1784497060357.9bd6be7c"
+      ],
+      "evidence_run_ids": [
+        "evidence.run.a7452aba04d14062a7efa0bfb6723110"
+      ],
+      "evidence_step_ids": [
+        "evidence.step.9d01d993d76a43d28055ed61840bf1d3"
+      ]
+    }
+  ],
+  "summary": "连续会话已把本回合的民居条件面板关闭、征战入口和军演关卡检查固化为当天有效记忆，并保留对应Before、Action、After来源。",
+  "actor": "ai-player-supervisor",
+  "reason": "让下一会话直接召回今天的终态、阻断和后续目标，避免重新理解同一界面。"
+}

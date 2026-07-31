@@ -1,0 +1,77 @@
+/* ============================================================
+   nav_audit 可达性审计 · 蓝图 G(2026-07-19 阶段四第四波;对照 analysis/nav_audit.md):
+   · 主焦点复位: 结论图形化(孤岛大数字 + n/m 堆叠比例条),「返回项目主页」降级 ghost。
+   · 删"返回主页"恒绿列(信息量恒 0);孤岛判定=独立状态徽标列,长句修复建议收 tooltip/图例。
+   · 补筛选: segmented(全部/仅孤岛)+ 类型 tag picker;表头 sticky。
+   · "从主页怎么到达"散文 → 面包屑 chip 链;功能名对单例实体可点直达。
+   纹理分区铁律: 页面/工具行=chrome 格纸;表格卡=平滑纸面禁纹理。
+   ============================================================ */
+
+.na-page { height: 100%; overflow: auto; box-sizing: border-box; padding: 12px 20px 48px;
+  color: var(--fp-text);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+.na-inner { max-width: 980px; margin: 0 auto; }
+
+/* 结论工具行(chrome): 大数字 + 比例条 + 筛选 + ghost 返回 */
+.na-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+.na-verdict { display: flex; align-items: baseline; gap: 8px; }
+.na-big { font-family: var(--fp-bp-font-display); font-size: 30px; font-weight: 700; line-height: 1; }
+.na-big.bad { color: var(--fp-err); }
+.na-big.ok { color: var(--fp-ok); }
+.na-verdict .lab { color: var(--fp-text-2); font-size: var(--fp-fs-3); }
+/* n/m 堆叠比例条: 可达=hatch 剖面填充(工程图语言), 孤岛=朱红剖面 */
+.na-ratio { display: flex; width: 150px; height: 10px; border: 1px solid rgba(235,245,255,.45);
+  border-radius: 2px; overflow: hidden; flex: none; }
+.na-ratio .ok { background: var(--fp-bp-hatch-fill); }
+.na-ratio .bad { background: repeating-linear-gradient(45deg, var(--fp-bp-seal) 0 2px, rgba(214,69,65,.25) 2px 6px); }
+.na-tools .spacer { flex: 1; }
+
+/* 图例行(替代红色说明段): 真实图例,12px 地板 */
+.na-legend { margin-bottom: 12px; }
+
+/* ghost 返回(导航出口不抢审计结论) */
+.na-back { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px dashed var(--fp-border); border-radius: var(--fp-r1); background: transparent;
+  color: var(--fp-text-2); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono);
+  letter-spacing: .06em; padding: 5px 12px; transition: all var(--fp-t-fast); }
+.na-back:hover { border-style: solid; border-color: var(--fp-border-strong); color: var(--fp-text); }
+.na-back:active { transform: translateY(1px); }
+
+/* 表格卡(2px 白框纸件) */
+.na-tablewrap { border: var(--fp-bp-frame-w) solid var(--fp-border); border-radius: var(--fp-r2);
+  background: var(--fp-bp-paper); box-shadow: var(--fp-shadow-sm); overflow: auto; }
+.na-table { width: 100%; border-collapse: collapse; font-size: var(--fp-fs-3); }
+.na-table th { position: sticky; top: 0; z-index: 1; text-align: left; padding: 8px 10px;
+  background: var(--fp-bp-paper-2); color: var(--fp-text-3); font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4); font-weight: 400; letter-spacing: .1em; text-transform: uppercase;
+  border-bottom: 1px solid var(--fp-border); white-space: nowrap; }
+.na-table td { padding: 7px 10px; border-bottom: 1px solid var(--fp-border-subtle);
+  color: var(--fp-text-2); vertical-align: middle; }
+.na-table tr:last-child td { border-bottom: 0; }
+.na-table tr[data-island="true"] td { background: color-mix(in srgb, var(--fp-err) 7%, transparent); }
+.na-table tr[data-openable="true"] { cursor: pointer; }
+.na-table tr[data-openable="true"]:hover td { background: var(--fp-bg-overlay); }
+.na-fn { display: flex; align-items: center; gap: 7px; color: var(--fp-text); font-weight: 550; }
+.na-fn .go { color: var(--fp-text-3); flex: none; }
+/* 类型 tag: 色点 + mono 短签(桌面独立列;窄屏并入功能格) */
+.na-type { display: inline-flex; align-items: center; gap: 5px; font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4); color: var(--fp-text-3); white-space: nowrap; }
+.na-type .dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid currentColor; flex: none; }
+.na-type.inline { display: none; } /* 桌面隐藏并入版;窄屏媒体查询翻转 */
+/* 路径 chip 链(面包屑,无实体映射不假装可点) */
+.na-via { display: flex; flex-wrap: wrap; gap: 4px; }
+.na-chip { display: inline-flex; align-items: center; max-width: 260px; padding: 1px 8px;
+  border: 1px dashed var(--fp-border); border-radius: var(--fp-r1); color: var(--fp-text-2);
+  font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.na-via .none { color: var(--fp-text-3); font-size: var(--fp-fs-4); }
+
+@media (max-width: 900px) {
+  .na-table .col-type { display: none; }        /* 窄屏类型列让位 */
+  .na-type.inline { display: inline-flex; }     /* 并入功能格 */
+}
+@media (max-width: 599px) {
+  .na-page { padding: 10px 12px 40px; }
+  .na-ratio { width: 110px; }
+  .na-big { font-size: 24px; }
+}

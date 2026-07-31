@@ -1,0 +1,86 @@
+{
+  "schema": "game-observatory.ai-player.knowledge-memory-seed.v1",
+  "environment_id": "environment.sanguo.bilibili.mumu.prelogin.1_31_0",
+  "sources": [
+    {
+      "local_path": "data/domains/research/reports/res_截至2026-07-15-三国谋定天下-bilibili-131_5abbfc21.md",
+      "snapshot": {
+        "id": "snapshot.research.sanguo-profession-20260715.v1",
+        "source_id": "res:截至2026-07-15-三国谋定天下-bilibili-131:5abbfc21",
+        "content_sha256": "31f1deda0f65b8489d8279b2b174da47f6fff3840b3b1a7c9e763efca9a484c5",
+        "locator": "data/domains/research/reports/res_截至2026-07-15-三国谋定天下-bilibili-131_5abbfc21.md",
+        "excerpt": "S1 新号的近期资料更偏向司仓或青囊；镇军更依赖战力与持续 PVP；职业天赋重置不等于转职。",
+        "captured_at": "2026-07-15T16:52:58.365844+00:00",
+        "status": "active",
+        "metadata": {
+          "research_richness": 33,
+          "unsupported_claim_count": 0
+        }
+      }
+    }
+  ],
+  "guides": [
+    {
+      "schema": "game-observatory.ai-player.guide-knowledge.v1",
+      "id": "guide.sanguo.taptap.s1-profession-opening-2025",
+      "version": 1,
+      "environment_id": "environment.sanguo.bilibili.mumu.prelogin.1_31_0",
+      "url": "https://www.taptap.cn/moment/698505761717747958",
+      "platform": "TapTap",
+      "author": "TapTap 玩家攻略作者（页面署名）",
+      "updated_at": "2025-07-27",
+      "retrieved_at": "2026-07-15T16:52:58.365844+00:00",
+      "season": "S1",
+      "summary": "S1 新手职业近期推荐青囊、司仓或天工；当前纯 AI 新号采用默认司仓，以资源发育和同盟后勤为主。",
+      "locators": [
+        "S1 新手职业推荐",
+        "司仓、青囊、天工"
+      ],
+      "status": "unverified",
+      "missing_applicability_reason": "账号赛季、服务器阶段和 Bilibili 1.31.0 职业精确数值尚未在游戏内全部确认。",
+      "created_at": "2026-07-15T16:52:58.365844+00:00",
+      "evidence_refs": [
+        {
+          "schema": "game-observatory.ai-player.evidence-reference.v1",
+          "environment_id": "environment.sanguo.bilibili.mumu.prelogin.1_31_0",
+          "source_ids": [
+            "res:截至2026-07-15-三国谋定天下-bilibili-131:5abbfc21"
+          ]
+        }
+      ]
+    }
+  ],
+  "memories": [
+    {
+      "schema": "game-observatory.ai-player.memory-record.v1",
+      "id": "memory.sanguo.decision.profession.sicang.v1",
+      "version": 1,
+      "environment_id": "environment.sanguo.bilibili.mumu.prelogin.1_31_0",
+      "kind": "episodic",
+      "subject_id": "account.profession-choice",
+      "payload": {
+        "chosen_profession": "司仓",
+        "decision_status": "executed_before_refresh_completed",
+        "evidence_run_id": "evidence.run.d68e741e393c475692a3abae46266686",
+        "posthoc_guide_assessment": "consistent_with_recent_S1_beginner_guidance",
+        "operating_intent": "优先资源发育和同盟后勤，具体天赋与数值以游戏内当前规则为准。",
+        "future_revisit": "赛季和霸业阶段确认后重查适用性；若确需转职，仅在游戏开放的一次转职机会前重新决策。",
+        "rollback_performed": false
+      },
+      "status": "active",
+      "created_at": "2026-07-15T16:52:58.365844+00:00",
+      "evidence_refs": [
+        {
+          "schema": "game-observatory.ai-player.evidence-reference.v1",
+          "environment_id": "environment.sanguo.bilibili.mumu.prelogin.1_31_0",
+          "evidence_run_ids": [
+            "evidence.run.d68e741e393c475692a3abae46266686"
+          ],
+          "source_ids": [
+            "res:截至2026-07-15-三国谋定天下-bilibili-131:5abbfc21"
+          ]
+        }
+      ]
+    }
+  ]
+}

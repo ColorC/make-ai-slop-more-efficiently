@@ -1,9 +1,0 @@
-{
-  "name": "ontology-candidates-weekly",
-  "schedule": "@weekly",
-  "command": "omni decisions candidates-scan",
-  "prompt": "",
-  "description": "决策本体候选流水线周扫:偏离聚集+到期复核两信号入口,生成候选进审阅台队列(幂等去重;plan=[2026-07-10]DECISION-ONTOLOGY §六)",
-  "created_at": "2026-07-10T10:34:45.658908+00:00",
-  "last_run_at": "2026-07-17T10:39:02.945309+00:00"
-}

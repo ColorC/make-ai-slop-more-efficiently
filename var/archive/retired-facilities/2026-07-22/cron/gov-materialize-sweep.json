@@ -1,9 +1,0 @@
-{
-  "name": "gov-materialize-sweep",
-  "schedule": "@daily",
-  "command": "omni semantic sweep",
-  "prompt": "",
-  "description": "每日: 产出目录里新文件自动纳入 material(产出即 material)",
-  "created_at": "2026-06-27T14:50:11.572769+00:00",
-  "last_run_at": "2026-07-21T18:59:02.246454+00:00"
-}

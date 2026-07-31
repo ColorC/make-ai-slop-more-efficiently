@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=services/hypothesis ts=2026-07-10T00:00:00Z type=bindings status=active
 # [OMNI] material_id="material:services.learning.hypothesis.team.bindings_builder.py"
-# OMNI-024 ALLOW: HypothesisSessionRouter 与 build_bindings 同文件紧耦合, 仅被本文件 bindings 构建使用(同 doctor/run.py 先例)
 """hypothesis.run — 管线 bindings(v5:薄包装 Router 驱动 run_session)。
 
 照 vilo eval 系模式:管线节点=薄确定性包装,内部驱动真实多轮 agent 循环

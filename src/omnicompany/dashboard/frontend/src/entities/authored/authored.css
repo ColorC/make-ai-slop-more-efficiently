@@ -1,0 +1,16 @@
+/* ============================================================
+   authored 笔记(overlay-shell iframe 页) · 蓝图 G 壳层处理(2026-07-19 阶段四第四波):
+   iframe 内容(.BlockSuite 白板/底部工具条)在 iframe 内,不可达;本实体只做壳层:
+   scene 格纸底 + 2px 白框纸件框住 iframe(厚框纸件语言),零重复 chrome(不加标题/工具行)。
+   ============================================================ */
+
+.au-shell { height: 100%; box-sizing: border-box; padding: 10px;
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+.au-frame { height: 100%; overflow: hidden; box-sizing: border-box;
+  border: var(--fp-bp-frame-w) solid var(--fp-border); border-radius: var(--fp-r2);
+  box-shadow: var(--fp-shadow-sm); }
+.au-frame iframe { display: block; width: 100%; height: 100%; border: 0; background: transparent; }
+
+@media (max-width: 599px) {
+  .au-shell { padding: 6px; }
+}

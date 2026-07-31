@@ -6,7 +6,6 @@ export const MCP_PROVIDER_NAMES: Record<McpProvider, string> = {
   codex: 'Codex',
   gemini: 'Gemini',
   opencode: 'OpenCode',
-  kimi: 'Kimi',
   omni_agent: 'Omni Agent',
   controller: '总控',
 };
@@ -17,7 +16,6 @@ export const MCP_SUPPORTED_SCOPES: Record<McpProvider, McpScope[]> = {
   codex: ['user', 'project'],
   gemini: ['user', 'project'],
   opencode: ['user', 'project'],
-  kimi: ['user', 'project'],
   omni_agent: ['user', 'project'],
   controller: ['user', 'project'],
 };
@@ -28,7 +26,6 @@ export const MCP_SUPPORTED_TRANSPORTS: Record<McpProvider, McpTransport[]> = {
   codex: ['stdio', 'http'],
   gemini: ['stdio', 'http', 'sse'],
   opencode: ['stdio', 'http'],
-  kimi: ['stdio', 'http'],
   omni_agent: ['stdio', 'http'],
   controller: ['stdio', 'http'],
 };
@@ -43,7 +40,6 @@ export const MCP_PROVIDER_BUTTON_CLASSES: Record<McpProvider, string> = {
   codex: 'bg-gray-800 text-white hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600',
   gemini: 'bg-blue-600 text-white hover:bg-blue-700',
   opencode: 'bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-700 dark:hover:bg-zinc-600',
-  kimi: 'bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-700 dark:hover:bg-zinc-600',
   omni_agent: 'bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-700 dark:hover:bg-zinc-600',
   controller: 'bg-purple-600 text-white hover:bg-purple-700',
 };
@@ -54,7 +50,6 @@ export const MCP_SUPPORTS_WORKING_DIRECTORY: Record<McpProvider, boolean> = {
   codex: true,
   gemini: true,
   opencode: false,
-  kimi: true,
   omni_agent: false,
   controller: false,
 };

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Session Self Bind"
-  short_description: "Bind native sessions to plans, tasks, and progress"
-  default_prompt: "Use $session-self-bind to bind this session to the active Omnicompany plan and task."

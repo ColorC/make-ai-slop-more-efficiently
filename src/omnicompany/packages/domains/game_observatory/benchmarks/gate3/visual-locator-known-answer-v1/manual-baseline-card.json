@@ -1,0 +1,51 @@
+{
+  "schema": "game-observatory.manual-baseline-card.v1",
+  "id": "gate3.visual-locator.known-answer.v1",
+  "frozen_at": "2026-07-14T00:00:00+08:00",
+  "status": "frozen-before-visual-locator-inference",
+  "purpose": "已知答案的几何定位组件校准；不计作 hypothesis 对人工基线的盲测胜出",
+  "input": {
+    "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-hero-detail-calibration-v1.json",
+    "artifact_id": "art.device.1783965916793.da7b51be",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783965916793.da7b51be.png",
+    "sha256": "38dbdb618eaf8de56226629c1e20fbd871072409fae2053acb129a88eaa6255c",
+    "viewport": {"width": 1080, "height": 1920}
+  },
+  "manual_method": {
+    "sources": [
+      "完整原始截图",
+      "Gate 2 已验证路线中的目标框与实际转换"
+    ],
+    "expected_interactions": 6,
+    "expected_ids": [
+      "rowan-combat-attributes",
+      "rowan-season-equipment",
+      "rowan-affinity",
+      "rowan-skin",
+      "rowan-headwear",
+      "rowan-next-hero"
+    ],
+    "cost_comparison_eligible": false,
+    "reason": "人工答案已在旧校准中公开，当前只用于验证视觉定位器能否覆盖已知几何"
+  },
+  "locator_contract": {
+    "input": "完整原始截图",
+    "output_coordinate_space": "source_pixels",
+    "eligible_candidates": "interactivity=true",
+    "semantic_caption_is_advisory": true,
+    "large_covering_boxes_cannot_match_multiple_targets": true,
+    "device_actions": false,
+    "fact_publication": false
+  },
+  "acceptance": {
+    "repetitions": 3,
+    "required_recall_each_run": 1.0,
+    "required_expected_matches_each_run": 6,
+    "maximum_missing_targets_each_run": 0,
+    "maximum_center_jitter_pixels_across_runs": 16,
+    "oom_allowed": false,
+    "runtime_errors_allowed": false,
+    "latency_and_peak_memory": "record-first; freeze a production threshold after hardware measurement"
+  },
+  "next_gate": "通过本卡只允许视觉定位器成为 hypothesis 的候选几何来源；hypothesis 仍需新的运行前人工基线与保留 fixture 才能比较严格占优"
+}

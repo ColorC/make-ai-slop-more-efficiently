@@ -114,7 +114,7 @@ _SAFE_OMNI_LIFECYCLE = (
     "task complete", "task status", "task start", "task next", "task show",
     "task list", "task assign", "task board", "task bindings", "task update",
     "plan gate", "plan show", "plan current", "plan list", "plan report",
-    "notes ls", "notes read", "review readback",
+    "notes ls", "notes read", "human inbox",
 )
 
 

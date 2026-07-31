@@ -41,7 +41,7 @@ def _build_review_pipeline(branch: str, title: str, standard: str) -> TeamSpec:
               TransformMethod.RULE, f"归一化审查请求, 锁定 archetype={branch} 与标尺({standard}), 建 run_dir。"),
         _node("gate", "Gate",
               "frontend_design.intake", "frontend_design.gate_result",
-              TransformMethod.RULE, "确定性门禁: ux_audit 三维枚举 + style_gates 六条扫描(LOFA 侧始终跑) + token_drift 三方对账, 产证据列表不打分。"),
+              TransformMethod.RULE, "确定性门禁: 跑可判定规则(溢出/文案预算/对比度/字号地板/平铺密度), 产证据列表不打分。"),
         _node("vlm_review", "VlmReview",
               "frontend_design.gate_result", "frontend_design.vlm_review",
               TransformMethod.LLM, "VLM 相对评审: 对基准图成对比较, 列证据不打分。"),

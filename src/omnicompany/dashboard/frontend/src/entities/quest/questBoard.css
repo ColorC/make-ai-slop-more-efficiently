@@ -1,0 +1,132 @@
+/* ============================================================
+   任务窗口(quest_board) · 蓝图 G 页面形态(2026-07-19 阶段四第四波;
+   合同=TRIFORM-UX-REDESIGN-V2/demo/MAPPING.md + analysis/quest_board.md):
+   · 筛选工具行(chrome 区铺格纸): 搜索 + 主线/支线 seg + 项目域 picker + 停滞快筛 seg
+     + 图签筛选状态 —— 消灭 21 卡 × 45+ 行裸平铺。
+   · 任务行收敛为一行(状态 chip + 标题 + 细进度条 + 停滞色阶时间),证据散文移入
+     展开层/hover 预览卡(深色描图纸) —— 45 段文字墙降为按需可见。
+   · 进度环分级: 仅任务线卡头保留环并按健康度着色(停滞红/完成绿/进行黄铜),
+     任务行降为 hatch 细进度条 —— 消灭 66 个等权黄环;全卡黄左边框删除,
+     置顶改左缘朱红条(图钉语言,与项目板一致)。
+   · 里程碑点串 → 分段进度轨 + ⊢N⊣ 计数(不再 12 点溢出 +N)。
+   · 纹理分区铁律:卡片/行文字面平滑纸面禁纹理。
+   ============================================================ */
+
+.qb2-page { position: relative; height: 100%; overflow: auto; color: var(--fp-text);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */
+  box-sizing: border-box; }
+
+/* 筛选工具行(chrome 区:格纸 + 收薄 padding) */
+.qb2-tools { display: flex; align-items: center; gap: 10px; padding: 8px 22px; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 5; border-bottom: 1px solid var(--fp-border-subtle);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+.qb2-tools .tools-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+.qb2-body { padding: 6px 22px 48px; max-width: 1080px; margin: 0 auto; }
+
+/* 任务线卡(v2-card 厚框纸件,纵向;置顶=左缘朱红条) */
+.qb2-goal { flex-direction: column; align-items: stretch; gap: 0; padding: 12px 14px 10px; margin: 12px 0; }
+.qb2-goal.pinned { border-color: var(--fp-border-strong); box-shadow: inset 3px 0 0 var(--fp-bp-seal), var(--fp-shadow-sm); }
+.qb2-ghead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.qb2-gtitle { color: var(--fp-text); font-size: var(--fp-fs-2); font-weight: 650;
+  font-family: var(--fp-bp-font-display); cursor: pointer; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.qb2-gtitle:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* 主线/支线 mono 标签(主线=黄铜描边,支线=弱线;替代 warn 色徽章) */
+.qb2-linetag { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); letter-spacing: .09em;
+  padding: 1px 8px; border-radius: 2px; flex: none; text-transform: uppercase; }
+.qb2-linetag.main { color: var(--fp-bp-brass-hi); border: 1px solid var(--fp-bp-brass); }
+.qb2-linetag.side { color: var(--fp-text-3); border: 1px dashed var(--fp-border); }
+.qb2-domtag { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono);
+  border: 1px dashed var(--fp-border); border-radius: 2px; padding: 1px 8px; flex: none; }
+
+/* 目标描述:默认收起(进 hover 预览卡/展开态),展开后 2 行截断 */
+.qb2-objective { color: var(--fp-text-2); font-size: var(--fp-fs-3); margin: 6px 0 2px;
+  line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* 里程碑分段轨(每任务一格;done=ok hatch/进行=warn hatch/未启=空)+ ⊢N⊣ 计数 */
+.qb2-msbar { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.qb2-msbar .track { display: inline-flex; width: 86px; height: 9px; gap: 1px;
+  border: 1px solid var(--fp-border); border-radius: 2px; padding: 1px; box-sizing: border-box; }
+.qb2-msbar .track i { flex: 1; display: block; min-width: 0; }
+.qb2-msbar .track i.done { background: repeating-linear-gradient(45deg, rgba(127,212,168,.85) 0 1.5px, rgba(127,212,168,.25) 1.5px 4px); }
+.qb2-msbar .track i.part { background: repeating-linear-gradient(45deg, rgba(226,192,90,.7) 0 1.5px, transparent 1.5px 4px); }
+
+/* 任务行:一行收敛(展开钮 | 标题行 | kebab);证据散文默认隐藏 */
+.qb2-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 8px; align-items: start; padding: 7px 6px; border-top: 1px solid var(--fp-border-subtle); }
+.qb2-trow { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.qb2-ttitle { color: var(--fp-text); font-size: var(--fp-fs-3); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; cursor: pointer; min-width: 0; }
+.qb2-tmeta { color: var(--fp-text-3); font-size: var(--fp-fs-4); flex: none; }
+
+/* hatch 细进度条(任务行/子任务替代黄环) */
+.qb2-pbar { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.qb2-pbar .track { width: 64px; height: 8px; border: 1px solid var(--fp-border);
+  border-radius: 2px; padding: 1px; box-sizing: border-box; }
+.qb2-pbar .track i { display: block; height: 100%; background: var(--fp-bp-hatch-fill); }
+.qb2-pbar .pct { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); color: var(--fp-text-3); min-width: 30px; text-align: right; }
+.qb2-pbar.done .pct { color: var(--fp-ok); }
+
+/* 停滞色阶(跟进时间:<3d 弱灰 / 3-13d 黄铜 / ≥14d 朱红;触屏无 hover 也可读) */
+.qb2-fu { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); flex: none; white-space: nowrap; }
+.qb2-fu.st-ok { color: var(--fp-text-3); }
+.qb2-fu.st-warn { color: var(--fp-bp-brass-hi); }
+.qb2-fu.st-err { color: #ff8d85; }
+
+/* 渠道徽章(外部渠道才亮牌) */
+.qb2-ch { font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); border-radius: 2px;
+  padding: 1px 7px; flex: none; letter-spacing: .04em; }
+
+/* 展开层:证据散文/进度时间线/子任务(按需可见) */
+.qb2-evidence { color: var(--fp-text-2); font-size: var(--fp-fs-3); margin: 4px 0 2px; line-height: 1.55;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.qb2-timeline { margin: 4px 0 2px 4px; border-left: 1px dashed var(--fp-border); padding-left: 10px; }
+.qb2-tlitem { color: var(--fp-text-2); font-size: var(--fp-fs-3); padding: 2px 0; line-height: 1.5; }
+.qb2-tlts { color: var(--fp-text-3); font-size: var(--fp-fs-4); margin-right: 6px; font-family: var(--fp-font-mono); }
+.qb2-subrow { display: flex; gap: 8px; align-items: center; padding: 3px 0 3px 16px;
+  color: var(--fp-text-2); font-size: var(--fp-fs-3); }
+
+/* 渐进披露钮(展开其余 N 条/已归档) */
+.qb2-more { color: var(--fp-bp-brass-hi); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono);
+  cursor: pointer; padding: 6px 0 2px 6px; display: inline-flex; align-items: center; gap: 4px;
+  letter-spacing: .04em; }
+.qb2-more:hover { color: var(--fp-text); }
+.qb2-empty { color: var(--fp-text-3); font-size: var(--fp-fs-3); padding: 6px 0 2px 6px; }
+
+/* 外部收件箱(空心描边节区标题 + 计数徽章 + 同步主钮) */
+.qb2-inbox { margin-top: 26px; }
+.qb2-inbox-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 4px 8px; }
+.qb2-inbox-title { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  color: transparent; -webkit-text-stroke: 1px rgba(235,245,255,.68); font-family: var(--fp-font-mono);
+  font-weight: 600; letter-spacing: .18em; text-transform: uppercase; font-size: 17px;
+  background: transparent; border: 0; padding: 0; font-style: normal; }
+.qb2-inbox-title .chev { color: var(--fp-text-3); -webkit-text-stroke: 0; display: inline-flex; }
+.qb2-inbox-note { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); }
+.qb2-sync { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px dashed var(--fp-border-strong); background: transparent; color: var(--fp-text);
+  border-radius: var(--fp-r1); padding: 5px 12px; font-size: var(--fp-fs-4); font-weight: 600;
+  font-family: var(--fp-font-mono); letter-spacing: .08em; text-transform: uppercase;
+  transition: all var(--fp-t-fast); }
+.qb2-sync:hover { border-style: solid; border-color: var(--fp-bp-brass); box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); }
+.qb2-sync:active { transform: translateY(1px); }
+
+/* hover 预览卡内容(容器玻璃在 HoverCard.tsx;这里只管排版) */
+.qb2-pv .pv-t { display: flex; align-items: center; gap: 8px; font-weight: 700;
+  font-size: var(--fp-fs-2); font-family: var(--fp-bp-font-display); color: var(--fp-text); }
+.qb2-pv .pv-sub { margin: 4px 0 6px; color: var(--fp-text-3); font-size: var(--fp-fs-4);
+  font-family: var(--fp-font-mono); }
+.qb2-pv .pv-d { color: var(--fp-text-2); margin-top: 6px; }
+.qb2-pv .pv-ev { color: var(--fp-text-2); margin-top: 6px; padding-left: 8px;
+  border-left: 1px dashed var(--fp-border); }
+
+/* 窄屏(phone <600): 工具行/列表 padding 收窄;seg 可横滑 */
+@media (max-width: 599px) {
+  .qb2-tools { padding: 8px 12px; gap: 8px; }
+  .qb2-tools .v2-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .qb2-tools .v2-seg::-webkit-scrollbar { display: none; }
+  .qb2-body { padding: 6px 12px 36px; }
+  .qb2-pbar .track { width: 44px; }
+  .qb2-inbox-title { font-size: 15px; }
+}

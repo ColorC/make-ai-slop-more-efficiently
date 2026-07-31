@@ -7,9 +7,11 @@
   - 提一个多选问题给用户, 收集回答
   - options: list[{label, description, value?}], 用户选其一 (或 multiSelect)
   - "Other" 选项默认追加 (用户可填自由文本)
-  - omnicompany 实现: 返回 USER_INPUT_REQUIRED, 由外层 agent 在当前聊天框直接询问
+  - omnicompany 实现: 走 HumanBus (要求 worker 真接到人类应答的总线)
 
-离线测试仍可用 ASK_USER_QUESTION_DRY_RUN=1 模拟首选项。
+注: omnicompany 不是聊天产品, 但有 HumanBus (humanbus material-gated human gate).
+此工具用法: 把问题 emit 到 HumanBus, 阻塞等 approval.yaml 答复, 解析为 result.
+没有 HumanBus 时 (单元测试 / 干跑) 走 ASK_USER_QUESTION_DRY_RUN=1 模拟.
 """
 from __future__ import annotations
 
@@ -104,13 +106,26 @@ class AskUserQuestionRouter(SingleToolRouter):
                 "mode": "dry_run",
             }, ensure_ascii=False)
 
-        # 人类输入只在当前 agent 对话发生。外层 agent 看到这个结构后把问题原样交给用户,
-        # 用户回复自然回到同一会话, 不再复制到第二个收件箱。
-        return json.dumps({
-            "status": "USER_INPUT_REQUIRED",
-            "mode": "current_conversation",
-            "header": header or None,
-            "question": question,
-            "options": options,
-            "multi_select": multi_select,
-        }, ensure_ascii=False)
+        # 真模式: emit 到 HumanBus 等响应
+        # ctx 上 worker 注入 human_bus + answer_callback
+        human_bus = getattr(ctx, "human_bus", None)
+        if human_bus is None:
+            raise ToolExecutionError(
+                "AskUserQuestion requires a HumanBus injected via ToolContext.human_bus. "
+                "In offline / unit-test contexts, set ASK_USER_QUESTION_DRY_RUN=1 to get the first option."
+            )
+
+        try:
+            response = human_bus.ask(
+                question=question,
+                options=options,
+                multi_select=multi_select,
+                header=header,
+            )
+        except Exception as e:
+            raise ToolExecutionError(f"HumanBus.ask failed: {e}")
+
+        if not isinstance(response, dict):
+            raise ToolExecutionError(f"HumanBus.ask returned non-dict: {type(response).__name__}")
+
+        return json.dumps(response, ensure_ascii=False)

@@ -28,8 +28,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from omnicompany.core.config import omni_workspace_root
-
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +46,7 @@ _D_DRIVE_ROOT_WHITELIST: frozenset[str] = frozenset({
 })
 
 
-# 工作区根 (omni_workspace_root().parent) 白名单
+# 工作区根 (e:/WindowsWorkspace/) 白名单
 _WORKSPACE_ROOT_WHITELIST: frozenset[str] = frozenset({
     ".claude",
     ".omni",
@@ -62,6 +60,8 @@ _WORKSPACE_ROOT_WHITELIST: frozenset[str] = frozenset({
     "demoworkspace",
     "figma-to-html",
     "hypothesis-workspace",
+    "demogame-knowledge-base",
+    "demogame-learn",
     "language-anchoring-protocol",
     "lofa",
     "node_modules",
@@ -93,12 +93,11 @@ _WINDOWS_DEVICE_NAMES: frozenset[str] = frozenset({
 })
 
 
-def _default_scan_targets() -> tuple:
-    """默认扫描根 (懒解析: 工作区根 = omni_workspace_root().parent)."""
-    return (
-        ("workspace_root", omni_workspace_root().parent, _WORKSPACE_ROOT_WHITELIST),
-        ("d_drive_root", Path("d:/"), _D_DRIVE_ROOT_WHITELIST),
-    )
+# 默认扫描根 (相对路径自动展开为绝对)
+_DEFAULT_SCAN_TARGETS = (
+    ("workspace_root", Path("e:/WindowsWorkspace"), _WORKSPACE_ROOT_WHITELIST),
+    ("d_drive_root", Path("d:/"), _D_DRIVE_ROOT_WHITELIST),
+)
 
 
 @dataclass
@@ -197,7 +196,7 @@ def scan_pollution(
         logger.debug("[workspace_pollution] 扫描根不存在: %s", scan_root)
         return []
 
-    omni_root = omni_root or omni_workspace_root()
+    omni_root = omni_root or Path("e:/WindowsWorkspace/omnicompany")
     backup_root = _quarantine_dir(omni_root)
     now = datetime.now(timezone.utc).isoformat()
     tickets: list[PollutionTicket] = []
@@ -263,7 +262,7 @@ def scan_pollution(
 
 
 def run_workspace_pollution_scan(
-    targets: tuple | None = None,
+    targets: tuple = _DEFAULT_SCAN_TARGETS,
     dry_run: bool = False,
     omni_root: Optional[Path] = None,
 ) -> dict:
@@ -272,8 +271,6 @@ def run_workspace_pollution_scan(
     Returns:
         {"total_tickets": int, "by_root": {root_name: count, ...}, "tickets": [...]}
     """
-    if targets is None:
-        targets = _default_scan_targets()
     all_tickets: list[PollutionTicket] = []
     by_root: dict[str, int] = {}
 

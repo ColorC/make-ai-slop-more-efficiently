@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex,nofollow">
+  <title>游戏观测站 · 本地设施</title>
+  <link rel="stylesheet" href="/game-observatory/studio.css">
+</head>
+<body>
+  <a class="skip-link" href="#workspace">跳到工作区</a>
+  <header class="studio-header">
+    <a class="studio-brand" href="/game-observatory/studio/">
+      <strong>游戏观测站</strong>
+      <span>LOCAL FACILITY</span>
+    </a>
+    <nav class="studio-nav" aria-label="设施导航">
+      <a href="/game-observatory/studio/" data-surface="overview">总览</a>
+      <a href="/game-observatory/studio/spec" data-surface="spec">事实案</a>
+      <a href="/game-observatory/studio/evidence" data-surface="evidence">游玩轨迹</a>
+      <a href="/game-observatory/studio/coverage" data-surface="coverage">探索覆盖</a>
+      <a href="/game-observatory/studio/sources" data-surface="sources">来源</a>
+      <a href="/game-observatory/studio/feedback" data-surface="feedback">玩家反馈</a>
+      <a href="/game-observatory/studio/interpretation" data-surface="interpretation">理解</a>
+      <a href="/game-observatory/console" data-surface="console">AI 玩家</a>
+    </nav>
+    <a class="public-link" href="/game-observatory/">公开资料库</a>
+  </header>
+  <main id="workspace" class="studio-main" data-testid="game-observatory-studio">
+    <div class="loading-card" data-loading>
+      <span></span>
+      <strong>正在读取本地设施</strong>
+    </div>
+  </main>
+  <div class="studio-toast" data-toast hidden></div>
+  <script type="module" src="/game-observatory/studio.js"></script>
+</body>
+</html>

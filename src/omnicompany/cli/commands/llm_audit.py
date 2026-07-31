@@ -341,7 +341,7 @@ def cmd_pipeline_audit_info(pipeline_name: str, only_node: str | None, as_json: 
     \b
     示例:
         omni pipeline audit-info workflow-factory
-        omni pipeline audit-info research.run --node field_classifier
+        omni pipeline audit-info demogame-learn --node field_classifier
         omni pipeline audit-info workflow-factory --json > audit.json
     """
     import asyncio as _asyncio
@@ -545,7 +545,7 @@ def cmd_pipeline_check(pipeline_file: str, as_json: bool, check_all: bool, run_n
     \b
     示例：
         omni pipeline check src/omnicompany/packages/services/doctor/pipeline.py
-        omni pipeline check src/omnicompany/packages/domains/research/report_gen/report_gen_pipeline.py
+        omni pipeline check src/omnicompany/packages/domains/demogame/table_learning/table_learning_pipeline.py
         omni pipeline check . --all-pipelines
         omni pipeline check src/omnicompany/packages/services/doctor/pipeline.py --narrative
     """
@@ -684,8 +684,8 @@ def cmd_pipeline_lineage(
     \b
     示例：
         omni pipeline lineage
-        omni pipeline lineage --format research.report_schema
-        omni pipeline lineage --pipeline research-report-gen
+        omni pipeline lineage --format demogame.table_schema
+        omni pipeline lineage --pipeline demogame-table-learning
         omni pipeline lineage --cross
     """
     import json as _json

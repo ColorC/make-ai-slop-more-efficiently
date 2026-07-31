@@ -1,0 +1,86 @@
+{
+  "domain": "game-observatory.afk-journey.viewerzoomed",
+  "goal": "只观察冻结的 AFK Journey ViewerZoomed 完整截图。首次清单必须覆盖 required_inventory_candidate_ids：0004 是左下独立返回候选，0001 是右侧独立圆形控件候选，0006/0007/0008 与 synthetic directional-pad-gap.00 是同一方向控件组的上/左/右/下成员，0002 是场景画布手势表面。独立按钮与控件组成员若需要裁片确认，先登记 pending_visual_review；四个方向成员填写同一 group_id。逐项从 visual candidate 原框开始检查，tap 第二张裁片在首框四边扩出规定余量并完整包住图标或按钮背景，propose 时引用对应 visual candidate id。双指平移只选择角色或场景画布中的无字区域，底部说明文字只作为 explicit_gesture_instruction 支持。右上 0005 图形缺少交互支持，只保留为 unverified_visual。所有结果保持待验证，不执行设备动作。",
+  "max_iterations": 1,
+  "scene": {
+    "mode": "shadow",
+    "kind": "game-ui-exploration",
+    "benchmark_run_id": "gate3-afk-rowan-viewerzoomed-canonical-v1-hypothesis-v6",
+    "fixture_id": "gate3-afk-rowan-viewerzoomed-canonical-v1",
+    "allowed_output_root": "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/gate3/afk-resume-20260714/formal-pair-assets/viewerzoomed-hypothesis-v6",
+    "suggestion_ledger": "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/gate3/afk-resume-20260714/formal-pair-assets/viewerzoomed-hypothesis-v6/suggestions.jsonl",
+    "allowed_image_roots": [
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/artifacts",
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/gate3/afk-resume-20260714"
+    ],
+    "required_grounding_image_paths": [
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/artifacts/art.device.1784028046760.2b798c5f.png",
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/gate3/afk-resume-20260714/coordinate-reference.bands.png"
+    ],
+    "grounding_image_paths": [
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/gate3/afk-resume-20260714/coordinate-reference.bands.png"
+    ],
+    "visual_candidate_policy": "require-reference",
+    "visual_candidate_manifest_path": "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/gate3/afk-resume-20260714/formal-pair-assets/viewerzoomed-omniparser-v1/candidate-manifest.json",
+    "visual_candidate_manifest_sha256": "1fc5ddfba3e6357e2a094d069f465b332f54f2d7ddf989e3f4542cfa05869640",
+    "required_inventory_candidate_ids": [
+      "omniparser.element.0004",
+      "omniparser.element.0001",
+      "omniparser.element.0006",
+      "omniparser.element.0007",
+      "omniparser.element.0008",
+      "synthetic.directional-pad-gap.00",
+      "omniparser.element.0002"
+    ],
+    "coordinate_reference_layout": {
+      "layout": "source_bands_2_columns",
+      "source_width": 1080,
+      "source_height": 1920,
+      "sheet_width": 2160,
+      "sheet_height": 960,
+      "bands": 4,
+      "pixel_step": 100,
+      "sha256": "39ef1fe8a6d566d3d391c6e283719ae3b384b995f69a50d4292986d653ba52f7"
+    },
+    "observation": {
+      "artifact_id": "art.device.1784028046760.2b798c5f",
+      "frame_path": "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/artifacts/art.device.1784028046760.2b798c5f.png",
+      "sha256": "8376f7edb1f5662e2885971fe786def5ff52c68cb9943c8de3d8704e93a0713e",
+      "viewport": {
+        "width": 1080,
+        "height": 1920
+      }
+    },
+    "coordinate_space": "source_pixels",
+    "allowed_action_types": [
+      "tap",
+      "two_finger_swipe"
+    ],
+    "forbidden_target_terms": [
+      "升级",
+      "赠礼",
+      "礼包",
+      "支付",
+      "购买",
+      "删除",
+      "账号",
+      "一键装备"
+    ],
+    "forbidden_target_policy": "reject",
+    "max_suggestions": 8,
+    "max_region_inspections": 14,
+    "require_region_inspection": true,
+    "require_candidate_inventory": true,
+    "require_interaction_support": true,
+    "require_gesture_surface_separation": true,
+    "require_full_target_confirmation": true,
+    "require_expanding_target_confirmation": true,
+    "min_target_expansion_px": 20,
+    "require_text_free_gesture_surface": true,
+    "min_region_inspections_per_candidate": 2,
+    "region_visible_cue_scope": "exact_target_only",
+    "expected_change_mode": "unverified",
+    "target_naming_mode": "visual-neutral",
+    "allow_prior_beliefs": false
+  }
+}

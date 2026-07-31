@@ -38,8 +38,6 @@ class ExternalWorkerTraceMirror:
             source=f"agent.external.{self.spec.provider}",
             payload=_json_safe(payload),
             tags=[
-                "omni.material",
-                "agent.material",
                 "external_worker",
                 f"provider:{self.spec.provider}",
                 f"run:{self.spec.run_id}",

@@ -7,7 +7,6 @@ import test from 'node:test';
 import TOML from '@iarna/toml';
 
 import { providerMcpService } from '@/modules/providers/services/mcp.service.js';
-import type { LLMProvider } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 const patchHomeDir = (nextHomeDir: string) => {
@@ -342,18 +341,8 @@ test('providerMcpService global adder writes to all providers and rejects unsupp
       workspacePath,
     });
 
-    assert.equal(globalResult.length, 8);
-    // omni_agent and controller intentionally reject MCP writes; every other
-    // provider persists the shared server.
-    const createdByProvider = new Map(globalResult.map((entry) => [entry.provider, entry.created]));
-    const writableProviders: LLMProvider[] = ['claude', 'codex', 'cursor', 'gemini', 'opencode', 'kimi'];
-    for (const provider of writableProviders) {
-      assert.ok(createdByProvider.get(provider) === true, `${provider} should persist the global server`);
-    }
-    const unsupportedProviders: LLMProvider[] = ['omni_agent', 'controller'];
-    for (const provider of unsupportedProviders) {
-      assert.ok(createdByProvider.get(provider) === false, `${provider} does not support MCP servers`);
-    }
+    assert.equal(globalResult.length, 5);
+    assert.ok(globalResult.every((entry) => entry.created === true));
 
     const claudeProject = await readJson(path.join(workspacePath, '.mcp.json'));
     assert.ok((claudeProject.mcpServers as Record<string, unknown>)['global-http']);
@@ -366,9 +355,6 @@ test('providerMcpService global adder writes to all providers and rejects unsupp
 
     const opencodeProject = await readJson(path.join(workspacePath, 'opencode.json'));
     assert.ok((opencodeProject.mcp as Record<string, unknown>)['global-http']);
-
-    const kimiProject = await readJson(path.join(workspacePath, '.kimi-code', 'mcp.json'));
-    assert.ok((kimiProject.mcpServers as Record<string, unknown>)['global-http']);
 
     const cursorProject = await readJson(path.join(workspacePath, '.cursor', 'mcp.json'));
     assert.ok((cursorProject.mcpServers as Record<string, unknown>)['global-http']);

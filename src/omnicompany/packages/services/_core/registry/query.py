@@ -44,7 +44,7 @@ class RegistryQuery:
 
     用法示例：
         q = RegistryQuery(registry)
-        result = q.type("router").package("example_domain.example_team").execute()
+        result = q.type("router").package("demogame.team_table").execute()
         result = q.type("router").attr_eq("attrs.format_in_kind", "fstring").execute()
     """
 

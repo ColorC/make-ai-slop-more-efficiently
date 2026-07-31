@@ -12,7 +12,7 @@ Worker 协议:
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from ..routers_legacy import FinalizerRouter as _Legacy
+from .._archive.routers_legacy import FinalizerRouter as _Legacy
 
 
 class FinalizerWorker(Worker, _Legacy):

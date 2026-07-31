@@ -16,7 +16,7 @@ Worker 协议:
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from ..routers_legacy import ErrorRouteAuditorRouter as _Legacy
+from .._archive.routers_legacy import ErrorRouteAuditorRouter as _Legacy
 
 
 class ErrorRouteAuditorWorker(Worker, _Legacy):

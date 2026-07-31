@@ -2,11 +2,11 @@
 # [OMNI] material_id="material:dashboard.cc_wrapper.mcp_server.tool_provider.py"
 """omnicompany MCP server — exposes read-only tools to Claude Code via stdio.
 
-Run: `python -m omnicompany.dashboard.ccdaemon.mcp_server`
+Run: `python -m omnicompany.dashboard.cc_wrapper.mcp_server`
 
 Wired into Claude Code via:
     {"mcpServers": {"omnicompany": {"command": "python",
-                                    "args": ["-m", "omnicompany.dashboard.ccdaemon.mcp_server"]}}}
+                                    "args": ["-m", "omnicompany.dashboard.cc_wrapper.mcp_server"]}}}
 
 Tool surface is intentionally small (≤10) and read-only. Internal mutations
 remain Claude's job (Edit/Write); we just give it visibility.
@@ -206,7 +206,7 @@ TOOLS: list[mt.Tool] = [
                 "limit": {"type": "integer", "default": 50, "minimum": 1, "maximum": 500}}}),
     mt.Tool(name="omni_get_worker", description="Get one worker's metadata + DESIGN.md content (if present).",
             inputSchema={"type": "object", "required": ["id"], "properties": {
-                "id": {"type": "string", "description": "Worker id like `domains/research/report/workers/report_writer`"}}}),
+                "id": {"type": "string", "description": "Worker id like `domains/voxelcraft/block/workers/block_designer`"}}}),
     mt.Tool(name="omni_list_teams", description="List Team definitions (49 `team*.py` files under packages/).",
             inputSchema={"type": "object", "properties": {
                 "filter": {"type": "string"}, "limit": {"type": "integer", "default": 50}}}),

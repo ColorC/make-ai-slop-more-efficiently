@@ -14,15 +14,11 @@ from omnicompany.protocol.format import Format, FormatRegistry
 PA_REQUEST = Format(
     id="project_atlas.request",
     name="ProjectAtlasRequest",
-    description="一次收集的发起请求。来自 omni run CLI。字段: space(必填,见 spaces.py)、dry_run、worker_provider(codex|claude-code,默认 codex)。",
+    description="一次收集的发起请求。来自 omni run CLI。字段: space(必填,见 spaces.py)、dry_run。",
     tags=["domain.project_atlas", "stage.request", "kind.source"],
     json_schema={
         "type": "object",
-        "properties": {
-            "space": {"type": "string"},
-            "dry_run": {"type": ["boolean", "string"]},
-            "worker_provider": {"type": "string", "enum": ["codex", "claude-code"]},
-        },
+        "properties": {"space": {"type": "string"}, "dry_run": {"type": ["boolean", "string"]}},
         "required": ["space"],
     },
 )
@@ -37,7 +33,6 @@ PA_INTAKE = Format(
         "properties": {
             "space": {"type": "string"}, "root": {"type": "string"}, "run_dir": {"type": "string"},
             "group": {"type": "string"}, "tier": {"type": "string"}, "dry_run": {"type": "boolean"},
-            "worker_provider": {"type": "string", "enum": ["codex", "claude-code"]},
         },
         "required": ["space", "root", "run_dir"],
     },

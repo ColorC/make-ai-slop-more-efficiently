@@ -1,0 +1,48 @@
+{
+  "domain": "game-observatory.sanguo.return-prompt",
+  "goal": "只观察冻结的《三国：谋定天下》当前完整截图和绝对像素坐标参考图。找出关闭当前阻断提示并继续回到游戏的唯一明确可见控件。提交至多一条 tap 影子建议，目标框紧贴控件，写清直接可见文字、待验证的画面变化和风险。不执行设备动作，不补充画面外的功能推测。",
+  "max_iterations": 1,
+  "scene": {
+    "mode": "shadow",
+    "kind": "game-ui-exploration",
+    "benchmark_run_id": "sanguo-return-prompt-live-20260716-v1",
+    "fixture_id": "sanguo-return-prompt-live-20260716-v1",
+    "allowed_output_root": "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/hypothesis-live/sanguo-return-prompt-v1/run",
+    "suggestion_ledger": "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/hypothesis-live/sanguo-return-prompt-v1/run/suggestions.jsonl",
+    "allowed_image_roots": [
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/artifacts",
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/hypothesis-live/sanguo-return-prompt-v1"
+    ],
+    "required_grounding_image_paths": [
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/artifacts/art.device.1784203210829.b241b670.png",
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/hypothesis-live/sanguo-return-prompt-v1/coordinate-reference.png"
+    ],
+    "grounding_image_paths": [
+      "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/benchmarks/hypothesis-live/sanguo-return-prompt-v1/coordinate-reference.png"
+    ],
+    "coordinate_reference_layout": {
+      "kind": "source_overlay",
+      "source_viewport": {"width": 1920, "height": 1080},
+      "pixel_step": 100
+    },
+    "observation": {
+      "artifact_id": "art.device.1784203210829.b241b670",
+      "frame_path": "E:/WindowsWorkspace/omnicompany/data/domains/game_observatory/artifacts/art.device.1784203210829.b241b670.png",
+      "sha256": "82e61be314e8293c018fe6cc8c147df46d75444546b780f3838e53d2404debfa",
+      "viewport": {"width": 1920, "height": 1080}
+    },
+    "coordinate_space": "source_pixels",
+    "allowed_action_types": ["tap"],
+    "forbidden_target_terms": ["支付", "购买", "账号", "删除", "外部身份"],
+    "forbidden_target_policy": "reject",
+    "max_suggestions": 1,
+    "max_region_inspections": 3,
+    "require_region_inspection": true,
+    "require_interaction_support": true,
+    "require_full_target_confirmation": true,
+    "region_visible_cue_scope": "exact_target_only",
+    "expected_change_mode": "unverified",
+    "target_naming_mode": "visual-neutral",
+    "allow_prior_beliefs": false
+  }
+}

@@ -18,16 +18,6 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
     ToolContext,
     ToolExecutionError,
 )
-from omnicompany.packages.services._core.agent.routers.execution_limits import (
-    FACILITY_TIMEOUT_MARKER,
-    SHELL_POLICY_MARKER,
-    ShellCommandPolicyError,
-    powershell_utf8_command,
-    reject_decode_replacement,
-    resolve_shell_timeout,
-    utf8_subprocess_env,
-    validate_shell_command,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +34,7 @@ class PowerShellRouter(SingleToolRouter):
     TOOL_NAME: ClassVar[str] = "PowerShell"
     # DESCRIPTION 1:1 复刻 cc PowerShellTool/prompt.ts::getPrompt 静态部分 (Wave 5 续, 2026-05-05)
     # 适配:
-    #   - timeout 仅在任务有真实 deadline 时显式设置
+    #   - timeout 用 omnicompany 默认 60s / 600s 上限 (跟 INPUT_SCHEMA 对齐)
     #   - edition 检测当前 omnicompany 没做 — 用最稳的 5.1 兼容版指引 (cc 在 edition 未知时也是这策略)
     #   - 跳过 background task (omnicompany 没该设施)
     #   - 工具替代项用 omnicompany 命名 (Glob/Grep/Read/Edit/write_file)
@@ -60,8 +50,8 @@ class PowerShellRouter(SingleToolRouter):
         "\n"
         "Before executing the command, please follow these steps:\n"
         "\n"
-        "1. Path Safety:\n"
-        "   - Directory creation and shell text output are refused; declare exact paths and use guarded Write/Edit tools\n"
+        "1. Directory Verification:\n"
+        "   - If the command will create new directories or files, first use `Get-ChildItem` (or `ls`) to verify the parent directory exists and is the correct location\n"
         "\n"
         "2. Command Execution:\n"
         "   - Always quote file paths that contain spaces with double quotes\n"
@@ -70,7 +60,7 @@ class PowerShellRouter(SingleToolRouter):
         "PowerShell Syntax Notes:\n"
         "   - Variables use $ prefix: $myVar = \"value\"\n"
         "   - Escape character is backtick (`), not backslash\n"
-        "   - Use Verb-Noun cmdlet naming for allowed process and diagnostic operations\n"
+        "   - Use Verb-Noun cmdlet naming: Get-ChildItem, Set-Location, New-Item, Remove-Item\n"
         "   - Common aliases: ls (Get-ChildItem), cd (Set-Location), cat (Get-Content), rm (Remove-Item)\n"
         "   - Pipe operator | works similarly to bash but passes objects, not text\n"
         "   - Use Select-Object, Where-Object, ForEach-Object for filtering and transformation\n"
@@ -97,7 +87,7 @@ class PowerShellRouter(SingleToolRouter):
         "\n"
         "Usage notes:\n"
         "  - The command argument is required.\n"
-        "  - You can specify an optional total timeout when the task has a real deadline; omitted means no total deadline.\n"
+        "  - You can specify an optional timeout in seconds (up to 600s / 10 minutes). If not specified, commands will timeout after 60s.\n"
         "  - It is very helpful if you write a clear, concise description of what this command does.\n"
         "  - Output is NOT silently truncated — if the output is large, narrow with `Select-Object -First N`, `| Out-String -Stream | Select-Object -First N`, or `| Where-Object { ... }`.\n"
         "  - Avoid using PowerShell to run commands that have dedicated tools, unless explicitly instructed:\n"
@@ -122,10 +112,7 @@ class PowerShellRouter(SingleToolRouter):
         "type": "object",
         "properties": {
             "command": {"type": "string"},
-            "timeout_sec": {
-                "type": "integer",
-                "minimum": 1,
-            },
+            "timeout_sec": {"type": "integer", "minimum": 1, "maximum": 600},
         },
         "required": ["command"],
     }
@@ -136,16 +123,7 @@ class PowerShellRouter(SingleToolRouter):
         command = (args.get("command") or "").strip()
         if not command:
             raise ToolExecutionError("command is required")
-        try:
-            command = validate_shell_command(command, dialect="powershell")
-        except ShellCommandPolicyError as exc:
-            raise ToolExecutionError(
-                f"{SHELL_POLICY_MARKER} PowerShell REFUSED: {exc}"
-            ) from exc
-        try:
-            timeout_sec = resolve_shell_timeout(args)
-        except ValueError as exc:
-            raise ToolExecutionError(str(exc)) from exc
+        timeout_sec = int(args.get("timeout_sec", 60))
 
         # 选择 shell
         ps = shutil.which("pwsh") or shutil.which("powershell.exe") or shutil.which("powershell")
@@ -158,48 +136,26 @@ class PowerShellRouter(SingleToolRouter):
             )
 
         # 通过 -NonInteractive -Command "..." 执行
-        full_cmd = [
-            ps,
-            "-NonInteractive",
-            "-NoProfile",
-            "-Command",
-            powershell_utf8_command(command),
-        ]
+        full_cmd = [ps, "-NonInteractive", "-NoProfile", "-Command", command]
         try:
             result = subprocess.run(
                 full_cmd,
                 capture_output=True, text=True, encoding="utf-8", errors="replace",
                 timeout=timeout_sec,
                 cwd=ctx.cwd or None,
-                env=utf8_subprocess_env(),
             )
         except subprocess.TimeoutExpired:
-            raise ToolExecutionError(
-                f"{FACILITY_TIMEOUT_MARKER} PowerShell timed out ({timeout_sec}s); "
-                "stop this Agent path and do not retry the same command"
-            )
+            raise ToolExecutionError(f"PowerShell timed out ({timeout_sec}s)")
         except OSError as e:
             raise ToolExecutionError(f"PowerShell invocation failed: {e}")
-
-        try:
-            reject_decode_replacement(result.stdout or "", result.stderr or "")
-        except ShellCommandPolicyError as exc:
-            raise ToolExecutionError(
-                f"{SHELL_POLICY_MARKER} PowerShell REFUSED: {exc}"
-            ) from exc
-
-        if result.returncode != 0:
-            raise ToolExecutionError(
-                f"PowerShell command failed with exit code {result.returncode}.\n"
-                f"stdout:\n{result.stdout[:4000]}\n"
-                f"stderr:\n{result.stderr[:4000]}"
-            )
 
         parts = []
         if result.stdout:
             parts.append(result.stdout.rstrip("\n"))
         if result.stderr:
             parts.append(f"[stderr]\n{result.stderr.rstrip()}")
+        if result.returncode != 0:
+            parts.append(f"[exit={result.returncode}]")
         return "\n".join(parts) if parts else "(no output)"
 
 

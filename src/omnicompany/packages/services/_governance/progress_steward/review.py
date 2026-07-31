@@ -1,24 +1,20 @@
 # [OMNI] origin=claude-code domain=services/_governance/progress_steward ts=2026-06-27T00:00:00Z type=router
-# [OMNI] summary="进度型自述语义精判。对确定性候选三态分类, 只喂 WhatNow 当前状态+候选行降误报, findings 合并送审。"
+# [OMNI] summary="进度型自述语义精判(轨一里程碑二, 性价比模型)。对确定性探针圈出的候选三态分类(进度漂移/决策设计/误报), 只喂 whatnow 当前状态+候选行降误报, findings 进 human-inbox 待审。"
 # [OMNI] why="纯词表会高误报(DocPrism 两段式经验);进度真源在 whatnow, 精判需对照它判'这行是否还成立/是否指涉别处进度'。决策叙述不可当垃圾删。"
-# [OMNI] tags=governance,progress-ssot,llm-semantic,reviewstage
+# [OMNI] tags=governance,progress-ssot,llm-semantic,human-inbox
 # [OMNI] material_id="material:governance.progress_steward.review.py"
-"""进度型自述语义精判 — 三态分类(性价比模型), 合并进 Reviewstage。
+"""进度型自述语义精判 — 三态分类(性价比模型), 进 human-inbox。
 
 形态(对齐 governance_semantic_first.md + doc_steward):
   - 输入 = 里程碑一确定性探针圈出的候选(progress_scan.json)。
   - 只喂"该计划在 whatnow 的当前状态摘要 + 候选行", 不灌全文(降幻觉/省 token)。
   - 三态: progress_drift(指涉式进度, 应剥离/标'以 whatnow 为准') / decision_design(决策设计叙述, 保留并可导向 decisions 域) / false_positive(放过)。
   - broken_ref 是确定性腐化, 不走 LLM 直接判 progress_drift。
-  - 每轮把可处置项合并成一份审阅材料(给证据列表, 不打分, 内容不变不重复)。
-  - 断点续跑(2026-07-26): 每篇判完立即落盘 progress_review-checkpoint.json,
-    重跑时签名(候选行集合)一致的篇目直接复用 —— 被心跳超时杀也保住已判部分, 下周只补缺口。
+  - 每个 doc 有可处置项就开一条 human-inbox 待审(给证据列表, 不打分)。
 """
 from __future__ import annotations
 
-import hashlib
 import json
-import threading
 import urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -70,32 +66,6 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ── 断点续跑 checkpoint(2026-07-26: 跑到 90/92 被心跳超时杀, 整轮白烧) ──────
-# 每篇判完立即落盘; 重跑时签名(候选行集合)一致的篇目直接复用, 超时被杀也保住已判部分。
-
-def _checkpoint_path() -> Path:
-    return report_dir() / "progress_review-checkpoint.json"
-
-
-def _load_checkpoint() -> dict[str, Any]:
-    try:
-        raw = json.loads(_checkpoint_path().read_text(encoding="utf-8"))
-        if isinstance(raw, dict):
-            return raw
-    except (OSError, json.JSONDecodeError):
-        pass
-    return {}
-
-
-def _doc_signature(cands: list[dict], brokens: list[dict]) -> str:
-    """候选行集合签名 — 文档内容/探针结果变了就重判, 没变就复用上轮结论。"""
-    rows = sorted(
-        [("c", c.get("line"), c.get("category"), c.get("snippet")) for c in cands]
-        + [("b", b.get("line"), b.get("category"), b.get("snippet")) for b in brokens]
-    )
-    return hashlib.sha1(json.dumps(rows, ensure_ascii=False).encode("utf-8")).hexdigest()
-
-
 def _board() -> dict:
     try:
         with urllib.request.urlopen(WHATNOW + "/api/board?archived=1", timeout=20) as r:
@@ -126,10 +96,10 @@ def _plan_id_of(doc_rel: str) -> str:
 
 
 def run_progress_review(*, limit: int | None = None, model: str | None = None,
-                        only_ref: bool = False, submit_review: bool = True,
+                        only_ref: bool = False, push_inbox: bool = True,
                         workers: int = 4, root: Path | None = None,
-                        echo: Any = None, review_store=None) -> dict[str, Any]:
-    """对探针候选做三态精判, 可处置项合并成一份审阅材料。"""
+                        echo: Any = None) -> dict[str, Any]:
+    """对探针候选做三态精判, 可处置项进 human-inbox。"""
     from omnicompany.runtime.llm.batch import run_parallel_items
     from omnicompany.runtime.llm.structured import call_json
 
@@ -151,32 +121,6 @@ def run_progress_review(*, limit: int | None = None, model: str | None = None,
     if limit:
         docs = docs[:limit]
     status_idx = _plan_status_index(_board())
-
-    # 断点续跑: 签名一致的篇目复用 checkpoint, 只精判新增/变了的; 每篇判完立即落盘。
-    checkpoint = _load_checkpoint()
-    signatures = {d: _doc_signature(by_doc.get(d, []), broken.get(d, [])) for d in docs}
-    reused: dict[str, dict[str, Any]] = {}
-    todo: list[str] = []
-    for d in docs:
-        prev = checkpoint.get(d)
-        prev_cls = (prev or {}).get("result", {}).get("classifications", []) if isinstance(prev, dict) else []
-        if isinstance(prev, dict) and prev.get("signature") == signatures[d] \
-                and isinstance(prev.get("result"), dict) \
-                and not any(c.get("state") == "error" for c in prev_cls):
-            # 签名一致且无 LLM 错误块 → 复用; 有错误块的不进复用, 下轮重判(瞬时失败可自愈)
-            reused[d] = prev["result"]
-        else:
-            todo.append(d)
-    _ck_lock = threading.Lock()
-
-    def _persist(doc: str, result: dict[str, Any]) -> None:
-        with _ck_lock:
-            checkpoint[doc] = {"signature": signatures[doc], "result": result, "at": _now()}
-            try:
-                _checkpoint_path().write_text(
-                    json.dumps(checkpoint, ensure_ascii=False, indent=1), encoding="utf-8")
-            except OSError:
-                pass
 
     def _review_doc(doc: str) -> dict[str, Any]:
         cands = by_doc.get(doc, [])
@@ -203,16 +147,12 @@ def run_progress_review(*, limit: int | None = None, model: str | None = None,
                 except Exception as e:  # noqa: BLE001
                     result_cls.append({"line": 0, "state": "error",
                                        "evidence": f"LLM 失败(块 {i//12}): {str(e)[:120]}", "category": "llm"})
-        result = {"doc": doc, "classifications": result_cls}
-        _persist(doc, result)
-        return result
+        return {"doc": doc, "classifications": result_cls}
 
-    batch = run_parallel_items(todo, _review_doc, workers=workers,
+    batch = run_parallel_items(docs, _review_doc, workers=workers,
                                progress_label="progress_steward.review",
                                item_label=lambda i, d: Path(d).parent.name, echo=echo)
-    judged = {r["doc"]: r for r in batch.results if r}
-    # 按 docs 顺序合并: 本轮新判 + checkpoint 复用(被杀掉的篇目下周只补判缺口)
-    doc_results = [judged.get(d) or reused[d] for d in docs if d in judged or d in reused]
+    doc_results = [r for r in batch.results if r]
 
     # 抑制名单过滤(人已判可接受的点不再报, 防定时跑刷旧噪声)
     from omnicompany.packages.services._governance.health_suppress import is_suppressed
@@ -222,54 +162,44 @@ def run_progress_review(*, limit: int | None = None, model: str | None = None,
             if not is_suppressed("progress_steward", f"{r['doc']}:{c.get('line')}:{c.get('state')}", base)
         ]
 
-    # 汇总: 不再为每份文档造一个阻塞待办。
+    # 汇总 + 推 human-inbox
+    inbox_opened = 0
     drift_total = decision_total = 0
+    if push_inbox:
+        from omnicompany.runtime.buses import HumanBus, HumanKind
+        hb = HumanBus()
     for r in doc_results:
         drifts = [c for c in r["classifications"] if c["state"] == "progress_drift"]
         decisions = [c for c in r["classifications"] if c["state"] == "decision_design"]
         drift_total += len(drifts)
         decision_total += len(decisions)
+        if push_inbox and (drifts or decisions):
+            lines = []
+            if drifts:
+                lines.append("【进度漂移·建议剥离或标'以 whatnow 为准'】")
+                lines += [f"  L{c['line']}: {c['evidence']}" for c in drifts[:12]]
+            if decisions:
+                lines.append("【决策/设计叙述·建议 omni decisions record 记一笔后保留】")
+                lines += [f"  L{c['line']}: {c['evidence']}" for c in decisions[:8]]
+            hb.ask(
+                question=(f"计划文档 {r['doc']} 含 {len(drifts)} 条进度漂移 / {len(decisions)} 条决策叙述。"
+                          f"进度真源是 whatnow, 请处置(剥离/标注/记决策/保留)。\n" + "\n".join(lines)),
+                kind=HumanKind.HUMAN_BLOCKING,
+                context={"doc": r["doc"], "drifts": drifts, "decisions": decisions,
+                         "facility": "progress_steward.review"},
+                source="progress_steward.review",
+            )
+            inbox_opened += 1
 
     payload = {
         "kind": "progress_review", "generated_at": _now(), "model": model or "default",
         "reviewed_docs": len(doc_results), "failed_docs": len(batch.failures),
-        "reused_docs": len(reused), "judged_docs": len(judged),
         "drift_total": drift_total, "decision_total": decision_total,
-        "results": doc_results,
+        "inbox_opened": inbox_opened, "results": doc_results,
     }
     stamp = _now().replace(":", "").replace("-", "")[:15]
     (report_dir() / f"progress_review-{stamp}.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     (report_dir() / "progress_review-latest.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    if submit_review and (drift_total or decision_total):
-        if review_store is None:
-            from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
-            review_store = get_store()
-        from omnicompany.dashboard.boss_sight.reviewstage.report_submission import submit_markdown_report
-        lines = [
-            "# 进度语义复判", "",
-            f"- 复判文档: {len(doc_results)}",
-            f"- 进度漂移: {drift_total}",
-            f"- 决策/设计叙述: {decision_total}", "",
-        ]
-        for result in doc_results:
-            actionable = [c for c in result["classifications"] if c.get("state") in {"progress_drift", "decision_design"}]
-            if not actionable:
-                continue
-            lines.append(f"## {result['doc']}")
-            for item in actionable[:20]:
-                lines.append(f"- L{item.get('line')} · {item.get('state')} · {item.get('evidence')}")
-            lines.append("")
-        payload["review_material"] = submit_markdown_report(
-            review_store,
-            title="进度语义复判合并报告",
-            content="\n".join(lines),
-            source_plan_id="omnicompany-governance/[2026-06-27]SEMANTIC-SPACE-HEALTH",
-            reason="语义精判发现进度漂移或需沉淀的决策叙述; 请按证据合并核对。",
-            dedupe_key="progress-semantic-review",
-            stable_payload=json.dumps(doc_results, ensure_ascii=False, sort_keys=True),
-            version_family="progress-semantic-review",
-            extra={"report_path": str(report_dir() / "progress_review-latest.json")},
-        )
     return payload

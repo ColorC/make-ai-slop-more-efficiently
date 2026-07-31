@@ -2,7 +2,6 @@
 # [OMNI] summary="BeliefReflector(v5 收编版):总结 agent 直接读写统一决策库 belief——立猜想/挑战/裁定/连边,不再编辑 khyp markdown 文档。"
 # [OMNI] why="决策本体合并清单#1:hypothesis 管线改读写决策库;探索与日常决策同一套设施(手册 20-探索通则);主题文档降为生成投影(30-知识)。"
 # [OMNI] tags=hypothesis,reflector,belief,decision-ontology
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """BeliefReflectorRouter —— 假设探索的总结 agent(决策库直写版)。
 
 读 Experimenter 行为轨迹 + 当前 belief 快照,用五件套工具维护统一决策库:

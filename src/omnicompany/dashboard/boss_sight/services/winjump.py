@@ -103,13 +103,8 @@ def activate_hwnd(hwnd: int) -> bool:
     return ok
 
 
-def set_clipboard(text: str, *, confirmed: bool = False) -> bool:
-    """用 CF_UNICODETEXT 正确写剪贴板(Windows `clip` 命令会把 UTF-8 中文搞乱, 这里走 ctypes)。
-
-    物理动作硬门(2026-07 总控止血「非确认不主动」): confirmed=False 时直接拒绝,
-    不碰任何 user32/kernel32 调用。自动派发路径不传 confirmed → 物理断电。"""
-    if not confirmed:
-        return False
+def set_clipboard(text: str) -> bool:
+    """用 CF_UNICODETEXT 正确写剪贴板(Windows `clip` 命令会把 UTF-8 中文搞乱, 这里走 ctypes)。"""
     if not _is_win():
         return False
     u = ctypes.windll.user32
@@ -186,16 +181,10 @@ def activate_location(
     title_hint: str | None = None,
     paste: bool = False,
     submit: bool = False,
-    confirmed: bool = False,
 ) -> dict:
     """把 location 对应 app 的主窗口激活到最前。title_hint 多窗口时优选标题含该串的;
     paste=True 则在确认窗口到前台后发 Ctrl+V；submit=True 会在再次确认前台窗口后
-    自动发 Enter。submit 只能与 paste 一起使用，避免提交未知输入。
-
-    物理动作硬门(2026-07 总控止血「非确认不主动」): confirmed=False 时直接拒绝,
-    不执行任何 user32/win32 调用。自动派发路径不传 confirmed → 物理断电。"""
-    if not confirmed:
-        return {"ok": False, "refused": True, "reason": "物理动作已硬关闭，需显式 --yes"}
+    自动发 Enter。submit 只能与 paste 一起使用，避免提交未知输入。"""
     if not _is_win():
         return {"ok": False, "error": "非 Windows 平台"}
     if submit and not paste:

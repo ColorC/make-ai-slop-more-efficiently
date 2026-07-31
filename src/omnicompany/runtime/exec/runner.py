@@ -594,7 +594,7 @@ class TeamRunner:
 
         当目标节点的 format_in 指向已注册的 composite Format 时，改用上游节点的
         format_out 作为 key（即 component Format ID），使 Router.run() 能通过
-        input_data["api.spec"] 精确访问各路输入，而非猜测 _from_{node_id}。
+        input_data["feishu.api-spec"] 精确访问各路输入，而非猜测 _from_{node_id}。
         """
         if len(received) == 1:
             return next(iter(received.values())).output

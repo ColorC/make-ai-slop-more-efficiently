@@ -22,15 +22,6 @@ from omnicompany.packages.services._core.agent.external_workers.codex import (
 from omnicompany.packages.services._core.agent.external_workers.claude_code import (
     ClaudeCodeSdkWorker,
 )
-from omnicompany.packages.services._core.agent.external_workers.kimi import (
-    KimiExecWorker,
-)
-from omnicompany.packages.services._core.agent.external_workers.opencode import (
-    OpenCodeRunWorker,
-)
-from omnicompany.packages.services._core.agent.external_workers.omni_native import (
-    OmniNativeWorkspaceWorker,
-)
 from omnicompany.packages.services._core.agent.external_workers.factory import (
     build_default_external_agent_worker_registry,
 )
@@ -63,13 +54,9 @@ from omnicompany.packages.services._core.agent.external_workers.runtime_profiles
 __all__ = [
     "CodexExecWorker",
     "ClaudeCodeSdkWorker",
-    "OpenCodeRunWorker",
-    "KimiExecWorker",
-    "OmniNativeWorkspaceWorker",
     "AgentCapabilityGrant",
     "AgentContextEnvelope",
     "AgentRuntimeProfile",
-    "HarnessCapabilities",
     "AgentRuntimeRequest",
     "AgentRuntimeSelection",
     "ExternalAgentSubAgent",
@@ -83,11 +70,12 @@ __all__ = [
     "ExternalAgentWorker",
     "ExternalAgentWorkerRegistry",
     "FakeExternalAgentWorker",
+    "HarnessCapabilities",
     "build_default_external_agent_worker_registry",
     "build_external_agent_subagent_registry",
-    "resolve_external_agent_model",
-    "run_external_agent_request",
-    "run_agent_runtime_request",
-    "select_agent_runtime",
     "get_harness_capabilities",
+    "resolve_external_agent_model",
+    "run_agent_runtime_request",
+    "run_external_agent_request",
+    "select_agent_runtime",
 ]

@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from omnicompany.packages.services._diagnosis.doctor.health_record import SCHEMA_VERSION
+from omnicompany.packages.services._diagnosis.doctor.health_record_v2 import SCHEMA_VERSION
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 

@@ -1,0 +1,62 @@
+{
+  "schema": "game-observatory.ai-player.guide-import-bundle.v1",
+  "source_snapshots": [
+    {
+      "id": "source-snapshot.sanguo.mumu.resource-land-20240605.websearch-20260717",
+      "source_id": "https://mumu.163.com/news/official/20240605/25239_1159141.html",
+      "content_sha256": "7240f251d46c86fe06fee842fb1e7860e00d607a3abfec3c55c8683ab9ae2a53",
+      "locator": "Claude WebSearch 于 2026-07-17 返回的 MuMu 官方攻略结果与摘要",
+      "excerpt": "《三国：谋定天下》资源地开荒攻略及兵力配备：资源地通过派遣单队与守军战斗完成开垦；攻略给出1级约600、2级约1800、3级约3300兵力的历史参考。",
+      "captured_at": "2026-07-17T21:38:00+08:00",
+      "status": "active",
+      "metadata": {
+        "url": "https://mumu.163.com/news/official/20240605/25239_1159141.html",
+        "platform": "MuMu模拟器官方攻略页",
+        "retrieved_by": "claude-code-cli",
+        "native_session_id": "eaff41a2-6b3a-4670-9d65-b15f0b84dc94",
+        "external_turn": 23,
+        "capture_scope": "web-search-result-summary"
+      }
+    }
+  ],
+  "guides": [
+    {
+      "schema": "game-observatory.ai-player.guide-knowledge.v1",
+      "id": "guide.sanguo.mumu.resource-land-20240605",
+      "version": 1,
+      "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+      "url": "https://mumu.163.com/news/official/20240605/25239_1159141.html",
+      "platform": "MuMu模拟器官方攻略页",
+      "author": "MuMu模拟器",
+      "published_at": "2024-06-05",
+      "retrieved_at": "2026-07-17T21:38:00+08:00",
+      "applicable_game_version": "1.31.0",
+      "summary": "资源地开垦需要派遣单支已编成部队与守军战斗。攻略给出低级资源地的兵力配置历史参考，可用于发现路线；当前账号仍须以实机界面验证实际入口、守军兵力和出征条件。",
+      "locators": [
+        "资源地开垦",
+        "单队出征",
+        "兵力配置",
+        "守军战斗"
+      ],
+      "status": "unverified",
+      "missing_applicability_reason": "来源发布于2024年；当前客户端版本、赛季、服务器阶段和实际界面入口仍须当前账号实机验证。",
+      "triggering_task_ids": [
+        "task.cli.e352ba886d5a44d1a1a0c894fead2efc"
+      ],
+      "evidence_refs": [
+        {
+          "schema": "game-observatory.ai-player.evidence-reference.v1",
+          "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+          "artifact_ids": [],
+          "evidence_run_ids": [],
+          "evidence_step_ids": [],
+          "trace_run_ids": [],
+          "source_ids": [
+            "https://mumu.163.com/news/official/20240605/25239_1159141.html"
+          ],
+          "note": "Claude WebSearch 返回的真实平台来源；结论只用于发现，等待当前账号实机验证。"
+        }
+      ]
+    }
+  ]
+}

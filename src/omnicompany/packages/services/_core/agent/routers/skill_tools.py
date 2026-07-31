@@ -194,7 +194,10 @@ class SkillRouter(SingleToolRouter):
     INPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
-            "name": {"type": "string", "description": "Skill name (dir under .agents/skills/ or .claude/skills/)"},
+            "name": {
+                "type": "string",
+                "description": "Skill name (dir under .agents/skills/ or .claude/skills/)",
+            },
             "args": {"type": "string", "description": "Optional argument string"},
         },
         "required": ["name"],

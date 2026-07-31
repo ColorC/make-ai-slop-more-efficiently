@@ -1,0 +1,43 @@
+{
+  "domain": "game-observatory-afk-hero-detail",
+  "goal": "只根据 scene 指定的纯 source_pixels 坐标网格完整画面，枚举当前 AFK Journey 罗万英雄详情画面中最值得安全验证的可见交互候选。第一轮只读取该画面；下一轮看到图片后，每次 propose_probe 都显式传 action_type，并给出紧贴可见控件的源像素目标框、直接可见线索、待验证的预期变化、理由和具体风险。优先选择有文字、独立导航箭头、明确只读信息入口；功能不明按钮和连续无文字语义图标组低优先级。逐条复核原截图左上角为 (0,0)，网格没有新增边距，最多提交 9 条互不重复候选。普通可返回页面跳转和只读查看的 risk_flags 传空数组。排除升级、赠礼、换装确认、一键装备、支付、删除与账号操作。不执行任何游戏动作。",
+  "max_iterations": 1,
+  "scene": {
+    "mode": "shadow",
+    "kind": "game-ui-exploration",
+    "benchmark_run_id": "gate3.calibration.hypothesis.08",
+    "fixture_id": "gate3-afk-rowan-hero-detail-calibration-v1",
+    "allowed_output_root": "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\benchmarks\\gate3\\calibration-hypothesis-08",
+    "suggestion_ledger": "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\benchmarks\\gate3\\calibration-hypothesis-08\\suggestions.jsonl",
+    "allowed_image_roots": [
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\fixtures"
+    ],
+    "grounding_image_paths": [
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\fixtures\\gate3-afk-rowan-hero-detail-calibration-grid-source-px-v3.png"
+    ],
+    "required_grounding_image_paths": [
+      "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\fixtures\\gate3-afk-rowan-hero-detail-calibration-grid-source-px-v3.png"
+    ],
+    "coordinate_space": "source_pixels",
+    "allowed_action_types": ["tap", "swipe", "wait", "back"],
+    "forbidden_target_terms": [
+      "升级",
+      "赠礼",
+      "礼物",
+      "礼包",
+      "一键装备",
+      "购买",
+      "支付",
+      "删除",
+      "账号",
+      "换装确认"
+    ],
+    "max_suggestions": 9,
+    "observation": {
+      "artifact_id": "art.device.1783965916793.da7b51be",
+      "frame_path": "E:\\WindowsWorkspace\\omnicompany\\data\\domains\\game_observatory\\artifacts\\art.device.1783965916793.da7b51be.png",
+      "sha256": "38dbdb618eaf8de56226629c1e20fbd871072409fae2053acb129a88eaa6255c",
+      "viewport": {"width": 1080, "height": 1920}
+    }
+  }
+}

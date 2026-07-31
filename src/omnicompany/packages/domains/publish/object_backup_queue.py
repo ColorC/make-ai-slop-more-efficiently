@@ -284,9 +284,16 @@ def chunk_units(item: QueueItem) -> list[BackupUnit]:
     current = [item.source]
     for _ in range(item.chunk_depth):
         next_level: list[Path] = []
-        for directory in current:
-            children = sorted(path for path in directory.iterdir() if path.is_dir())
-            next_level.extend(children or [directory])
+        for source in current:
+            if source.is_file():
+                next_level.append(source)
+                continue
+            directories = sorted(path for path in source.iterdir() if path.is_dir())
+            if directories:
+                next_level.extend(directories)
+                continue
+            files = sorted(path for path in source.iterdir() if path.is_file())
+            next_level.extend(files or [source])
         current = next_level
     units = []
     for source in current:

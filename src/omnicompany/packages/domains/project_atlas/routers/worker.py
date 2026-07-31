@@ -15,7 +15,7 @@ from omnicompany.runtime.routing.router import Router
 
 from .. import writer
 from .._paths import PLAN_DIR, STAGING_ROOT, repo_root
-from .._worker import run_tool_worker
+from .._worker import run_claude_worker
 
 _STANDARD_REL = "docs/plans/[2026-06-22]OMNI-RESOURCE-CENTER/object-skill-standard.md"
 
@@ -101,7 +101,6 @@ class Collect(Router):
         ctx = input_data if isinstance(input_data, dict) else {}
         space = ctx["space"]
         root = ctx["root"]
-        provider = str(ctx.get("worker_provider") or "codex")
         run_dir = Path(ctx["run_dir"])
         staging = STAGING_ROOT / space
         staging.mkdir(parents=True, exist_ok=True)
@@ -128,9 +127,8 @@ class Collect(Router):
                 (run_dir / "inventory.md").write_text(inventory, encoding="utf-8")
             sp = run_dir / "enumerate_spec.md"
             sp.write_text(_enumerate_spec(space, root, _rel(objects_path), inventory), encoding="utf-8")
-            res = run_tool_worker(spec_path=sp, cwd=omni_root, run_root=run_dir / "w_enumerate",
-                                  provider=provider, permission="workspace-write",
-                                  watch_rel=_rel(PLAN_DIR), timeout_s=180.0)
+            res = run_claude_worker(spec_path=sp, cwd=omni_root, run_root=run_dir / "w_enumerate",
+                                    permission="workspace-write", watch_rel=_rel(PLAN_DIR), timeout_s=600.0)
             rounds.append({"step": "enumerate", "status": res.get("status")})
         if not objects_path.exists():
             return Verdict(kind=VerdictKind.FAIL, output={**ctx, "worker_status": "enumerate_failed", "rounds": rounds},
@@ -164,9 +162,8 @@ class Collect(Router):
             name = writer.slug(o["object_name"])
             sp = run_dir / f"author_{name}_spec.md"
             sp.write_text(_author_spec(space, o, name, staging_rel), encoding="utf-8")
-            res = run_tool_worker(spec_path=sp, cwd=omni_root, run_root=run_dir / f"w_{name}",
-                                  provider=provider, permission="workspace-write",
-                                  watch_rel=f"{staging_rel}/{name}", timeout_s=180.0)
+            res = run_claude_worker(spec_path=sp, cwd=omni_root, run_root=run_dir / f"w_{name}",
+                                    permission="workspace-write", watch_rel=f"{staging_rel}/{name}", timeout_s=600.0)
             rounds.append({"step": name, "status": res.get("status")})
             if _done(o):
                 authored += 1

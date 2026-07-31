@@ -1,0 +1,49 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-tabs-repetition2-rumor-known-answer-v1",
+  "benchmark_run_id": "pair.gate3.repetition2.rumor.postchange.retry.01",
+  "adjudicator": "main-agent-independent-original-image-and-known-route-review",
+  "generated_at": "2026-07-14T02:55:00Z",
+  "items": [
+    {
+      "probe_id": "shadow.probe.dcd3f14cc9434d098912370981f9cb6a",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "原尺寸截图清楚显示信赖度页签及相邻礼物图标；点位落在页签范围内，切换结果已有冻结路线覆盖。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.6906a3d15cc741c99d8a91d8bf166f70",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "原尺寸截图清楚显示绿色传闻页签及选中指示；点位落在冻结基准的选中页签范围内。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.a72401b942524c44b12b94102da58399",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "原尺寸截图清楚显示语音页签；点位落在页签范围内，切换结果已有冻结路线覆盖。旧 prechange 判读中关于文字不可见的结论在本次复核后撤销。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.150309df07e84206aa96d58cd17b4cc0",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "左下返回箭头与点击点位均受截图支持；冻结 fixture 只验证了系统 back 动作，尚未验证点击该箭头产生同一结果，因此不匹配已知动作合同。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-season-equipment-unknown-real-v1",
+  "benchmark_run_id": "pair.gate3.season-equipment.hypothesis.unknown-real.08",
+  "adjudicator": "main-agent-independent-mumu-evidence-union-20260714",
+  "generated_at": "2026-07-14T07:05:00Z",
+  "items": [
+    {
+      "probe_id": "shadow.probe.6828abb8dd0b44f0a7d2f2283a276311",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "沙漏命中后打开规则详情；结果在建议中保持为待验证问题。",
+      "evidence_ids": ["evidence.step.13fb6957c5f8450b9bad91addb1f4331"]
+    },
+    {
+      "probe_id": "shadow.probe.9009af9804804d4f8b574d383e08db8b",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "点击打开 320 级灯笼辅助装备详情。",
+      "evidence_ids": ["evidence.step.c5a75ee44d124322825e70b6acb67dd4"]
+    },
+    {
+      "probe_id": "shadow.probe.9eb8a7507e1b4810a3bd9e2d9063df07",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "点击打开 310 级服装辅助装备详情。",
+      "evidence_ids": ["evidence.step.98308f505d07491a9c1ba13e514cb2e0"]
+    },
+    {
+      "probe_id": "shadow.probe.68d57f5a5697481f89a8fb889c50e97c",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "点击打开 290 级饰件辅助装备详情。",
+      "evidence_ids": ["evidence.step.c4f7ac18d18a421fb2a027423ec1228e"]
+    },
+    {
+      "probe_id": "shadow.probe.f1a78d6fe6ee41f59894ef8c2e3f0a30",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "点击打开 330 级头饰辅助装备详情。",
+      "evidence_ids": ["evidence.step.6d5871358c0a470a9578706a56caf208"]
+    },
+    {
+      "probe_id": "shadow.probe.0b9767c747c1420bbbf464b6d15fd6a3",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "点击打开 290 级绿色长袍辅助装备详情。",
+      "evidence_ids": ["evidence.step.de711409242947e6a409263c376d5902"]
+    },
+    {
+      "probe_id": "shadow.probe.b7c75891fe6946f8bbc6a9def6c5c47a",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "点击打开 290 级靴子辅助装备详情。",
+      "evidence_ids": ["evidence.step.7b36e4c5e7c94e009ca560e1073a7096"]
+    },
+    {
+      "probe_id": "shadow.probe.996fd864075e4495a745af0fc923430a",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "点击进入赛季职业装备墙；建议中的跳转结果保持为待验证问题。",
+      "evidence_ids": ["evidence.step.9df3b1cb5cd247a8a1d801b10dba8a89"]
+    },
+    {
+      "probe_id": "shadow.probe.639ffed69c1147bd9dad0923a1c8b5ba",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "目标按可见双箭头命名，功能仅以待验证问题表达；设备证据确认它在两种职业装备模式间切换。",
+      "evidence_ids": [
+        "evidence.step.9ba4bb104983495b9e4a5956a3f0db98",
+        "evidence.step.e5ef086fefe74b8c94184242b0ac6942"
+      ]
+    }
+  ]
+}

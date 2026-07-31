@@ -86,7 +86,7 @@ _register_builtin_tools()
 def auto_register_singletool_subclasses() -> int:
     """扫所有已 import 的 SingleToolRouter 子类自动 register_tool.
 
-    业务侧 (例 example_domain/team_business/workers/messaging_tools 等) import 自己 router 后
+    业务侧 (例 demogame/team_business/workers/feishu_tools 等) import 自己 router 后
     调一次本函数, 把所有有 TOOL_NAME 的子类都登记到 TOOL_REGISTRY.
 
     返回新登记的 tool 数. 已存在的不重复.
@@ -129,9 +129,9 @@ class AgentSpec:
     """
 
     # ── 1. omnicompany 注册信息 ──
-    id: str                                              # 唯一 ID (例 "example_domain.business_researcher")
-    name: str                                            # 类名风格 (例 "ExampleBusinessResearcher")
-    domain: str = ""                                     # 业务域 (例 "example_domain")
+    id: str                                              # 唯一 ID (例 "demogame.business_researcher")
+    name: str                                            # 类名风格 (例 "IgameBusinessResearcher")
+    domain: str = ""                                     # 业务域 (例 "demogame")
     parent_worker_kind: str = "agent"                    # 跟工人规范对齐 (R-19 智能体子类型)
     registry_namespace: str = "services.agent.instances"  # 注册中心命名空间
 
@@ -140,7 +140,7 @@ class AgentSpec:
     llm_temperature: float = 0.3                         # 调研类任务低温度减幻觉
     llm_max_tokens: int = 16000                          # 单轮 max_tokens (16k 起步, 2026-05-03 跟 LLMClient + Claude Code escalated 64k 同向). LLMClient _continue_if_truncated_* 自动续写撞 length 接着生, 4000 / 12000 都是反模式
     llm_max_turns: int | None = None                     # 活动驱动；仅明确有界任务设整数上限
-    llm_timeout_seconds: int | None = None                # None 使用统一传输层无返回保护
+    llm_timeout_seconds: int | None = None               # None 使用统一传输层无返回保护
     llm_extra_body: Mapping[str, Any] = field(default_factory=dict)  # 原生模型参数，如 thinking_budget
 
     # ── 3. 产出 material 列表 ──
@@ -199,16 +199,16 @@ class ConfigurableAgent(AgentNodeLoop):
 
     示例最小子类 (业务侧)::
 
-        class ExampleBusinessResearcher(ConfigurableAgent):
+        class IgameBusinessResearcher(ConfigurableAgent):
             SPEC = AgentSpec(
-                id="example_domain.business_researcher",
-                name="ExampleBusinessResearcher",
-                domain="example_domain",
-                prompt_path="docs/agent_prompts/example_business_researcher.md",
+                id="demogame.business_researcher",
+                name="IgameBusinessResearcher",
+                domain="demogame",
+                prompt_path="docs/agent_prompts/demogame_business_researcher.md",
                 tools=("glob", "grep", "read_file", "list_dir"),
-                output_materials=("example_domain.business-understanding-doc",),
-                primary_output="example_domain.business-understanding-doc",
-                trigger_materials=("example_domain.business-research-request",),
+                output_materials=("demogame.business-understanding-doc",),
+                primary_output="demogame.business-understanding-doc",
+                trigger_materials=("demogame.business-research-request",),
             )
 
     框架自动:

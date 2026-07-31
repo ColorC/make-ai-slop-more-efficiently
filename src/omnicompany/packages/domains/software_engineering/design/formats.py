@@ -19,7 +19,6 @@ FORMATS = [
         name="DesignTask",
         description="设计审查任务: 设计提案文本 + 项目目录 + 审查目标",
         parent="sw.task-input",
-        tags=["kind.source"],
     ),
 
     # ── 项目快照 ──
@@ -28,7 +27,7 @@ FORMATS = [
         name="DesignProjectSnapshot",
         description="项目快照: 目录结构 + 语言分布 + 关键文件",
         parent="sw.project-snapshot",
-        tags=["scanned", "kind.internal"],
+        tags=["scanned"],
     ),
 
     # ── 上下文累积 ──
@@ -37,7 +36,7 @@ FORMATS = [
         name="DesignContextState",
         description="设计审查上下文: file_batch + iteration + sufficient",
         parent="agent-state",
-        tags=["stateful", "accumulating", "kind.internal"],
+        tags=["stateful", "accumulating"],
     ),
 
     # ── 架构模式 ──
@@ -46,7 +45,7 @@ FORMATS = [
         name="ArchPatterns",
         description="现有架构模式: 命名规范 + 分层 + 测试策略 + 错误处理 + DI",
         parent=f"{DOMAIN}.context-state",
-        tags=["analyzed", "kind.internal"],
+        tags=["analyzed"],
     ),
 
     # ── LLM 审查 ──
@@ -55,7 +54,7 @@ FORMATS = [
         name="DesignReview",
         description="LLM 审查结果: findings + conclusion + summary",
         parent="sw.llm-review",
-        tags=["reviewed", "kind.internal"],
+        tags=["reviewed"],
     ),
 
     # ── 最终报告 ──
@@ -64,7 +63,7 @@ FORMATS = [
         name="DesignReport",
         description="报告: report_text + conclusion + metrics",
         parent="sw.report",
-        tags=["finalized", "kind.sink"],
+        tags=["finalized"],
         required_tags=["reviewed"],
     ),
 ]

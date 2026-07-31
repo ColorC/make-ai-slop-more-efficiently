@@ -1,0 +1,1 @@
+{"action":{"type":"back","duration_ms":250},"target_name":"系统返回","settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

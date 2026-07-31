@@ -29,7 +29,7 @@ relations:
 provenance:
   created_from: "V18 HypothesisDeriverAgent"
   created_at: "2026-05-06"
-  source_artifact: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/team_derivation_2026-05-07.md"
+  source_artifact: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v18_team_derivation_2026-05-07.md"
 
 notes:
   - "该 claim 不应作为全局健康规则继续使用。"

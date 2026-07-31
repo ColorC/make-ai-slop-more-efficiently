@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnicompany.local/schemas/mechanics-first-play-design.v1.schema.json",
+  "title": "机制优先的玩法设计案",
+  "type": "object",
+  "required": [
+    "template_version",
+    "system_definition",
+    "mechanism_map",
+    "mechanism_modules",
+    "progression_axes",
+    "resource_loop",
+    "state_matrix",
+    "source_refs"
+  ],
+  "properties": {
+    "template_version": { "const": "mechanics-first-play-design.v1" },
+    "system_definition": {
+      "type": "object",
+      "required": ["title", "definition", "managed_objects", "boundaries"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "definition": { "type": "string", "minLength": 1 },
+        "managed_objects": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "boundaries": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "mechanism_map": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["from", "relation", "to"],
+        "properties": {
+          "from": { "type": "string" },
+          "relation": { "type": "string" },
+          "to": { "type": "string" }
+        }
+      }
+    },
+    "mechanism_modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/mechanismModule" }
+    },
+    "progression_axes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "stages", "gates", "reset_or_inheritance"],
+        "properties": {
+          "name": { "type": "string" },
+          "stages": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "gates": { "type": "array", "items": { "type": "string" } },
+          "reset_or_inheritance": { "type": "string" },
+          "effects": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "resource_loop": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["resource", "sources", "uses", "result"],
+        "properties": {
+          "resource": { "type": "string" },
+          "sources": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "uses": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "result": { "type": "string" },
+          "limits": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "state_matrix": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["subject", "condition", "available_action", "result", "feedback"],
+        "properties": {
+          "subject": { "type": "string" },
+          "condition": { "type": "string" },
+          "available_action": { "type": "string" },
+          "result": { "type": "string" },
+          "feedback": { "type": "string" }
+        }
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "title", "locator"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["live_observation", "internal_design", "internal_config", "internal_code", "official_public", "public_research"] },
+          "title": { "type": "string" },
+          "locator": { "type": "string" },
+          "version_context": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "mechanismModule": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "definition",
+        "player_result",
+        "state_variables",
+        "inputs",
+        "rules",
+        "outputs",
+        "states",
+        "boundaries",
+        "dependencies",
+        "artifact_id",
+        "source_ref_ids"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "definition": { "type": "string" },
+        "player_result": { "type": "string" },
+        "artifact_id": { "type": "string" },
+        "state_variables": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "inputs": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["title", "statement"],
+            "properties": {
+              "title": { "type": "string" },
+              "statement": { "type": "string" },
+              "formula": { "type": "string" }
+            }
+          }
+        },
+        "outputs": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "states": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "resources": { "type": "array", "items": { "type": "string" } },
+        "boundaries": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "dependencies": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "source_ref_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    }
+  }
+}

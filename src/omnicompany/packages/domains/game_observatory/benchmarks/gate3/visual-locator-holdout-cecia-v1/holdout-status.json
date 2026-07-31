@@ -1,0 +1,15 @@
+{
+  "schema": "game-observatory.holdout-status.v1",
+  "fixture_id": "gate3-afk-cecia-hero-detail-holdout-v1",
+  "first_inference_run": "run-01/result.json",
+  "first_score": "scores/run-01-score.json",
+  "first_result": {
+    "expected_count": 2,
+    "matched_count": 1,
+    "expected_recall": 0.5,
+    "missing_expected_ids": ["cecia-previous-hero"]
+  },
+  "status": "consumed-failed-holdout-now-development-regression",
+  "reason": "The left edge hero switch was visible and evidence-verified, while only the aligned right edge switch was detected. Any later mirrored-edge rule makes this a development regression case.",
+  "next_requirement": "Freeze a different screenshot and manual baseline before the next generalization claim."
+}

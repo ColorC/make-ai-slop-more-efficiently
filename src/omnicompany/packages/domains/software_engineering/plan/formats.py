@@ -23,7 +23,6 @@ FORMATS = [
         name="PlanSpec",
         description="设计文档/需求: 文本内容 + 来源路径 + 项目目录",
         parent="sw.task-input",
-        tags=["kind.source"],
     ),
 
     # ── 代码库扫描 ──
@@ -32,7 +31,7 @@ FORMATS = [
         name="PlanCodebaseScan",
         description="代码库扫描结果: 目录结构树、文件列表、关键文件识别",
         parent="sw.project-snapshot",
-        tags=["scanned", "kind.internal"],
+        tags=["scanned"],
     ),
 
     # ── 代码上下文（累积，回路1载体）──
@@ -41,7 +40,7 @@ FORMATS = [
         name="PlanCodeContext",
         description="累积代码上下文: 已读文件 + 模式 + 充分性",
         parent="agent-state",
-        tags=["stateful", "accumulating", "kind.internal"],
+        tags=["stateful", "accumulating"],
     ),
 
     # ── 文件映射 ──
@@ -50,7 +49,7 @@ FORMATS = [
         name="FileMap",
         description="文件创建/修改计划: 每个文件的操作 + 依赖关系",
         parent=f"{DOMAIN}.code-context",
-        tags=["mapped", "kind.internal"],
+        tags=["mapped"],
     ),
 
     # ── 计划草稿 ──
@@ -59,7 +58,7 @@ FORMATS = [
         name="PlanDraft",
         description="LLM 生成的实施计划草稿: Task 列表 + 代码 + 验证命令",
         parent=f"{DOMAIN}.file-map",
-        tags=["drafted", "kind.internal"],
+        tags=["drafted"],
     ),
 
     # ── 自检结果（回路2载体）──
@@ -68,7 +67,7 @@ FORMATS = [
         name="SelfReviewResult",
         description="计划自检: 占位符扫描 + 覆盖度 + 问题列表",
         parent=f"{DOMAIN}.draft",
-        tags=["reviewed", "kind.internal"],
+        tags=["reviewed"],
     ),
 
     # ── 终版计划 ──
@@ -77,7 +76,7 @@ FORMATS = [
         name="FinalPlan",
         description="终版实施计划: 零占位符 + 完整代码块 + TDD 步骤",
         parent=f"{DOMAIN}.review-result",
-        tags=["validated", "finalized", "kind.sink"],
+        tags=["validated", "finalized"],
         required_tags=["reviewed"],
     ),
 ]

@@ -1,0 +1,69 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-hero-detail-home-known-answer-v1",
+  "benchmark_run_id": "pair.gate3.hero-detail-home.hypothesis.equal-input.target-crops.07",
+  "adjudicator": "main-agent-independent-full-image-target-reference-and-gate2-route-review",
+  "generated_at": "2026-07-14T03:31:00Z",
+  "items": [
+    {
+      "probe_id": "shadow.probe.63299a4a0ed64c1c9f556f6ca44a8b00",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "TARGET 01 与完整原图均显示圆形 i；框、151万邻接锚点和既有结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.bf7aac88b9fe4be3afbd7e3c48bccc38"]
+    },
+    {
+      "probe_id": "shadow.probe.023bcf1db8704b0daf2e1a3c332e3feb",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "TARGET 02 与完整原图均显示 305 级蓝绿色对称职业徽记；框和既有结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.f22f534b0071418586cb8a215f7cc681"]
+    },
+    {
+      "probe_id": "shadow.probe.f9dc9894c2f440118fb85c5ed52952b2",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "TARGET 03 清楚显示四叶草、礼物角标和信赖度文字；框、邻接未置顶按钮和既有结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.8627baee63704b649feb7663f57e037b"]
+    },
+    {
+      "probe_id": "shadow.probe.f02f779674844d25b8d293ac6d9f5d81",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "TARGET 04 清楚显示衣服图标和皮肤文字；框、邻接关系和既有结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.5aff4e3a3de34c098f749ff2186b576b"]
+    },
+    {
+      "probe_id": "shadow.probe.e41f56b1830a4346916ead99e79d0eff",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "TARGET 05 清楚显示红发角色头像、动物造型头饰和英雄头饰文字；框、邻接关系和既有结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.eaf526081d084542a8e803e0264c5c5b"]
+    },
+    {
+      "probe_id": "shadow.probe.1bdd2b2d027b4911a7b8e453a5723dfb",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "TARGET 06 与完整原图均显示白色右箭头；框、上下邻接关系和切换下一英雄结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.8fedf821e4ff4c69b0a1afa34d53ec54"]
+    }
+  ]
+}

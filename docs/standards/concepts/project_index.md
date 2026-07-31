@@ -8,7 +8,7 @@
 
 > **权威**: 本文件（从真源提取: `core/projects_registry.py` 的解析/校验逻辑 + 现存实例）。
 > 改字段契约时必同步 `projects_registry.INDEX_REQUIRED_KEYS` 与本文件, 不一致即出问题信号。
-> **合规样本**: `src/omnicompany/dashboard/PROJECT_INDEX.md`（驾驶舱项目, 字段全、活跃消费中）
+> **合规样本**: [`src/omnicompany/dashboard/PROJECT_INDEX.md`](../../../src/omnicompany/dashboard/PROJECT_INDEX.md)（驾驶舱项目, 字段全、活跃消费中）
 
 ## 一 · PROJECT_INDEX.md 是什么
 

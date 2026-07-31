@@ -1,0 +1,18 @@
+{
+  "action": {
+    "type": "tap",
+    "x": 70,
+    "y": 1090
+  },
+  "target_name": "上一个英雄",
+  "target_bounds": {
+    "x": 25,
+    "y": 1015,
+    "width": 95,
+    "height": 145
+  },
+  "settle_threshold": 0.03,
+  "required_consecutive": 3,
+  "settle_timeout_seconds": 8.0,
+  "sample_interval_seconds": 0.25
+}

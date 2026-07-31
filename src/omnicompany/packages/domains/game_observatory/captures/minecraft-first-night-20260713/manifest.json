@@ -1,0 +1,22 @@
+{
+  "schema_version": "game-observatory.minecraft-first-night-evidence.v1",
+  "source_root": "E:/MinecraftWorkspace/proto-world",
+  "game_version": "Minecraft Java 1.21.1 / ProtoWorld first-night v4",
+  "server_address": "127.0.0.1:25599",
+  "world_snapshot": "eba1aee",
+  "benchmark_player": "GOFood01",
+  "captured_at": "2026-07-13T19:19:36+08:00",
+  "e2e_gates_path": "verify/first_night_e2e/gates.json",
+  "screenshot_paths": {
+    "world_start": "run-client/screenshots/go_mc_world_start.png",
+    "campfire": "verify/first_night_e2e/fn01_campfire.png",
+    "roasted_food": "verify/first_night_e2e/fn02_roast.png",
+    "night_threat": "verify/first_night_e2e/fn03_night_remnant.png",
+    "night_burning": "verify/first_night_e2e/fn04_burning.png",
+    "night_light": "verify/first_night_e2e/fn05_night_light.png",
+    "recipe_zeroed": "run-client/screenshots/go_mc_recipe_book_all.png"
+  },
+  "recipe_probe_response": "Unknown recipe: minecraft:stone_pickaxe",
+  "reset_after_run": true,
+  "note": "24/24 first-night objective gates passed with real client input. The test player was stopped and the deterministic world was rebuilt and snapshotted as eba1aee. The recipe-book frame and live probe preserve the separate, deterministic boundary that vanilla stone-pickaxe crafting is unavailable in this ProtoWorld instance."
+}

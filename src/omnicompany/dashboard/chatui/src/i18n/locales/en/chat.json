@@ -20,7 +20,6 @@
     "codex": "Codex",
     "gemini": "Gemini",
     "opencode": "OpenCode",
-    "kimi": "Kimi",
     "omni_agent": "Omni Agent",
     "controller": "总控"
   },
@@ -158,7 +157,6 @@
       "codex": "Ready to use Codex with {{model}}. Start typing your message below.",
       "gemini": "Ready to use Gemini with {{model}}. Start typing your message below.",
       "opencode": "Ready to use OpenCode with {{model}}. Start typing your message below.",
-      "kimi": "Ready to use Kimi with {{model}}. Start typing your message below.",
       "omni_agent": "Ready to use Omni Agent with {{model}}. Start typing your message below.",
       "controller": "Ready to use 总控 (local Claude {{model}}). Start typing your message below.",
       "default": "Select a provider above to begin"

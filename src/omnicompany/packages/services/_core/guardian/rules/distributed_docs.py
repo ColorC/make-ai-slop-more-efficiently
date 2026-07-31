@@ -135,7 +135,7 @@ def _check_stray_progress(ctx: FileContext) -> bool:
 #   docs/plans/<主题区>/[date]TOPIC/<rest>                                — 主题区直接
 #   docs/plans/<主题区>/<子主题>/[date]TOPIC/<rest>                       — 主题区内按对象拆子层
 #   docs/plans/<主题区>/_archive/[date]TOPIC/<rest>                       — 主题区内归档
-# 主题区命名: 代码模块名 (agent-framework/dashboard/...) | 业务域名 (research/decisions) | omnicompany-<中文能力名>
+# 主题区命名: 代码模块名 (agent-framework/dashboard/...) | 业务域名 (voxelcraft/demogame) | omnicompany-<中文能力名>
 _PLAN_TOPIC_INNER = re.compile(
     r"^docs/plans/"
     r"(?:_archive/"

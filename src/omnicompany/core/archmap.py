@@ -187,13 +187,7 @@ class ArchMap:
         Args:
             has_purpose: 调用方是否提供了非空 purpose,仅 key_file 判定用
         """
-        # Strip only explicit relative-path prefixes. ``str.lstrip('./')`` also
-        # removed the leading dot from real drawers such as ``.claude`` and
-        # ``.agents``, making every hidden project integration look undeclared.
-        p = rel_path.replace("\\", "/")
-        while p.startswith("./"):
-            p = p[2:]
-        p = p.lstrip("/")
+        p = rel_path.replace("\\", "/").lstrip("./")
         if not p:
             return WriteCheck(False, "空路径", drawer_layer="none")
 
@@ -214,7 +208,7 @@ class ArchMap:
                     False,
                     f"{p} 是 protected_key_file 且 require_purpose=true。"
                     f"必须传非空 purpose 说明这次 meta config 修改的原因(会进 audit log)。"
-                    f"例如: write_file(..., purpose='S3f: 加 data/domains/my_domain/ 子目录')",
+                    f"例如: write_file(..., purpose='S3f: 加 data/domains/demogame/ 子目录')",
                     drawer="(key_file)", drawer_layer="repo_root",
                 )
             return WriteCheck(

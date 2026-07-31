@@ -23,7 +23,7 @@ from .hypothesis_agent_prompt_builder import (
     HypothesisAgentPromptBuilder,
     HypothesisAgentPromptSkeleton,
 )
-from .hypothesis_upgrader import (
+from .hypothesis_v1_upgrader import (
     HypothesisV1Upgrader,
     HypothesisV1UpgradeResult,
     UpgradedHypothesis,

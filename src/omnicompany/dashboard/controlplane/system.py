@@ -9,11 +9,13 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from omnicompany.core.config import omni_workspace_root
+
 system_router = APIRouter()
 
 
 def _project_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    return omni_workspace_root()
 
 
 @system_router.get("/system/info")

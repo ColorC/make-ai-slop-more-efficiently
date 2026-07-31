@@ -64,9 +64,8 @@ def _write(data: dict[str, Any]) -> None:
     tmp.replace(p)
 
 
-def add_entry(ref_type: str, ref_id: str, text: str, *, by: str = "human",
-              trace_id: str | None = None) -> dict[str, Any]:
-    """新增一条历史(自动记时间戳 + 所属 plan/project)。trace_id: 记哪个会话产出的(可空)。"""
+def add_entry(ref_type: str, ref_id: str, text: str, *, by: str = "human") -> dict[str, Any]:
+    """新增一条历史(自动记时间戳 + 所属 plan/project)。"""
     if ref_type not in REF_TYPES:
         raise ValueError(f"ref_type 必须是 {REF_TYPES}, 收到 {ref_type!r}")
     ref_id = (ref_id or "").strip()
@@ -83,7 +82,6 @@ def add_entry(ref_type: str, ref_id: str, text: str, *, by: str = "human",
             "ref_id": ref_id,
             "text": text,
             "by": by,
-            "trace_id": trace_id,  # 哪个会话产出的(会话侧还会反向挂一条引用)
             "created_at": _now(),
             "updated_at": _now(),
         }

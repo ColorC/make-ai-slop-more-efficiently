@@ -1,6 +1,5 @@
 # [OMNI] origin=omnifactory domain=omnifactory/repair ts=2026-04-10T00:00:00Z
 # [OMNI] material_id="material:core.repair.repair_planner_format_patcher_format_repair_agent.routers_legacy.py"
-# OMNI-024 ALLOW: 归档冻结留档(legacy 快照), 仅历史参考不再演进, 迁移无意义(同仓内其它 _archive ALLOW 先例)
 """repair.routers — Format 自动修复管线的 Router 实现
 
   RepairPlannerRouter      (LLM)  分析健康档案，输出字段修复 delta JSON
@@ -17,13 +16,12 @@ import re
 from pathlib import Path
 from typing import Any
 
-from omnicompany.core.config import omni_workspace_root
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.runtime.routing.router import Router
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SOURCE_ROOT = omni_workspace_root() / "src" / "omnicompany"
+_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnifactory/src/omnifactory")
 
 
 # ════════════════════════════════════════════════════════════════

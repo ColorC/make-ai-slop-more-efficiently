@@ -763,6 +763,11 @@ async def automation_pairing_window(req: Request):
     with _automation_lock:
         data = _load_automation()
         bucket = data.setdefault(device_id, {"queue": [], "results": []})
+        # Prefer the last token-authenticated native source over an unauthenticated
+        # WebView registration. The IP remains telemetry, never device identity.
+        authenticated_ip = str(bucket.get("ip") or "").strip() if bucket.get("device_token_hash") else ""
+        if authenticated_ip:
+            observed_ip = authenticated_ip
         attempt_at = float(bucket.get("last_pair_attempt_at") or 0)
         attempt_hash = str(bucket.get("last_pair_attempt_token_hash") or "")
         attempt_recent = bool(attempt_hash) and attempt_at >= now - 120

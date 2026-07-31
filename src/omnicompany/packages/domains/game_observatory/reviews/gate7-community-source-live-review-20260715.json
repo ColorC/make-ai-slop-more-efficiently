@@ -1,0 +1,144 @@
+{
+  "schema": "game-observatory.community-source-live-review.v1",
+  "id": "review.gate7.community-source-live.20260715",
+  "reviewed_at": "2026-07-15T00:20:38+00:00",
+  "scope": {
+    "drafts": [
+      "drafts/afk-journey-rowan-hero-detail.partial.v1.json",
+      "drafts/minecraft-protoworld-first-night-fire-food.partial.v1.json"
+    ],
+    "feedback_count": 14,
+    "source_types": [
+      "player_comment",
+      "player_discussion",
+      "media_score",
+      "media_review",
+      "media_article",
+      "objective_data",
+      "estimated_data"
+    ]
+  },
+  "result": {
+    "all_sources_resolve_to_real_platforms": true,
+    "stable_item_locator_count": 13,
+    "platform_surface_only_count": 1,
+    "future_capture_timestamps_found": 10,
+    "future_capture_timestamps_corrected": 10,
+    "dynamic_metric_corrections": 1,
+    "publication_blockers": [
+      "Apple App Store does not expose a stable per-review permalink for the Dilem87 review; keep the official review surface plus author and date locator, and do not mirror the review text."
+    ]
+  },
+  "dynamic_metric_corrections": [
+    {
+      "source_id": "source.afk.google-play.snapshot-20260715",
+      "url": "https://play.google.com/store/apps/details?hl=en&id=com.farlightgames.demogame.gp&listing=fbrtt",
+      "observed_at": "2026-07-15T00:20:38+00:00",
+      "observed": {
+        "header_rating": 4.7,
+        "header_rating_count_approx": 297000,
+        "phone_rating_count_approx": 284000,
+        "download_band": "5,000,000+"
+      },
+      "note": "The page exposes different aggregate counts in the app header and the Phone ratings section. Both are retained with locale and capture time because store metrics vary by surface and time."
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "source.afk.google-play.necrowolf-20240918",
+      "platform": "Google Play",
+      "source_type": "player_comment",
+      "url": "https://play.google.com/store/apps/details?hl=en_US&id=com.farlightgames.demogame.gp",
+      "locator_status": "confirmed_on_live_surface",
+      "locator": "NecroWolfExPaladin, 2024-09-18, shared five-hero leveling and six class equipment"
+    },
+    {
+      "source_id": "source.afk.app-store.dilem87-20240415",
+      "platform": "Apple App Store",
+      "source_type": "player_comment",
+      "url": "https://apps.apple.com/us/app/afk-journey/id1628970855?see-all=reviews",
+      "locator_status": "official_surface_without_stable_item_permalink",
+      "locator": "Dilem87, 2024-04-15; developer response 2024-04-20"
+    },
+    {
+      "source_id": "source.afk.reddit.upgrade-all-skills",
+      "platform": "Reddit / r/AFKJourney",
+      "source_type": "player_discussion",
+      "url": "https://www.reddit.com/r/AFKJourney/comments/1hkhgjr/upgrade_all_skills/",
+      "locator_status": "confirmed_on_live_item",
+      "locator": "post 1hkhgjr by u/thesikale0n; resolved reply by u/H-Mae-"
+    },
+    {
+      "source_id": "source.afk.reddit.new-version-question",
+      "platform": "Reddit / r/AFKJourney",
+      "source_type": "player_discussion",
+      "url": "https://www.reddit.com/r/AFKJourney/comments/1jlpx1g/new_player_question_new_version/",
+      "locator_status": "confirmed_on_live_item",
+      "locator": "post 1jlpx1g by u/Even_Sandwich7613; accepted reply by u/Masterpiece-Mundane"
+    },
+    {
+      "source_id": "source.afk.pocketgamer.review",
+      "platform": "Pocket Gamer",
+      "source_type": "media_score_and_review",
+      "url": "https://www.pocketgamer.com/afk-journey/review/",
+      "locator_status": "confirmed_on_live_item"
+    },
+    {
+      "source_id": "source.afk.mmorpg.review",
+      "platform": "MMORPG.com",
+      "source_type": "media_review",
+      "url": "https://www.mmorpg.com/reviews/afk-journey-review-heroes-guilds-and-gacha-should-you-invest-your-time-2000131159",
+      "locator_status": "confirmed_on_live_item"
+    },
+    {
+      "source_id": "source.afk.progameguides.beginner-guide",
+      "platform": "Pro Game Guides",
+      "source_type": "media_article",
+      "url": "https://progameguides.com/afk-journey/afk-journey-beginner-guide/",
+      "locator_status": "confirmed_on_live_item"
+    },
+    {
+      "source_id": "source.afk.google-play.snapshot-20260715",
+      "platform": "Google Play",
+      "source_type": "objective_data",
+      "url": "https://play.google.com/store/apps/details?hl=en&id=com.farlightgames.demogame.gp&listing=fbrtt",
+      "locator_status": "confirmed_on_live_surface"
+    },
+    {
+      "source_id": "source.afk.steamdb.snapshot-20260715",
+      "platform": "SteamDB",
+      "source_type": "objective_data",
+      "url": "https://steamdb.info/app/4195600/charts/",
+      "locator_status": "confirmed_on_live_item"
+    },
+    {
+      "source_id": "source.afk.pocketgamerbiz.appmagic-202409",
+      "platform": "PocketGamer.biz / AppMagic",
+      "source_type": "estimated_data",
+      "url": "https://www.pocketgamer.biz/afk-journey-surpasses-150-million-with-asian-market-dominance/",
+      "locator_status": "confirmed_on_live_item"
+    },
+    {
+      "source_id": "source.minecraft.community.reddit.12ikobu.20260715",
+      "platform": "Reddit / r/minecraftsuggestions",
+      "source_type": "player_discussion",
+      "url": "https://www.reddit.com/r/minecraftsuggestions/comments/12ikobu/",
+      "locator_status": "confirmed_on_live_item"
+    },
+    {
+      "source_id": "source.minecraft.community.feedback.360071395512.20260715",
+      "platform": "Minecraft Feedback",
+      "source_type": "player_discussion",
+      "url": "https://feedback.minecraft.net/hc/en-us/community/posts/360071395512-Campfire-Revamp",
+      "locator_status": "confirmed_on_live_item"
+    },
+    {
+      "source_id": "source.minecraft.community.reddit.1gj1723.20260715",
+      "platform": "Reddit / r/minecraftsuggestions",
+      "source_type": "player_discussion",
+      "url": "https://www.reddit.com/r/minecraftsuggestions/comments/1gj1723/",
+      "locator_status": "confirmed_on_live_item"
+    }
+  ],
+  "publication_rule": "Public play pages may show paraphrased feedback, source type, platform, author, date, engagement, scope, locator and outbound URL. They must not mirror unlicensed full comments or convert estimated data into objective data."
+}

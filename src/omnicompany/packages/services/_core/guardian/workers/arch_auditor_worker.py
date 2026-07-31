@@ -19,11 +19,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from omnicompany.core.config import omni_workspace_root
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.packages.services._core.omnicompany import Worker
 
 logger = logging.getLogger(__name__)
+
+
+_DEFAULT_PROJECT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
 
 
 class ArchAuditorWorker(Worker):
@@ -38,7 +40,7 @@ class ArchAuditorWorker(Worker):
         if not isinstance(input_data, dict):
             input_data = {}
 
-        project_root = Path(input_data.get("project_root", str(omni_workspace_root())))
+        project_root = Path(input_data.get("project_root", str(_DEFAULT_PROJECT_ROOT)))
         src_root = project_root / "src" / "omnicompany"
 
         arch_issues: list[dict[str, str]] = []

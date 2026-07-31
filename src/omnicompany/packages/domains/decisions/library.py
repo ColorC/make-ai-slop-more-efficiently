@@ -1,6 +1,6 @@
 # [OMNI] origin=ai-ide domain=decisions ts=2026-06-18T00:00:00Z type=library status=active
 # [OMNI] summary="统一决策库:决策/猜想/评论的唯一落点。append-only jsonl + fold 取最新 + 按 id 增量合并 + 墓碑软删 + 落库校验。"
-# [OMNI] why="主线=决策记录。所有源(对话/API消息/策划文档/札记)和手记都汇进这一个库,成可搜索的决策树。照 research/library 范式,但去重键=显式 id(决策有稳定身份)而非题目归一。"
+# [OMNI] why="主线=决策记录。所有源(对话/collab platform/策划文档/札记)和手记都汇进这一个库,成可搜索的决策树。照 research/library 范式,但去重键=显式 id(决策有稳定身份)而非题目归一。"
 # [OMNI] tags=decisions,library,decision-record,dedup
 """统一决策库 —— 决策/猜想/评论的累积存储。
 
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import os
-import threading
 from datetime import datetime, timezone
 from typing import Any
 
@@ -44,7 +43,7 @@ def nature_of(record: dict) -> str:
     return _KIND_DEFAULT_NATURE.get(record.get("kind") or "", "normative")
 
 # links 的边:parent 是标量(单父),其余是列表。
-# enforced_by 的值是执法载体标识(如 example_domain.design_doc_lint.check7_self_reference),不是记录 id。
+# enforced_by 的值是执法载体标识(如 demogame.design_doc_lint.check7_self_reference),不是记录 id。
 _LINK_LIST_RELS = ("rests_on", "supersedes", "related", "enforced_by")
 _LINK_SCALAR_RELS = ("parent",)
 
@@ -63,46 +62,19 @@ def _today() -> str:
 
 # ── 读 / 折叠 ───────────────────────────────────────────────────────────────
 
-# records.jsonl 解析缓存: 签名 (path, mtime_ns, size) → 已解析行。
-# fold()/active_records() 原实现每次全读全解析 14.6MB jsonl (~0.14s), domain-tree 等
-# handler 每请求都付一遍; 签名没变直接复用解析结果 (范式照
-# controlplane/material_graph.py 的 _GRAPH_CACHE + source_token, 2026-07 P0 批)。
-# 注意两点:
-# - 缓存的是"解析出的行"; fold() 每次仍新折一份 dict 返回 — 调用方对折后 dict 的
-#   增删不影响缓存 (但行内 record 对象仍是共享引用, 请勿原地改 — 与原语义一致,
-#   upsert/_merge 都走 dict() 拷贝)。
-# - 签名含 path: 测试 monkeypatch RECORDS_PATH 切到临时库时自动失效, 不会串库。
-_LINES_CACHE_LOCK = threading.Lock()
-_LINES_CACHE: dict[str, Any] = {"key": None, "lines": []}
-
-
-def _records_signature() -> tuple[str, int, int]:
-    try:
-        st = RECORDS_PATH.stat()
-        return (str(RECORDS_PATH), st.st_mtime_ns, st.st_size)
-    except OSError:
-        return (str(RECORDS_PATH), 0, 0)
-
-
 def _read_lines() -> list[dict]:
-    sig = _records_signature()
-    with _LINES_CACHE_LOCK:
-        if _LINES_CACHE["key"] == sig:
-            return list(_LINES_CACHE["lines"])
-    lines: list[dict] = []
-    if RECORDS_PATH.is_file():
-        for line in RECORDS_PATH.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                lines.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    with _LINES_CACHE_LOCK:
-        _LINES_CACHE["key"] = sig
-        _LINES_CACHE["lines"] = lines
-    return list(lines)
+    if not RECORDS_PATH.is_file():
+        return []
+    out: list[dict] = []
+    for line in RECORDS_PATH.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return out
 
 
 def fold() -> dict[str, dict]:

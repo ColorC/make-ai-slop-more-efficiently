@@ -57,7 +57,7 @@ agent-first 哲学 (`docs/standards/concepts/agent_first.md`): **先搭完整 wo
 - Materials (V1 9 类 → V2 16 类) → [formats.py](formats.py)
 - workflow 详述 → .omni/build_workflow.md
 - workspace → .omni/workspace.yaml
-- 旧 workflow_factory 实现 → [routers_legacy.py](routers_legacy.py) (3076 行 Diamond 实现, 2026-07-26 迁出 _archive; 用户明示**不拆**, 作回退路径 + 观测对照组)
+- 旧 workflow_factory 实现归档 → [_archive/](_archive/) (Stage 2 · 3076 行 Diamond 实现, 用户明示**不拆 Stage 3**, 作回退路径 + 观测对照组)
 - compat shim → [../workflow_factory/](../workflow_factory/) (deprecated, import 路径兼容)
 
 ## 想了解更多

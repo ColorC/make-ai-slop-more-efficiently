@@ -28,24 +28,11 @@ type PtySessionEntry = {
   timeoutId: NodeJS.Timeout | null;
   projectPath: string;
   sessionId: string | null;
-  provider: string;
-  displayName: string;
-  detachedAt: number | null;
-  lastOutputAt: number;
 };
 
 const ptySessionsMap = new Map<string, PtySessionEntry>();
 const PTY_SESSION_TIMEOUT = 30 * 60 * 1000;
 const SHELL_URL_PARSE_BUFFER_LIMIT = 32768;
-
-export function terminalIdleRemainingMs(
-  session: Pick<PtySessionEntry, 'detachedAt' | 'lastOutputAt'>,
-  now = Date.now(),
-): number {
-  if (session.detachedAt === null) return PTY_SESSION_TIMEOUT;
-  const quietSince = Math.max(session.detachedAt, session.lastOutputAt);
-  return Math.max(0, PTY_SESSION_TIMEOUT - (now - quietSince));
-}
 
 type ShellWebSocketDependencies = {
   resolveProviderSessionId: (
@@ -77,20 +64,6 @@ function readBoolean(value: unknown, fallback = false): boolean {
  */
 function readNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function cliDisplayName(provider: string, projectPath: string, createdAt = new Date()): string {
-  const providerNames: Record<string, string> = {
-    claude: 'Claude 编程',
-    codex: 'Codex 编程',
-    opencode: 'OpenCode 编程',
-    kimi: 'Kimi 编程',
-  };
-  const workspace = path.basename(projectPath) || '工作区';
-  const stamp = new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(createdAt);
-  return `${providerNames[provider] || 'CLI 编程'} · ${workspace} · ${stamp}`;
 }
 
 /**
@@ -188,16 +161,6 @@ function buildShellCommand(
     return initialCommand || 'opencode';
   }
 
-  if (provider === 'kimi') {
-    if (resumeSessionId) {
-      if (os.platform() === 'win32') {
-        return `kimi -S "${resumeSessionId}"; if ($LASTEXITCODE -ne 0) { kimi }`;
-      }
-      return `kimi -S "${resumeSessionId}" || kimi`;
-    }
-    return 'kimi';
-  }
-
   const command = initialCommand || 'claude';
   if (resumeSessionId) {
     if (os.platform() === 'win32') {
@@ -254,7 +217,7 @@ export function handleShellConnection(
           isPlainShell && initialCommand
             ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
             : '';
-        ptySessionKey = `${projectPath}_${provider}_${sessionId ?? 'default'}${commandSuffix}`;
+        ptySessionKey = `${projectPath}_${sessionId ?? 'default'}${commandSuffix}`;
 
         if (isLoginCommand || forceRestart) {
           const oldSession = ptySessionsMap.get(ptySessionKey);
@@ -294,7 +257,6 @@ export function handleShellConnection(
           }
 
           existingSession.ws = ws;
-          existingSession.detachedAt = null;
           return;
         }
 
@@ -343,10 +305,6 @@ export function handleShellConnection(
           timeoutId: null,
           projectPath,
           sessionId,
-          provider,
-          displayName: cliDisplayName(provider, projectPath),
-          detachedAt: null,
-          lastOutputAt: Date.now(),
         });
 
         shellProcess.onData((chunk) => {
@@ -358,8 +316,6 @@ export function handleShellConnection(
           if (!session) {
             return;
           }
-
-          session.lastOutputAt = Date.now();
 
           if (session.buffer.length < 5000) {
             session.buffer.push(chunk);
@@ -467,9 +423,7 @@ export function handleShellConnection(
                   ? 'Gemini'
                   : provider === 'opencode'
                     ? 'OpenCode'
-                    : provider === 'kimi'
-                      ? 'Kimi'
-                      : 'Claude';
+                  : 'Claude';
           welcomeMsg = hasSession && resumeSessionId
             ? `\x1b[36mResuming ${providerName} session ${resumeSessionId} in: ${projectPath}\x1b[0m\r\n`
             : `\x1b[36mStarting new ${providerName} session in: ${projectPath}\x1b[0m\r\n`;
@@ -521,22 +475,14 @@ export function handleShellConnection(
     }
 
     session.ws = null;
-    session.detachedAt = Date.now();
-    const reapWhenQuiet = () => {
+    session.timeoutId = setTimeout(() => {
       if (ptySessionsMap.get(ptySessionKey as string) !== session) {
-        return;
-      }
-
-      const remainingMs = terminalIdleRemainingMs(session);
-      if (remainingMs > 0) {
-        session.timeoutId = setTimeout(reapWhenQuiet, remainingMs);
         return;
       }
 
       session.pty.kill();
       ptySessionsMap.delete(ptySessionKey as string);
-    };
-    session.timeoutId = setTimeout(reapWhenQuiet, PTY_SESSION_TIMEOUT);
+    }, PTY_SESSION_TIMEOUT);
   });
 
   ws.on('error', (error) => {

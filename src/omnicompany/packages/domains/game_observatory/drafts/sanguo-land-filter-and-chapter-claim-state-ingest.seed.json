@@ -1,0 +1,55 @@
+{
+  "schema": "game-observatory.ai-player.live-evidence-state-ingest-seed.v1",
+  "seed_id": "seed.sanguo.land-filter-and-chapter-claim.20260716.v1",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "runs": [
+    {
+      "evidence_run_id": "evidence.run.dc2b9b2a66964cfb8d08fda3a7acdf5e",
+      "evidence_step_ids": ["evidence.step.8438a67ed89f43daa478a2f7f6a44f65"]
+    },
+    {
+      "evidence_run_id": "evidence.run.0e849d7501a144d9a36f0d8fa9fcfee9",
+      "evidence_step_ids": ["evidence.step.92614ddc95da4f738ab1ad220391c1c8"]
+    },
+    {
+      "evidence_run_id": "evidence.run.45f32f9c2bb04bd38677c3795acaa034",
+      "evidence_step_ids": ["evidence.step.3d7c73d7253c42db88c9e72a1d8eb554"]
+    },
+    {
+      "evidence_run_id": "evidence.run.b42e23476ec24bcaaf79901c60029362",
+      "evidence_step_ids": ["evidence.step.e4f6066395fc44fba2c11edb7c3ea78c"]
+    },
+    {
+      "evidence_run_id": "evidence.run.9db5e6a0f60449fdb4a0ad126db00835",
+      "evidence_step_ids": ["evidence.step.d769dd11ebfa4a6b8393491648e1f5f3"]
+    },
+    {
+      "evidence_run_id": "evidence.run.4d7f7d873e7444008afcdfcdd0b5290b",
+      "evidence_step_ids": ["evidence.step.dce10eb4fc2a4b2d8b5c1705e44910d5"]
+    },
+    {
+      "evidence_run_id": "evidence.run.0fab5ca0a8af4518a8cb43987985e61d",
+      "evidence_step_ids": ["evidence.step.3f05e2d684ba44549be59d2ebf9fb51e"]
+    },
+    {
+      "evidence_run_id": "evidence.run.b755403a9e5d4639b2ea7496ca54ef9d",
+      "evidence_step_ids": ["evidence.step.a5a9d424b7484839904d2af6af037a49"]
+    },
+    {
+      "evidence_run_id": "evidence.run.07cd020f22bd4e6281e32ade697c1b5b",
+      "evidence_step_ids": ["evidence.step.34d3b3b7258b4b29a8b74c565fe2a08f"]
+    },
+    {
+      "evidence_run_id": "evidence.run.97b1f1c31dee4f43b48f596f9a445a04",
+      "evidence_step_ids": ["evidence.step.2053a8aaa02b4a8481b8931b624f3109"]
+    },
+    {
+      "evidence_run_id": "evidence.run.61b0728fd20d422dbe02d6cddd788892",
+      "evidence_step_ids": ["evidence.step.8c2af3e8c2054d158b5cb4ff3a8e63e7"]
+    },
+    {
+      "evidence_run_id": "evidence.run.65cc38da8c9d448e832fcfb2cb3e2b2b",
+      "evidence_step_ids": ["evidence.step.14d332bd3c9945cbb893bc507b3b782e"]
+    }
+  ]
+}

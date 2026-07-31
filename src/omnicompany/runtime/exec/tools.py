@@ -289,7 +289,7 @@ REGISTER_SEMANTIC_TYPES_TOOL = {
         "properties": {
             "domain": {
                 "type": "string",
-                "description": "Domain being cataloged (e.g. 'unity3d', 'git', 'python', 'slack').",
+                "description": "Domain being cataloged (e.g. 'unity3d', 'git', 'python', 'feishu').",
             },
             "types": {
                 "type": "array",

@@ -34,7 +34,7 @@ class TeamEntry:
 
     每个业务 Team 在自己的模块中创建一个 TeamEntry 并调用 register()。
     """
-    name: str                                   # CLI 名称，如 "agent", "research-run"
+    name: str                                   # CLI 名称，如 "agent", "demogame-learn"
     description: str                            # 人类可读描述
     domain: str                                 # 领域标识，用于 DB 路径分隔
     build_team: Callable[..., Any]          # () -> TeamSpec
@@ -57,7 +57,7 @@ class TeamEntry:
     run_context: Callable[[dict], Any] | None = None
     """可选: 运行级上下文工厂 —— 接收 input_dict, 返回 context manager。
     dispatch() 在管线执行前进入、结束后退出(两种引擎都生效)。
-    首个消费者 = 业务域多条内容路径 (阶段一 1-5, architecture §3.2 方案a):
+    首个消费者 = voxelcraft 五条内容路径 (阶段一 1-5, architecture §3.2 方案a):
     工厂返回 eternal_war_worktree(), 使 worker 的 active_eternal_war_root() 解析到
     隔离副本 —— 没有它, event 引擎裸挂会让 worker 静默回退到活基线直写。"""
 

@@ -37,7 +37,6 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
     ToolContext,
     ToolExecutionError,
-    _resolve_path_from_ctx,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,82 +98,37 @@ class WriteFileRouter(SingleToolRouter):
     DESCRIPTION: ClassVar[str] = (
         "Write UTF-8 text content to a file. "
         "Each caller has a pre-declared allowlist of target paths in the tool context. "
-        "- Use OpenCode-compatible `filePath` for the destination. "
-        "The `file_path` and legacy `path` spellings are fully supported aliases.\n"
-        "- If the destination matches the allowlist: file is overwritten and '{bytes} bytes written' is returned.\n"
-        "- If the destination is anywhere else: the call is REFUSED with a message telling you where the allowed "
+        "- If `path` matches the allowlist: file is overwritten and '{bytes} bytes written' is returned.\n"
+        "- If `path` is anywhere else: the call is REFUSED with a message telling you where the allowed "
         "targets are. In that case, emit your output as assistant text instead — the Worker's "
         "extract_result step will persist it for you.\n"
         "- Parent directory is auto-created if missing.\n"
-        "- `mode=overwrite` replaces the file (default). `mode=append` appends one bounded chunk. "
-        "For large HTML or reports, write a small scaffold first, then append chunks below 6000 characters; "
-        "do not place an entire large file in one tool call.\n"
-        "- Content is written verbatim as UTF-8 without BOM; line endings are not rewritten.\n"
         "- Do NOT use for binary content; only UTF-8 text."
     )
     INPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
-            "filePath": {
-                "type": "string",
-                "description": "OpenCode-compatible destination path. Must match the context allowlist.",
-            },
-            "file_path": {
-                "type": "string",
-                "description": "Snake-case alias for filePath.",
-            },
             "path": {
                 "type": "string",
-                "description": "Legacy alias for filePath.",
+                "description": "Absolute (or resolvable) file path to write. Must match context allowlist.",
             },
             "content": {
                 "type": "string",
                 "description": "UTF-8 text to write. Will overwrite existing content.",
             },
-            "mode": {
-                "type": "string",
-                "enum": ["overwrite", "append"],
-                "default": "overwrite",
-                "description": "Use append for bounded chunks of a large text file.",
-            },
         },
-        "required": ["content"],
-        "anyOf": [
-            {"required": ["filePath"]},
-            {"required": ["file_path"]},
-            {"required": ["path"]},
-        ],
+        "required": ["path", "content"],
     }
     IS_CONCURRENCY_SAFE: ClassVar[bool] = False
     IS_READONLY: ClassVar[bool] = False
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
-        path_values = {
-            key: str(args.get(key) or "").strip()
-            for key in ("filePath", "file_path", "path")
-        }
-        provided_paths = {
-            value for value in path_values.values() if value
-        }
-        if len(provided_paths) > 1:
-            raise ToolExecutionError(
-                "filePath, file_path, and path disagree; provide one destination"
-            )
-        raw_path = (
-            path_values["filePath"]
-            or path_values["file_path"]
-            or path_values["path"]
-        )
+        raw_path = (args.get("path") or "").strip()
         content = args.get("content", "")
-        mode = str(args.get("mode") or "overwrite").strip().lower()
         if not raw_path:
-            raise ToolExecutionError(
-                "one destination field is required: filePath, file_path, or path"
-            )
+            raise ToolExecutionError("path is required")
         if not isinstance(content, str):
             raise ToolExecutionError(f"content must be string, got {type(content).__name__}")
-        if mode not in {"overwrite", "append"}:
-            raise ToolExecutionError("mode must be 'overwrite' or 'append'")
 
         # 两种白名单模式, 从 ToolContext 读:
         #   (1) allowed_write_paths: tuple[str] — 精确路径白名单 (Stage C 的原始模式)
@@ -191,7 +145,7 @@ class WriteFileRouter(SingleToolRouter):
             )
 
         try:
-            abs_path = str(_resolve_path_from_ctx(raw_path, ctx))
+            abs_path = str(Path(raw_path).resolve())
         except Exception as e:
             raise ToolExecutionError(f"cannot resolve path {raw_path!r}: {e}")
 
@@ -237,18 +191,13 @@ class WriteFileRouter(SingleToolRouter):
             target = Path(abs_path)
             existed_before = target.exists()
             target.parent.mkdir(parents=True, exist_ok=True)
-            if mode == "append":
-                with target.open("a", encoding="utf-8", newline="") as stream:
-                    stream.write(content)
-            else:
-                target.write_text(content, encoding="utf-8", newline="")
+            target.write_text(content, encoding="utf-8")
         except Exception as e:
             raise ToolExecutionError(f"write failed: {e}")
 
         # Stage E P1.1 (2026-04-25): 副作用记 ownership 到匹配 root 的 .omni/file_ownership.jsonl.
         # 仅 root_match 路径触发 (路径白名单是单文件 sink, 不是任务工作树).
-        record_ownership = bool(getattr(ctx, "record_file_ownership", True))
-        if record_ownership and root_match and matched_root is not None:
+        if root_match and matched_root is not None:
             _record_file_ownership(
                 matched_root=matched_root,
                 written_path=target,
@@ -265,5 +214,4 @@ class WriteFileRouter(SingleToolRouter):
             except Exception:
                 pass
 
-        verb = "Appended" if mode == "append" else "Wrote"
-        return f"{verb} {len(content)} chars ({len(content.encode('utf-8'))} bytes) to {abs_path}"
+        return f"Wrote {len(content)} chars ({len(content.encode('utf-8'))} bytes) to {abs_path}"

@@ -82,7 +82,6 @@ GATE_RESULT = Format(
             },
             "checked": {"type": "array", "items": {"type": "string"}},
             "gate_status": {"type": "string"},
-            "degraded": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["branch", "failures"],
     },

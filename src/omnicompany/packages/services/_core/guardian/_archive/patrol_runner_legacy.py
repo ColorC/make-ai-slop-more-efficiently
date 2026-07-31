@@ -18,11 +18,11 @@ from pathlib import Path
 from typing import Optional
 
 # NOTE: 已归档 (2026-04-20), 不再被活代码 import。相对 import 改为 `.patrol_legacy`。
-from omnicompany.core.config import omni_workspace_root
-
 from .patrol_legacy import FileContext, RuleEngine, parse_omnimark
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_ROOT = Path("e:/WindowsWorkspace/omnifactory")
 
 
 # ─── Git 变更文件收集 ──────────────────────────────────────────
@@ -231,7 +231,7 @@ def _full_src_scan(root: Path) -> list[FileContext]:
 
 
 def run_patrol(
-    project_root: str | Path | None = None,
+    project_root: str | Path = _DEFAULT_ROOT,
     full_scan: bool = False,
     committed: bool = True,
     uncommitted: bool = True,
@@ -273,8 +273,7 @@ def run_patrol(
     """
     from datetime import datetime, timezone
 
-    # project_root 缺省 (None) 时懒解析 omni_workspace_root()
-    root = Path(project_root) if project_root else omni_workspace_root()
+    root = Path(project_root)
     now = datetime.now(timezone.utc).isoformat()
 
     # ─── 文件收集 ──────────────────────────────────────────────

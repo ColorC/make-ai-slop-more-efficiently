@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:team_builder.workers.material_deepener_orchestrator.worker.py"
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """MaterialDesignerWorker — Phase 4' · AgentNodeLoop (2026-04-23).
 
 Worker 协议:

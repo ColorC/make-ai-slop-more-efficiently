@@ -1,6 +1,0 @@
-interface:
-  display_name: "游戏任务策展"
-  short_description: "从目标和覆盖缺口生成、去重、排序并闭合任务"
-  default_prompt: "Use $game-task-curator to rebuild the canonical frontier and explain the next ready task."
-policy:
-  allow_implicit_invocation: true

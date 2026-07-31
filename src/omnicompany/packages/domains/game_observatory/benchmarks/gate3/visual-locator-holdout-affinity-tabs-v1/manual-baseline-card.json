@@ -1,0 +1,49 @@
+{
+  "schema": "game-observatory.manual-baseline-card.v1",
+  "id": "gate3.visual-locator.holdout.affinity-tabs.v1",
+  "frozen_at": "2026-07-14T05:10:49.3070974+08:00",
+  "status": "frozen-before-visual-locator-inference",
+  "purpose": "检验视觉定位器对未参与微型字形补充调参的页签界面能否泛化",
+  "input": {
+    "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-affinity-tabs-holdout-v1.json",
+    "artifact_id": "art.device.1783964331620.89c3ed87",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783964331620.89c3ed87.png",
+    "sha256": "012c48d4e75b104df6cf68201c134a76a91bef19abe7074bbe9b16374d419a5b",
+    "viewport": {"width": 1080, "height": 1920}
+  },
+  "manual_method": {
+    "sources": [
+      "完整原始截图",
+      "evidence.run.ada44e70c2c841b88de4d42bc0dda598 的四步已通过路线",
+      "evidence.step.808aa2e2cffd483f99284209376df3e3",
+      "evidence.step.735585d94d2141feb9ce672caceaa08c",
+      "evidence.step.853db34a9a9842a5b5528d93c992dabb"
+    ],
+    "expected_interactions": 3,
+    "expected_ids": [
+      "rowan-affinity-tab-trust",
+      "rowan-affinity-tab-rumor",
+      "rowan-affinity-tab-voice"
+    ],
+    "locator_holdout_eligible": true,
+    "hypothesis_cost_comparison_eligible": false,
+    "reason": "三个页签已由历史设备动作证明；本截图与目标框在视觉定位器调参期间未被用于推理或阈值选择"
+  },
+  "locator_contract": {
+    "input": "完整原始截图",
+    "output_coordinate_space": "source_pixels",
+    "eligible_candidates": "interaction_candidate=true; interactivity_source must be recorded; candidate geometry does not prove actual interactivity",
+    "semantic_caption_is_advisory": true,
+    "one_candidate_cannot_match_multiple_targets": true,
+    "device_actions": false,
+    "fact_publication": false
+  },
+  "acceptance": {
+    "repetitions": 1,
+    "required_recall": 1.0,
+    "required_expected_matches": 3,
+    "maximum_missing_targets": 0,
+    "runtime_errors_allowed": false
+  },
+  "next_gate": "保留集通过后，视觉候选才可接入新的 hypothesis 影子评估；hypothesis 仍需运行前冻结的人工提案基线"
+}

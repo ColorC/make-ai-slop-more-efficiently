@@ -36,9 +36,8 @@ import os
 import shutil
 import subprocess
 import threading
-import time
 import uuid
-from typing import Any, Callable
+from typing import Any
 
 from omnicompany.runtime.buses.bash_bus import (
     _kill_process_tree,
@@ -69,11 +68,10 @@ class PersistentShellSession:
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         shell: str | None = None,
-        timeout_default: float | None = None,
+        timeout_default: float = 60.0,
     ):
         self._cwd: str = cwd or os.getcwd()
         self._env: dict[str, str] = dict(os.environ) if env is None else dict(env)
-        self._base_env_keys = frozenset(self._env)
         self._shell: str | None = shell  # None → 自动探测
         self._timeout_default = timeout_default
         self._closed = False
@@ -125,13 +123,12 @@ class PersistentShellSession:
         *,
         timeout: float | None = None,
         abort_event: "threading.Event | None" = None,
-        progress_callback: Callable[[dict], None] | None = None,
     ) -> tuple[str, str, int]:
         """执行 cmd, 返 (stdout, stderr, exit_code). cwd / env 跨调用持久.
 
         Args:
             cmd: shell 命令字符串
-            timeout: 调用方选择的总超时秒数；None 使用 session 默认值，默认也为 None
+            timeout: 超时秒数, None 用默认 60s
             abort_event: L7 abort 协议 (Wave 8). 命中时杀进程树 + raise. 调用方
                 通常传 ctx.abort_event (AgentNodeLoop 主循环管控).
 
@@ -150,17 +147,11 @@ class PersistentShellSession:
         timeout = timeout if timeout is not None else self._timeout_default
 
         with self._lock:
-            return self._run_locked(
-                cmd,
-                timeout=timeout,
-                abort_event=abort_event,
-                progress_callback=progress_callback,
-            )
+            return self._run_locked(cmd, timeout=timeout, abort_event=abort_event)
 
     def _run_locked(
-        self, cmd: str, *, timeout: float | None,
+        self, cmd: str, *, timeout: float,
         abort_event: "threading.Event | None" = None,
-        progress_callback: Callable[[dict], None] | None = None,
     ) -> tuple[str, str, int]:
         # 用 uuid 防 marker 跟用户输出冲突
         marker_id = uuid.uuid4().hex[:16]
@@ -206,45 +197,50 @@ class PersistentShellSession:
             raise RuntimeError(f"shell not found: {shell!r} ({e})")
 
         _register_process(proc)
-        try:
-            # Always drive the process in short windows. This keeps abort
-            # responsive and lets callers publish heartbeat materials without
-            # turning a quiet-but-valid command into a timeout.
-            started_at = time.monotonic()
-            deadline = started_at + timeout if timeout is not None else None
-            pending_input: bytes | None = full_cmd.encode("utf-8")
-            next_heartbeat = started_at + 10.0
-            while True:
+        # L7 abort 协议 watchdog (Wave 8 P3, 2026-05-05): 用单独线程周期检查
+        # abort_event, 命中 → 杀进程树, 让 communicate 自然解阻塞.
+        # communicate 自身只 honor timeout 不 honor 任意 event, 必须用外部 watchdog.
+        aborted_flag = {"value": False}
+
+        def _watchdog() -> None:
+            while proc.poll() is None:
                 if abort_event is not None and abort_event.is_set():
+                    aborted_flag["value"] = True
                     _kill_process_tree(proc, timeout=2.0)
-                    raise RuntimeError(
-                        "PersistentShellSession aborted by external signal "
-                        "(process tree killed)"
-                    )
-                now = time.monotonic()
-                remaining = deadline - now if deadline is not None else None
-                if remaining is not None and remaining <= 0:
+                    return
+                # 0.2s polling 间隔, 跟 abort 信号响应延迟可接受
+                if abort_event is None:
+                    return  # 没 abort_event 不需要 watchdog
+                # threading.Event.wait(timeout=) 比 time.sleep 准, 同时 abort 触发即时返
+                if abort_event.wait(timeout=0.2):
+                    aborted_flag["value"] = True
                     _kill_process_tree(proc, timeout=2.0)
-                    raise subprocess.TimeoutExpired(cmd=full_cmd, timeout=timeout)
-                wait_for = min(0.2, remaining) if remaining is not None else 0.2
-                try:
-                    stdout_b, stderr_b = proc.communicate(
-                        input=pending_input,
-                        timeout=wait_for,
-                    )
-                    break
-                except subprocess.TimeoutExpired:
-                    pending_input = None
-                    now = time.monotonic()
-                    if progress_callback is not None and now >= next_heartbeat:
-                        progress_callback({"runtime_ms": int((now - started_at) * 1000)})
-                        next_heartbeat = now + 10.0
-                    continue
-        except subprocess.TimeoutExpired:
-            _kill_process_tree(proc, timeout=2.0)
-            raise
+                    return
+
+        watchdog_thread: "threading.Thread | None" = None
+        if abort_event is not None:
+            watchdog_thread = threading.Thread(target=_watchdog, daemon=True)
+            watchdog_thread.start()
+
+        try:
+            try:
+                stdout_b, stderr_b = proc.communicate(
+                    input=full_cmd.encode("utf-8"),
+                    timeout=timeout,
+                )
+            except subprocess.TimeoutExpired:
+                _kill_process_tree(proc, timeout=2.0)
+                raise
         finally:
             _unregister_process(proc)
+            if watchdog_thread is not None:
+                watchdog_thread.join(timeout=1.0)
+            # abort 命中 → raise RuntimeError 区分于 timeout
+            if aborted_flag["value"]:
+                raise RuntimeError(
+                    "PersistentShellSession aborted by external signal "
+                    "(process tree killed)"
+                )
 
         stdout = stdout_b.decode("utf-8", errors="replace")
         stderr = stderr_b.decode("utf-8", errors="replace")
@@ -316,13 +312,6 @@ class PersistentShellSession:
             return parsed
 
         merged = dict(self._env)
-        # Drop variables that were introduced by an earlier session command
-        # and are absent from the new complete shell snapshot (``unset``).
-        # Keep the original Windows base because Git Bash may omit some native
-        # process variables from its own ``env`` output.
-        for key in tuple(merged):
-            if key not in self._base_env_keys and key not in parsed:
-                merged.pop(key, None)
         for key, value in parsed.items():
             if "\x00" in key or "\x00" in value:
                 continue

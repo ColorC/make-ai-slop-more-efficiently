@@ -1,7 +1,3 @@
-# [OMNI] origin=human domain=services/_utility type=module agent=ai-ide-2b20d28d ts=2026-07-26T09:07:27Z
-# [OMNI] summary="Stable repository-path discovery for runtime-test-builder."
-# [OMNI] why="_utility/runtime_test 测试设施组件"
-# [OMNI] tags=_utility,runtime_test,builder,module
 """Stable repository-path discovery for runtime-test-builder."""
 
 from __future__ import annotations

@@ -1,10 +1,10 @@
 # [OMNI] origin=omnifactory domain=services/doctor ts=2026-04-12T00:00:00Z
 # [OMNI] material_id="material:diagnosis.doctor.pipeline_topology.check_engine.legacy.py"
-# 2026-07-26 OMNI-040 Stage 3: 本文件从 _archive/ 迁到 doctor/ 顶层正式位置 (改名
-#   pipeline_topology_engine.py). 拓扑检查引擎本体 (Finding/CheckContext/PipelineCheckSpec/
+# OMNI-024 ALLOW: PipelineTopologyCheckRouter 是拓扑检查引擎的公共接口，与检查逻辑同文件是正确设计
+# [OMNI] PARTIALLY-DEPRECATED 2026-04-22 — 2 个 Router 类 (PipelineTopologyCheckRouter/PipelineLineageRouter)
+#   已迁到 workers/pipeline/*.py 独立文件. 但拓扑检查引擎本体 (Finding/CheckContext/PipelineCheckSpec/
 #   PIPELINE_CHECKS/run_pipeline_checks/load_pipeline_from_file/extract_pipeline_lineage/discover_all_pipelines)
-#   是基础设施代码, 由 doctor/pipeline_topology.py shim re-export; 2 个 Router 类
-#   (PipelineTopologyCheckRouter/PipelineLineageRouter) 已迁到 workers/team/*.py.
+#   是基础设施代码, 继续保留在本文件, 由 doctor/pipeline_topology.py re-export.
 """Pipeline 拓扑诊断（B1/B2）— 检查注册表模式
 
 每条检查是独立的 PipelineCheckSpec，可按 ID 开启/关闭。

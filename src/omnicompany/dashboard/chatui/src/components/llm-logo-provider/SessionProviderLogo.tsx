@@ -4,7 +4,6 @@ import CodexLogo from './CodexLogo';
 import CursorLogo from './CursorLogo';
 import GeminiLogo from './GeminiLogo';
 import OpenCodeLogo from './OpenCodeLogo';
-import KimiLogo from './KimiLogo';
 import OmniAgentLogo from './OmniAgentLogo';
 import ControllerLogo from './ControllerLogo';
 
@@ -31,10 +30,6 @@ export default function SessionProviderLogo({
 
   if (provider === 'opencode') {
     return <OpenCodeLogo className={className} />;
-  }
-
-  if (provider === 'kimi') {
-    return <KimiLogo className={className} />;
   }
 
   if (provider === 'omni_agent') {

@@ -21,8 +21,6 @@ BOOK_DIR = _OMNI_ROOT / "docs" / "ontology"
 PART_META: dict[str, dict[str, str]] = {
     "10-vilo叙事": {"project": "vilo", "authority": "user_explicit"},
     "20-探索通则": {"project": "omnicompany", "authority": "high"},
-    "40-walker前端设计": {"project": "webgame-ui", "authority": "user_explicit"},
-    "50-对外发布": {"project": "xiaohongshu-publish", "authority": "user_explicit"},
 }
 DEFAULT_PART_META = {"project": "omnicompany", "authority": "high"}
 

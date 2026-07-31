@@ -1,12 +1,12 @@
 # [OMNI] origin=claude-code domain=project_atlas ts=2026-07-04 type=health status=active
 # [OMNI] summary="技能库健康巡检:解析级体检(BOM/frontmatter/name+description)+ canonical→两生效目录导出漂移检测与自动修复(仅 atlas 管理的技能)+ 正文死绝对路径只报不修。"
-# [OMNI] why="canonical 真源之外还有两个生效目录(~/.claude/skills、~/.agents/skills),此前只在 approve/export 手动触发时才可能对齐,坏半库事故(手改生效目录/漏导)无持续巡检;本模块补上无人值守闭环,且明确不动非 atlas 管理的技能(如 lark-*)。"
+# [OMNI] why="canonical 真源之外还有两个生效目录(~/.claude/skills、~/.codex/skills),此前只在 approve/export 手动触发时才可能对齐,坏半库事故(手改生效目录/漏导)无持续巡检;本模块补上无人值守闭环,且明确不动非 atlas 管理的技能(如 lark-*)。"
 # [OMNI] tags=project_atlas,health,skills,atlas,cron
 """project_atlas 技能库健康巡检(`omni atlas health`)。
 
 三类 finding:
   parse    —— BOM / frontmatter 开闭 / name·description 缺失(解析级体检,全部技能都查)
-  drift    —— canonical 已批准集合 vs 两个生效目录(~/.claude/skills、~/.agents/skills)缺失或内容不一致
+  drift    —— canonical 已批准集合 vs 两个生效目录(~/.claude/skills、~/.codex/skills)缺失或内容不一致
               (仅对 canonical 里存在的名字做漂移检查; 生效目录独有的名字视为非 atlas 管理, 跳过)
   dead_ref —— canonical 正文里的绝对路径(盘符打头)在磁盘上不存在(只报不修, 语义内容不动)
 
@@ -29,13 +29,13 @@ from ._paths import DATA_ROOT, SKILLS_ROOT
 HEALTH_DIR = DATA_ROOT / "health"
 
 _CLAUDE_SKILLS = Path.home() / ".claude" / "skills"
-_CODEX_SKILLS = Path.home() / ".agents" / "skills"
+_CODEX_SKILLS = Path.home() / ".codex" / "skills"
 
 # 生效目录布局是扁平的 <name>/SKILL.md(无 space 子层, 见 atlas.py export)
 _EXPORT_TARGETS: tuple[tuple[str, Path], ...] = (("claude", _CLAUDE_SKILLS), ("codex", _CODEX_SKILLS))
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
-# Windows 绝对路径: 盘符打头, 如 C:\Users\you\workspace\... 或 C:/Users/you/workspace/...
+# Windows 绝对路径: 盘符打头, 如 E:\WindowsWorkspace\... 或 E:/WindowsWorkspace/...
 # 反引号包裹的路径允许空格；裸路径仍在空白和常见标点处结束，避免吞入后续叙述。
 _ABS_PATH_RE = re.compile(
     r"`([A-Za-z]:[\\/][^`\r\n]+)`|"

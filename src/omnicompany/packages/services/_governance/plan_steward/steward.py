@@ -2,7 +2,7 @@
 # [OMNI] material_id="material:governance.plan_steward.classify_pipeline.py"
 """计划治理管线 — 给全仓 docs/plans 的每个计划: 归属项目 / 中文标题 / 格式检查。
 
-背景(2026-06-12 用户): KB-INGEST 类计划曾出现在错误项目下, 根因是上一轮**人工拍脑袋**把
+背景(2026-06-12 用户): demogame-KB-INGEST 出现在错误项目下, 根因是上一轮**人工拍脑袋**把
 plan id 写进项目类目; 且类目前缀匹配会把物理放错文件夹的计划一起带进来。本部门用便宜
 模型(deepseek-v4-pro)对每个计划逐一判定, 产出**显式覆盖表** data/registry/plan_governance.json:
 

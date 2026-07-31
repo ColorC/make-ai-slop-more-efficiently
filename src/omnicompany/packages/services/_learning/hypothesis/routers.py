@@ -13,7 +13,7 @@ from .workers import (
     BeliefReflectorWorker as ReflectorRouter,
     ExperimenterWorker as ExperimenterRouter,
 )
-from .routers_legacy import BashRouter
+from ._archive.routers_legacy import BashRouter
 
 __all__ = [
     "ExperimenterRouter",

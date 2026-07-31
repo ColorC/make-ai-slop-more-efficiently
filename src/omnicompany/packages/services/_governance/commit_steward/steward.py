@@ -15,15 +15,11 @@
 4. apply_batches(): 逐批 `git add <显式文件清单>` + `git commit -F` — **禁 git add -A 盲目全量**。
    未进任何批次的文件留在工作区并报告。pre-commit 卫士逐批兜底。
 
-产物落 data/governance/commit_steward/。CLI: omni governance commit-run [--dry-run] [--max-files N]。
-每轮上限(--max-files / OMNI_COMMIT_MAX_FILES): 一轮只处理前 N 个文件并完整跑完, 判过
-"留工作区"的进 commit_steward_state.json 暂缓名单(冷静期 3 天), 让大积压分批稳步清,
-不再每次全量 map 撞心跳超时白烧(2026-07-26 gov-commit-daily 10/10 全败事故)。
+产物落 data/governance/commit_steward/。CLI: omni governance commit-run [--dry-run]。
 """
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -53,11 +49,6 @@ _SKIP_DIR_HINTS = ("__pycache__/", "node_modules/", "/dist/", "/build/", "/.omni
 # read 文件 diff 超过这么多行也降级为 skip(超大改动逐行读无意义)
 _MAX_READ_DIFF_LINES = 600
 
-# 每轮处理文件数上限的环境变量(命令行 --max-files 优先; 都不给 = 不设限)
-MAX_FILES_ENV = "OMNI_COMMIT_MAX_FILES"
-# 被判"留工作区"的文件进暂缓名单后, 多少天内不再重试(防每天头 N 个坑位被同一批死文件占满)
-_DEFER_RETRY_DAYS = 3
-
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -67,57 +58,6 @@ def report_dir() -> Path:
     d = omni_workspace_root() / "data" / "governance" / "commit_steward"
     d.mkdir(parents=True, exist_ok=True)
     return d
-
-
-# ── 跨轮状态(暂缓名单): 判过"留工作区"的文件记下, 下轮跳过, 积压才能稳步下降 ──
-
-def _state_path() -> Path:
-    return report_dir() / "commit_steward_state.json"
-
-
-def _load_state() -> dict[str, Any]:
-    try:
-        raw = json.loads(_state_path().read_text(encoding="utf-8"))
-        if isinstance(raw, dict) and isinstance(raw.get("deferred"), dict):
-            return raw
-    except (OSError, json.JSONDecodeError):
-        pass
-    return {"deferred": {}}
-
-
-def _save_state(state: dict[str, Any]) -> None:
-    try:
-        _state_path().write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
-    except OSError:
-        pass
-
-
-def _deferred_active(state: dict[str, Any], retry_days: int = _DEFER_RETRY_DAYS) -> set[str]:
-    """暂缓名单里仍在冷静期(暂不重试)的路径。超期的放行重试(可能是瞬时失败)。"""
-    from datetime import timedelta
-    now = datetime.now(timezone.utc)
-    out: set[str] = set()
-    for path, rec in (state.get("deferred") or {}).items():
-        try:
-            at = datetime.fromisoformat(str(rec.get("at", "")))
-            if at.tzinfo is None:
-                at = at.replace(tzinfo=timezone.utc)
-        except (ValueError, TypeError):
-            out.add(path)  # 时间戳坏了也保守跳过(下轮写状态时会刷新)
-            continue
-        if now - at < timedelta(days=retry_days):
-            out.add(path)
-    return out
-
-
-def resolve_max_files(max_files: int | None = None) -> int | None:
-    """每轮上限解析: 显式参数 > OMNI_COMMIT_MAX_FILES 环境变量 > 不设限(None)。"""
-    if max_files is not None:
-        return max_files if max_files > 0 else None
-    raw = os.environ.get(MAX_FILES_ENV, "").strip()
-    if raw.isdigit() and int(raw) > 0:
-        return int(raw)
-    return None
 
 
 def _repo_root() -> Path:
@@ -337,29 +277,12 @@ def apply_batches(batches: list[CommitBatch], *, dry_run: bool = True) -> dict[s
 
 
 def run_commit(*, model: str | None = None, dry_run: bool = True, workers: int = 4,
-               max_files: int | None = None, echo: Any = None) -> dict[str, Any]:
-    """端到端: 扫改动 → 逐文件读摘要 → 聚批 → (dry_run 出计划 | 真提交)。
-
-    每轮上限(2026-07-26, gov-commit-daily 10/10 超时事故): 工作区积压上千文件时,
-    一轮全量 map 必撞心跳超时被杀、 token 白烧。max_files(或 OMNI_COMMIT_MAX_FILES)
-    把一轮限定在前 N 个文件并**完整跑完**; 判过"留工作区"的进暂缓名单落盘
-    (data/governance/commit_steward/commit_steward_state.json), 冷静期内下轮跳过,
-    已提交的自然从 git status 消失 —— 积压每天稳步下降而不是每次从零开始被掐。
-    """
+               echo: Any = None) -> dict[str, Any]:
+    """端到端: 扫改动 → 逐文件读摘要 → 聚批 → (dry_run 出计划 | 真提交)。"""
     from omnicompany.runtime.llm.batch import run_parallel_items
     changes = scan_changes()
     if not changes:
         return {"changes": 0, "message": "工作区干净, 无可提交改动"}
-    total_changes = len(changes)
-    state = _load_state()
-    deferred = _deferred_active(state)
-    if deferred:
-        changes = [c for c in changes if c.path not in deferred]
-    cap = resolve_max_files(max_files)
-    backlog_remaining = 0
-    if cap is not None and len(changes) > cap:
-        backlog_remaining = len(changes) - cap
-        changes = changes[:cap]
     to_read = [c for c in changes if c.policy == "read"]
     result = run_parallel_items(to_read, lambda c: _summarize_one(c, model),
                                 workers=workers, progress_label="commit_steward.map",
@@ -375,17 +298,6 @@ def run_commit(*, model: str | None = None, dry_run: bool = True, workers: int =
     applied = apply_batches(batches, dry_run=dry_run)
     committed_files = {f for b in applied["batches"] for f in b["files"]}
     left = [c.path for c in merged if c.path not in committed_files]
-    if not dry_run:
-        # 状态推进: 真提交成功的从暂缓名单移除; 本轮没提交成的(读失败/未进批/批失败)
-        # 记进暂缓名单, 冷静期内下轮不再占用头 N 个坑位。
-        committed_ok = {f for b in applied["batches"] if b.get("committed") for f in b["files"]}
-        reasons = {c.path: (c.reason or "未进任何批次") for c in merged}
-        for p in committed_ok:
-            state["deferred"].pop(p, None)
-        for p in left:
-            if p not in committed_ok:
-                state["deferred"][p] = {"reason": reasons.get(p, "")[:160], "at": _now()}
-        _save_state(state)
     payload = {
         "generated_at": _now(), "dry_run": dry_run, "model": model or "default",
         "changes": len(changes), "batches": len(batches),
@@ -394,11 +306,6 @@ def run_commit(*, model: str | None = None, dry_run: bool = True, workers: int =
         "plan": [{"subject": b.subject, "body": b.body, "files": b.files} for b in batches],
         "applied": applied["batches"],
     }
-    if cap is not None or deferred:
-        payload["max_files"] = cap
-        payload["total_changes"] = total_changes
-        payload["deferred_skipped"] = len(deferred)
-        payload["backlog_remaining"] = backlog_remaining
     out = report_dir() / ("commit_plan_dryrun.json" if dry_run else "commit_last.json")
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     payload["_written"] = str(out)

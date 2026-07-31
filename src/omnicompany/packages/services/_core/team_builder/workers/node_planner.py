@@ -12,7 +12,7 @@ Worker 协议:
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from ..routers_legacy import NodePlannerRouter as _Legacy
+from .._archive.routers_legacy import NodePlannerRouter as _Legacy
 
 
 class NodePlannerWorker(Worker, _Legacy):

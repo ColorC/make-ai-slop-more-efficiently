@@ -22,8 +22,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from omnicompany.core.config import omni_workspace_root
-
 # 兼容 re-export: 外部测试 / 旧代码 `from ...guardian import RuleEngine, Violation, FileContext, RULES`
 from .rules import FileContext, GuardianRule, Violation, parse_omnimark, RULES  # noqa: F401
 
@@ -89,6 +87,8 @@ class RuleEngine:
                     logger.debug("Rule %s failed on %s: %s", rule.id, ctx.path, e)
 
         return {"confirmed": confirmed, "needs_judgment": needs_judgment}
+
+_DEFAULT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
 
 # ── patrol 非阻塞锁(2026-07-04 密度分层批1) ─────────────────────────────
 # patrol 提到心跳级(@every15m)后, 会话手动跑与 tick 顺带跑可能并发, 存在无锁并发
@@ -235,7 +235,7 @@ def run_guardian(scan_request: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_patrol(
-    project_root: str | Path | None = None,
+    project_root: str | Path = _DEFAULT_ROOT,
     full_scan: bool = False,
     committed: bool = True,
     uncommitted: bool = True,
@@ -254,11 +254,7 @@ def run_patrol(
     锁: 心跳级(@every15m)后会话手动跑与 tick 顺带跑可能并发, 本函数入口非阻塞取锁——
     已有新鲜锁(<15min)直接跳过不等待(幂等增量活, 跳过一轮无损); ≥15min 视为僵死接管。
     正常/异常退出都释放(try/finally)。
-
-    project_root 缺省 (None) 时懒解析 omni_workspace_root()。
     """
-    if project_root is None:
-        project_root = omni_workspace_root()
     if not _acquire_patrol_lock(project_root):
         return {
             "skipped": "patrol already running",
@@ -282,7 +278,7 @@ def run_patrol(
 
 
 def _run_patrol_impl(
-    project_root: str | Path | None = None,
+    project_root: str | Path = _DEFAULT_ROOT,
     full_scan: bool = False,
     committed: bool = True,
     uncommitted: bool = True,
@@ -299,10 +295,7 @@ def _run_patrol_impl(
     """原 run_patrol 实现体(内部 delegate 到 run_guardian(scan_request))。
 
     原 patrol_runner.py 已归档到 _archive/patrol_runner_legacy.py。
-    project_root 缺省 (None) 时懒解析 omni_workspace_root()。
     """
-    if project_root is None:
-        project_root = omni_workspace_root()
     if full_scan:
         scan_mode = "full"
     elif staged_only:

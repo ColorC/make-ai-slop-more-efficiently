@@ -110,24 +110,24 @@ class PipelineManifest(BaseModel):
     生成骨架：
         python -m omnicompany.packages.services._diagnosis.doctor.run manifest init <pipeline_file>
 
-    示例（example-domain-learning）：
-        id: example_domain.example_learning
+    示例（demogame-table-learning）：
+        id: demogame.table-learning
         purpose: >
-          从历史数据中学习字段生成规则，产出可重复执行的处理脚本。
-          输入：原始数据 + ground truth diff；
-          输出：可执行的 Python 处理脚本 + 字段分类档案。
+          从历史配表数据中学习字段生成规则，产出可重复执行的配表脚本。
+          输入：原始 xlsm + ground truth CSV diff；
+          输出：可执行的 Python 配表脚本 + 字段分类档案。
         design_rationale: >
           采用 learn→validate→feedback 循环而非单次 LLM 生成，
-          因为字段类型多样，
+          因为配表字段类型多样（formula/MI/auto_derivable），
           单次推断准确率不足以满足业务要求（目标 >95%）。
         boundaries:
-          entry_format: example_domain.raw_data
-          exit_format: example_domain.generated_script
+          entry_format: demogame.csv.raw
+          exit_format: demogame.generated_script
         current_status:
           maturity: growing
           last_verified: "2026-04-11"
           known_issues:
-            - "ValidatorRouter 的 FORMAT_IN 已修复，但测试覆盖待补"
+            - "BenchmarkValidatorRouter 的 FORMAT_IN 已修复，但测试覆盖待补"
     """
 
     id: str
@@ -172,8 +172,8 @@ def manifest_path(pipeline_file: str | Path) -> Path:
     """返回与 pipeline_file 对应的 manifest.yaml 路径。
 
     约定：manifest 存放在 pipeline_file 同级目录的 .omni/ 子目录中。
-    例：packages/domains/my_domain/example_pipeline/example_pipeline.py
-      → packages/domains/my_domain/example_pipeline/.omni/manifest.yaml
+    例：packages/domains/demogame/table_learning/table_learning_pipeline.py
+      → packages/domains/demogame/table_learning/.omni/manifest.yaml
     """
     return Path(pipeline_file).parent / _OMNI_DIR / _MANIFEST_FILENAME
 

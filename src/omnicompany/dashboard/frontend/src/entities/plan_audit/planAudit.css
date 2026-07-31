@@ -1,0 +1,110 @@
+/* ============================================================
+   plan_audit 实体页 · 蓝图 G(2026-07-19 阶段四第四波;对照 analysis/plan_audit.md):
+   · P0: 错误态死胡同 → 横幅内嵌主按钮「重新发起审计」(重发 POST /api/plan-audit 并切回 running)。
+   · 状态药丸 → 迷你生命周期条(审计中→完成/失败,耗时刻度),双红重复表达合一。
+   · running: 散文进度句 → 不定态 hatch 推进条(看得见的"还在动")。
+   · done: pre-wrap 整段 → 分区折叠卡(元信息 kv 条/指示清单状态行/未落地/汇总)
+     + 头部"通过 n·部分 p·未落地 m"计数条 + segmented 按落地状态筛选。
+   纹理分区铁律: 页面/chrome 铺 scene 格纸; 报告正文/卡面=平滑纸面禁纹理。
+   ============================================================ */
+
+.pa-page { height: 100%; overflow: auto; box-sizing: border-box; padding: 12px 20px 48px;
+  color: var(--fp-text);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+.pa-inner { max-width: 880px; margin: 0 auto; }
+
+/* 顶行: 状态徽章 + 生命周期条 + 元信息 + ⋯(chrome 区) */
+.pa-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.pa-head .spacer { flex: 1; }
+.pa-meta { color: var(--fp-text-2); font-size: var(--fp-fs-3); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+
+/* 迷你生命周期条: 两节点 + 连接标注线;当前节点文字提亮,其余弱字(承载真实状态+耗时) */
+.pa-life { display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); color: var(--fp-text-3);
+  letter-spacing: .06em; text-transform: uppercase; }
+.pa-life .node { display: inline-flex; align-items: center; gap: 5px; }
+.pa-life .node .dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor;
+  background: transparent; }
+.pa-life .node.cur { color: var(--fp-text); }
+.pa-life .node.cur .dot { background: currentColor; }
+.pa-life .link { width: 18px; height: 5px; border-top: 1px solid var(--fp-border); position: relative; }
+.pa-life .link::before, .pa-life .link::after { content: ""; position: absolute; top: -3px;
+  width: 1px; height: 5px; background: var(--fp-border); }
+.pa-life .link::before { left: 0; }
+.pa-life .link::after { right: 0; }
+.pa-life.tone-run .node.cur { color: #ff8d85; }
+.pa-life.tone-done .node.cur { color: var(--fp-ok); }
+.pa-life.tone-err .node.cur { color: var(--fp-err); }
+
+/* running 不定态推进条(45° hatch 滑动; reduced-motion 静止) */
+.pa-run { border: var(--fp-bp-frame-w) solid var(--fp-border); border-radius: var(--fp-r2);
+  background: var(--fp-bp-paper); box-shadow: var(--fp-shadow-sm); padding: 14px 16px; }
+.pa-run .bar { height: 8px; border: 1px solid rgba(235,245,255,.4); border-radius: 2px;
+  background: repeating-linear-gradient(45deg, rgba(200,235,255,.5) 0 6px, transparent 6px 12px);
+  background-size: 17px 100%;
+  animation: pa-slide 1.1s linear infinite; }
+.pa-run .txt { margin-top: 10px; color: var(--fp-text-2); font-size: var(--fp-fs-3); line-height: 1.6; }
+@keyframes pa-slide { to { background-position: 17px 0; } }
+@media (prefers-reduced-motion: reduce) { .pa-run .bar { animation: none; } }
+
+/* 错误横幅: 摘要 + 主按钮「重新发起审计」(P0 死胡同出口) + job 元信息 */
+.pa-err { border: var(--fp-bp-frame-w) solid color-mix(in srgb, var(--fp-err) 55%, transparent);
+  border-radius: var(--fp-r2); background: var(--fp-bp-paper); box-shadow: var(--fp-shadow-sm);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.pa-err .sum { display: flex; align-items: flex-start; gap: 8px; color: var(--fp-err);
+  font-size: var(--fp-fs-3); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.pa-err .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pa-err .hint { color: var(--fp-text-3); font-size: var(--fp-fs-4); }
+
+/* 主按钮(每屏唯一): 2px 白框纸件 + 按压凹入; 朱红 seal 描边=关键恢复动作 */
+.pa-btn-primary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  border: 2px solid var(--fp-bp-seal); border-radius: var(--fp-r1); background: var(--fp-bp-paper-2);
+  color: var(--fp-text); font-size: var(--fp-fs-3); font-weight: 600; font-family: inherit;
+  padding: 6px 14px; box-shadow: var(--fp-shadow-sm); transition: all var(--fp-t-fast); }
+.pa-btn-primary:hover { border-color: #ff6f6a; background: var(--fp-bg-overlay); }
+.pa-btn-primary:active { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(6,16,38,.5); }
+.pa-btn-primary:disabled { opacity: .5; cursor: wait; }
+
+/* done: 计数条 + segmented 筛选行 */
+.pa-report-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+
+/* 分区折叠卡(2px 白框纸件;头=chrome 空心描边字) */
+.pa-section { border: var(--fp-bp-frame-w) solid var(--fp-border); border-radius: var(--fp-r2);
+  background: var(--fp-bp-paper); box-shadow: var(--fp-shadow-sm); margin-bottom: 10px; overflow: hidden; }
+.pa-sec-head { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 9px 12px; border: 0; background: transparent; cursor: pointer; font: inherit;
+  color: var(--fp-text-2); box-sizing: border-box; }
+.pa-sec-head:hover { color: var(--fp-text); }
+.pa-sec-head .chev { display: inline-flex; color: var(--fp-text-3); flex: none;
+  transition: transform var(--fp-t-fast) var(--fp-ease); }
+.pa-sec-head[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.pa-sec-head .t { color: transparent; -webkit-text-stroke: 1px rgba(235,245,255,.68);
+  font-family: var(--fp-font-mono); font-weight: 600; letter-spacing: .18em; font-size: 13px;
+  text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pa-sec-head .bp-dim { color: var(--fp-bp-brass-hi); flex: none; }
+.pa-sec-body { border-top: 1px solid var(--fp-border-subtle); padding: 10px 14px 14px; }
+.pa-sec-body.pre { white-space: pre-wrap; word-break: break-word; font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-3); line-height: 1.65; color: var(--fp-text); }
+.pa-sec-body.hidden { display: none; }
+
+/* 元信息 kv 条(mono 大写标签 + 值;不泄漏 frontmatter 原文格式) */
+.pa-kv { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px;
+  padding: 4px 0; border-bottom: 1px dashed var(--fp-border-subtle); font-size: var(--fp-fs-3); }
+.pa-kv:last-child { border-bottom: 0; }
+.pa-kv .k { color: var(--fp-text-3); font-family: var(--fp-font-mono); font-size: var(--fp-fs-4);
+  letter-spacing: .08em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
+.pa-kv .v { color: var(--fp-text); overflow-wrap: anywhere; }
+
+/* 指示行: 状态徽章 + 文本 + 证据(mono 弱字) */
+.pa-ins { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0;
+  border-bottom: 1px dashed var(--fp-border-subtle); }
+.pa-ins:last-child { border-bottom: 0; }
+.pa-ins .tx { flex: 1; min-width: 0; font-size: var(--fp-fs-3); line-height: 1.55; color: var(--fp-text); }
+.pa-ins .ev { margin-top: 3px; color: var(--fp-text-3); font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4); line-height: 1.5; overflow-wrap: anywhere; }
+
+@media (max-width: 599px) {
+  .pa-page { padding: 10px 12px 40px; }
+  .pa-kv { grid-template-columns: 110px minmax(0, 1fr); }
+}

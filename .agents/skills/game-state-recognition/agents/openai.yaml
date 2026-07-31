@@ -1,6 +1,0 @@
-interface:
-  display_name: "游戏状态识别"
-  short_description: "把截图、UI 树和动作上下文归入可追溯语义状态"
-  default_prompt: "Use $game-state-recognition to classify this terminal observation without forcing an ambiguous merge."
-policy:
-  allow_implicit_invocation: true

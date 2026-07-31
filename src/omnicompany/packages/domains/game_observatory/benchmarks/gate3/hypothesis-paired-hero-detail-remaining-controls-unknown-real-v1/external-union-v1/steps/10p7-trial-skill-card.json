@@ -1,0 +1,1 @@
+{"action":{"type":"tap","x":542,"y":1740,"duration_ms":250},"target_name":"英雄试用罗万主动技能卡牌","target_bounds":{"x":465,"y":1600,"width":160,"height":275},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":12.0,"sample_interval_seconds":0.25}

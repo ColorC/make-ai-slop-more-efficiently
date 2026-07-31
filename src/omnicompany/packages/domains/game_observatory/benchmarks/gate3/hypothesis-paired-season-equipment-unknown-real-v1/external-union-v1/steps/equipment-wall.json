@@ -1,0 +1,1 @@
+{"action":{"type":"tap","x":369,"y":1813,"duration_ms":250},"target_name":"前往装备墙入口","target_bounds":{"x":195,"y":1736,"width":348,"height":155},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

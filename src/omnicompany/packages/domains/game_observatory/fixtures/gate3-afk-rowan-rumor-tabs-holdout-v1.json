@@ -1,0 +1,47 @@
+{
+  "schema": "game-observatory.exploration-benchmark.v1",
+  "id": "gate3-afk-rowan-rumor-tabs-holdout-v1",
+  "title": "AFK Journey 罗万传闻页页签视觉定位保留集",
+  "phase": "holdout",
+  "game_id": "afk-journey",
+  "build_scope_id": "afk-cn-1.7.21-live-20260714",
+  "start_state": "罗万信赖度界面：传闻页签激活，信赖度与语音页签可见",
+  "goal": "从完整原始截图定位三个已由历史交互证据验证的页签区域；不执行设备动作，不发布语义推断",
+  "observation": {
+    "artifact_id": "art.device.1783964343875.495385af",
+    "frame_path": "data/domains/game_observatory/artifacts/art.device.1783964343875.495385af.png",
+    "sha256": "2958ef85df2afb328bbdaeabe59f5360eecf94b2720144905a3f38c4d6e05bd9",
+    "viewport_width": 1080,
+    "viewport_height": 1920
+  },
+  "allowed_action_types": ["tap"],
+  "forbidden_target_terms": ["赠礼", "礼物", "礼包", "支付", "删除", "账号"],
+  "max_suggestions": 6,
+  "expected_probes": [
+    {
+      "id": "rowan-rumor-screen-tab-trust",
+      "target_names": ["信赖度页签", "信赖度"],
+      "action_type": "tap",
+      "target_bounds": {"x": 130, "y": 985, "width": 260, "height": 100},
+      "importance": "important",
+      "tags": ["affinity", "tab", "verified-route"]
+    },
+    {
+      "id": "rowan-rumor-screen-tab-rumor",
+      "target_names": ["传闻页签", "传闻"],
+      "action_type": "tap",
+      "target_bounds": {"x": 430, "y": 985, "width": 235, "height": 100},
+      "importance": "important",
+      "tags": ["affinity", "tab", "verified-route"]
+    },
+    {
+      "id": "rowan-rumor-screen-tab-voice",
+      "target_names": ["语音页签", "语音"],
+      "action_type": "tap",
+      "target_bounds": {"x": 730, "y": 985, "width": 250, "height": 100},
+      "importance": "important",
+      "tags": ["affinity", "tab", "verified-route"]
+    }
+  ],
+  "tags": ["mobile", "portrait", "affinity", "holdout", "external-evidence"]
+}

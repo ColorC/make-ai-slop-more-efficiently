@@ -1,0 +1,927 @@
+# [OMNI] origin=claude-code domain=omnicompany/dashboard/frontend ts=2026-07-04T01:05:00+08:00 type=data
+# testmap.yaml — 功能点-测试对照表。真源跟随本仓(dashboard 前端); omnicompany 只注册指针。
+# 契约定义: src/omnicompany/packages/services/_governance/testmap.py
+# 上位计划: docs/plans/omnicompany-governance/[2026-07-03]FEATURE-TEST-LEDGER/plan.md
+#
+# W4a 全量反推(试点反推批): 实测 tests/e2e/*.spec.ts 共 36 份 / test( 标题 198 条(不含
+# test.describe, 提取脚本见报告); src/ 下与源码同目录 vitest 单元 23 份。features 只登记
+# 用 grep 核实过测试锚真实存在的功能点, 不编造。按界面/行为域归组, 一个功能点吸多条 case
+# 是常态。保留原有 4 条(quest_board.copy / project_board.kebab_copy_id /
+# home_recent.conversation_row_kebab_copy_sid / quest_board.task_pin, 后者仍是故意留空的 gap)。
+
+app: omnidashboard-frontend
+doc: TESTING.md
+gates:
+  - id: e2e
+    cmd: npx playwright test
+    cwd: .
+  - id: unit
+    cmd: npm test
+    cwd: .
+
+features:
+  # ── 任务窗口 / 项目工作板复制链路(既有 4 条, 原样保留) ─────────────────────
+  - id: quest_board.copy
+    what: 任务窗口计划行与任务线卡头的"复制引用/复制路径", 复制成败均有行内可见反馈
+    should:
+      - "e2e: 正常浏览器下点复制后剪贴板内容精确等于计划 id/目录路径, 且行内出现「已复制」反馈"
+      - "e2e: 受限环境(无 navigator.clipboard, 如 VSCode webview iframe)走 execCommand 降级仍真复制成功, 且反馈可见, 绝不静默无反应"
+    tests:
+      - file: tests/e2e/quest_copy.spec.ts
+        cases: ["复制引用", "复制路径", "受限环境"]
+    status: covered
+
+  - id: project_board.kebab_copy_id
+    what: 工作板项目卡片右上角三点菜单复制项目 id, 点菜单项不误触发卡片展开
+    should:
+      - "e2e: 点三点菜单的复制项目 id 项后剪贴板内容非空, 菜单收起且 stopPropagation 生效(未被顶进项目详情页)"
+    tests:
+      - file: tests/e2e/recent_kebab.spec.ts
+        cases: ["项目卡片三点菜单: 复制项目 id, 点菜单不误开卡片"]
+    status: covered
+
+  - id: home_recent.conversation_row_kebab_copy_sid
+    what: 首页最近访问表对话行的三点菜单复制 session id, 且对话行文本回退展示 prompt(不显示"信息不足"占位)
+    should:
+      - "e2e: captures 兜底后对话行文本不出现「信息不足」占位, 回退展示 prompt"
+      - "e2e: 对话行三点菜单复制 session id 后剪贴板内容非空"
+    tests:
+      - file: tests/e2e/recent_kebab.spec.ts
+        cases: ["最近访问表: 对话行回退显示 prompt(无「信息不足」) + 行内 kebab 复制 session id"]
+    status: covered
+
+  - id: quest_board.task_pin
+    what: 任务窗口计划行三点菜单的"置顶（排到列表最前）"——置顶后该行应排到列表最前并保留高亮态
+    should:
+      - "e2e: 点置顶后该任务行排到列表最前, 且视觉上带置顶高亮态"
+      - "e2e: 再次点击(取消置顶)后该任务行回到原有排序位置"
+    tests:
+      - file: tests/e2e/quest_pin.spec.ts
+        cases: ["点置顶后该行排到列表最前 + 带置顶高亮态; 再点取消置顶回到原排序"]
+    status: covered
+
+  - id: project_board.kebab_layout_regression
+    what: 项目卡片三点菜单悬浮层定位不被相邻卡片按钮遮挡(布局回归)
+    should:
+      - "e2e: 三点菜单触发钮贴住悬浮层且不被相邻卡片按钮盖住"
+    tests:
+      - file: tests/e2e/recent_kebab.spec.ts
+        cases: ["项目卡片三点菜单: 贴住触发钮且不被相邻卡片按钮盖住(悬浮层定位回归)"]
+    status: covered
+
+  - id: project_board.homepage_to_detail_flow
+    what: 首页即项目工作板——按分组展示卡片, 点卡片进详情(八页签; 2026-07-06 删常用工作选项/新建按钮, 新增技能页签与文件目录树)
+    should:
+      - "e2e: 首页展示分组卡片, 点卡片能进入项目详情页, 详情页能复制 index 路径"
+      - "e2e: 详情页八页签齐(canvas/plans/convos/teams/skills/files/reviews/authored); 常用工作选项与新建计划书按钮不存在"
+      - "e2e: 技能页签有过滤框; 文件页签是目录树且有「展示所有目录」开关"
+    tests:
+      - file: tests/e2e/project_board.spec.ts
+        cases: ["首页即项目工作板: 分组卡片 → 详情 → 复制 index 路径"]
+    status: covered
+
+  - id: team_recent_board.team_topology_entry
+    what: 最近 team 看板的"更多"菜单——列出 team、复制 team id、点开可直达该 team 拓扑图
+    should:
+      - "e2e: 更多菜单打开后能列出 team 列表, 点复制 id 剪贴板非空, 点开能跳到该 team 拓扑"
+    tests:
+      - file: tests/e2e/team_recent_board.spec.ts
+        cases: ["最近 team 看板: 更多菜单打开 → 列出 team → 复制 id → 点开拓扑"]
+    status: covered
+
+  # ── shell 骨架 / 布局 ───────────────────────────────────────────────────
+  - id: shell.activity_bar_and_module_switch
+    what: 左侧 ActivityBar 四个模块入口可见, 点切换后 Sidebar 内容跟随切换的模块变化
+    should:
+      - "e2e: ActivityBar 展示 4 个模块入口"
+      - "e2e: 切换模块后 Sidebar 内容跟随切到对应模块"
+    tests:
+      - file: tests/e2e/shell.spec.ts
+        cases: ["A1 ActivityBar 4 项可见", "A2 切 module sidebar 跟随"]
+    status: covered
+
+  - id: shell.sidebar_filter_and_grouping
+    what: Sidebar 标题与过滤框可见, system 模块默认按 Worker/Team/Material 分组, Agent 会话独立成模块
+    should:
+      - "e2e: Sidebar 标题与过滤输入框均可见"
+      - "e2e: system 模块默认分组=Worker/Team/Material, Agent 会话是独立模块不混进 system"
+    tests:
+      - file: tests/e2e/shell.spec.ts
+        cases: ["A3 Sidebar 标题 + 过滤框可见", "A4 实体分组 (system 默认 = Worker / Team / Material; Agent 会话独立模块)"]
+    status: covered
+
+  - id: shell.editor_area_default_and_welcome
+    what: 中央编辑区默认展示 Welcome 页, Welcome 页含 4 个模块入口卡片
+    should:
+      - "e2e: 未开任何 tab 时中央区默认显示 Welcome"
+      - "e2e: Welcome 页展示 4 个模块入口卡片"
+    tests:
+      - file: tests/e2e/shell.spec.ts
+        cases: ["A6 EditorArea 默认显 Welcome", "A11 Welcome 4 模块卡片可见"]
+    status: covered
+
+  - id: shell.bottom_panel_toggle
+    what: 底部面板(BottomPanel)默认展开且标签可见, 可在标签间切换
+    should:
+      - "e2e: 默认打开 BottomPanel 且标签可见"
+      - "e2e: 点其他标签能切换 BottomPanel 显示内容"
+    tests:
+      - file: tests/e2e/shell.spec.ts
+        cases: ["A8 BottomPanel 默认开 + 标签可见", "A9 BottomPanel 切换标签"]
+    status: covered
+
+  - id: shell.status_bar_and_modal_dismiss
+    what: 底部状态栏展示当前打开的标签数与快捷键提示; 弹出的 Modal 能用 Esc 或取消按钮关闭(不留死态)
+    should:
+      - "e2e: 无 tab 时状态栏显示 0 标签且展示快捷键提示"
+      - "e2e: Modal 打开后 Esc 键与取消按钮均能关闭, 不是死锁状态"
+    tests:
+      - file: tests/e2e/shell.spec.ts
+        cases: ["A10 StatusBar 显 0 标签 + 快捷键提示", "A12 Modal Esc 关闭 + 取消按钮关闭"]
+    status: covered
+
+  - id: shell.homepage_screenshot_archive
+    what: 首页截图存档(视觉回归留痕)
+    should:
+      - "e2e: 能成功取首页截图并存档, 不报错"
+    tests:
+      - file: tests/e2e/shell.spec.ts
+        cases: ["A_screenshot 取首页截图存档"]
+    status: covered
+
+  - id: shell.splitter_resize
+    what: Sidebar 与底部面板的分隔条(splitter)可拖拽改变宽高
+    should:
+      - "e2e: 拖拽 sidebar 右边 splitter 能改变 sidebar 宽度"
+      - "e2e: 拖拽 bottom panel splitter 能改变 bottom panel 高度"
+    tests:
+      - file: tests/e2e/splitter.spec.ts
+        cases: ["S1 sidebar 右边 splitter 拖拽 改宽度", "S2 bottom panel splitter 拖拽 改高度"]
+    status: covered
+
+  - id: shell.dev_reload_auto_refresh
+    what: 开发时后端 ui bump 触发页面自动刷新, 不误动 VSCode 外壳/不重启子进程
+    should:
+      - "e2e: ui bump 事件触发页面自刷新, 且不动 VSCode/不重启进程"
+    tests:
+      - file: tests/e2e/dev_reload.spec.ts
+        cases: ["ui bump 触发页面自刷新 (不动 VSCode / 不重启进程)"]
+    status: covered
+
+  - id: shell.dockview_panel_placement
+    what: 驾驶舱工作台(Dockview)新开面板可按请求放到右侧或指定 split 位置, 已开面板可被后续请求移动到新位置
+    should:
+      - "unit: 新增面板时右侧放置(right placement)请求被正确传给 Dockview"
+      - "unit: 已存在的面板在后续收到 split 放置请求时会被移动而不是重开"
+    tests:
+      - file: src/shell/EditorArea.test.tsx
+        cases: ["passes right-side placement to Dockview when adding a new panel", "moves an existing panel when a split placement is requested later"]
+    status: covered
+
+  - id: shell.cockpit_shell_entry_points
+    what: 驾驶舱壳(CockpitShell)v2-11 版渲染含 workflow 摘要数据, 页内快照按钮、材料台账入口、通知引用打开均接到工作面
+    should:
+      - "unit: CockpitShell 渲染时带上 workflow 摘要数据"
+      - "unit: 页内快照按钮恢复可用(不再只是 poof 提示)"
+      - "unit: material registry 与当前活跃计划入口接到工作面, 点开材料台账搜索结果能落进工作面(默认或显式右侧)"
+      - "unit: 点通知引用能在工作面打开对应内容"
+    tests:
+      - file: src/shell/CockpitShell.test.tsx
+        cases: ["renders the v2-11 cockpit shell with workflow summary data", "restores the in-page page-snapshot button (no longer just a poof hint)", "keeps material registry and active plan entry points wired to the work surface", "opens material registry search results in the work surface", "opens search results to the right side when explicitly requested", "opens notification refs in the work surface"]
+    status: covered
+
+  - id: shell.panels_store_tab_lifecycle
+    what: 面板状态仓(panelsStore)固定 tab(工作板/任务/总控)不可被普通关闭动作误关, 布局恢复/拆分放置请求均能正确合并
+    should:
+      - "unit: 初始状态固定含工作板首页 + 任务 + 总控三个 tab"
+      - "unit: 关闭动作不会关掉固定的总控 tab, 但能关掉普通 tab"
+      - "unit: 从存档恢复布局时固定 tab 会被正确合并进恢复结果"
+      - "unit: 显式 split 停靠请求在恢复后仍被保留"
+      - "unit: review_material 是多实例 tab(每条材料一个页签, 重开同材料只聚焦), review_queue 是单例 tab(不同材料公用一个 tab 并更新聚焦 id)"
+    tests:
+      - file: src/stores/panelsStore.test.ts
+        cases: ["starts with the fixed project board (homepage) + quest + controller tabs", "does not close the fixed controller tab but closes normal tabs", "merges the fixed tabs into restored layouts", "keeps explicit dock placement requests for split monitoring", "review_material 是多实例 tab", "review_queue 是单例 tab"]
+    status: covered
+
+  - id: shell.tab_maximize_and_context_menu
+    what: tab 最大化/还原(reviewMaximizeStore)与 tab 右键菜单——最大化已知 tab 生效、未知 tab 不进入最大化态、dockview 外部丢弃最大化分组时状态能对齐、菜单开关不与最大化互相打架
+    should:
+      - "unit: 最大化一个已知 tab 会激活它、调用 dockview maximize、记录其 id"
+      - "unit: 对未知 tab 调用最大化不会进入最大化态(不可判定的 tab 直接忽略)"
+      - "unit: 退出最大化会调用 dockview exit 并清空已记录的最大化 id"
+      - "unit: dockview 在外部丢弃最大化分组(如 tab 被关闭)后状态能对账复位"
+      - "unit: tab 右键上下文菜单能正常开关"
+      - "unit: 触发最大化会关闭任何已打开的 tab 菜单"
+    tests:
+      - file: src/stores/reviewMaximizeStore.test.ts
+        cases: ["maximizes a known tab: activates it, calls dockview maximize, records the id", "ignores maximize for an unknown tab without entering maximized state", "exit calls dockview exit and clears the maximized id", "reconciles when dockview drops its maximized group externally (e.g. tab closed)", "opens and closes the tab context menu", "maximizing closes any open tab menu"]
+    status: covered
+
+  # ── 命令面板 / 深链 ─────────────────────────────────────────────────────
+  - id: cmdk.command_palette_search_and_navigate
+    what: Ctrl+K 命令面板——触发、按名搜索(worker/note/PM 均可命中)、分组展示、Enter 打开、Esc 关闭
+    should:
+      - "e2e: Ctrl+K 能触发命令面板打开"
+      - "e2e: 输入 worker/PROGRESS 等关键字能命中对应候选(worker section / note)"
+      - "e2e: 候选按 WORKER/NOTE/PM 总览等 section 分组展示"
+      - "e2e: Enter 选中项能打开对应 tab"
+      - "e2e: Esc 能关闭命令面板"
+    tests:
+      - file: tests/e2e/cmdk.spec.ts
+        cases: ["F1 Ctrl+K 触发命令面板", "F2 输入 worker 名 — 出 worker section + 候选", "F3 输入 PROGRESS — 命中 note", "F4 section 分组 (WORKER / NOTE / PM 总览)", "F5 Enter 选中项目开 tab", "F6 Esc 关闭命令面板"]
+    status: covered
+
+  - id: deeplink.layout_persist_and_restore
+    what: 深链与布局持久化——开关 tab 反映到 URL 的 layout 参数, 重新载入 URL 能恢复单/多 tab 布局
+    should:
+      - "e2e: 开 tab 后 URL 出现 layout 参数, 关闭全部 tab 后 layout 参数消失"
+      - "e2e: 携带 layout 参数重新载入页面能恢复单 tab 或多 tab(worker+note)布局"
+    tests:
+      - file: tests/e2e/deeplink.spec.ts
+        cases: ["F7 开 tab 后 URL 含 layout 参数", "F8 关所有 tab 后 URL 不含 layout", "F9 重新载入 URL 恢复 1 tab", "F10 重新载入 URL 恢复多 tab (worker + note)"]
+    status: covered
+
+  - id: routing.entry_route_normalization
+    what: 入口路由归一化——不同历史入口链接(纯 OmniChat/完整 chat session/老 review-stage 链接)都能映射到驾驶舱正确落点, 内嵌聊天与老 chat 链接保持独立不被误吞并
+    should:
+      - "unit: 默认根路径保持驾驶舱壳"
+      - "unit: 供 iframe 使用的内嵌聊天入口保持独立不被路由吞并"
+      - "unit: 显式请求老 chat 入口时仍保持独立"
+      - "unit: 纯 OmniChat 入口被归一化转成驾驶舱壳"
+      - "unit: 完整 chat session 链接被映射为驾驶舱 cc_session 深链"
+      - "unit: 老 review-stage 材料链接映射为驾驶舱 review_material 深链"
+      - "unit: 裸 review-stage 链接(无参数)映射为驾驶舱审阅队列深链"
+    tests:
+      - file: src/routes/entryRoute.test.ts
+        cases: ["keeps the cockpit shell as the default root", "keeps embedded chat standalone for iframe consumers", "keeps legacy chat standalone when explicitly requested", "turns plain OmniChat entry into the cockpit shell", "turns full chat session links into cockpit cc_session deep links", "maps legacy review-stage material links to the cockpit review_material deeplink", "maps bare review-stage links to the cockpit review queue"]
+    status: covered
+
+  - id: audit.zero_404_sweep
+    what: 5 大模块切换与内部深入浏览(KB 树+笔记、PM 计划+plan.md、System 各实体、Settings、Trace、KB 内 .md 链接全量)全程零 404、零 console.error
+    should:
+      - "e2e: 5 模块之间切换零 404 / 零 console.error"
+      - "e2e: KB 模块树+第一条 note 打开零 404"
+      - "e2e: PM 模块第一条 plan 展开+打开 plan.md 零 404"
+      - "e2e: System 模块 Worker/Team/Material 各开第一条零 404"
+      - "e2e: Settings 模块零 404"
+      - "e2e: Trace 列表点开第一条零 404"
+      - "e2e(负路径/体检): kb_markdown_demo 内每个 .md 链接逐个点开都不 404"
+    tests:
+      - file: tests/e2e/audit_404_sweep.spec.ts
+        cases: ["AUDIT.1 5 模块切换零 404 / 零 console.error", "AUDIT.2 KB 模块 — 树+第一条 note 开启零 404", "AUDIT.3 PM 模块 — 第一条 plan 开启 + plan.md 打开零 404", "AUDIT.4 System 模块 — Worker / Team / Material 各开第一条零 404", "AUDIT.5 Settings 模块零 404", "AUDIT.6 Trace 列表点开第一条零 404", "AUDIT.7 kb_markdown_demo 内每个 .md 链接都不 404"]
+    status: covered
+
+  # ── KB 笔记: 渲染 ────────────────────────────────────────────────────────
+  - id: kb.sidebar_list_and_open_note
+    what: KB sidebar 以树形展示 note 列表(真后端数据), 点 note 能开 tab 渲染真实 markdown, 过滤框能按关键字缩小列表
+    should:
+      - "e2e: sidebar 树形展示 note 列表(数据来自真后端 /api/notes)"
+      - "e2e: 点 note 打开对应 tab"
+      - "e2e: note tab 渲染真实 markdown(h1/段落等)"
+      - "e2e: 过滤输入生效, 列表按关键字缩小"
+    tests:
+      - file: tests/e2e/kb.spec.ts
+        cases: ["B1 KB sidebar 显 note 列表 (真后端 /api/notes, 树形)", "B2 点 note 开 tab", "B3 Note tab 真 markdown 渲染 (h1 / 段落)", "B_filter Note 过滤生效"]
+    status: covered
+
+  - id: kb.markdown_render_basic_and_gfm
+    what: markdown 渲染覆盖标题/行内格式/列表(含 GFM 任务列表)/表格/引用(含 Obsidian callout 四类型)/代码高亮/Mermaid/KaTeX/水平线, 并留存整体与分区截图
+    should:
+      - "e2e: 标题(H1/H2)渲染且带底边线"
+      - "e2e: 行内格式(粗体/斜体/删除线/行内 code)正确渲染"
+      - "e2e: 无序/有序列表与 GFM 任务列表(checkbox)正确渲染"
+      - "e2e: GFM 表格渲染出 table/th/td/border"
+      - "e2e: 普通 blockquote 与 Obsidian callout(note/warning/tip/danger 四类型)都能识别渲染"
+      - "e2e: 代码块按语言(python/typescript)独立语法高亮"
+      - "e2e: Mermaid 图渲染为 SVG"
+      - "e2e: KaTeX 行内与块级数学公式渲染"
+      - "e2e: 水平线(hr)渲染"
+      - "e2e(截图留档): 综合观感、markdown-body 内部、表格+callout 区、代码+mermaid+math 区分别截图存档"
+    tests:
+      - file: tests/e2e/kb_md.spec.ts
+        cases: ["M1.1 H1 渲染 + 底边线", "M1.2 H2 + 底边线", "M2 行内格式 (粗体 / 斜体 / strikethrough / 行内 code)", "M3.1 无序列表 / 有序列表渲染", "M3.2 任务列表 (GFM checkbox)", "M4 GFM 表格 — table/th/td/border 都生效", "M5.1 普通 blockquote 渲染", "M5.2 Obsidian callout (note 类) 渲染为彩色框", "M5.3 Callout 4 类型都识别 (note/warning/tip/danger)", "M6.1 代码块 (python) — 含语法高亮 token", "M6.2 代码块 (typescript) — 高亮独立工作", "M7 Mermaid — graph 渲染为 SVG", "M8.1 KaTeX 行内数学渲染", "M8.2 KaTeX 块级数学 (display)", "M9 水平线 hr 渲染", "M10 综合截图 — 整体观感", "M10b 截 .markdown-body 内部 (含表格/callout/code/mermaid 整体)", "M10c 滚到表格 + callouts 区截图", "M10d 滚到代码 + mermaid + math 区截图"]
+    status: covered
+
+  - id: kb.gfm_table_and_note_tree_grouping
+    what: 笔记内 GFM 表格渲染为真 table, 笔记 sidebar 是树形分组(不是扁平列表)且顶层目录默认展开
+    should:
+      - "e2e: feature_matrix 笔记内表格渲染为 <table>"
+      - "e2e: 笔记 sidebar 是树形结构而非 flat list"
+      - "e2e: 笔记树顶层目录默认展开"
+    tests:
+      - file: tests/e2e/kb_gfm.spec.ts
+        cases: ["M1 GFM 表格 — feature_matrix 笔记的表格被渲染为 <table>", "M2 笔记 sidebar 是树形 (不是 flat list)", "M3 笔记树 顶层目录默认展开"]
+    status: covered
+
+  - id: kb.frontmatter_and_embedded_assets
+    what: 笔记 frontmatter 卡片在头部渲染并展示解析出的 key/value, `![[image.png]]` 语法渲染真图片(非 0 字节)且 alt 文字透传
+    should:
+      - "e2e: frontmatter 卡片渲染在笔记头部"
+      - "e2e: frontmatter 解析出的 key/value 行可见"
+      - "e2e: ![[image.png]] 语法渲染为带 asset src 的 <img>"
+      - "e2e: 图片资源网络层真返回非 0 字节"
+      - "e2e: alt 文字正确透传到 <img>"
+    tests:
+      - file: tests/e2e/kb_assets_and_frontmatter.spec.ts
+        cases: ["FM.1 frontmatter card 渲染在头部", "FM.2 解析的 key/value 行可见", "IMG.1 ![[image.png]] → <img> w/ asset src", "IMG.2 资源真返回非 0 字节 (网络层)", "IMG.3 alt 文字传过去"]
+    status: covered
+
+  - id: kb.obsidian_syntax_extensions
+    what: Obsidian 专有语法——高亮标记、注释块、脚注、内联 HTML(sup/sub/kbd)、details 折叠区均渲染正确; 已知暂不接的语法(block ref/note embed/inline tag)不导致崩溃或 404
+    should:
+      - "e2e: ==text== 高亮渲染为 <mark> 且带自定义背景色"
+      - "e2e: %% ... %% 注释块在渲染结果里完全消失"
+      - "e2e: 脚注 [^demo-fn] 渲染且文末出现脚注定义"
+      - "e2e: 内联 HTML(sup/sub/kbd)均正确渲染"
+      - "e2e: <details> 折叠区可见且 summary 默认折叠"
+      - "e2e(负路径): 已知暂不接的语法(block ref/note embed/inline tag)不导致 404 或页面崩溃"
+    tests:
+      - file: tests/e2e/kb_obsidian.spec.ts
+        cases: ["OB.1 highlight ==text== → <mark> 渲染 + 自定义背景色", "OB.2 comment %% ... %% 完全消失", "OB.3 footnote [^demo-fn] 渲染 + 文末出脚注定义", "OB.4 HTML inline: <sup> <sub> <kbd> 都渲染", "OB.5 <details> 折叠区可见, summary 默认折叠", "OB.6 已知\"暂不接\"项 (block ref / note embed / inline tag) 不导致 404 / 不崩"]
+    status: covered
+
+  - id: kb.markdown_link_routing
+    what: 笔记内 markdown 链接按目标类型正确分流——外部 URL/mailto 新标签打开, docs 内部链接(含省略前缀/相对路径)路由到 note tab, 锚点不误触外部跳转
+    should:
+      - "e2e: 外部 URL 链接 target=_blank 新标签打开"
+      - "e2e: docs/X.md 链接路由到 note tab(不是 404)"
+      - "e2e: docs 前缀省略的 .md 链接同样能路由"
+      - "e2e: ./ 相对链接基于当前 note 路径正确解析"
+      - "e2e: ../ 相对链接正确走到父目录"
+      - "e2e: mailto 链接走外部新标签"
+      - "e2e(负路径): #anchor 锚点链接不误触外部新标签(保留浏览器默认锚跳转)"
+    tests:
+      - file: tests/e2e/kb_md_links_and_fontctl.spec.ts
+        cases: ["ML.1 外部 URL 链接 → target=_blank 在新 tab 打开", "ML.2 docs/X.md 链接 → 路由到 note tab (不是 404)", "ML.3 docs 前缀省略的 .md 链接也路由", "ML.4 ./ 相对链接基于当前 note 路径解析", "ML.5 ../ 相对链接走父 dir", "ML.6 mailto 走外部新 tab", "ML.7 #anchor 不走外部 tab (浏览器默认锚跳转)"]
+    status: covered
+
+  - id: kb.font_size_control
+    what: 笔记阅读区字号工具栏——可见并显示当前字号, 点 A+/A- 能实时改变渲染字号, 改动跨 tab/reload 持久, reset 能回默认
+    should:
+      - "e2e: 字号工具栏可见且显示当前字号"
+      - "e2e: 点 A+ 字号变大且 markdown-body 内联 fontSize 同步"
+      - "e2e: 点 A- 字号变小"
+      - "e2e: 字号设置跨 tab 共享同一 store 且 reload 后保持"
+      - "e2e: 点 reset 按钮回到默认字号"
+    tests:
+      - file: tests/e2e/kb_md_links_and_fontctl.spec.ts
+        cases: ["ML.8 字号工具栏可见 + 显当前字号", "ML.9 点 A+ 字号变大 + .markdown-body inline fontSize 同步", "ML.10 点 A− 字号变小", "ML.11 字号持久 (跨 tab 同 store + reload 保持)", "ML.12 点 reset 按钮回默认"]
+    status: covered
+
+  # ── KB 笔记: 双链 / 全局链接协议 ─────────────────────────────────────────
+  - id: kb.backlinks_and_wikilink
+    what: 双链体系——sidebar 双链项接进实体图谱, [[name]] 渲染为可点 wikilink, 反链/外链面板展示解析与未解析项, 图谱视图能点开渲染
+    should:
+      - "e2e: 双链 sidebar 项接入图谱实体"
+      - "e2e: [[name]] 渲染为带 wikilink 标记的可点元素"
+      - "e2e: 反链/外链面板可见"
+      - "e2e: 含双链笔记的外链区能区分展示已解析项与未解析项"
+      - "e2e: 图谱 sidebar 项点开后 cytoscape 图谱正确渲染"
+    tests:
+      - file: tests/e2e/kb_links.spec.ts
+        cases: ["B4.1 双链 sidebar 项 加 graph 实体", "B4.2 [[name]] 渲染为 wikilink (找带 wikilink-data 的笔记)", "B5 反链面板 — 反链/外链区可见", "B5.2 含双链笔记的外链区显示解析项 / 未解析项", "B6 图谱 sidebar 项 + 点开 cytoscape 渲染"]
+    status: covered
+
+  - id: kb.omni_protocol_links
+    what: omni:// 全局实体协议链接(worker/trace/session/plan 等)及其短写形式均能正确解析为带类型标记的可点 anchor, 点击能跳转到对应实体 tab, hover 能预览
+    should:
+      - "e2e: omni://worker 协议解析为带 data-entity-type=worker 的 anchor"
+      - "e2e: omni://trace、omni://session(含 alias)协议均正确解析"
+      - "e2e: 短写形式(plan:xxx / worker:xxx)与完整协议等价解析"
+      - "e2e: 无前缀的 [[README]] 默认解析为 note 类型"
+      - "e2e: 点 worker wikilink 能在中央区打开 worker tab"
+      - "e2e: hover wikilink 弹出 HoverCard 预览"
+    tests:
+      - file: tests/e2e/kb_omni_links.spec.ts
+        cases: ["OL.1 omni://worker 协议解析为带 data-entity-type=worker 的 anchor", "OL.2 omni://trace 协议解析", "OL.3 omni://session 协议解析 + alias 显示", "OL.3b 短写 plan:xxx 解析为 plan 类型", "OL.4 短写 worker:xxx 协议等价", "OL.5 无前缀 [[README]] 默认 note 类型", "OL.6 点 worker wikilink → 中央开 worker tab", "OL.7 hover wikilink 弹 HoverCard 预览"]
+    status: covered
+
+  # ── KB 笔记: 编辑 / 批注 / 搜索 ──────────────────────────────────────────
+  - id: kb.edit_modes_and_save
+    what: 笔记编辑三态(只读/编辑/分屏)切换正确, 编辑后出现 dirty 指示与可点保存按钮, 真保存后文件写回且后端 GET 能读到改动
+    should:
+      - "e2e: 默认进只读模式且三个模式切换按钮可见"
+      - "e2e: 切到编辑模式 Monaco 编辑器出现"
+      - "e2e: 切到分屏模式 Monaco 与预览同时可见"
+      - "e2e: 修改内容后出现 dirty 指示且保存按钮可点"
+      - "e2e: 真保存后文件写回磁盘, 后端 GET 返回内容含改动"
+    tests:
+      - file: tests/e2e/kb_edit.spec.ts
+        cases: ["B9.1 默认进只读模式 + 三个模式按钮可见", "B9.2 切到编辑模式 → Monaco 出现", "B9.3 切到分屏模式 → Monaco + 预览 同时可见", "B9.4 修改后 dirty 指示出现 + 保存按钮可点", "B9.5 真保存 → 文件写回 + 后端 GET 含改动"]
+    status: covered
+
+  - id: kb.annotation_lifecycle
+    what: 段落级批注——sidebar 批注计数区默认态、hover 出批注入口、通过 API 造批注后 sidebar 立即可见、点批注项弹出含已有评论的 modal 并可删除、失锚批注(锚点 hash 不存在)有明显警示且计入失锚计数
+    should:
+      - "e2e: 批注 sidebar section 默认显示 0 且有引导提示"
+      - "e2e: hover 段落右侧出现 + 号批注入口"
+      - "e2e: 通过 API 造出批注后 sidebar 立即显示"
+      - "e2e: 点 sidebar 批注项弹出 modal, 含已有评论且可删除"
+      - "e2e(负路径): 失锚批注(锚点 hash 不存在)用 ⚠ 标记且计入失锚计数, 不静默消失"
+    tests:
+      - file: tests/e2e/kb_anno.spec.ts
+        cases: ["B7.1 批注 sidebar section 默认显示 0 + 提示", "B7.2 hover 段落右侧出 + 入口", "B7.3 通过 API 造批注 → sidebar 立显", "B7.4 点 sidebar 批注项 → modal 出 + 含已有评论 + 删", "B7.5 失锚批注 (hash 不存在) 用 ⚠ 标 + 算入失锚计数"]
+    status: covered
+
+  - id: kb.annotation_block_type_coverage
+    what: 批注能力覆盖到 heading/列表项/表格/blockquote/无语言代码块等多种块级元素, hover 出批注入口, hr 这类无内容块不被误包进批注 wrapper
+    should:
+      - "e2e: heading 也被批注 wrapper 包裹"
+      - "e2e: list item(li)可单独批注"
+      - "e2e: table 整体可批注(一个 wrapper)"
+      - "e2e: blockquote 整体可批注"
+      - "e2e: 无 language code 的代码块(pre)可批注"
+      - "e2e: hover heading/li 均能出现 + 号按钮"
+      - "e2e(负路径): hr 不被批注 wrapper 包裹(仍正常渲染但无批注入口)"
+    tests:
+      - file: tests/e2e/kb_anno_v2.spec.ts
+        cases: ["S19.1 heading 也包了 annotation wrapper", "S19.2 list item (li) 单独可批", "S19.3 table 整体可批 (一个 wrapper)", "S19.4 blockquote 整体可批", "S19.5 无 language code 块 (pre) 可批", "S19.6 hover heading → + 按钮出现", "S19.7 hover li → + 按钮出现", "S19.8 hr 不被 wrapper 包 (本身仍渲染但无 anno)"]
+    status: covered
+
+  - id: kb.fulltext_search
+    what: KB 全文搜索——标签可见可切换, 输入关键字触发后端搜索并展示命中, 点结果开 note tab; 空输入与无匹配都有明确提示(不是空白/报错)
+    should:
+      - "e2e: 全文搜索标签可见且可切换"
+      - "e2e: 输入关键字触发后端 _search 接口并展示命中结果"
+      - "e2e: 点击搜索结果打开对应 note tab"
+      - "e2e(负路径): 空输入显示提示(非空白页)"
+      - "e2e(负路径): 无匹配结果时显示「无匹配」而非报错或空白"
+    tests:
+      - file: tests/e2e/kb_search.spec.ts
+        cases: ["B8.1 全文搜索 标签 可见 + 切换", "B8.2 输入关键字 触发后端 _search → 命中显示", "B8.3 点击结果开 note tab", "B8.4 空输入显示提示", "B8.5 无匹配显示无匹配"]
+    status: covered
+
+  # ── PM 计划 ──────────────────────────────────────────────────────────────
+  - id: pm.plan_tree_and_open_planmd
+    what: PM 模块 sidebar 按 category 树形展示 plan, 点 plan 名内联展开显示 .md 文件清单(不误开中央 tab), 点 plan.md 文件才在中央区用 KB 编辑器打开 note tab, 过滤框对 plan 名生效
+    should:
+      - "e2e: PM sidebar 树形展示 plan 并按 category 分组"
+      - "e2e: 点 plan 名内联展开显示 .md 文件清单, 不误开中央 tab"
+      - "e2e: 点 plan.md 文件后 KB 编辑器在中央区打开 note tab"
+      - "e2e: 过滤框输入(如 archive)对 plan 列表生效"
+    tests:
+      - file: tests/e2e/pm.spec.ts
+        cases: ["C1 PM module sidebar 树形显示 plan (按 category 分组)", "C2 点 plan 名 → 内联 expand 显 .md 文件清单 (不开中央 tab)", "C3 点 plan.md 文件 → KB 编辑器在中央打开 note tab", "C4 过滤生效 (输 archive)"]
+    status: covered
+
+  # ── System: Worker / Team / Material 实体 ───────────────────────────────
+  - id: worker.tree_navigation_and_filter
+    what: Worker 树默认展开 domains 分组, 点目录能展开子目录, 过滤框对 worker 名生效, 点叶子节点开 worker tab
+    should:
+      - "e2e: Worker 树默认展开 domains"
+      - "e2e: 点目录展开子目录"
+      - "e2e: 过滤输入(如 block)对 Worker 树生效"
+      - "e2e: 点 worker 叶子节点打开对应 tab"
+    tests:
+      - file: tests/e2e/worker.spec.ts
+        cases: ["D1 Worker 树默认 domains 展", "D2 Worker 树点 dir 展子目录", "D3 Worker 树过滤生效 (输 block)", "D4 点 worker leaf 开 tab"]
+    status: covered
+
+  - id: worker.design_and_source_facets
+    what: worker tab 内设计(DESIGN.md)/源码(source)切换面(facet)——切换按钮可见, 统一 renderer 处理表格与代码高亮, 无 DESIGN 时占位文字, source 面用 Monaco 渲染
+    should:
+      - "e2e: 设计/source 切换按钮可见"
+      - "e2e: 设计 facet 用 .markdown-body 容器(统一 renderer), 且能正确渲染表格与代码块语法高亮"
+      - "e2e(负路径): worker 无 DESIGN.md 时展示占位文字而非报错或空白"
+      - "e2e: 切到 source facet 用 Monaco 正确渲染"
+    tests:
+      - file: tests/e2e/worker.spec.ts
+        cases: ["D5 设计 facet — DESIGN.md / source 切换按钮可见", "D5.1 设计 facet 用 .markdown-body 容器 (统一 renderer)", "D5.2 设计 facet 渲染表格 (复用统一 renderer)", "D5.3 设计 facet 代码块语法高亮 (统一 renderer)", "D6 设计 facet 切 source — Monaco 渲染", "D7 worker 无 DESIGN 时占位文字 (切到 DESIGN.md tab)"]
+    status: covered
+
+  - id: worker.run_and_history_facets
+    what: worker tab 内运行(run)与历史(history)facet——运行面切到后展示事件占位/实时区, 历史面真请求后端并展示列表或空态
+    should:
+      - "e2e: 切运行 facet 展示事件占位或实时区"
+      - "e2e: 切历史 facet 真发后端请求, 有数据展示列表, 无数据展示空态"
+    tests:
+      - file: tests/e2e/worker.spec.ts
+        cases: ["D8 切运行 facet — 显事件占位 / 实时区", "D9 切历史 facet — 真请求 + 列表/空状态"]
+    status: covered
+
+  - id: team_material.system_entity_browsing
+    what: System sidebar 的 Team/Material 分组树形展示, 后端 /api/teams 与 /api/materials 均返回足量真数据, 点 Team/Material 项都能用 CodeFileEditor 打开(含 DESIGN.md/source 切换), Cmd+K 能跨实体搜到 Material
+    should:
+      - "e2e: System sidebar 展示 Team 分组且顶层 domains 树形可见"
+      - "e2e: 后端 /api/teams 返回 49 条以上(扫描 team*.py)"
+      - "e2e: 点 Team 项打开 CodeFileEditor(PaneHeader + DESIGN.md/source 切换)"
+      - "e2e: Team source 视图用 Monaco 渲染且内容含 TeamSpec"
+      - "e2e: 后端 /api/materials 返回 60 条以上(含 materials.py + formats.py)"
+      - "e2e: System sidebar 展示 Material 分组"
+      - "e2e: 点 Material 项能用 CodeFileEditor 真实展示内容"
+      - "e2e: Cmd+K 跨实体搜索能命中 Material 项"
+    tests:
+      - file: tests/e2e/team_material.spec.ts
+        cases: ["TM.1 系统 sidebar 显 Team 分组 + 树形 顶层 domains 可见", "TM.2 后端 /api/teams 返回 49+ 条 (扫 team*.py)", "TM.3 点 Team 项 → CodeFileEditor (PaneHeader + DESIGN.md/source 切换)", "TM.4 Team source view 显 Monaco 内容含 TeamSpec", "TM.5 后端 /api/materials 返回 60+ 条 (含 materials.py + formats.py)", "TM.6 系统 sidebar 显 Material 分组", "TM.7 点 Material 项 → CodeFileEditor 真显", "TM.8 Cmd+K 跨实体搜 — Material 项可命中"]
+    status: covered
+
+  - id: team.builder_graph_visualization
+    what: TeamBuilder 拓扑图——agent-first TeamSpec 默认展示且暴露 materials 节点, 真实 team 样本能渲染成图(smoke-only 的如 csv_to_md 有明确标注), team 目录保持干净(全部列出的 team 都有图与 doctor 数据)
+    should:
+      - "unit: TeamBuilder 图默认渲染 agent-first TeamSpec 且暴露 materials"
+      - "unit: 真实 team 样本能渲染为图, 且 csv_to_md 这类 smoke-only team 被明确标注(不伪装成完整拓扑)"
+      - "unit: team 目录里列出的全部 team 都有图数据与 doctor 数据, 不留脏数据"
+    tests:
+      - file: tests/e2e/team_graph.spec.ts
+        cases: ["TeamBuilder graph defaults to the agent-first TeamSpec and exposes materials", "real team samples render as graph, while csv_to_md is labelled smoke only", "team catalogue stays clean and all listed teams have graph plus doctor data"]
+    status: covered
+
+  - id: material_registry.panel_browse_and_filter
+    what: 材料台账面板(MaterialRegistryPanel)展示材料统计与详情, 点已存在实体能开对应 tab, 按角色过滤能正确发查询并展示选中材料详情
+    should:
+      - "unit: 面板渲染材料计数与详情, 点已存在实体能开对应 tab"
+      - "unit: 按角色过滤时发出对应查询请求并展示选中材料详情"
+    tests:
+      - file: src/entities/material_registry/MaterialRegistryPanel.test.tsx
+        cases: ["renders material counts, detail, and opens existing entity tabs", "sends role filter queries and shows selected material detail"]
+    status: covered
+
+  - id: material_graph.decision_tree_traversal_logic
+    what: 材料决策图的上下游遍历逻辑——收集选中节点的上下游、不吸入无关子图、沿 rests_on 边可传递地传播到被依赖的决策、非 rests_on 边不参与证伪传播、每个节点产出稳定坐标、supersedes 版本链横向排开
+    should:
+      - "unit: 能收集选中节点的上游与下游, 且不含无关子图"
+      - "unit: 沿 rests_on 边可传递地传播到被依赖的决策"
+      - "unit: 非 rests_on 边不参与传播(产出边不算证伪传播路径)"
+      - "unit: 每个节点都产出数值坐标; LR 布局下带 supersedes 边的版本节点沿 x 轴递增排开"
+    tests:
+      - file: src/entities/material-graph/graph-logic.test.ts
+        cases: ["收集选中节点的上游与下游", "不含无关子图", "沿 rests_on 传播到依赖的决策(可传递)", "不走非 rests_on 边(产出不算证伪传播)", "给每个节点产出数值坐标", "LR 下有 supersedes 边的版本节点横向排开(x 递增)"]
+    status: covered
+
+  # ── Agent 会话 / Claude Code 集成 ────────────────────────────────────────
+  - id: session.agent_session_create_modal
+    what: Agent 会话组入口可见, 点"+"弹出创建 modal, modal 可用 Esc/取消按钮关闭, 输入为空时创建按钮保持禁用(不允许发起空会话)
+    should:
+      - "e2e: Agent 会话组与 + 按钮可见"
+      - "e2e: 点 + 弹出创建 modal"
+      - "e2e: modal 用 Esc 能关闭"
+      - "e2e: modal 取消按钮能关闭"
+      - "e2e(负路径): 输入为空字符串时创建按钮保持无效, 不允许发起空会话"
+    tests:
+      - file: tests/e2e/session.spec.ts
+        cases: ["D10 Agent 会话组 + 按钮可见", "D11.a 点 + 弹 modal", "D11.b modal Esc 关闭", "D11.c modal 取消按钮关闭", "D11.d modal 输入空时创建按钮无效 (验空字符串)"]
+    status: covered
+
+  - id: cc_session.terminal_lifecycle
+    what: Claude Code 会话面——health 接口报告 CLI 状态, sidebar 有 Claude Code 分组与"+"按钮, 通过 API 起 cmd.exe session 后中央 xterm 渲染且状态为 alive, 键盘输入能到后端并回显, kill 按钮能让状态变 ended
+    should:
+      - "e2e: health 接口正确报告 claude CLI 状态"
+      - "e2e: sidebar 含 Claude Code 分组与 + 按钮"
+      - "e2e: 通过 API 起 cmd.exe session 后中央 xterm 渲染且状态为 alive"
+      - "e2e: 键盘输入能送达后端并在 xterm 回显(echo hello)"
+      - "e2e: 点 kill 按钮后状态变为 ended"
+    tests:
+      - file: tests/e2e/cc_session.spec.ts
+        cases: ["CC.1 health endpoint reports claude CLI status", "CC.2 sidebar 含 Claude Code 组 + \"+\" 按钮", "CC.3 通过 API 起 cmd.exe session → 中央 xterm 渲染 + alive 状态", "CC.4 keyboard input → backend 收到 + 输出回 xterm (echo hello)", "CC.5 kill 按钮 → 状态变 ended"]
+    status: covered
+
+  - id: cc_session.context_panel
+    what: cc_session 中央 tab 内的上下文面板——含三段信息且展示 cwd 字段, 后端 GET /context 对未知 sid 返回空而非 500
+    should:
+      - "e2e: cc_session 中央 tab 含 context panel 且展示三段信息"
+      - "e2e: 上下文段里含 cwd 字段"
+      - "e2e(负路径): GET /context 对未知 sid 回空结果而不是 500"
+    tests:
+      - file: tests/e2e/cc_context_panel.spec.ts
+        cases: ["S16.1 cc_session 中央 tab 含 context panel + 三段", "S16.2 上下文段含 cwd 字段", "S16.3 GET /context 端点对未知 sid 回空但不 500"]
+    status: covered
+
+  - id: cc_session.install_widget
+    what: Claude Code 安装向导 widget——渲染含 scope 下拉与现状 pill, 切到 user scope 后 pill 正确反映该 scope 状态, 等价 CLI 命令提示在 widget 内可见
+    should:
+      - "e2e: install widget 渲染含 scope 下拉与现状 pill"
+      - "e2e: 切到 user scope 后状态 pill 反映 user scope(一般显示未装)"
+      - "e2e: 等价 CLI 命令提示在 widget 内可见"
+    tests:
+      - file: tests/e2e/cc_install_widget.spec.ts
+        cases: ["CCI.1 install widget 渲染 + scope 下拉 + 现状 pill", "CCI.2 切到 user scope → 状态 pill 反映 user scope (一般是未装)", "CCI.3 等价 CLI 提示在 widget 里可见"]
+    status: covered
+
+  - id: cc_session.chat_handoff_provider_tagging
+    what: 总控对话 tab 交接到 chatui 时带 provider=controller 标记, 普通 cc_session 聊天页签交接到 chatui 不带该标记(两条链路不互相污染)
+    should:
+      - "e2e: 总控对话 tab 交接落点卡且 window.open 带 provider=controller"
+      - "e2e: 普通 cc_session chat 页签交接落点卡且不带 provider=controller"
+    tests:
+      - file: tests/e2e/cc_chat_handoff.spec.ts
+        cases: ["A 总控对话 tab → chatui 落点卡 + window.open 带 provider=controller", "B 普通 cc_session chat 页签 → chatui 落点卡(无 provider=controller)"]
+    status: covered
+
+  - id: multiagent.thread_monitor_panel
+    what: ThreadMonitorPanel 展示 chat 与 pty 两类会话, 点击能作为 cc_session tab 打开
+    should:
+      - "unit: 面板同时展示 chat 与 pty 会话, 点击后作为 cc_session tab 打开"
+    tests:
+      - file: src/entities/controller/ThreadMonitorPanel.test.tsx
+        cases: ["shows chat and pty sessions and opens them as cc_session tabs"]
+    status: covered
+
+  - id: multiagent.view_grouping_and_selection
+    what: Multiagent 总览视图——按 run_status 映射到展示分组, 总控置顶其余按状态分组, 卡片点击只选中不跳转, 只有详情里显式 ↗ 按钮才真正导航, fetch 失败有明确错误展示
+    should:
+      - "unit: run_status 正确映射到对应展示分组"
+      - "unit: 总控(controller)置顶, 其余按状态分组"
+      - "unit: 卡片点击只选中, 不发生导航"
+      - "unit: 只有详情里显式 ↗ 打开按钮才触发导航"
+      - "unit(负路径): fetch 失败时展示明确错误提示"
+    tests:
+      - file: src/entities/multiagent/MultiagentView.test.tsx
+        cases: ["maps run_status to display group", "pins the controller and groups others by state", "selects on card click WITHOUT navigating", "navigates only via the explicit ↗ open button in detail", "shows an error when fetch fails"]
+    status: covered
+
+  # ── 审阅链路(boss sight / review stage) ─────────────────────────────────
+  - id: review.boss_sight_cockpit_flow
+    what: 审阅链路驾驶舱化——deeplink 直开审阅队列页签看空状态, 注入 material 后共享 sidebar 显示, 选材料后共享明细渲染(verdict/评论/批注)且可开 review_material 页签, 老链接(带参/不带参)都能重定向进驾驶舱对应落点, 必验收级材料含 html 渲染与 stats 警告
+    should:
+      - "e2e: deeplink 打开审阅队列页签展示空状态"
+      - "e2e: 注入 markdown material 后共享 sidebar 能显示"
+      - "e2e: 选中材料后共享明细正确渲染(verdict/评论/批注), 且能从 Detail 打开 review_material 页签"
+      - "e2e: 老链接 /review-stage?material=X 重定向进驾驶舱材料页签"
+      - "e2e: 老链接 /review-stage(无参)重定向进驾驶舱审阅队列"
+      - "e2e: 必验收级(mandatory)材料 html 渲染正确且展示 stats 警告"
+    tests:
+      - file: tests/e2e/boss_sight_reviewstage_visual.spec.ts
+        cases: ["B5-V01 · deeplink 开审阅队列页签看空状态", "B5-V02 · 注入 markdown material → 共享 sidebar 显示", "B5-V03 · 选材料 → 共享明细渲染 + verdict/评论/批注 → Detail 开 review_material 页签", "B5-V04 · 老链接 /review-stage?material=X 重定向进驾驶舱材料页签", "B5-V05 · 老链接 /review-stage (无参) 重定向进审阅队列", "B5-V06 · 必验收级 mandatory + html 渲染 + stats 警告"]
+    status: covered
+
+  - id: review.overview_ranking_and_preview
+    what: 审阅总览列表——markdown 摘要做截断处理, 按材料 kind 展示对应预览类型, importance 与视觉 kind 映射到卡片尺寸, 列表按时间倒序且尺寸按重要度排布, fetch 失败有明确错误态
+    should:
+      - "unit: markdown 内容被去除标记并截断展示摘要"
+      - "unit: 按材料 kind 渲染对应类型的预览"
+      - "unit: importance 与视觉 kind 映射到卡片尺寸"
+      - "unit: 列表按时间倒序排列, 且尺寸按重要度分布"
+      - "unit(负路径): fetch 失败时展示错误提示"
+    tests:
+      - file: src/entities/review/ReviewOverview.test.tsx
+        cases: ["strips markdown and truncates", "renders the right preview per kind", "maps importance and visual kind to size", "orders by time desc and sizes by importance", "shows error on fetch failure"]
+    status: covered
+
+  - id: review.material_video_preview_fallback
+    what: 材料视频类预览——YouTube 链接嵌 iframe, 本地文件与直链视频都渲染为 <video>, 无来源时展示占位而非报错
+    should:
+      - "unit: YouTube 链接嵌入为 iframe"
+      - "unit: 本地文件渲染为 <video> 元素"
+      - "unit: 直接视频 URL 渲染为 <video>"
+      - "unit(负路径): 无视频来源时展示占位, 不报错不空白"
+    tests:
+      - file: src/entities/review/MaterialViews.video.test.tsx
+        cases: ["embeds a YouTube link as an iframe", "renders a local file as a <video> element", "renders a direct video URL as <video>", "shows a placeholder when there is no source"]
+    status: covered
+
+  - id: review.stream_store_connection_sharing
+    what: 审阅实时流(streamStore)连接管理——多订阅者共享一条连接且全部释放后延迟关闭(release 幂等), linger 窗口内重新订阅不重新建连(切页签场景), 事件按 snapshot/增量/deleted/ping 正确合并, 断线后仍有订阅者时自动重连
+    should:
+      - "unit: 引用计数正确——两个订阅者共享一条连接, 全部释放后延迟关闭, release 调用是幂等的"
+      - "unit: linger 窗口内重新 acquire 不会重新建连(dockview 切页签场景)"
+      - "unit: 事件合并正确处理 snapshot 重建/增量更新/deleted 移除/ping 不改变 version"
+      - "unit(负路径): 断线后只要仍有订阅者就自动重连"
+    tests:
+      - file: src/entities/review/streamStore.test.ts
+        cases: ["引用计数: 两个订阅者共享一条连接, 全部释放后延迟关闭, release 幂等", "linger 窗口内重新 acquire 不断连(dockview 切页签场景)", "事件合并: snapshot 重建 / 增量更新 / deleted 移除 / ping 不动 version", "断线后仍有订阅者 → 自动重连"]
+    status: covered
+
+  - id: review.material_type_registry_resolution
+    what: review_material 类型注册——resolver 与 renderer 按同 type 注册, 取单条走后端单条接口而非靠 list 过滤, list 能把材料映射成实体, 长标题被正确截断
+    should:
+      - "unit: resolver 与 renderer 按同一 type 正确注册"
+      - "unit: 取单条材料走后端单条接口 reviewstageApi.get(id), 不依赖 list 过滤"
+      - "unit: list 把后端材料正确映射成前端实体"
+      - "unit: materialTabTitle 对长标题做截断处理"
+    tests:
+      - file: src/entities/review_material/index.test.ts
+        cases: ["resolver 与 renderer 同 type 注册", "fetch 走后端单条接口 reviewstageApi.get(id), 不靠 list 过滤", "list 把材料映射成实体", "materialTabTitle 截断长标题"]
+    status: covered
+
+  - id: review.web_review_target_resolution
+    what: 网页审阅托管——resolver 与 renderer 按同 type 注册, walker-game 目标解析为同源 url, vilo demo 目标经驾驶舱反代解析, 列出内置目标且对未知 id 明确抛错
+    should:
+      - "unit: resolver 与 renderer 按同一 type 正确注册"
+      - "unit: walker-game 审阅目标解析为同源 url"
+      - "unit: vilo demo 目标经驾驶舱反代解析(不直连外部)"
+      - "unit(负路径): 未知 id 明确抛错而非返回空/静默失败"
+    tests:
+      - file: src/entities/web_review/index.test.ts
+        cases: ["registers resolver and renderer under the same type", "resolves the walker-game target to a same-origin url", "resolves the vilo demo target through the dashboard proxy", "lists built-in targets and throws for unknown ids"]
+    status: covered
+
+  # ── 材料展示框架: 业务顶栏并入 + 阅读视图深链(件一/件二 DEC-2026-07-06-082/083) ──
+  - id: review.business_toolbar_merged_into_review_toolbar
+    what: 业务顶栏并入审阅顶栏(件一)——渲染器经 RendererEntry.toolbar 工厂声明业务身份/chips/actions, MaterialDetail 渲成单条合并栏(业务身份 + 审阅 tier/status/verdict/kebab 永不丢); 无 toolbar 的材料顶栏照旧零回归; 叙事九渲染器正文不再自画第二条工具条
+    should:
+      - "unit: 叙事业务渲染器挂有 toolbar 工厂, 产出合并栏 spec(icon/title/决策历程 action)"
+      - "unit(负路径): 无 toolbar 的普通 kind 渲染器 entry.toolbar 为 undefined(默认栏零回归)"
+      - "unit: 有 toolbar 的材料 → MaterialDetail 渲染合并栏(material-detail-merged-toolbar), 业务身份取代材料标题区(原标题以 title 保留), 审阅动作(通过/驳回/tier·status/⋯)全在"
+      - "unit(负路径): 无 toolbar 的材料 → 无合并栏 testid, 材料标题原样显示, 审阅动作仍在"
+      - "unit: 叙事渲染器正文内不再出现旧 NarrativeToolbar DOM(适用裁决 chip/决策历程按钮), 迁到顶栏工厂 + aux 活体件(决策历程跳转与适用裁决展开原话行为保留)"
+      - "e2e: vilo 阅读视图选中叙事材料 → 合并顶栏可见, 正文区无独立第二条工具条(narrative-goto-decisions 不在正文)"
+    tests:
+      - file: src/entities/review/rendererRegistry.test.tsx
+        cases: ["件一: 叙事业务渲染器挂有 toolbar 工厂, 产出合并栏 spec(icon/title/决策历程 action)", "件一: 无 toolbar 的普通 kind 渲染器 → entry.toolbar 为 undefined(默认栏零回归)"]
+      - file: src/entities/review/MaterialDetail.test.tsx
+        cases: ["① 有 toolbar 的材料 → 渲染合并栏, 业务身份 + 审阅动作(通过/驳回/⋯)都在, 无第二条顶栏", "② 无 toolbar 的材料 → 顶栏照旧(无合并栏 testid, 材料标题原样显示), 零回归"]
+      - file: src/entities/review/businesses/narrative.test.tsx
+        cases: ["①b 件一: 正文不再自画第二条工具条(渲染器内无 NarrativeToolbar/适用裁决/决策历程)", "② 顶栏工厂: icon/title/决策历程 action(一跳项目轨迹) + 适用裁决 aux(可展开原话)"]
+      - file: tests/e2e/studio_reader_merged_toolbar.spec.ts
+        cases: ["件一: vilo 阅读视图选中叙事材料 → 单条合并顶栏, 正文无第二条工具条"]
+    status: covered
+
+  - id: review.open_in_studio_reader_deeplink
+    what: 审阅列表/总览卡「在项目工作台打开」+ 阅读视图深链定位(件二)——列表卡与总览卡 kebab 新增入口, openTab({type:'studio_reader', id:项目}, ..., 材料 id); studio_reader Editor 消费 facet=材料 id, StudioReaderPanel 优先选中该材料(不在列表则回落默认最新)
+    should:
+      - "unit: ReviewQueueSidebar 卡片 kebab 含「在项目工作台打开」, 点击 → openTab(studio_reader, project, facet=材料 id)"
+      - "unit: StudioReaderPanel initialMaterialId(深链)优先选中该材料, 而非默认最新 markdown"
+      - "unit(负路径): initialMaterialId 不在列表时回落默认最新 markdown(不白屏)"
+      - "e2e: 审阅列表卡「在项目工作台打开」→ studio_reader tab 打开且定位到该材料, 合并顶栏在"
+    tests:
+      - file: src/entities/review/ReviewQueueSidebar.test.tsx
+        cases: ["cardKebab 含新入口, 点击 → openTab(studio_reader, project=vilo, facet=材料 id)"]
+      - file: src/entities/studio_reader/StudioReader.test.tsx
+        cases: ["⑥b 件二: initialMaterialId(深链)优先选中该材料, 而非默认最新 markdown", "⑥c 件二: initialMaterialId 不在列表 → 回落默认最新 markdown(不白屏)"]
+      - file: tests/e2e/studio_reader_merged_toolbar.spec.ts
+        cases: ["件二: 审阅列表卡「在项目工作台打开」→ studio_reader tab 打开且定位到该材料, 合并顶栏在"]
+    status: covered
+
+  - id: review.studio_reader_panel_and_business_display
+    what: 阅读视图(studio_reader)——左列按域层级/track 分组列出材料, 默认落最新 markdown, 同族多版本 v1/v2 内联切换, 决策过程面板, 切轨迹视图, 收起/展开; 业务展示区三配置(结构排布 domain-tree/track × 版本策略三型 coexist/latest-collapse/latest-selective)
+    should:
+      - "unit: 左列按轨分组列出材料, 默认落最新 markdown, embedded 复用 review_material"
+      - "unit: 同族多版本 v1/v2 小片内联切换, 决策过程面板渲染 adopted/proposed, 切轨迹视图 openTab(project) 不带 facet, 收起/展开, 待裁决计数"
+      - "unit: vilo 按域层级排布(序号+层名+空层显式), 装不进层级的轨附后; 版本策略=仅最新+历史折叠; 域层级不可达显式降级回落 track"
+      - "unit: demogame-design 版本策略=最新为主+选择性(钉住旧版可见)"
+    tests:
+      - file: src/entities/studio_reader/StudioReader.test.tsx
+        cases: ["① 左列按轨分组列出材料, 默认落在最新一条 markdown 材料上", "② 同族多版本以 v1/v2 小片内联, 点 v1 切到该版本材料", "③ 点「决策过程」→ 主区渲染裁决面板(adopted 列表 + proposed 高亮)", "④ 「切到轨迹视图」→ openTab(project) 复用既有项目页签(不带 facet)", "⑤ 收起/展开细条切换", "⑥ 待你裁决计数徽章 = 库中真 proposed 条数", "⑦ vilo: 按域层级排布(序号+层名+空层显式), 装不进层级的轨附在后面", "⑧ vilo: 版本策略=仅最新+历史折叠 —— 默认无版本片, 点「历史」展开全链(底层一条不丢)", "⑨ vilo: 域层级不可达 → 显式降级横条 + 回落按 track 陈列(不白屏)", "⑩ demogame-design: 版本策略=最新为主+选择性 —— 被钉住的旧版保持可见, 其余折叠"]
+    status: covered
+
+  - id: review.narrative_business_renderers
+    what: 叙事业务专属渲染器(vilo 租户 N1/N2)——大纲段×线矩阵(段列头/故事线行/认可徽标)、立意(命题/主控思想/锁定态, 唯一权威=wiki/10 标注于顶栏)、引擎不可达显式降级可重试; 租户纪律(零 useStudio, 只吃引擎 API 投影)
+    should:
+      - "unit: 大纲段为列头、故事线为行、子卡按 lane 落格, 认可状态徽标(作者/拟)直接长在卡上"
+      - "unit: 立意命题/主控思想/锁定态齐全(正文), 唯一权威=wiki/10 标注在顶栏工厂 sub"
+      - "unit(负路径/错误样本): 引擎不可达 → 显式降级提示 + 可重试, 不拖垮整页"
+    tests:
+      - file: src/entities/review/businesses/narrative.test.tsx
+        cases: ["① 段为列头、故事线为行、子卡按 lane 落格; 认可状态徽标直接长在卡上", "命题/主控思想/锁定态齐全(正文); 唯一权威=wiki/10 标注随件一迁到顶栏工厂 sub", "③ 错误样本: 引擎不可达 → 显式降级提示 + 可重试, 不拖垮整页"]
+    status: covered
+
+  - id: review.renderer_registry_and_display_profiles
+    what: 材料展示框架契约——rendererRegistry 唯一分发(data_schema_id 优先于 kind, 未注册显式回退不白屏, kind/schema 可被业务扩展); displayProfiles 三项配置契约(结构只引用数据源名 domain-tree/track 无内联层级数组, 版本策略三型都有真实业务在用, vilo 声明的 schemaId 全部真实登记, 层覆写优先)
+    should:
+      - "unit: 内建 kind 全部在注册表; 解析优先级 data_schema_id > kind, 未注册 schema 落回 kind; schemaIdOf 只认非空字符串; 未注册 kind 显式回退不白屏; register 可被业务扩展"
+      - "unit: 未配置项目回落默认(track + coexist); A13 结构只引用数据源名无内联层级数组; 三型版本策略都有真实业务在用; vilo 声明 schemaId 全部登记; 层覆写优先于业务默认"
+    tests:
+      - file: src/entities/review/rendererRegistry.test.tsx
+        cases: ["内建 kind 全部在注册表(七类 + 五型工作报告)", "解析优先级: 注册过的 data_schema_id > kind; 未注册 schema 落回 kind", "schemaIdOf 只认非空字符串", "错误样本: 未注册 kind → MaterialContentView 显式回退, 不白屏", "registerKindRenderer 可被业务扩展且解析可见", "未配置项目回落默认: 按 track 陈列 + 多版本并存", "A13: 结构排布只引用数据源名(domain-tree/track), 无内联层级数组", "版本策略三型都有真实业务在用(场景丙全型)", "业务类型渲染器清单与注册表一致: vilo 声明的 schemaId 全部真实登记", "层级覆写: versionPolicyFor 层覆写优先于业务默认"]
+    status: covered
+
+  - id: review.boss_sight_control_card
+    what: BossSightControlCard 渲染控制项并能正确更新开关/尺寸/用户偏好
+    should:
+      - "unit: 渲染控制项且更新开关、尺寸、用户偏好均生效"
+    tests:
+      - file: src/entities/settings/BossSightControlCard.test.tsx
+        cases: ["renders controls and updates switches, dimensions, and user prefs"]
+    status: covered
+
+  - id: review.boss_sight_client_api_calls
+    what: bossSightClient 封装的三类写接口——双控更新带 actor/reason、观测设置与事件上报、永久放行只走用户偏好通道
+    should:
+      - "unit: 双控更新请求携带 actor 与 reason"
+      - "unit: 观测设置与事件能正确 POST"
+      - "unit(负路径): 永久放行(permanent allow)只经用户偏好写入, 不误走其他通道"
+    tests:
+      - file: src/api/bossSightClient.test.ts
+        cases: ["posts dual-control updates with actor and reason", "posts observability settings and events", "writes permanent allow through user prefs only"]
+    status: covered
+
+  - id: review.reviewstage_client_api_calls
+    what: reviewstageClient 封装的写接口——评论反馈状态更新、批量 verdict/tier/删除请求、UI 截图 payload 上报
+    should:
+      - "unit: 评论反馈状态更新请求正确 POST"
+      - "unit: 批量 verdict/tier/删除请求正确 POST"
+      - "unit: UI 截图 payload 正确上报"
+    tests:
+      - file: src/api/reviewstageClient.test.ts
+        cases: ["posts comment feedback status updates", "posts batch verdict, tier, and delete requests", "posts UI capture payloads"]
+    status: covered
+
+  - id: review.secretary_briefing_all_green
+    what: 底部秘书简报(Briefing)在全绿态下正确渲染
+    should:
+      - "unit: 全绿态秘书简报正确渲染"
+    tests:
+      - file: src/shell/bottomTabs/Briefing.test.tsx
+        cases: ["renders the all-green secretary briefing"]
+    status: covered
+
+  # ── 设置 / 事件流 / Trace ────────────────────────────────────────────────
+  - id: settings.system_info_display
+    what: Settings 模块 sidebar 展示设置项, 点设置能看到真实 system info, 系统统计里 worker 数超过 100(体量真实性断言)
+    should:
+      - "e2e: Settings 模块 sidebar 展示设置项"
+      - "e2e: 点设置展示真实 system info"
+      - "e2e: 系统统计 worker 数 > 100"
+    tests:
+      - file: tests/e2e/settings.spec.ts
+        cases: ["E1 设置 module sidebar 显设置项", "E2 点设置 → 真 system info 显", "E3 系统统计 worker 数 > 100"]
+    status: covered
+
+  - id: events.stream_tab_default_and_connection
+    what: 事件流标签默认激活, 空状态有引导文案, SSE 连接建立成功且无 console error
+    should:
+      - "e2e: 事件流标签默认 active"
+      - "e2e(负路径/空态): 无数据时有明确引导"
+      - "e2e: SSE 连接成立且无 console error"
+    tests:
+      - file: tests/e2e/events.spec.ts
+        cases: ["H1 事件流标签默认 active", "H2 空状态有引导", "H3 SSE 连接成立 (无 console error)"]
+    status: covered
+
+  - id: trace.list_filter_and_open_detail
+    what: Trace 底部面板可见, 过滤输入对无匹配也不报错, 域下拉含 events/ide_events, 点 trace 行开中央 tab 展示事件列表, 点事件展示 payload
+    should:
+      - "e2e: Trace 列表底部面板可见"
+      - "e2e(负路径): 过滤输入无匹配结果时不报错"
+      - "e2e: 域 select 含 events 或 ide_events"
+      - "e2e: 点 trace 行在中央区打开 trace tab"
+      - "e2e: trace tab 展示事件列表"
+      - "e2e: 点事件展示 payload"
+    tests:
+      - file: tests/e2e/trace.spec.ts
+        cases: ["G1 Trace 列表底部 panel 可见", "G2 输入过滤 (无匹配也不报错)", "G3 域 select 含 events 或 ide_events", "G4 点 trace 行 → 中央开 trace tab", "G5 trace tab 显事件列表", "G6 点事件显 payload"]
+    status: covered
+
+  - id: trace.dag_view_modes
+    what: Trace 详情视图三态(List/Tree/Timeline)——工具栏三按钮可见且默认 List、可切 Tree(按 parent_id 缩进/chevron 折叠)、可切 Timeline(默认按 source 分组, 点组展开看子事件 payload, grouped/flat 切换, zoom 改视图宽度, group bar 含逐事件 tick), 视图切换间保留已选中事件
+    should:
+      - "e2e: 工具栏含 List/Tree/Timeline 三个按钮, 默认 List 视图, 可切到 Tree"
+      - "e2e: Tree 视图对有 parent_id 的 trace 做深度缩进, 有 children 的节点 chevron 可点折叠"
+      - "e2e: Timeline 视图默认按 source 分组渲染时间轴, 点组行展开后点子事件能展示 Payload"
+      - "e2e: timeline grouped/flat 切换生效, zoom 改变内部宽度, group bar 含逐事件 tick marks"
+      - "e2e: List 与 Timeline 之间切换保留已选中事件"
+    tests:
+      - file: tests/e2e/trace_dag.spec.ts
+        cases: ["TD.1 工具栏含 List/Tree/Timeline 三按钮", "TD.2 默认 List 视图, 可切到 Tree", "TD.4 Tree 视图: 有 parent_id 的 trace 出现深度缩进", "TD.5 Tree 视图: 有 children 的节点 chevron 可点折叠", "TD.3 切到 Timeline 视图渲染时间轴 + 行 (默认 grouped 按 source)", "TD.6 timeline grouped: 点 group 行 → 展开 → 点子事件 → Payload 显", "TD.8 timeline group toggle: grouped ↔ flat 切换", "TD.9 timeline zoom 改 inner width", "TD.10 timeline group bar 含 tick marks (每个事件一个 tick)", "TD.7 List ↔ Timeline 切换保留选中事件"]
+    status: covered
+
+  # ── 基础工具函数库(跨界面复用的纯逻辑) ──────────────────────────────────
+  - id: lib.ws_auto_reconnect
+    what: WebSocket 自动重连(wsAutoReconnect)——首次连接回调、非正常关闭后指数退避重连(封顶 30s)、重连期间发送入队并在恢复后 flush、主动关闭不再重连、长时间掉线后切换为明确的 disconnected 态
+    should:
+      - "unit: 首次 connect 成功回调 onOpen 且 isReconnect=false"
+      - "unit(负路径): server 非 1000 关闭后 1s 左右发起重连尝试"
+      - "unit: 退避间隔指数增长直到 30s 上限"
+      - "unit: 重连期间调用 send 会入队, 连接恢复后自动 flush"
+      - "unit: 主动关闭(code=1000)后状态切 disconnected 且不再重连"
+      - "unit(负路径): 累计断线时长超过阈值仍未连上则状态切换为明确的 disconnected"
+    tests:
+      - file: src/lib/wsAutoReconnect.test.ts
+        cases: ["CASE1 首次 connect → onOpen 调一次 isReconnect=false", "CASE2 server close (非 1000) → 1s 后重连尝试", "CASE3 退避指数增长到 30s 上限", "CASE4 reconnecting 期间 send 入队, open 后 flush", "CASE5 主动 close(1000) → state 切 disconnected, 不再重连", "CASE6 累计 longDisconnectMs 仍未连上 → state 切 disconnected"]
+    status: covered
+
+  - id: lib.open_in_vscode_path_normalize
+    what: 在 VSCode 中打开路径归一化——Windows 反斜杠路径转正斜杠并加前导斜杠, 空格与中文做 URL 编码但冒号斜杠保留, 支持行号/行列, 已是 POSIX 形式的路径不重复加斜杠
+    should:
+      - "unit: Windows 反斜杠路径被归一化并加前导斜杠"
+      - "unit: 空格与中文字符做 URL 编码, 冒号与斜杠保留不转义"
+      - "unit: 支持携带行号/行列信息"
+      - "unit(负路径): 已是正斜杠+前导斜杠的 POSIX 路径不重复加斜杠"
+    tests:
+      - file: src/lib/openInVscode.test.ts
+        cases: ["Windows 反斜杠路径归一并加前导斜杠", "空格与中文做 URL 编码, 冒号斜杠保留", "带行号/行列", "已是正斜杠 + 前导斜杠的 POSIX 形不重复加斜杠"]
+    status: covered
+
+  - id: lib.relative_time_formatting
+    what: 相对时间展示格式化——按秒/分/时/天/月分档展示, 一小时内按分钟、当天按小时、更久按天; 空值/非法输入与未来时间均有明确兜底
+    should:
+      - "unit: 按秒/分/时/天/月正确分档"
+      - "unit: 一小时内按分钟展示, 当天按小时展示, 更久按天展示"
+      - "unit(负路径): 空值或非法输入返回空串而非抛错"
+      - "unit(负路径): 未来时间被钳制到 0, 不展示负数"
+    tests:
+      - file: src/lib/time.test.ts
+        cases: ["空值与非法输入返回空串", "一小时内按分钟、当天按小时、更久按天", "未来时间钳到 0", "0/空返回空串", "秒/分/时/天/月分档"]
+    status: covered
+
+  - id: lib.iframe_element_picker_selector
+    what: iframe 元素取点器(iframePicker)生成的 CSS 选择器——有 id 直接用 id 选择器, 无 id 时构造能定位回原元素的选择器链, 无 class 元素退化用 nth-child
+    should:
+      - "unit: 元素有 id 时直接返回 #id"
+      - "unit: 无 id 时构造出的选择器链能解析回原元素"
+      - "unit(负路径): 无 class 的元素退化为 nth-child 选择器"
+    tests:
+      - file: src/lib/iframePicker.test.ts
+        cases: ["returns #id when the element has an id", "builds a chain that resolves back to the element", "falls back to nth-child for class-less elements"]
+    status: covered
+
+  - id: session.optimistic_text_reconciliation
+    what: 会话消息乐观更新对账(useSessionStore)——服务端消息到达前保留实时文本, 服务端出现同内容后丢弃过时的实时文本, 乐观用户文本与服务端仅差 thinking 前缀时也能正确丢弃
+    should:
+      - "unit: 服务端后到的用户消息出现前, 保留过时的实时 assistant 文本"
+      - "unit: 服务端已含相同内容后, 丢弃实时 assistant 文本"
+      - "unit(负路径): 乐观用户文本与服务端副本仅差 thinking 前缀时也能正确丢弃, 不留重复"
+    tests:
+      - file: src/stores/useSessionStore.test.ts
+        cases: ["keeps stale realtime assistant text before a later server user message", "drops realtime assistant text once server has the same content", "drops optimistic user text when the server copy only differs by thinking prefix"]
+    status: covered

@@ -1,6 +1,6 @@
 # [OMNI] origin=claude-code domain=omnicompany/cli ts=2026-06-22 type=cli status=active
 # [OMNI] summary="omni atlas —— project_atlas 资源中心的审/导闭环:list 待审 / approve 入 canonical / export 到两个 AI 的 skills 目录 / reject。"
-# [OMNI] why="收集 worker 产出落在 staging(待人审);这条 CLI 把'人审→批准→export 到 ~/.claude+~/.agents'闭环补上,让 object-SKILL 真正被两个 AI 用上(防重复造轮)。"
+# [OMNI] why="收集 worker 产出落在 staging(待人审);这条 CLI 把'人审→批准→export 到 ~/.claude+~/.codex'闭环补上,让 object-SKILL 真正被两个 AI 用上(防重复造轮)。"
 # [OMNI] tags=cli,atlas,project_atlas,review,export
 """omni atlas —— project_atlas object-SKILL 审/导闭环。"""
 
@@ -23,7 +23,7 @@ from omnicompany.packages.domains.project_atlas._paths import (
 from omnicompany.packages.domains.project_atlas.spaces import SPACES
 
 _CLAUDE_SKILLS = Path.home() / ".claude" / "skills"
-_CODEX_SKILLS = Path.home() / ".agents" / "skills"
+_CODEX_SKILLS = Path.home() / ".codex" / "skills"
 
 
 def _last_health_summary() -> tuple[str, int] | None:
@@ -160,7 +160,7 @@ def atlas_reject(ref: str) -> None:
 @click.option("--targets", default="claude,codex", help="导出目标(逗号分隔): claude,codex")
 @click.option("--dry-run", is_flag=True)
 def atlas_export(space: str | None, targets: str, dry_run: bool) -> None:
-    """导出已批准的 canonical object-SKILL → ~/.claude/skills + ~/.agents/skills(各为 <name>/SKILL.md)。"""
+    """导出已批准的 canonical object-SKILL → ~/.claude/skills + ~/.codex/skills(各为 <name>/SKILL.md)。"""
     tg = []
     if "claude" in targets:
         tg.append(_CLAUDE_SKILLS)

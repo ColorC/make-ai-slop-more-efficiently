@@ -1,0 +1,35 @@
+{
+  "schema": "game-observatory.ai-player.sanguo-daily-duty-candidate.v1",
+  "candidate_id": "sanguo.20260720.guide-freshness.military-exercise.v1",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "continuity_run_id": "sanguo-daily-continuity.pure-ai-campaign.20260720",
+  "duty": "guide_freshness_check",
+  "session_ids": [
+    "external-session.sanguo.terra.live96.20260720"
+  ],
+  "guide_refs": [
+    {
+      "id": "guide.sanguo.taptap.official-team-formation-20240621",
+      "version": 1
+    }
+  ],
+  "guide_freshness_conclusion": "unverified",
+  "guide_freshness_reason": "来源能提示军演、远征和独立编队界面的存在，但发布于2024年，仍未证明Bilibili 1.31.0当前账号的兵力门槛、出战队伍关系和现行数值；当天军演原图只用于核对当前客户端真值。",
+  "evidence_refs": [
+    {
+      "artifact_ids": [
+        "art.device.1784497164873.b7f8a1b0",
+        "art.probe-terminal.1784497169496.d3419567"
+      ],
+      "evidence_run_ids": [
+        "evidence.run.7aa678773b754e1899480bfb74aff6a3"
+      ],
+      "evidence_step_ids": [
+        "evidence.step.9178f9a5ac60401f90b2b1018b30b276"
+      ]
+    }
+  ],
+  "summary": "当天攻略检查保留为未验证线索：官方旧资料可引导寻找军演和编队，当前规则继续以1.31.0实机界面、确认框和战斗结果为准。",
+  "actor": "ai-player-supervisor",
+  "reason": "防止旧攻略中的阵容、兵力和入口描述直接控制当前账号行为。"
+}

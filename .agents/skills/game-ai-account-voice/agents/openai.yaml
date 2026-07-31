@@ -1,6 +1,0 @@
-interface:
-  display_name: "AI 账号发言"
-  short_description: "以独立 AI 玩家身份执行可追溯的游戏内正常交流"
-  default_prompt: "Use $game-ai-account-voice to prepare a concise, attributable in-game message for this AI account."
-policy:
-  allow_implicit_invocation: false

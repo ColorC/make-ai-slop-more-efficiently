@@ -1,0 +1,41 @@
+{
+  "schema_version": "game-observatory.afk-live-evidence.v1",
+  "target_id": "device://mumu/0",
+  "serial": "127.0.0.1:16384",
+  "package_name": "com.the_companygame.demogame.android.cn",
+  "package_version": "1.7.21",
+  "platform_version": "Android 15",
+  "device_model": "V2344A",
+  "captured_at": "2026-07-13T09:56:24.728798+00:00",
+  "screenshot_artifact_ids": {
+    "world": "art.device.1783936276214.7f434676",
+    "hero_hall": "art.device.1783936408472.842a4158",
+    "monetization_interrupt": "art.device.1783936495137.2a7ce9ad",
+    "hero_detail": "art.device.1783936582356.4cd9ca48"
+  },
+  "capture_session_ids": [
+    "capture.3eb64de428944aa29f392047925ae0d0",
+    "capture.e51ac4c46add4585891d199d908ff47d",
+    "capture.a55d8b9fbbc74128955e6cea61c95a89",
+    "capture.ce642d18c1254db5adf272514fb7b865"
+  ],
+  "action_run_ids": [
+    "run.action.1783936306014.4264d700",
+    "run.action.1783936447662.6d097ceb"
+  ],
+  "source_root": "D:/P4/main/Client",
+  "observed_fields": {
+    "account_progress": 105,
+    "resonance_vein": 120,
+    "season_level": 357,
+    "base_level": 305,
+    "combat_power": 151,
+    "coin_owned": 21567,
+    "coin_cost": 13561,
+    "manual_owned": 29950,
+    "manual_cost": 8518,
+    "offer_price_cny": 45
+  },
+  "upgrade_executed": false,
+  "note": "Read-only content extraction session. Offer purchase, free reward claims, account settings and hero upgrade were not executed."
+}

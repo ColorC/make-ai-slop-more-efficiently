@@ -15,9 +15,9 @@
 - `cc_wrapper/` 整目录搬到 [`ccdaemon/`](ccdaemon/), `cc_chat_bridge.py` → `chat.py`, `pty_service.py` → `pty.py`, `settings_installer.py` → `installer.py`, `api.py` → `pty_routes.py`
 - 走偏过的 `sdk_bridge.py` 跟 `_smoke.py` 直接删 (无旧兼容)
 - 双进程拆分: dashboard 进程 (8200, --reload) 跟 ccdaemon 进程 (8201, 默认不 reload), 反向代理走 [`controlplane/cc_proxy.py`](controlplane/cc_proxy.py) (HTTP + WebSocket)
-- daemon 生命周期 `omni cc daemon start|stop|restart|status` + 启动脚本 [`scripts/start_dashboard_dev.py`](../../../scripts/start_dashboard_dev.py)
-- 前端 `frontend/src/lib/wsAutoReconnect.ts` + `frontend/src/components/ConnectionStatus.tsx`, CcChatEditor 接入自动重连 + sessionStorage 草稿持久化
-- dogfood 韧性测试 [`scripts/dogfood_dashboard_resilience_test.py`](../../../scripts/dogfood_dashboard_resilience_test.py) 6/6 PASS
+- daemon 生命周期 `omni cc daemon start|stop|restart|status` + 启动脚本 `scripts/start_dashboard_dev.py`
+- 前端 [`frontend/src/lib/wsAutoReconnect.ts`](frontend/src/lib/wsAutoReconnect.ts) + [`frontend/src/components/ConnectionStatus.tsx`](frontend/src/components/ConnectionStatus.tsx), CcChatEditor 接入自动重连 + sessionStorage 草稿持久化
+- dogfood 韧性测试 `scripts/dogfood_dashboard_resilience_test.py` 6/6 PASS
 
 ## 核心目的
 `dashboard` 提供 omnicompany 系统的**统一可观测性入口**。集中展示管线运行状态、Trace 拓扑、IDE 会话上下文与 Format/Router 注册表健康度。
@@ -54,9 +54,9 @@
 ### D4 · 控制面 / cc 进程级隔离 (2026-05-09)
 **决策**: dashboard 拆成两个独立 uvicorn 进程 — `dashboard` 进程 (8200) 持有 [`controlplane/`](controlplane/) 全部 API + 反向代理, 开 `--reload` 安全自更新; `ccdaemon` 进程 (8201) 独家持有 [`ccdaemon/chat.py`](ccdaemon/chat.py) 的 claude-agent-sdk client 跟 [`ccdaemon/pty.py`](ccdaemon/pty.py) 的 winpty PtySession, 默认不 reload, 由 `omni cc daemon restart` 显式控制. 浏览器只连 dashboard, [`controlplane/cc_proxy.py`](controlplane/cc_proxy.py) 把 `/api/cc/*` HTTP + WebSocket 透传到 ccdaemon.
 
-**理由**: dogfood 期间 AI IDE 在网页 chat 框里改 `controlplane/*.py` 必触发 dashboard reload, 单进程方案下整个 worker 重启会把所有 chat session 跟 SDK 子进程一起杀掉 — AI IDE 自己改代码改到一半进程就没了, chat 历史丢, 用户体验崩. 进程级隔离让两侧独立生命周期: 改控制面 → dashboard 自动 reload, daemon 不动, chat 不掉. 改 ccdaemon → 显式重启, 浏览器走 `frontend/src/lib/wsAutoReconnect.ts` 自动重连协议续展历史 (snapshot 帧由 daemon 在 ws accept 后第一时间发送, 重连时也会重发).
+**理由**: dogfood 期间 AI IDE 在网页 chat 框里改 `controlplane/*.py` 必触发 dashboard reload, 单进程方案下整个 worker 重启会把所有 chat session 跟 SDK 子进程一起杀掉 — AI IDE 自己改代码改到一半进程就没了, chat 历史丢, 用户体验崩. 进程级隔离让两侧独立生命周期: 改控制面 → dashboard 自动 reload, daemon 不动, chat 不掉. 改 ccdaemon → 显式重启, 浏览器走 [`frontend/src/lib/wsAutoReconnect.ts`](frontend/src/lib/wsAutoReconnect.ts) 自动重连协议续展历史 (snapshot 帧由 daemon 在 ws accept 后第一时间发送, 重连时也会重发).
 
-**验证**: [`scripts/dogfood_dashboard_resilience_test.py`](../../../scripts/dogfood_dashboard_resilience_test.py) 6 个场景全 PASS — 含 `dashboard_reload` (改 `controlplane/notes.py` daemon pid 不变), `daemon_restart` (显式 restart pid 换 dashboard 仍能路由), `ws_through_reload` (WS 桥接断后浏览器侧重连仍通).
+**验证**: `scripts/dogfood_dashboard_resilience_test.py` 6 个场景全 PASS — 含 `dashboard_reload` (改 `controlplane/notes.py` daemon pid 不变), `daemon_restart` (显式 restart pid 换 dashboard 仍能路由), `ws_through_reload` (WS 桥接断后浏览器侧重连仍通).
 
 ## 数据流 / 拓扑 (V2, 2026-05-09)
 ```

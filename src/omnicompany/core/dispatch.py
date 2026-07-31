@@ -175,7 +175,7 @@ async def dispatch(
 
     entry = get_or_raise(pipeline_name)
 
-    # ── 运行级上下文钩子 (阶段一 1-5): 如业务域的 worktree 隔离 ──
+    # ── 运行级上下文钩子 (阶段一 1-5): 如 voxelcraft 的 eternal-war worktree 隔离 ──
     from contextlib import ExitStack
 
     with ExitStack() as _run_stack:

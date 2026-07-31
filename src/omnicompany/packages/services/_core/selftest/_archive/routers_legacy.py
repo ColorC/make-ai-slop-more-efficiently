@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=selftest/routers.py ts=2026-04-08T03:23:37Z
 # [OMNI] material_id="material:core.selftest.registry_checker_functional_tester_selftest_gate_llm_reporter.routers_legacy.py"
-# OMNI-024 ALLOW: 归档冻结留档(legacy 快照), 仅历史参考不再演进, 迁移无意义(同仓内其它 _archive ALLOW 先例)
 """selftest — Router 实现
 
 四个 Router：

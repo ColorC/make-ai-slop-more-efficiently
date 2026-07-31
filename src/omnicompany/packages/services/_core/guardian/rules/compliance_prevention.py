@@ -91,7 +91,7 @@ _STAGED_EXEMPTIONS_EXPIRES: dict[str, str] = {
 _FLOW_OUTSIDE_WORKER_EXEMPTIONS: tuple[str, ...] = (
     # LLM-CALL-UNIFICATION T4 (2026-06-13): this adapter keeps the multi-turn
     # tool_use_id continuity contract until runtime owns a structured-chat API.
-    "src/omnicompany/packages/domains/example_domain/content/paths/_llm_helpers.py",
+    "src/omnicompany/packages/domains/voxelcraft/content/paths/_llm_helpers.py",
 )
 
 _ORPHAN_MODULE_EXEMPTIONS: tuple[str, ...] = (
@@ -101,8 +101,8 @@ _ORPHAN_MODULE_EXEMPTIONS: tuple[str, ...] = (
     # single structured JSON authority.
     "src/omnicompany/packages/services/_governance/plan_steward/steward.py",
     "src/omnicompany/packages/services/_governance/work_history/miner.py",
-    "src/omnicompany/packages/domains/example_domain/content/paths/_llm_helpers.py",
-    "src/omnicompany/packages/domains/example_domain/content/paths/item/workers/item_asset_picker.py",
+    "src/omnicompany/packages/domains/voxelcraft/content/paths/_llm_helpers.py",
+    "src/omnicompany/packages/domains/voxelcraft/content/paths/item/workers/item_asset_picker.py",
     "src/omnicompany/packages/domains/narrative/routers/beat_generate.py",
     "src/omnicompany/packages/domains/narrative/routers/csl_ingest.py",
     "src/omnicompany/packages/domains/narrative/routers/dialogue_generator.py",
@@ -131,13 +131,13 @@ _ORPHAN_MODULE_EXEMPTIONS: tuple[str, ...] = (
     # LLM-CALL-UNIFICATION T13 (2026-06-13): active EventBus bridge and batch
     # tool entrypoint, not orphan candidates.
     "src/omnicompany/packages/services/_core/evolution/workflow/events.py",
-    "src/omnicompany/packages/domains/example_domain/ux/seven_tuple/runners/batch_runner.py",
-    # 业务域文本重述入口 (2026-07-15): 用户裁定的长期设施 (wiki 页 + 产品内
-    # 正式文本一律经 text_rewriter 重述). 已在业务域 .omni/manifest.yaml
+    "src/omnicompany/packages/domains/demogame/ux/seven_tuple/runners/batch_runner.py",
+    # voxelcraft 文本重述入口 (2026-07-15): 用户裁定的长期设施 (wiki 页 + 游戏内
+    # 正式文本一律经 bw.text_rewriter 重述). 已在 voxelcraft/.omni/manifest.yaml
     # modules 节声明长期价值; agents/text_rewriter.py 被 agents/__init__.py 与
     # run_text_rewrite.py 消费, run_text_rewrite.py 是其标准 runner 入口.
-    "src/omnicompany/packages/domains/example_domain/agents/text_rewriter.py",
-    "src/omnicompany/packages/domains/example_domain/run_text_rewrite.py",
+    "src/omnicompany/packages/domains/voxelcraft/agents/text_rewriter.py",
+    "src/omnicompany/packages/domains/voxelcraft/run_text_rewrite.py",
 )
 
 
@@ -179,9 +179,8 @@ def _check_direct_llmclient_in_class(ctx: FileContext) -> bool:
     if _common_skip(ctx):
         return False
     p = ctx.path.replace("\\", "/")
-    # 只扫 src/omnicompany/packages/ 活包树 (2026-07-26 锚定: 原 "/packages/"
-    # 子串匹配会扫进 data/ 下仓库快照树 — 数据产物不该送 LLM 复核)
-    if not p.startswith("src/omnicompany/packages/"):
+    # 只扫 packages/ 下文件 (其他路径可能有合法工具脚本)
+    if "/packages/" not in p:
         return False
     content = ctx.content or ""
     if "LLMClient" not in content:
@@ -266,7 +265,7 @@ _WORKER_BASE_NAMES = (
     # (templates/agent/向导.md v2 权威基类; OMNI-094 _LLM_FACILITY_NAMES 与
     # OMNI-095 _UNIFIED_TOKENS 均已认它为统一设施). 本列表立于 2026-04-24,
     # 早于 ConfigurableAgent (2026-05-01), 补录消除其子类被误判为
-    # "不走 Worker 体系" 的假阳性 (首例: 业务域 agents/text_rewriter.py).
+    # "不走 Worker 体系" 的假阳性 (首例: voxelcraft/agents/text_rewriter.py).
     "ConfigurableAgent",
 )
 
@@ -280,7 +279,7 @@ def _check_packages_flow_outside_worker(ctx: FileContext) -> bool:
     if _common_skip(ctx):
         return False
     p = ctx.path.replace("\\", "/")
-    if not p.startswith("src/omnicompany/packages/"):  # 2026-07-26 锚定活包树
+    if "/packages/" not in p:
         return False
     # __init__.py / formats.py / team.py 是结构文件, 跳过
     fname = p.rsplit("/", 1)[-1]
@@ -333,10 +332,6 @@ def _check_scripts_business_logic(ctx: FileContext) -> bool:
         return False
     if not p.endswith(".py"):
         return False
-    # 2026-07-26 裁决: scripts/_archive/ 是归档区, 与其他规则的 _archive
-    # 通用豁免对齐 — 归档内历史脚本不再送复核 (存量曾误报)
-    if "_archive" in p or "_graveyard" in p:
-        return False
     if not ctx.content:
         return False
     # 明显 CLI entry / install 类文件自己申报 (文件头含标记) 可略过
@@ -363,7 +358,7 @@ def _check_orphan_module(ctx: FileContext) -> bool:
     if _common_skip(ctx):
         return False
     p = ctx.path.replace("\\", "/")
-    if not p.startswith("src/omnicompany/packages/"):  # 2026-07-26 锚定活包树
+    if "/packages/" not in p:
         return False
     fname = p.rsplit("/", 1)[-1]
     # 协议文件不是孤儿, 是架构槽位

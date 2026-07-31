@@ -30,7 +30,7 @@
 ### 3.1 输入
 
 `team_supervisor.target_spec`:
-- `target_team_id` (str, required): 协议层 team id (如 `csv-to-md`)
+- `target_team_id` (str, required): 协议层 team id (如 `repo-absorption` / `csv-to-md`)
 - `sample_input` (dict, optional): 给 target 跑用的 input_data; 不给则 supervisor 尝试从 traces 历史中找
 - `run_count` (int, default=1): 跑几次 target 取样
 - `previous_ledger_path` (str, optional): 上次假设 ledger 路径, 累积新假设用
@@ -97,7 +97,7 @@ TargetIngressWorker (entry · HARD)
 ### 6.2 写法泛起步, 实践窄起步
 
 - 代码上 target_team_id 是参数, 不为 absorption 写 if-else
-- 旧 repo absorption 样例已退役；后续必须选当前真实业务 team 验通用性
+- 首批喂 repo_absorption, 验通用性后再扩 csv_to_md
 
 ### 6.3 workspace 动态引用
 

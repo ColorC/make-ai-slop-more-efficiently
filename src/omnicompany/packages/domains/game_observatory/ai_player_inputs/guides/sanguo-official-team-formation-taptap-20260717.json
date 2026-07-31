@@ -1,0 +1,65 @@
+{
+  "schema": "game-observatory.ai-player.guide-import-bundle.v1",
+  "source_snapshots": [
+    {
+      "id": "source-snapshot.sanguo.taptap.official-team-formation-20240621.websearch-20260717",
+      "source_id": "https://www.taptap.cn/moment/553323529341241509",
+      "content_sha256": "0326452ae05e530368760bc400844610e6bf01ab888ce4a58f27a95b099005a2",
+      "locator": "TapTap《三国：谋定天下》官方资讯《新手开荒必读40条小技巧》第3、4条",
+      "excerpt": "官方资讯第3条说明：进入“编队”界面后，可通过左下角“配将台”求助配将；第4条建议每日推进军演和远征章节。",
+      "captured_at": "2026-07-17T22:30:08+08:00",
+      "status": "active",
+      "metadata": {
+        "url": "https://www.taptap.cn/moment/553323529341241509",
+        "platform": "TapTap 三国：谋定天下官方资讯",
+        "author": "乔妹",
+        "published_at": "2024-06-21",
+        "retrieved_by": "claude-code-cli WebSearch；主代理复核原页",
+        "native_session_id": "eaff41a2-6b3a-4670-9d65-b15f0b84dc94",
+        "external_turn": 38,
+        "capture_scope": "official-page-lines-70-94"
+      }
+    }
+  ],
+  "guides": [
+    {
+      "schema": "game-observatory.ai-player.guide-knowledge.v1",
+      "id": "guide.sanguo.taptap.official-team-formation-20240621",
+      "version": 1,
+      "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+      "url": "https://www.taptap.cn/moment/553323529341241509",
+      "platform": "TapTap 三国：谋定天下官方资讯",
+      "author": "乔妹",
+      "published_at": "2024-06-21",
+      "retrieved_at": "2026-07-17T22:30:08+08:00",
+      "applicable_game_version": "1.31.0",
+      "summary": "官方资料确认游戏存在独立“编队”界面，并在该界面左下角提供“配将台”；军演和远征属于需要日常推进章节进度的玩法。资料没有说明军演侧栏与常规部队如何同步，当前账号仍需通过实机找到编队入口并验证军演出战条件。",
+      "locators": [
+        "编队界面",
+        "配将台",
+        "武将上阵",
+        "军演",
+        "远征"
+      ],
+      "status": "unverified",
+      "missing_applicability_reason": "来源发布于2024年，当前客户端版本为1.31.0；独立编队界面及军演出战队伍关系需要在当前账号实机验证。",
+      "triggering_task_ids": [
+        "task.cli.e352ba886d5a44d1a1a0c894fead2efc"
+      ],
+      "evidence_refs": [
+        {
+          "schema": "game-observatory.ai-player.evidence-reference.v1",
+          "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+          "artifact_ids": [],
+          "evidence_run_ids": [],
+          "evidence_step_ids": [],
+          "trace_run_ids": [],
+          "source_ids": [
+            "https://www.taptap.cn/moment/553323529341241509"
+          ],
+          "note": "Claude WebSearch 返回真实平台来源，主代理打开原页核验标题、作者、日期及第3、4条正文；仅用于发现路径，等待当前账号实机验证。"
+        }
+      ]
+    }
+  ]
+}

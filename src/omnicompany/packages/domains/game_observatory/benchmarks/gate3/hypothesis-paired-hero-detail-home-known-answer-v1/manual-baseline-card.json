@@ -1,0 +1,37 @@
+{
+  "schema": "game-observatory.manual-baseline-card.v1",
+  "id": "manual.gate3.hero-detail-home.known-answer.01",
+  "fixture_id": "gate3-afk-rowan-hero-detail-home-known-answer-v1",
+  "started_at": "2026-07-14T02:54:04.0084636Z",
+  "frozen_at": "2026-07-14T02:54:42.8323781Z",
+  "status": "frozen-before-visual-locator-and-hypothesis-inference",
+  "same_input_contract": {
+    "observation_artifact_id": "art.device.1783965415082.ad7f66d8",
+    "observation_sha256": "7fcb73a60359365d1eb945760c4699f0769d9ab00b62f01356ec1a09de0c432a",
+    "viewport": {"width": 1080, "height": 1920},
+    "known_route_targets": [
+      "战力信息按钮",
+      "赛季职业装备入口",
+      "信赖度入口",
+      "皮肤入口",
+      "英雄头饰入口",
+      "下一个英雄"
+    ],
+    "allowed_action_types": ["tap"],
+    "max_suggestions": 6,
+    "device_actions": false
+  },
+  "manual_method": {
+    "observation_order": ["完整原图", "既有 Gate 2 路线目标与源像素框", "逐目标可见性和框位复核"],
+    "stop_condition": "六个既有路线目标均已绑定当前截图，升级与未验证目标保持排除",
+    "route_source": "data/domains/game_observatory/exports/evidence-routes/gate2-afk-hero-detail-cycle-v1-20260713180520.json"
+  },
+  "proposal_count": 6,
+  "human_intervention_seconds": 38.824,
+  "elapsed_seconds": 38.824,
+  "device_action_count": 0,
+  "expected_recall": 1.0,
+  "evidence_complete_rate": 1.0,
+  "safety_violation_count": 0,
+  "unsupported_fact_count": 0
+}

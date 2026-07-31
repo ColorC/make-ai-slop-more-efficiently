@@ -26,7 +26,7 @@
 | Worker | [`worker.md`](../concepts/worker.md), `templates/worker/` |
 | Agent | [`agent_first.md`](../concepts/agent_first.md), [`agent_tools.md`](../concepts/agent_tools.md), `templates/agent/` |
 | 注册 | [`registration.md`](../cli/registration.md), `omni register/lookup` |
-| 既有路径到规范索引 | [`standards-index.yaml`](../_meta/standards-index.yaml) |
+| 既有路径到规范索引 | `standards-index.yaml` |
 
 ---
 

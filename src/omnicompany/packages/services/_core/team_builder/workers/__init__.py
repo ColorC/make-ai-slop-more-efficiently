@@ -13,9 +13,8 @@
     (2026-07-03 批4: LAP 九维检查器显式废止, 已从验证链摘除, 实现体留归档
      _archive/routers_legacy.py 不删。见 DESIGN.md 废止说明。)
 
-Diamond 继承模式 (2026-07-26 OMNI-040 Stage 3: 业务代码已迁回正式位置
-../routers_legacy.py, `_archive/` 仅留废止实现体作历史参考).
-所有 Worker 都从 omnicompany.Worker 继承链挂入.
+Diamond 继承模式 (Diamond shortcut, 业务代码暂存 _archive/routers_legacy.py,
+Stage 3 清洁工作会搬进 workers/*.py). 所有 Worker 都从 omnicompany.Worker 继承链挂入.
 """
 from __future__ import annotations
 

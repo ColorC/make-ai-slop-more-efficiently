@@ -109,10 +109,7 @@ def _check_stage3_completeness(ctx: FileContext) -> bool:
       - `_archive/` 内部文件本身的 import (归档自含, 历史代码自由 import 历史代码)
     """
     p = ctx.path.replace("\\", "/")
-    # 2026-07-26 锚定: 只查活的 services 树. 原 "/services/" 子串匹配把 data/
-    # 下仓库快照树 (data/_workspaces/*, data/services/repo_exporter/jobs/*)
-    # 里的 omnifactory 副本也扫进来 — 那是数据产物, 369 条存量误报
-    if not p.startswith("src/omnicompany/packages/services/"):
+    if "/services/" not in p:
         return False
     if not p.endswith(".py"):
         return False

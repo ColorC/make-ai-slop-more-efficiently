@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:core.team_builder.decomposition_planner.large_split.py"
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """DecompositionPlannerWorker — Phase 2 · AgentNodeLoop · conditional (2026-04-23).
 
 Worker 协议 (composite fan-in and):
@@ -55,7 +54,7 @@ _SYSTEM_PROMPT = """你是 team_builder 第 2 阶段 · DecompositionPlanner age
 
 ## 拆分原则 (scale_assessment.decompose_axis 指定)
 - **by_capability**: 按能力边界 (例: 分析/生成/验证 三子 team)
-- **by_domain**: 按业务子域 (例: research/decisions 三子 team)
+- **by_domain**: 按业务子域 (例: demogame/voxelcraft 三子 team)
 - **by_phase**: 按阶段 (例: ingest/process/output 三子 team)
 
 ## 契约 material 设计要点

@@ -1,6 +1,0 @@
-interface:
-  display_name: "时效攻略研究"
-  short_description: "检索带时间、版本与实机反馈的当前玩法攻略知识"
-  default_prompt: "Use $game-guide-research to research current, version-scoped guidance for this gameplay decision."
-policy:
-  allow_implicit_invocation: false

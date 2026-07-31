@@ -736,7 +736,7 @@ def cmd_register_batch(manifest, continue_on_error, as_json):
 @click.option("--kind", default=None,
               help="按 kind 过滤 (material / worker / team / agent / hook / tool / data / plan)")
 @click.option("--id", "id_filter", default=None,
-              help="按 entity_id 精确查 (例: format:research.report_schema)")
+              help="按 entity_id 精确查 (例: format:demogame.season_book)")
 @click.option("--package", "pkg_filter", default=None, help="按 package 过滤")
 @click.option("--trace-id", default=None,
               help="按 trace_id 过滤 (查某 session 注册的内容)")

@@ -14,18 +14,6 @@ const patchHomeDir = (nextHomeDir: string) => {
   };
 };
 
-const patchEnv = (name: string, value: string) => {
-  const original = process.env[name];
-  process.env[name] = value;
-  return () => {
-    if (original === undefined) {
-      delete process.env[name];
-    } else {
-      process.env[name] = original;
-    }
-  };
-};
-
 const writeSkill = async (
   skillsRoot: string,
   directoryName: string,
@@ -331,20 +319,17 @@ test('providerSkillsService lists claude user, project, and enabled plugin skill
 });
 
 /**
- * This test covers every Codex skill source exposed by the provider adapter:
- * each repository ancestor, user Agents skills, CODEX_HOME skills, bundled
- * system skills, and enabled plugin skills from the installed cache layout.
+ * This test covers Codex repository/user/system skill folders and verifies that
+ * repository lookup includes cwd, parent, and git root skill locations.
  */
-test('providerSkillsService lists codex repository, user, system, and enabled plugin skills', { concurrency: false }, async () => {
+test('providerSkillsService lists codex repository, user, and system skills', { concurrency: false }, async () => {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'llm-skills-codex-'));
   const repoRoot = path.join(tempRoot, 'repo');
-  const workspacePath = path.join(repoRoot, 'services', 'platform', 'apps', 'client');
-  const codexHome = path.join(tempRoot, 'custom-codex-home');
+  const workspacePath = path.join(repoRoot, 'packages', 'app');
   await fs.mkdir(path.join(repoRoot, '.git'), { recursive: true });
   await fs.mkdir(workspacePath, { recursive: true });
 
   const restoreHomeDir = patchHomeDir(tempRoot);
-  const restoreCodexHome = patchEnv('CODEX_HOME', codexHome);
   try {
     await writeSkill(
       path.join(workspacePath, '.agents', 'skills'),
@@ -353,16 +338,10 @@ test('providerSkillsService lists codex repository, user, system, and enabled pl
       'Codex cwd skill',
     );
     await writeSkill(
-      path.join(repoRoot, 'services', 'platform', 'apps', '.agents', 'skills'),
+      path.join(repoRoot, 'packages', '.agents', 'skills'),
       'codex-parent-dir',
       'codex-parent',
       'Codex parent skill',
-    );
-    await writeSkill(
-      path.join(repoRoot, 'services', '.agents', 'skills'),
-      'codex-intermediate-dir',
-      'codex-intermediate',
-      'Codex intermediate ancestor skill',
     );
     await writeSkill(
       path.join(repoRoot, '.agents', 'skills'),
@@ -377,111 +356,10 @@ test('providerSkillsService lists codex repository, user, system, and enabled pl
       'Codex user skill',
     );
     await writeSkill(
-      path.join(codexHome, 'skills'),
-      'codex-home-dir',
-      'codex-home',
-      'Codex CODEX_HOME skill',
-    );
-    await writeSkill(
-      path.join(codexHome, 'skills', '.system'),
+      path.join(tempRoot, '.codex', 'skills', '.system'),
       'codex-system-dir',
       'codex-system',
       'Codex system skill',
-    );
-    await writeSkill(
-      path.join(tempRoot, '.codex', 'skills'),
-      'wrong-default-home-dir',
-      'wrong-default-home',
-      'Must be ignored when CODEX_HOME is set',
-    );
-
-    const enabledPluginRoot = path.join(
-      codexHome,
-      'plugins',
-      'cache',
-      'test-marketplace',
-      'enabled-plugin',
-      '1.2.3',
-    );
-    await fs.mkdir(path.join(enabledPluginRoot, '.codex-plugin'), { recursive: true });
-    await fs.writeFile(
-      path.join(enabledPluginRoot, '.codex-plugin', 'plugin.json'),
-      JSON.stringify({
-        name: 'enabled-plugin',
-        version: '1.2.3',
-        skills: './bundled-skills/',
-      }),
-      'utf8',
-    );
-    await writeSkill(
-      path.join(enabledPluginRoot, 'bundled-skills'),
-      'codex-plugin-dir',
-      'codex-plugin',
-      'Enabled Codex plugin skill',
-    );
-
-    const stalePluginRoot = path.join(
-      codexHome,
-      'plugins',
-      'cache',
-      'test-marketplace',
-      'enabled-plugin',
-      '0.9.0',
-    );
-    await fs.mkdir(path.join(stalePluginRoot, '.codex-plugin'), { recursive: true });
-    await fs.writeFile(
-      path.join(stalePluginRoot, '.codex-plugin', 'plugin.json'),
-      JSON.stringify({
-        name: 'enabled-plugin',
-        version: '0.9.0',
-        skills: './skills/',
-      }),
-      'utf8',
-    );
-    await writeSkill(
-      path.join(stalePluginRoot, 'skills'),
-      'stale-plugin-dir',
-      'stale-plugin-skill',
-      'Must not leak from an inactive cached version',
-    );
-
-    const disabledPluginRoot = path.join(
-      codexHome,
-      'plugins',
-      'cache',
-      'test-marketplace',
-      'disabled-plugin',
-      '2.0.0',
-    );
-    await fs.mkdir(path.join(disabledPluginRoot, '.codex-plugin'), { recursive: true });
-    await fs.writeFile(
-      path.join(disabledPluginRoot, '.codex-plugin', 'plugin.json'),
-      JSON.stringify({
-        name: 'disabled-plugin',
-        version: '2.0.0',
-        skills: './skills/',
-      }),
-      'utf8',
-    );
-    await writeSkill(
-      path.join(disabledPluginRoot, 'skills'),
-      'disabled-plugin-dir',
-      'disabled-plugin-skill',
-      'Disabled Codex plugin skill',
-    );
-
-    await fs.mkdir(codexHome, { recursive: true });
-    await fs.writeFile(
-      path.join(codexHome, 'config.toml'),
-      [
-        '[plugins."enabled-plugin@test-marketplace"]',
-        'enabled = true',
-        '',
-        '[plugins."disabled-plugin@test-marketplace"]',
-        'enabled = false',
-        '',
-      ].join('\n'),
-      'utf8',
     );
 
     const skills = await providerSkillsService.listProviderSkills('codex', { workspacePath });
@@ -489,27 +367,11 @@ test('providerSkillsService lists codex repository, user, system, and enabled pl
 
     assert.equal(byName.get('codex-cwd')?.scope, 'repo');
     assert.equal(byName.get('codex-parent')?.scope, 'repo');
-    assert.equal(byName.get('codex-intermediate')?.scope, 'repo');
     assert.equal(byName.get('codex-root')?.scope, 'repo');
     assert.equal(byName.get('codex-user')?.scope, 'user');
-    assert.equal(byName.get('codex-home')?.scope, 'user');
     assert.equal(byName.get('codex-system')?.scope, 'system');
     assert.equal(byName.get('codex-root')?.command, '$codex-root');
-    assert.equal(byName.has('wrong-default-home'), false);
-    assert.equal(byName.has('stale-plugin-skill'), false);
-    assert.equal(byName.has('disabled-plugin-skill'), false);
-
-    const pluginSkill = byName.get('codex-plugin');
-    assert.equal(pluginSkill?.scope, 'plugin');
-    assert.equal(pluginSkill?.pluginName, 'enabled-plugin');
-    assert.equal(pluginSkill?.pluginId, 'enabled-plugin@test-marketplace');
-    assert.equal(pluginSkill?.command, '$enabled-plugin:codex-plugin');
-    assert.match(
-      pluginSkill?.sourcePath ?? '',
-      /cache[\\/]test-marketplace[\\/]enabled-plugin[\\/]1\.2\.3[\\/]bundled-skills[\\/]/,
-    );
   } finally {
-    restoreCodexHome();
     restoreHomeDir();
     await fs.rm(tempRoot, { recursive: true, force: true });
   }

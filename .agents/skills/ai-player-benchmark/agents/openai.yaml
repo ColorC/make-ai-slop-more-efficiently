@@ -1,6 +1,0 @@
-interface:
-  display_name: "AI 玩家基准"
-  short_description: "运行冻结双游戏验收并生成机器结果与独立审查包"
-  default_prompt: "Use $ai-player-benchmark to run the frozen AI-player gates and produce a strict PASS or FAIL package."
-policy:
-  allow_implicit_invocation: false

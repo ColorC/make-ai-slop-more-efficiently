@@ -173,9 +173,7 @@ def route(message: str, *, context: str | None = None, running_only: bool = True
             "\n\n这是需要开始处理的工作项。请同时选择开始工作前必须加载的 Skill，"
             "只能使用下面候选的精确名称；并为任何非 ask_user 结果返回权威项目目录中的"
             "精确 project id。无法确定 Skill、Project 或 Agent 中任一项时返回 ask_user，"
-            "不要编造。候选里可能混有标注「领域保底候选，低置信」的条目，它们只是按领域"
-            "保底进场的低置信选项，不代表词面命中；无论保底还是召回候选，只要没有一个"
-            "真正匹配该工作项所需能力，就返回 ask_user，不要选最不差的一个。\n"
+            "不要编造。\n"
             "可用 Skill 候选:\n"
         )
         for skill in skill_candidates:

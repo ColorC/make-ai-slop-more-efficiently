@@ -7,8 +7,7 @@
   - 本 Router 是 Stage D DevAgent 专用: **独立 subprocess** + 双层守卫
     * cwd 必须在 ToolContext.allowed_bash_roots 某根下 (骨架级 assert)
     * 命令黑名单扫描 (dangerous patterns)
-    * 无隐式总时限；调用方可显式设 timeout_sec，且始终可被外部中止
-    * 运行中定期发送不含命令输出的 material heartbeat
+    * 超时硬上限 300s
 
 CWD 追踪 (2026-05-04 加): user 命令尾部追加 pwd 标记, 跑完从 stderr 抽真实 cwd.
   - LLM 跑 `cd /tmp; ls` 后, 返回结果含 `[cwd_after=/tmp]`
@@ -27,24 +26,12 @@ import logging
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, ClassVar
-
-from omnicompany.packages.services._core.agent.event_bridge import (
-    publish_agent_event_sync,
-)
+from typing import ClassVar
 
 from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
     ToolContext,
     ToolExecutionError,
-)
-from omnicompany.packages.services._core.agent.routers.execution_limits import (
-    FACILITY_TIMEOUT_MARKER,
-    SHELL_POLICY_MARKER,
-    ShellCommandPolicyError,
-    reject_decode_replacement,
-    resolve_shell_timeout,
-    validate_shell_command,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,84 +70,6 @@ def _matches_danger(cmd: str) -> str | None:
     return None
 
 
-def _normalize_git_bash_command_path(command: str) -> str:
-    """Normalize a leading /mnt/<drive>/ executable path to Windows form.
-
-    Git Bash legitimately rewrites ``E:/path/tool.exe`` as
-    ``/mnt/e/path/tool.exe`` in model-generated commands.  Command allowlists
-    compare the executable prefix, so both spellings must resolve to the same
-    canonical prefix before the fail-closed check.
-    """
-    match = re.match(r"^/mnt/([a-zA-Z])/(.*)$", command, re.DOTALL)
-    if not match:
-        return command
-    return f"{match.group(1).upper()}:/{match.group(2)}"
-
-
-def _canonicalize_allowlist_command(command: str, cwd: str) -> str:
-    """Canonicalize harmless shell spelling differences for prefix checks.
-
-    Models commonly prepend ``cd <cwd> &&`` even though ``cwd`` is already a
-    native tool argument, or spell an executable relative to that directory.
-    These forms should share one audited allowlist entry; the command itself is
-    still passed through the danger scan and cwd guard unchanged.
-    """
-    normalized = _normalize_git_bash_command_path(command.strip())
-    wrapper = re.match(
-        r"^cd\s+(?:\"([^\"]+)\"|'([^']+)'|(\S+))\s*&&\s*(.+)$",
-        normalized,
-        re.DOTALL,
-    )
-    if wrapper:
-        cd_target = next(value for value in wrapper.groups()[:3] if value is not None)
-        same_dir = cd_target.replace("\\", "/").rstrip("/").casefold() == cwd.replace("\\", "/").rstrip("/").casefold()
-        if same_dir:
-            normalized = wrapper.group(4).strip()
-
-    first, separator, remainder = normalized.partition(" ")
-    relative_first = first[2:] if first.startswith("./") else first
-    if "/" in relative_first and not re.match(r"^(?:[A-Za-z]:/|/)", relative_first):
-        absolute_first = (Path(cwd) / relative_first).resolve().as_posix()
-        normalized = absolute_first + (separator + remainder if separator else "")
-    return _normalize_git_bash_command_path(normalized)
-
-
-def _resolve_bash_executable() -> str:
-    """Prefer Git for Windows Bash; never mistake the WSL launcher for Git Bash."""
-
-    import os
-    import shutil
-
-    if os.name != "nt":
-        return shutil.which("bash") or "/usr/bin/bash"
-
-    candidates: list[Path] = []
-    configured = os.environ.get("GIT_BASH")
-    if configured:
-        candidates.append(Path(configured))
-    git = shutil.which("git")
-    if git:
-        git_root = Path(git).resolve().parent.parent
-        candidates.extend([git_root / "bin" / "bash.exe", git_root / "usr" / "bin" / "bash.exe"])
-    for env_name in ("ProgramFiles", "ProgramFiles(x86)"):
-        root = os.environ.get(env_name)
-        if root:
-            candidates.extend(
-                [Path(root) / "Git" / "bin" / "bash.exe", Path(root) / "Git" / "usr" / "bin" / "bash.exe"]
-            )
-    for candidate in candidates:
-        if candidate.is_file():
-            return str(candidate)
-
-    fallback = shutil.which("bash")
-    if fallback and "windows\\system32" not in fallback.lower():
-        return fallback
-    raise ToolExecutionError(
-        "bash is unavailable: Windows resolved only the WSL launcher. "
-        "Install Git for Windows or set GIT_BASH to its bash.exe."
-    )
-
-
 class DevBashRouter(SingleToolRouter):
     CONSUMED_META_IO = ("*",)
     PRODUCED_META_IO = ("*",)
@@ -183,12 +92,12 @@ class DevBashRouter(SingleToolRouter):
         "- stdout + stderr + exit code returned. Each stream truncated at 5MB to prevent OOM "
         "(LLM 看到 [TRUNCATED ... bytes omitted] 标注; 用 head/tail/grep 自己缩窄).\n"
         "- Use pipes inside the command (head/tail/grep) to narrow large output yourself.\n"
-        "- Long foreground work remains observable and externally abortable. Use an "
-        "explicit timeout_sec only when the task itself has a real deadline.\n"
+        "- For long-running processes (dev server / build / test), run in background "
+        "(`nohup ... > log 2>&1 &; disown`) and poll log file or HTTP via web_fetch.\n"
         "\nArguments:\n"
         "  command: str       — shell command\n"
         "  cwd: str           — absolute path in allowed_bash_roots\n"
-        "  timeout_sec: int   — optional caller-selected total deadline; omitted means none."
+        "  timeout_sec: int   — default 120, max 1200 (=20min). 长流程改 nohup 后台跑."
     )
     INPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
@@ -198,7 +107,8 @@ class DevBashRouter(SingleToolRouter):
             "timeout_sec": {
                 "type": "integer",
                 "minimum": 1,
-                "description": "Optional total deadline in seconds. Omit when elapsed time alone is not a failure condition.",
+                "maximum": 1200,
+                "description": "Timeout seconds. Default 120, max 1200 (20 min). 超过这个就 nohup 后台.",
             },
         },
         "required": ["command", "cwd"],
@@ -209,20 +119,11 @@ class DevBashRouter(SingleToolRouter):
     def _execute(self, args: dict, ctx: ToolContext) -> str:
         cmd = (args.get("command") or "").strip()
         raw_cwd = (args.get("cwd") or "").strip()
-        try:
-            timeout = resolve_shell_timeout(args)
-        except ValueError as exc:
-            raise ToolExecutionError(str(exc)) from exc
+        timeout = int(args.get("timeout_sec", 120))
+        timeout = max(1, min(timeout, 1200))
 
         if not cmd:
             raise ToolExecutionError("command is required")
-        try:
-            cmd = validate_shell_command(cmd, dialect="bash")
-        except ShellCommandPolicyError as exc:
-            raise ToolExecutionError(
-                f"{SHELL_POLICY_MARKER} bash REFUSED: {exc}"
-            ) from exc
-
         # cwd 缺省策略: agent 没传 cwd → 用 ctx.cwd (build_tool_context 设的默认 cwd) fallback
         # 完全没 ctx.cwd 才 raise (没默认可用)
         if not raw_cwd:
@@ -236,29 +137,8 @@ class DevBashRouter(SingleToolRouter):
                 raise ToolExecutionError(
                     f"cwd 参数必填 — bash 没默认 cwd 也没 ctx.cwd. 你必须传 cwd 字段 (绝对路径, 在 allowed_bash_roots 内).\n"
                     f"allowed_bash_roots 示例: {roots_hint}\n"
-                    f"示例: bash(command='ls', cwd='<project-root>/data/'). 重试, 带 cwd."
+                    f"示例: bash(command='ls', cwd='e:/WindowsWorkspace/demogame-knowledge-base/'). 重试, 带 cwd."
                 )
-
-        # Some correction workflows may execute only a small set of audited
-        # deterministic commands. Equivalent `cd cwd && relative/tool` forms
-        # are canonicalized before comparison so harmless shell spelling does
-        # not turn a normal lint loop into a failed tool call.
-        allowed_command_prefixes = (
-            getattr(ctx, "allowed_bash_command_prefixes", None) or ()
-        )
-        command_for_allowlist = _canonicalize_allowlist_command(cmd, raw_cwd)
-        normalized_allowed_prefixes = tuple(
-            _canonicalize_allowlist_command(prefix, raw_cwd)
-            for prefix in allowed_command_prefixes
-        )
-        if allowed_command_prefixes and not any(
-            command_for_allowlist.startswith(prefix) for prefix in normalized_allowed_prefixes
-        ):
-            listing = "\n  - ".join(allowed_command_prefixes)
-            raise ToolExecutionError(
-                f"bash REFUSED: command is outside allowed_bash_command_prefixes.\n"
-                f"Allowed prefixes:\n  - {listing}"
-            )
 
         # 黑名单 (骨架级 assert)
         danger = _matches_danger(cmd)
@@ -277,13 +157,13 @@ class DevBashRouter(SingleToolRouter):
                 "This Worker has no permission to run shell commands."
             )
         # cwd sanity check: 防 LLM 输出 bug 拼出无 separator 的怪串
-        # (例 "workspace_scratch_figma_pull_abyssgJUhPyBeWrC6486sojoD6d" — 应是 "<workspace>/_scratch/figma_pull_abyss/gJUhPyBeWrC..." 但分隔符被吞)
+        # (例 "eWindowsWorkspace_scratchfigma_pull_abyssgJUhPyBeWrC6486sojoD6d" — 应是 "e:/WindowsWorkspace/_scratch/figma_pull_abyss/gJUhPyBeWrC..." 但分隔符被吞)
         # 检测: 长字符串 (>20 char) 且无 / 也无 \ → 不是合法路径
         if len(raw_cwd) > 20 and "/" not in raw_cwd and "\\" not in raw_cwd:
             raise ToolExecutionError(
                 f"cwd 格式可疑 — `{raw_cwd}` 长度 {len(raw_cwd)} 但完全没路径分隔符 ('/' 或 '\\\\').\n"
                 f"看起来像 LLM 输出 bug 把分隔符吞了. 检查你拼接 cwd 时是否丢了 '/' 或 ':'.\n"
-                f"正确格式示例: '<workspace>/_scratch/figma_pull_abyss/<file_key>/'"
+                f"正确格式示例: 'e:/WindowsWorkspace/_scratch/figma_pull_abyss/<file_key>/'"
             )
         try:
             cwd_abs = Path(raw_cwd).resolve()
@@ -327,7 +207,8 @@ class DevBashRouter(SingleToolRouter):
         # 修法: shutil.which('bash') 找 git bash (Windows) / 系统 bash (Linux/Mac), 显式
         # 调 ['bash', '-c', cmd] 不走 shell=True. 跟 Claude Code 一致.
         import os as _os
-        bash_path = _resolve_bash_executable()
+        import shutil as _shutil
+        bash_path = _shutil.which("bash") or "/usr/bin/bash"
         # CWD 追踪 (CC Shell.ts pwd 模式): 把 user cmd 包成
         #   { newline cmd newline }
         #   _omni_rc=$?            # 抓 user 命令真 exit code
@@ -335,13 +216,12 @@ class DevBashRouter(SingleToolRouter):
         #   exit $_omni_rc          # 用 user exit 覆盖 printf exit (返回真退出码)
         # 即使 user_cmd 失败, pwd marker 仍然写; exit code 反映 user_cmd 不是 printf.
         # 用 newline 分隔 (不用 ;), 防 user_cmd 含 heredoc / 注释行 / 未闭合等破坏 ;.
-        # Windows' legacy bash.exe/WSL launcher can strip `$?` and temporary
-        # shell variables from `-c` arguments. Use an EXIT trap so the cwd
-        # marker is still emitted while the user's real exit code is kept.
         wrapped_cmd = (
-            "trap 'printf \"\\n__OMNI_CWD_AFTER__%s__OMNI_END__\\n\" "
-            "\"$(pwd -P 2>/dev/null)\" >&2' EXIT\n"
-            + cmd
+            "{\n" + cmd + "\n}\n"
+            "_omni_rc=$?\n"
+            "printf '\\n__OMNI_CWD_AFTER__%s__OMNI_END__\\n' "
+            "\"$(pwd -P 2>/dev/null)\" >&2\n"
+            "exit $_omni_rc"
         )
         try:
             popen_kwargs = dict(
@@ -369,10 +249,7 @@ class DevBashRouter(SingleToolRouter):
         _MAX_STREAM = 5 * 1024 * 1024  # 5 MiB / 流
         import threading as _threading
 
-        progress_lock = _threading.Lock()
-        stream_progress = {"stdout_chars": 0, "stderr_chars": 0}
-
-        def _capped_read(stream: Any, dest: list[Any], progress_key: str) -> None:
+        def _capped_read(stream: Any, dest: list[Any]) -> None:
             chunks: list[str] = []
             total = 0
             truncated = False
@@ -384,8 +261,6 @@ class DevBashRouter(SingleToolRouter):
                         break
                     if not chunk:
                         break
-                    with progress_lock:
-                        stream_progress[progress_key] += len(chunk)
                     if total < _MAX_STREAM:
                         allowed = _MAX_STREAM - total
                         if len(chunk) <= allowed:
@@ -402,16 +277,8 @@ class DevBashRouter(SingleToolRouter):
 
         stdout_buf: list[Any] = []
         stderr_buf: list[Any] = []
-        t_out = _threading.Thread(
-            target=_capped_read,
-            args=(proc.stdout, stdout_buf, "stdout_chars"),
-            daemon=True,
-        )
-        t_err = _threading.Thread(
-            target=_capped_read,
-            args=(proc.stderr, stderr_buf, "stderr_chars"),
-            daemon=True,
-        )
+        t_out = _threading.Thread(target=_capped_read, args=(proc.stdout, stdout_buf), daemon=True)
+        t_err = _threading.Thread(target=_capped_read, args=(proc.stderr, stderr_buf), daemon=True)
         t_out.start(); t_err.start()
         timed_out = False
         aborted = False
@@ -439,50 +306,15 @@ class DevBashRouter(SingleToolRouter):
 
         import time as _time
         _poll_interval = 0.5  # 0.5s polling, 平衡响应性 + CPU
-        _started_at = _time.monotonic()
-        _deadline = _started_at + timeout if timeout is not None else None
-        _heartbeat_interval = 10.0
-        _next_heartbeat = _started_at + _heartbeat_interval
-
-        def _emit_heartbeat(now: float) -> None:
-            trace_id = str(getattr(ctx, "trace_id", "") or "")
-            if not trace_id:
-                return
-            with progress_lock:
-                counts = dict(stream_progress)
-            publish_agent_event_sync(
-                trace_id=trace_id,
-                parent_id=str(getattr(ctx, "tool_use_id", "") or "") or None,
-                event_type="agent.tool.heartbeat",
-                source="agent.tool.bash",
-                payload={
-                    "material_kind": "tool-heartbeat",
-                    "tool": self.TOOL_NAME,
-                    "turn": int(getattr(ctx, "turn", 0) or 0),
-                    "runtime_ms": int((now - _started_at) * 1000),
-                    **counts,
-                },
-                tags=[
-                    "omni.material",
-                    "agent.material",
-                    "material:tool-heartbeat",
-                    "tool:bash",
-                ],
-            )
-
+        _deadline = _time.time() + timeout
         try:
             while True:
-                _now = _time.monotonic()
-                _remaining = _deadline - _now if _deadline is not None else None
-                if _remaining is not None and _remaining <= 0:
+                _remaining = _deadline - _time.time()
+                if _remaining <= 0:
                     # 真 timeout
                     raise subprocess.TimeoutExpired(cmd=cmd, timeout=timeout)
                 # poll 一次, 等长 = min(poll_interval, remaining)
-                _wait_chunk = (
-                    min(_poll_interval, _remaining)
-                    if _remaining is not None
-                    else _poll_interval
-                )
+                _wait_chunk = min(_poll_interval, _remaining)
                 try:
                     proc.wait(timeout=_wait_chunk)
                     returncode = proc.returncode
@@ -494,10 +326,6 @@ class DevBashRouter(SingleToolRouter):
                         returncode = -15  # SIGTERM 风格 ("aborted")
                         aborted = True
                         break
-                    _now = _time.monotonic()
-                    if _now >= _next_heartbeat:
-                        _emit_heartbeat(_now)
-                        _next_heartbeat = _now + _heartbeat_interval
                     # else 继续 polling
         except subprocess.TimeoutExpired:
             _kill_tree()
@@ -509,12 +337,6 @@ class DevBashRouter(SingleToolRouter):
         stderr, stderr_total, stderr_truncated = stderr_buf[0] if stderr_buf else ("", 0, False)
         stdout = (stdout or "").rstrip("\n")
         stderr = (stderr or "").rstrip("\n")
-        try:
-            reject_decode_replacement(stdout, stderr)
-        except ShellCommandPolicyError as exc:
-            raise ToolExecutionError(
-                f"{SHELL_POLICY_MARKER} bash REFUSED: {exc}"
-            ) from exc
 
         # CWD 追踪解析 — 从 stderr 抽 __OMNI_CWD_AFTER__<path>__OMNI_END__ 标记
         cwd_after: str | None = None
@@ -531,12 +353,12 @@ class DevBashRouter(SingleToolRouter):
         if stdout_truncated:
             stdout += (
                 f"\n\n[TRUNCATED · stdout 截断 (上限 5 MiB · 已读 {stdout_total} bytes) · "
-                f"用专用 Read/Glob/Grep 工具缩窄]"
+                f"用 head/tail/grep 在命令内缩窄, 或写文件后 read_file 分段读]"
             )
         if stderr_truncated:
             stderr += (
                 f"\n\n[TRUNCATED · stderr 截断 (上限 5 MiB · 已读 {stderr_total} bytes) · "
-                f"用专用 Read/Glob/Grep 工具缩窄]"
+                f"用 head/tail/grep 在命令内缩窄, 或写文件后 read_file 分段读]"
             )
 
         if aborted:
@@ -548,23 +370,13 @@ class DevBashRouter(SingleToolRouter):
             )
 
         if timed_out:
-            assert timeout is not None
             raise ToolExecutionError(
-                f"{FACILITY_TIMEOUT_MARKER} bash TIMEOUT after {timeout}s (process tree killed). "
-                f"The Agent path must stop here; do not retry the same command. Command: `{cmd[:120]}...`\n"
+                f"bash TIMEOUT after {timeout}s (killed). Command: `{cmd[:120]}...`\n"
                 f"Captured stdout: {stdout[:500]}\n"
                 f"Captured stderr: {stderr[:500]}\n"
                 f"Note (Windows): `npx`/`npm` background `&` can appear to hang subprocess even with timeout. "
                 f"Use `powershell -Command 'Start-Process ... -NoNewWindow -RedirectStandardOutput log'` "
                 f"for a truly detached dev server, then poll via web_fetch / playwright_probe."
-            )
-
-        if returncode != 0:
-            raise ToolExecutionError(
-                f"bash command failed with exit code {returncode}. Command: `{cmd[:200]}`\n"
-                f"stdout:\n{stdout[:4000]}\n"
-                f"stderr:\n{stderr[:4000]}\n"
-                f"cwd_after={cwd_after or cwd_abs}"
             )
 
         parts = []

@@ -59,12 +59,21 @@ _VILO_OS_UPSTREAM = os.environ.get("OMNI_VILO_OS_URL", "http://127.0.0.1:5186").
 # 叙事工作室 narrative_studio(:8330)同源反向代理目标 —— 让审阅 iframe 与 dashboard 同源,
 # 圈选/快照能读到内容;strip 前缀 + 转发全方法(落地层编辑写回 wiki 走 POST/PUT/DELETE)。
 _NARRATIVE_STUDIO_UPSTREAM = os.environ.get("OMNI_NARRATIVE_STUDIO_URL", "http://127.0.0.1:8330").rstrip("/")
+# voxelcraft 资产库只读浏览 API(:8331)同源反向代理目标 —— 项目级资产审阅视图后端半边,
+# 仅 api/*(page_retired), 让审阅前端与 dashboard 同源读到库数据/预览。
+_voxelcraft_ASSETS_UPSTREAM = os.environ.get("OMNI_voxelcraft_ASSETS_URL", "http://127.0.0.1:8331").rstrip("/")
+# voxelcraft 检阅台(:8332)同源反向代理目标 —— proto-world 的 web 检阅入口(取代桌面启动器):
+# 状态/起停/进入世界/重置世界/e2e/wiki/证据 集中一页, 服务本体在 proto-world 仓 tools/console。
+_voxelcraft_CONSOLE_UPSTREAM = os.environ.get("OMNI_voxelcraft_CONSOLE_URL", "http://127.0.0.1:8332").rstrip("/")
+_PROTO_WORLD_ROOT = os.environ.get("OMNI_voxelcraft_PROTO_WORLD", "E:/MinecraftWorkspace/proto-world")
 # 共享、带连接池/keep-alive 的 httpx 客户端 —— vite dev 把页面拆成几百个小模块逐个请求,
 # 若每个请求新建 client(无 keep-alive)会慢到十几秒; 共享池后回到 ~1-2s。懒建, shutdown 关。
 _walker_client: "httpx.AsyncClient | None" = None
 _vilo_demo_client: "httpx.AsyncClient | None" = None
 _vilo_os_client: "httpx.AsyncClient | None" = None
 _narrative_client: "httpx.AsyncClient | None" = None
+_voxelcraft_assets_client: "httpx.AsyncClient | None" = None
+_voxelcraft_console_client: "httpx.AsyncClient | None" = None
 
 
 def _get_walker_client() -> "httpx.AsyncClient":
@@ -111,6 +120,28 @@ def _get_narrative_client() -> "httpx.AsyncClient":
     return _narrative_client
 
 
+def _get_voxelcraft_assets_client() -> "httpx.AsyncClient":
+    global _voxelcraft_assets_client
+    if _voxelcraft_assets_client is None:
+        _voxelcraft_assets_client = httpx.AsyncClient(
+            base_url=_voxelcraft_ASSETS_UPSTREAM,
+            timeout=30.0,
+            limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
+        )
+    return _voxelcraft_assets_client
+
+
+def _get_voxelcraft_console_client() -> "httpx.AsyncClient":
+    global _voxelcraft_console_client
+    if _voxelcraft_console_client is None:
+        _voxelcraft_console_client = httpx.AsyncClient(
+            base_url=_voxelcraft_CONSOLE_UPSTREAM,
+            timeout=30.0,
+            limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
+        )
+    return _voxelcraft_console_client
+
+
 # ── 网页审阅托管中心: 懒启动注册表 ─────────────────────────────────────────────
 # 审阅 iframe 打开某 app 的 live_url 时, 若其后端没在跑, 由本进程按标准命令把它拉起来
 # (无窗口——subprocess.Popen 已被上面的 _subprocess_hide 全局加 CREATE_NO_WINDOW),
@@ -131,6 +162,29 @@ _HOSTED_APPS: "dict[str, dict]" = {
                   "serve", "--port", "8330"],
         "cwd": str(_REPO_ROOT),
         "env": {"PYTHONPATH": "src"},  # PYTHONPATH 的相对值按仓根解析(见下)
+    },
+    "voxelcraft-assets": {
+        # 项目级资产审阅视图后端(仅 API): 库只读浏览 API, 页面壳由前端半边另做, 本条目
+        # 只作数据通路(api/* 反代)的启动配置存在, 不作托管中心页面条目(page_retired)。
+        "name": "voxelcraft 资产库浏览 API(仅 API)",
+        "page_retired": True,
+        "upstream": _voxelcraft_ASSETS_UPSTREAM,
+        "ready_path": "/api/health",
+        "start": [sys.executable, "-m",
+                  "omnicompany.packages.domains.voxelcraft.content.assets.api",
+                  "serve", "--port", "8331"],
+        "cwd": str(_REPO_ROOT),
+        "env": {"PYTHONPATH": "src"},
+    },
+    "voxelcraft": {
+        # voxelcraft 检阅台(取代桌面启动器, 用户 2026-07-12 裁定): 状态/服务器起停/
+        # 进入世界/重置世界/e2e/wiki/验证证据 集中一页; 本体在 proto-world 仓, 纯标准库。
+        "name": "voxelcraft 检阅台",
+        "upstream": _voxelcraft_CONSOLE_UPSTREAM,
+        "ready_path": "/api/status",
+        "start": [sys.executable, str(pathlib.Path(_PROTO_WORLD_ROOT) / "tools" / "console" / "app.py")],
+        "cwd": _PROTO_WORLD_ROOT,
+        "env": {"PYTHONUTF8": "1"},
     },
     "walker-game": {
         "name": "行者无乡 walker-game",
@@ -388,6 +442,7 @@ _CONTROLPLANE_ROUTERS: list[tuple[str, str, str | None]] = [
     ("omnicompany.dashboard.controlplane.health",      "health_router",      "/api"),
     ("omnicompany.dashboard.controlplane.evolution",   "evolution_router",   "/api"),
     ("omnicompany.dashboard.controlplane.semantic",    "semantic_router",    "/api"),
+    ("omnicompany.packages.domains.voxelcraft.runtime.dialog.route", "voxelcraft_dialog_router", "/api"),
     # LOFA 安卓远程端日志回传 ([2026-06-25] 见 controlplane/android.py)
     ("omnicompany.dashboard.controlplane.android",     "android_router",     None),
     # LOFA 实机操作台反代: devview/ws-scrcpy 收进 8210, 对外只一个口 ([2026-06-28] 见 lofa_proxy.py)
@@ -398,6 +453,8 @@ _CONTROLPLANE_ROUTERS: list[tuple[str, str, str | None]] = [
     ("omnicompany.dashboard.controlplane.overlay_notes",  "overlay_notes_router",  None),
     # 受控文件桥: 远端上传到固定暂存区 + 许可根目录的只读反向浏览.
     ("omnicompany.dashboard.controlplane.file_bridge",  "file_bridge_router",  None),
+    ("omnicompany.packages.domains.game_observatory.api", "game_observatory_router", None),
+    ("omnicompany.dashboard.controlplane.bilibili_draft", "bilibili_draft_router", None),
 ]
 
 for _mod_path, _attr, _prefix in _CONTROLPLANE_ROUTERS:
@@ -474,6 +531,7 @@ async def _shutdown() -> None:
     if bus:
         await bus.close()
     global _walker_client, _vilo_demo_client, _vilo_os_client
+    global _narrative_client, _voxelcraft_assets_client, _voxelcraft_console_client
     if _walker_client is not None:
         await _walker_client.aclose()
         _walker_client = None
@@ -483,6 +541,15 @@ async def _shutdown() -> None:
     if _vilo_os_client is not None:
         await _vilo_os_client.aclose()
         _vilo_os_client = None
+    if _narrative_client is not None:
+        await _narrative_client.aclose()
+        _narrative_client = None
+    if _voxelcraft_assets_client is not None:
+        await _voxelcraft_assets_client.aclose()
+        _voxelcraft_assets_client = None
+    if _voxelcraft_console_client is not None:
+        await _voxelcraft_console_client.aclose()
+        _voxelcraft_console_client = None
 
 
 # 产物缺失时返回的"构建中"自愈页(而非裸 503 JSON)。
@@ -679,6 +746,103 @@ async def narrative_studio_proxy(request: Request, path: str = "") -> Response:
                 detail=(
                     "narrative-studio 启动失败或超时。手动: "
                     "PYTHONPATH=src python -m omnicompany.packages.narrative_studio serve --port 8330"
+                ),
+            )
+    drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in drop}
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        headers=headers,
+        media_type=resp.headers.get("content-type"),
+    )
+
+
+@app.api_route("/voxelcraft-assets", methods=["GET"])
+@app.api_route("/voxelcraft-assets/{path:path}", methods=["GET"])
+async def voxelcraft_assets_proxy(request: Request, path: str = "") -> Response:
+    """voxelcraft 资产库只读 API 反代(默认 :8331), 仅 api/*(page_retired)。"""
+    if not (path == "api" or path.startswith("api/")):
+        return Response(
+            content="voxelcraft-assets 仅提供只读 API(/voxelcraft-assets/api/*), 无页面壳。",
+            status_code=410,
+            media_type="text/plain; charset=utf-8",
+        )
+    upstream = f"/{path}" if path else "/"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+    fwd = {
+        k: v for k, v in request.headers.items()
+        if k.lower() not in {"host", "accept-encoding", "content-length"}
+    }
+    fwd["accept-encoding"] = "identity"
+    try:
+        resp = await _get_voxelcraft_assets_client().get(upstream, headers=fwd)
+    except httpx.RequestError:
+        if await _ensure_hosted_app("voxelcraft-assets"):
+            try:
+                resp = await _get_voxelcraft_assets_client().get(upstream, headers=fwd)
+            except httpx.RequestError as exc2:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"voxelcraft-assets 已尝试启动但仍不可达: {exc2}",
+                )
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "voxelcraft-assets 启动失败或超时。手动: "
+                    "PYTHONPATH=src python -m "
+                    "omnicompany.packages.domains.voxelcraft.content.assets.api serve --port 8331"
+                ),
+            )
+    drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in drop}
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        headers=headers,
+        media_type=resp.headers.get("content-type"),
+    )
+
+
+@app.api_route("/voxelcraft", methods=["GET", "POST"])
+@app.api_route("/voxelcraft/{path:path}", methods=["GET", "POST"])
+async def voxelcraft_console_proxy(request: Request, path: str = "") -> Response:
+    """voxelcraft 检阅台反代(默认 :8332)，上游未起时自动按标准命令启动。"""
+    upstream = f"/{path}" if path else "/"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+    body = await request.body()
+    fwd = {
+        k: v for k, v in request.headers.items()
+        if k.lower() not in {"host", "accept-encoding", "content-length"}
+    }
+    fwd["accept-encoding"] = "identity"
+    try:
+        resp = await _get_voxelcraft_console_client().request(
+            request.method, upstream, content=body, headers=fwd,
+        )
+    except httpx.RequestError:
+        if _wants_html(request):
+            asyncio.get_running_loop().create_task(_ensure_hosted_app("voxelcraft"))
+            return _lazy_boot_page("voxelcraft 检阅台")
+        if await _ensure_hosted_app("voxelcraft"):
+            try:
+                resp = await _get_voxelcraft_console_client().request(
+                    request.method, upstream, content=body, headers=fwd,
+                )
+            except httpx.RequestError as exc2:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"voxelcraft 检阅台已尝试启动但仍不可达: {exc2}",
+                )
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "voxelcraft 检阅台启动失败或超时。手动: "
+                    "python E:/MinecraftWorkspace/proto-world/tools/console/app.py"
                 ),
             )
     drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}

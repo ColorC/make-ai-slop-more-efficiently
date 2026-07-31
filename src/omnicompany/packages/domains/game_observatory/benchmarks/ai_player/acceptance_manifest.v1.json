@@ -1,0 +1,156 @@
+{
+  "schema": "ai-player-acceptance-manifest.v1",
+  "manifest_id": "ai-player.acceptance.v1",
+  "created_at": "2026-07-15T21:20:00+08:00",
+  "freeze_status": "candidate_review_required",
+  "freeze_rule": "AI players and benchmark runners may read this manifest but cannot approve or mutate truth labels.",
+  "final_exit": {
+    "requirements_passed": "11/11",
+    "products_passed": "13/13",
+    "e2e_passed": "10/10",
+    "gates_passed": "12/12",
+    "blocker_count": 0,
+    "major_count": 0,
+    "clean_database_rerun": "PASS",
+    "independent_review": "PASS"
+  },
+  "targets": [
+    {
+      "benchmark_id": "afk_hero_growth_v1",
+      "role": "known_truth_regression",
+      "game_id": "afk-journey",
+      "build_id": "afk-cn-1.7.21-versionCode-10750-20260714",
+      "device_target_id": "device://adb/127.0.0.1:16384",
+      "resolution": [1080, 1920],
+      "scope": "hero_growth_and_explicit_boundaries",
+      "candidate_inventory": "docs/plans/game-observatory/[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/afk-benchmark-inventory.md",
+      "candidate_counts": {
+        "semantic_states": 24,
+        "strict_interactions": 43,
+        "explicit_transitions": 36,
+        "safe_edge_candidates": 34,
+        "interactive_object_instances_at_least": 51,
+        "candidate_routes": 8,
+        "controlled_interruptions": 0,
+        "human_truth_signoffs": 0,
+        "normalized_state_counterexamples": 0,
+        "referenced_evidence_steps": 66,
+        "readable_artifacts": 592
+      },
+      "frozen_counts": {
+        "semantic_states": 0,
+        "safe_transition_edges": 0,
+        "interactive_objects": 0,
+        "target_routes": 0,
+        "controlled_interruptions": 0,
+        "gameplay_boundary_sets": 0,
+        "human_truth_signoffs": 0
+      },
+      "required_before_freeze": {
+        "semantic_states_at_least": 20,
+        "safe_transition_edges_at_least": 30,
+        "interactive_objects_at_least": 40,
+        "target_routes": 8,
+        "controlled_interruptions": 6,
+        "gameplay_boundary_sets": 4,
+        "human_truth_signoffs": 1,
+        "object_classes": [
+          "play",
+          "adjacent_play_entry",
+          "pure_navigation",
+          "prohibited"
+        ]
+      },
+      "known_candidate_defects": [
+        "skill selection states are currently collapsed into self-loops",
+        "two hero-switch transitions have incorrect self-loop endpoints",
+        "object-level four-way classification is absent",
+        "pure-navigation boundary set is absent",
+        "eight routes have templates but no immutable fixtures",
+        "controlled interruption fixtures are absent",
+        "human final truth adjudication is absent"
+      ]
+    },
+    {
+      "benchmark_id": "sanguo_mouding_pure_ai_v1",
+      "role": "live_business_autonomous_operation",
+      "game_id": "sanguo-mouding-tianxia",
+      "channel": "bilibili",
+      "package": "com.bilibili.nslg",
+      "version_name": "1.31.0",
+      "version_code": 13100,
+      "device_target_id": "device://adb/127.0.0.1:16384",
+      "environment_baseline": "data/domains/game_observatory/benchmarks/ai_player/environments/sanguo_mouding_pure_ai_v1.environment.json",
+      "current_status": "pre_login_observed",
+      "unknown_identity_fields": [
+        "account_id",
+        "server_id",
+        "season_id",
+        "server_open_days",
+        "hegemony_stage",
+        "tutorial_state"
+      ],
+      "dynamic_requirements": {
+        "record_first_available_startup_and_all_tutorial_steps": true,
+        "visible_root_entries_must_enter_task_board": true,
+        "unlocked_businesses_need_one_meaningful_cycle": true,
+        "locked_businesses_need_condition_and_revisit_task": true,
+        "live_e2e_tasks_at_least": 12,
+        "semantic_states_at_least": 30,
+        "transition_edges_at_least": 40,
+        "reference_skills_at_least": 6,
+        "controlled_interruptions": 6,
+        "skill_invalidation_scenarios": 4,
+        "consecutive_natural_days": 7,
+        "user_gameplay_actions_during_campaign": 0
+      },
+      "guide_research": {
+        "record_id": "res:截至2026-07-15-三国谋定天下-bilibili-版-1:f768c565",
+        "source_count": 14,
+        "selection_requires_live_version_season_and_server_stage": true,
+        "refresh_triggers": [
+          "first_entry_to_new_system",
+          "high_value_hard_to_reverse_choice",
+          "version_or_season_change",
+          "two_consecutive_failures",
+          "knowledge_expired"
+        ]
+      },
+      "account_policy": {
+        "identity": "independent_ai_player",
+        "autonomous_in_game_actions": [
+          "virtual_resource_use",
+          "recruitment_and_growth",
+          "construction_and_research",
+          "map_actions_and_battle",
+          "tasks_and_events",
+          "alliance_join_leave_and_cooperation",
+          "normal_in_game_communication"
+        ],
+        "separate_authorization_actions": [
+          "real_money_payment",
+          "external_personal_identity_submission"
+        ]
+      }
+    }
+  ],
+  "shared_counterexample_sets": {
+    "loop_scenarios": 100,
+    "state_recognition_samples": 500,
+    "task_queue_scenarios": 100,
+    "account_policy_samples": 500,
+    "frozen_counts": {
+      "loop_scenarios": 0,
+      "state_recognition_samples": 0,
+      "task_queue_scenarios": 0,
+      "account_policy_samples": 0
+    }
+  },
+  "manifest_pass": false,
+  "blocking_reasons": [
+    "AFK candidate truth requires semantic correction and human signoff",
+    "AFK route and interruption fixtures are not frozen",
+    "shared counterexample sets are not frozen",
+    "Sanguo account identity and live stage remain unknown before evidence-backed login"
+  ]
+}

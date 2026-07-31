@@ -184,12 +184,6 @@ class SingleToolRouter(Router):
         turn = input_data.get("turn", 0)
         ctx_data = input_data.get("context", {}) or {}
         ctx = self._build_ctx(ctx_data)
-        # Give synchronous tool implementations enough run identity to emit
-        # progress materials while they execute in ``asyncio.to_thread``.
-        # These are observability fields, not additional authority.
-        ctx.trace_id = trace_id  # type: ignore[attr-defined]
-        ctx.tool_use_id = tool_use_id  # type: ignore[attr-defined]
-        ctx.turn = turn  # type: ignore[attr-defined]
 
         # 名字校验（dispatch 应该已经分发对了，但防御一下）
         if tool_name != self.TOOL_NAME:
@@ -325,8 +319,6 @@ class GlobRouter(SingleToolRouter):
     IS_READONLY: ClassVar[bool] = True
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
-        args = dict(args)
-        args["path"] = str(_resolve_path_from_ctx(args.get("path") or ".", ctx))
         return self._executor.execute("glob", args)
 
 
@@ -434,7 +426,6 @@ class GrepRouter(SingleToolRouter):
             args["-i"] = args.pop("case_insensitive")
         if "include" in args and "glob" not in args:
             args["glob"] = args.pop("include")
-        args["path"] = str(_resolve_path_from_ctx(args.get("path") or ".", ctx))
         return self._executor.execute("grep", args)
 
 
@@ -661,23 +652,9 @@ class ReadFileRouter(SingleToolRouter):
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
         # CC 用 file_path；接受 path 作为 legacy alias
-        raw_path = args.get("file_path") or args.get("path", "")
-        if not raw_path:
+        path = args.get("file_path") or args.get("path", "")
+        if not path:
             raise ToolExecutionError("file_path is required (absolute path to a file)")
-        path = str(_resolve_path_from_ctx(raw_path, ctx))
-
-        # Optional exact-file allowlist for narrow correction agents.  General
-        # agents omit this field and retain the normal READ_ANY behavior.
-        allowed_read_files = getattr(ctx, "allowed_read_files", None) or ()
-        if allowed_read_files:
-            target = Path(path)
-            allowed = {Path(item).expanduser().resolve() for item in allowed_read_files}
-            if target not in allowed:
-                listing = "\n  - ".join(str(item) for item in sorted(allowed))
-                raise ToolExecutionError(
-                    f"read_file REFUSED: {target} is outside allowed_read_files.\n"
-                    f"Allowed files:\n  - {listing}"
-                )
         offset = args.get("offset", 0)
         limit = args.get("limit", 2000)
         is_full_read = offset == 0 and limit >= 2000
@@ -832,14 +809,13 @@ class EditRouter(SingleToolRouter):
     IS_READONLY: ClassVar[bool] = False
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
-        raw_path = (args.get("file_path") or args.get("path") or "").strip()
+        path = (args.get("file_path") or args.get("path") or "").strip()
         old = args.get("old_string", "")
         new = args.get("new_string", "")
         replace_all = bool(args.get("replace_all", False))
 
-        if not raw_path:
+        if not path:
             raise ToolExecutionError("file_path is required (absolute path to a file)")
-        path = str(_resolve_path_from_ctx(raw_path, ctx))
         if not isinstance(old, str) or not isinstance(new, str):
             raise ToolExecutionError("old_string and new_string must be strings")
         if old == new:
@@ -946,7 +922,7 @@ class ListDirRouter(SingleToolRouter):
     IS_READONLY: ClassVar[bool] = True
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
-        path = str(_resolve_path_from_ctx(args.get("path") or ".", ctx))
+        path = args.get("path", ctx.cwd or os.getcwd())
         target = Path(path)
         if not target.is_dir():
             return f"Error: '{path}' is not a directory."

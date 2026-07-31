@@ -1,0 +1,69 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-tabs-repetition2-rumor-known-answer-v1",
+  "benchmark_run_id": "pair.gate3.repetition2.rumor.prechange.01",
+  "adjudicator": "main-agent-independent-image-and-known-route-review",
+  "generated_at": "2026-07-14T02:34:00Z",
+  "items": [
+    {
+      "probe_id": "shadow.probe.6e3fa92feda24b1887d3a1ea74a778fa",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "信赖度文字和左侧页签区域可见，目标点位于既有路线验证框内。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.942e40dfe256499b8659d9df962e694d",
+      "visible_target_supported": false,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "右侧页签区域存在，冻结截图只显示浅色短线痕迹，账本声称直接看见灰色“语音”文字，当前画面无法支持该线索。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.bed278f5857c4bc1ad8f2fc71239dc9b",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "传闻正文卡片可见；当前已验证路线没有证明卡片可点击，因此不能计入已知交互召回。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.113d65706aeb453ea279c7a5aebd13f7",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "传闻正文卡片可见；当前已验证路线没有证明卡片可点击，因此不能计入已知交互召回。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.6f6660ccfca04eae87ab7be5e4735f22",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "传闻正文卡片可见；当前已验证路线没有证明卡片可点击，因此不能计入已知交互召回。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    },
+    {
+      "probe_id": "shadow.probe.41e4cbf11bf042abbe993ce4ce056c14",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "左下返回箭头可见；本 fixture 的已知路线使用 back 动作，账本提交 tap，动作合同不匹配。",
+      "evidence_ids": ["art.device.1783965755678.49724c34"]
+    }
+  ]
+}

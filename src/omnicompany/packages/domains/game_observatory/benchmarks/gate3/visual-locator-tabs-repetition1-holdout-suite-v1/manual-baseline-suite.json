@@ -1,0 +1,41 @@
+{
+  "schema": "game-observatory.manual-baseline-suite.v1",
+  "id": "gate3.visual-locator.tabs-repetition1.holdout-suite.v1",
+  "frozen_at": "2026-07-14T05:32:59.8336789+08:00",
+  "status": "frozen-before-any-suite-inference",
+  "purpose": "在同一独立录制轮次的三个页签激活状态上检验页签候选完整性",
+  "source_evidence_run": "evidence.run.bc89bfde983c4ad7a4a04812200bc232",
+  "source_step_ids": [
+    "evidence.step.7f6fad3e2b3c49f09eedcf5a739c57bc",
+    "evidence.step.20a3445a2b8b433b81e2b9084f0af878",
+    "evidence.step.3b548f5811834f75b08104595273c742"
+  ],
+  "cases": [
+    {
+      "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-tabs-repetition1-trust-holdout-v1.json",
+      "sha256": "6723ffce687b97d9e41ac9c7843681a013527bf4f43c701dc06d99cc41fde1ca",
+      "expected_interactions": 3
+    },
+    {
+      "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-tabs-repetition1-rumor-holdout-v1.json",
+      "sha256": "cc618b4d99fb14dbdc3125210892cd9bd4df0624f32861e9f037c5e975d97775",
+      "expected_interactions": 3
+    },
+    {
+      "fixture": "data/domains/game_observatory/fixtures/gate3-afk-rowan-tabs-repetition1-voice-holdout-v1.json",
+      "sha256": "ac13a1af76cca5216fc8ff2a1080b9aac68492c706493e664d1f567f7ebe7965",
+      "expected_interactions": 3
+    }
+  ],
+  "acceptance": {
+    "required_case_count": 3,
+    "required_recall_each_case": 1.0,
+    "required_total_matches": 9,
+    "maximum_total_missing_targets": 0,
+    "runtime_errors_allowed": false
+  },
+  "locator_holdout_eligible": true,
+  "hypothesis_cost_comparison_eligible": false,
+  "device_actions": false,
+  "fact_publication": false
+}

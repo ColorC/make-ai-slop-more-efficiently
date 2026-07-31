@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from ..routers_legacy import (
+from .._archive.routers_legacy import (
     CodeGenFormatsRouter as _LegacyFormats,
     CodeGenPipelineRouter as _LegacyPipeline,
     CodeGenRoutersRouter as _LegacyRouters,

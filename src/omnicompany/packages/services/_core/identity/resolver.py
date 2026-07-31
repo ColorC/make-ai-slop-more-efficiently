@@ -120,10 +120,10 @@ def get_session_binding(trace_id: str | None = None) -> dict[str, Any]:
 
 
 def bindings_by_session_key() -> dict[str, dict[str, Any]]:
-    """按 ``provider:session_id`` 索引；兼容旧 ``claude_session_id`` 台账。"""
+    """按 `provider:claude_session_id` 索引, 给 agent_registry.rebuild join 用。"""
     out: dict[str, dict[str, Any]] = {}
     for rec in _read_bindings().values():
-        sid = rec.get("session_id") or rec.get("claude_session_id")
+        sid = rec.get("claude_session_id")
         if sid:
             out[f"{rec.get('provider')}:{sid}"] = rec
     return out
@@ -146,11 +146,9 @@ def bind_task_for_session(
     if not session_id:
         return
     rec = bindings_by_session_key().get(f"{provider}:{session_id}")
-    trace_prefix = "codex" if provider == "codex" else "cc"
-    trace_id = (rec or {}).get("trace_id") or f"{trace_prefix}_{session_id}"
+    trace_id = (rec or {}).get("trace_id") or f"cc_{session_id}"
     _upsert_binding(trace_id, {
-        "session_id": session_id,
-        "claude_session_id": session_id if str(provider or "").startswith("claude") else None,
+        "claude_session_id": session_id,
         "provider": provider,
         "task_id": task_id,
         "active_plan": plan_id,
@@ -243,17 +241,13 @@ def resolve_active_trace_id() -> str:
 
     解析优先级:
     1. `OMNI_CC_TRACE_ID` env (CLI 显式设 / 测试 / 脚本)
-    2. `CODEX_THREAD_ID` env (Codex Desktop 当前原生会话; 不读全局 active 指针)
-    3. `OMNI_CC_PTY_ID` env (dashboard PTY 启动 claude 时传给子进程)
-    4. `data/cc_session_active.json` 里 active_trace_id (SessionStart hook 写的)
-    5. fallback `cc_unknown_<unix_ts>` (warn 级缺省, 仍能跑但跟 dashboard 对不上)
+    2. `OMNI_CC_PTY_ID` env (dashboard PTY 启动 claude 时传给子进程)
+    3. `data/cc_session_active.json` 里 active_trace_id (SessionStart hook 写的)
+    4. fallback `cc_unknown_<unix_ts>` (warn 级缺省, 仍能跑但跟 dashboard 对不上)
     """
     explicit = os.environ.get("OMNI_CC_TRACE_ID")
     if explicit:
         return explicit
-    codex_thread_id = os.environ.get("CODEX_THREAD_ID")
-    if codex_thread_id:
-        return f"codex_{codex_thread_id}"
     pty_id = os.environ.get("OMNI_CC_PTY_ID")
     if pty_id:
         return pty_id
@@ -270,8 +264,7 @@ def current_session_meta() -> dict[str, Any]:
     返回 dict, 字段含:
     - trace_id: 当前解析出的 trace_id
     - source: 'env_explicit' / 'env_pty' / 'active_file' / 'fallback'
-    - session_id: provider-neutral native session id (可能 None)
-    - claude_session_id: legacy Claude alias (可能 None)
+    - claude_session_id: hook 抓到的 (可能 None)
     - pty_id: dashboard PTY id (可能 None)
     - active_plan: 当前 active plan 路径 (hook 抓的)
     - started_at: ISO 时间戳
@@ -279,14 +272,11 @@ def current_session_meta() -> dict[str, Any]:
     - active_file_path: cc_session_active.json 绝对路径
     """
     explicit = os.environ.get("OMNI_CC_TRACE_ID")
-    codex_thread_id = os.environ.get("CODEX_THREAD_ID")
     pty_id = os.environ.get("OMNI_CC_PTY_ID")
     active = _read_active()
 
     if explicit:
         trace_id, source = explicit, "env_explicit"
-    elif codex_thread_id:
-        trace_id, source = f"codex_{codex_thread_id}", "env_codex"
     elif pty_id:
         trace_id, source = pty_id, "env_pty"
     elif active.get("trace_id") or active.get("active_trace_id"):
@@ -298,25 +288,21 @@ def current_session_meta() -> dict[str, Any]:
     # 叠加按会话台账: active 指针文件可能被切 plan 时整档覆盖而丢掉 project/task,
     # 台账是合并累积的, 用它兜底当前会话的累积字段。
     binding = _read_bindings().get(trace_id, {})
-    # CODEX_THREAD_ID 已经精确指明当前会话; 全局 Claude active 指针可能被别的终端/
-    # pytest 覆盖, 不能再把它的 plan/project/session 字段叠到 Codex 会话上。
-    session_active = {} if codex_thread_id else active
 
     def _pick(key: str) -> Any:
-        return session_active.get(key) if session_active.get(key) is not None else binding.get(key)
+        return active.get(key) if active.get(key) is not None else binding.get(key)
 
     return {
         "trace_id": trace_id,
         "source": source,
-        "session_id": codex_thread_id or _pick("session_id") or _pick("claude_session_id"),
         "claude_session_id": _pick("claude_session_id"),
         "pty_id": pty_id or _pick("pty_id"),
         "active_plan": _pick("active_plan"),
         "project": _pick("project"),
         "task_id": _pick("task_id"),
-        "provider": "codex" if codex_thread_id else _pick("provider"),
-        "started_at": session_active.get("started_at"),
-        "cwd": session_active.get("cwd") or os.getcwd(),
+        "provider": _pick("provider"),
+        "started_at": active.get("started_at"),
+        "cwd": active.get("cwd") or os.getcwd(),
         "active_file_path": str(_active_file()),
     }
 
@@ -324,7 +310,6 @@ def current_session_meta() -> dict[str, Any]:
 def record_active_session(
     trace_id: str,
     *,
-    session_id: str | None = None,
     claude_session_id: str | None = None,
     pty_id: str | None = None,
     active_plan: str | None = None,
@@ -350,10 +335,8 @@ def record_active_session(
     if not trace_id:
         raise ValueError("trace_id 不能为空")
 
-    provider_session_id = session_id or claude_session_id
     payload: dict[str, Any] = {
         "trace_id": trace_id,
-        "session_id": provider_session_id,
         "claude_session_id": claude_session_id,
         "pty_id": pty_id,
         "active_plan": active_plan,
@@ -369,7 +352,6 @@ def record_active_session(
 
     # 按会话台账: 合并 upsert (只写非 None, 让不同触发点累积)。
     _upsert_binding(trace_id, {
-        "session_id": provider_session_id,
         "claude_session_id": claude_session_id,
         "pty_id": pty_id,
         "active_plan": active_plan,

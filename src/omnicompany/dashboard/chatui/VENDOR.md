@@ -38,15 +38,6 @@
 > ⚠ Phase 3 候选裁剪项(taskmaster / browser-use / plugins / 未用的 cursor·gemini·opencode provider)
 > **按用户决定保留**(provider 留作参考、browser-use 留求职反爬、plugins 留未来接口、taskmaster 休眠),re-vendor 时别误删。
 
-## 与 ccdaemon 的分工(两栈边界)
-
-仓里有两套"创建会话"栈,**功能不重复、都在服役**——不要再争论删哪套,也不允许发明第三套:
-
-- **chatui(本目录,Node vendored CCUI :7348)** — web 驾驶舱的会话后端,驾驶舱"新建会话"UI 全部走这里。
-- **ccdaemon(`../ccdaemon/`,Python FastAPI :8201)** — lofa 手机端的会话 API,链路:lofa app → Caddy 12443 → dashboard 8210 → `controlplane/cc_proxy.py` 透传 `/api/cc/*` → ccdaemon `/cc/*`;同时是 BOSS SIGHT 的 Python 进程内 spawn 通道(`boss_sight/captures/routes.py`、`boss_sight/services/workflow_orchestrator.py` 直接 `import ccdaemon.chat`)。**lofa + BOSS SIGHT 双依赖,不能删。**
-
-约定:新增 AI CLI 时两边都评估——web 驾驶舱用得上,就在本包按 `server/modules/providers/README.md` 加 Node provider;lofa 手机端用得上,就同步在 ccdaemon 加 Python provider(见 `../ccdaemon/DESIGN.md` "与 chatui 的分工"一节)。
-
 ## 构建产物不入仓(换机/clone 后必跑 setup)
 
 `dist/`(client)+ `dist-server/`(server)+ `node_modules/` 全 gitignore。fresh clone / 换机后:

@@ -8,7 +8,7 @@
 所有 LLM agent tool 的 write_file / Router 业务代码的文件创建都应该走这里:
 
     from omnicompany.core.guarded_write import write_file
-    write_file("packages/domains/my_domain/produce/foo.py", content,
+    write_file("packages/domains/demogame/produce/foo.py", content,
                origin="claude-code", trace=trace_id, node=node_id,
                purpose="补充新字段提取器")
 

@@ -1,0 +1,1 @@
+{"action":{"type":"tap","x":1012,"y":1433,"duration_ms":250},"target_name":"辅助装备区域双箭头控件","target_bounds":{"x":959,"y":1378,"width":107,"height":110},"settle_threshold":0.03,"required_consecutive":3,"settle_timeout_seconds":8.0,"sample_interval_seconds":0.25}

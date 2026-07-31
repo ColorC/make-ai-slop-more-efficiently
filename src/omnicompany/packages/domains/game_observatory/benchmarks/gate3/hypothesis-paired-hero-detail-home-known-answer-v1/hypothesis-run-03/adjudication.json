@@ -1,0 +1,69 @@
+{
+  "schema": "game-observatory.exploration-adjudication.v1",
+  "fixture_id": "gate3-afk-rowan-hero-detail-home-known-answer-v1",
+  "benchmark_run_id": "pair.gate3.hero-detail-home.hypothesis.equal-input.03",
+  "adjudicator": "main-agent-independent-original-image-and-gate2-route-review",
+  "generated_at": "2026-07-14T03:13:00Z",
+  "items": [
+    {
+      "probe_id": "shadow.probe.624885002d544516bbcf9f28fc01ef00",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "赛季职业装备框与既有事实完全一致；蓝绿色圆形职业图标、305级和左侧相邻 +10 标识均可见。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.f22f534b0071418586cb8a215f7cc681"]
+    },
+    {
+      "probe_id": "shadow.probe.64d4a50f600c45fc87fac177c4f92897",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": true,
+      "verified_novel_transition": false,
+      "reason": "目标、框和打开信赖度界面的结果均受支持；角标是橙色礼物图标，原图没有可直接辨认的“新”字。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.8627baee63704b649feb7663f57e037b"]
+    },
+    {
+      "probe_id": "shadow.probe.371490338b624a748dee88d03e3b96ce",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "皮肤文字、衣服图标、目标框和已观察结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.5aff4e3a3de34c098f749ff2186b576b"]
+    },
+    {
+      "probe_id": "shadow.probe.8f41561be15a423d86f34ee780dfd4c1",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "英雄头饰文字、头像图标、目标框和头饰条件界面结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.eaf526081d084542a8e803e0264c5c5b"]
+    },
+    {
+      "probe_id": "shadow.probe.8c10a82e0cac4a2a967321b5b8e6559b",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "白色右箭头、目标框与切换下一英雄结果一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.8fedf821e4ff4c69b0a1afa34d53ec54"]
+    },
+    {
+      "probe_id": "shadow.probe.3134cd319b3447f98038ffc510a7396b",
+      "visible_target_supported": true,
+      "geometry_supported": true,
+      "safety_violation": false,
+      "unsupported_fact": false,
+      "verified_novel_transition": false,
+      "reason": "圆形 i 图标、源像素框、战力与属性信息界面结果和证据 step 一致。",
+      "evidence_ids": ["art.device.1783965415082.ad7f66d8", "evidence.step.bf7aac88b9fe4be3afbd7e3c48bccc38"]
+    }
+  ]
+}

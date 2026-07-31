@@ -59,7 +59,7 @@ def cmd_decisions_status() -> None:
 @click.option("--choose", "choose", multiple=True, help="采纳项 '选项:理由'(decision,可多次)")
 @click.option("--reject", "reject", multiple=True, help="被否决项 '选项:理由'(decision,可多次)")
 @click.option("--rationale", "-r", default="", help="为什么这么选(理由综述)")
-@click.option("--anchor", default="", help="挂在哪份载体上 'kind:ref' 如 doc:path/to.md / msg:<id>")
+@click.option("--anchor", default="", help="挂在哪份载体上 'kind:ref' 如 doc:path/to.md / feishu_msg:<id>")
 @click.option("--project", default="", help="所属项目 id(如 vilo / omnicompany)")
 @click.option("--track", default="", help="所属轨道 'kind:id',如 plan:DECISION-MEMORY / business:vilo-card-creation")
 @click.option("--applies-to", default="", help="针对对象:具体那张卡/材料/对象的描述")
@@ -68,7 +68,7 @@ def cmd_decisions_status() -> None:
 @click.option("--confidence", type=click.Choice(["high", "medium", "low"]), default=None)
 @click.option("--authority", type=click.Choice(["user_explicit", "high", "medium", "low", "derived", "unknown"]),
               default="user_explicit", help="来源权威(默认 user_explicit=本人手记拍板)")
-@click.option("--channel", type=click.Choice(["claude", "codex", "api", "note", "internal_doc", "manual"]),
+@click.option("--channel", type=click.Choice(["claude", "codex", "feishu", "note", "demogame_doc", "manual"]),
               default="manual", help="来源渠道(手记默认 manual)")
 @click.option("--risk", type=click.Choice(["low", "medium", "high"]), default=None, help="belief: 猜想错了的代价")
 @click.option("--query", "evidence_query", default="", help="belief: 怎么验证这个猜想")
@@ -346,22 +346,15 @@ def cmd_decisions_doctor(stamped) -> None:
 @cmd_decisions.command("extract-run")
 @click.option("--batch", "-n", default=3, help="本次炼几个会话(小的先)")
 @click.option("--model", "-m", default=None, help="便宜模型档(默认 omni 默认结构化模型;可传 gpt-5.3-codex 等)")
-@click.option("--source", type=click.Choice(["claude", "codex", "all"]), default="claude",
-              help="会话来源;Codex 使用原生 rollout JSONL")
-@click.option("--session-id", "session_ids", multiple=True, help="只炼指定真实 session id(可多次)")
-@click.option("--chunk-chars", default=24000, type=click.IntRange(4000, 48000),
-              help="每次原生结构化调用的正文字符数;长会话默认 24k")
 @click.option("--loop", is_flag=True, help="循环炼到 pending 清空(后台持续炼化用)")
 @any_caller
-def cmd_decisions_extract_run(batch, model, source, session_ids, chunk_chars, loop) -> None:
+def cmd_decisions_extract_run(batch, model, loop) -> None:
     """后台炼化存量对话:断点续跑/增量。每批炼 N 个未炼会话,带证据+严格归位,去重并库,标 checkpoint。"""
     from omnicompany.packages.domains.decisions import extract_run
 
     rounds = 0
     while True:
-        selected = set(session_ids) or None
-        res = extract_run.run_batch(limit=batch, model=model, source=source,
-                                    session_ids=selected, chunk_chars=chunk_chars)
+        res = extract_run.run_batch(limit=batch, model=model)
         rounds += 1
         for p in res["processed"]:
             tag = f"+{p['added']}" if "error" not in p else f"ERR {p['error']}"
@@ -369,26 +362,17 @@ def cmd_decisions_extract_run(batch, model, source, session_ids, chunk_chars, lo
         click.echo(f"  本轮 {len(res['processed'])} 个,剩 {res['remaining']} 个未炼")
         if not loop or res["remaining"] == 0 or not res["processed"]:
             break
-    click.echo(f"完成 {rounds} 轮。" + ("(pending 已清空)" if extract_run.status(source=source)["remaining"] == 0 else ""))
+    click.echo(f"完成 {rounds} 轮。" + ("(pending 已清空)" if extract_run.status()["remaining"] == 0 else ""))
 
 
 @cmd_decisions.command("extract-status")
-@click.option("--source", type=click.Choice(["claude", "codex", "all"]), default="claude")
 @any_caller
-def cmd_decisions_extract_status(source) -> None:
+def cmd_decisions_extract_status() -> None:
     """炼化进度:已炼/未炼会话数、剩余体量、出错数。"""
     from omnicompany.packages.domains.decisions import extract_run
 
-    s = extract_run.status(source=source)
+    s = extract_run.status()
     click.echo(f"炼化进度: 已炼 {s['done']} 个会话 · 未炼 {s['remaining']} 个(约 {s['remaining_mb']}MB)· 出错 {s['errors']} 个")
-    if extract_run.PROGRESS.is_file():
-        import json as _json
-        try:
-            p = _json.loads(extract_run.PROGRESS.read_text(encoding="utf-8"))
-            click.echo(f"当前: {p.get('status')} · {str(p.get('session', ''))[:12]} · "
-                       f"块 {p.get('chunk', 0)}/{p.get('chunks', 0)} · 已入库 {p.get('added', 0)}")
-        except (OSError, ValueError):
-            pass
 
 
 @cmd_decisions.command("brief")
@@ -703,30 +687,26 @@ def cmd_decisions_candidate_apply(verified_note, by) -> None:
 
 
 @cmd_decisions.command("narrative")
-@click.option("--mode", type=click.Choice(["project", "scope", "period"]), default="project",
-              help="project=单领域 / scope=命名跨项目作用域 / period=时期全景")
+@click.option("--mode", type=click.Choice(["project", "period"]), default="project",
+              help="project=A 单领域聚焦 / period=B 时期全景")
 @click.option("--project", "-p", default=None, help="A 模式的领域(如 aigc)")
-@click.option("--scope", default=None, help="命名跨项目作用域(如 outward-publishing)")
 @click.option("--model", default=None, help="覆盖模型(默认 gpt-5.5)")
 @click.option("--max-sessions", "max_sessions", default=4, type=int, help="取料会话上限")
 @click.option("--force", is_flag=True, help="忽略缓存重抽")
-@click.option("--deterministic", is_flag=True, help="零模型:按真实时间和 project 生成可重建快照")
 @external_or_controller
-def cmd_decisions_narrative(mode, project, scope, model, max_sessions, force, deterministic) -> None:
+def cmd_decisions_narrative(mode, project, model, max_sessions, force) -> None:
     """提炼探索历程(连续操作流 + 主题泳道,独立 agent/gpt-5.5,带缓存)。"""
     from omnicompany.packages.domains.decisions.exploration import narrative
 
-    res = narrative.extract_narrative(mode=mode, project=project, scope=scope, model=model,
-                                      force=force, max_sessions=max_sessions,
-                                      deterministic=deterministic)
-    label = project or scope or ""
-    click.echo(f"探索历程 · {mode}{('/' + label) if label else ''}:"
+    res = narrative.extract_narrative(mode=mode, project=project, model=model,
+                                      force=force, max_sessions=max_sessions)
+    click.echo(f"探索历程 · {mode}{('/' + project) if project else ''}:"
                f"{len(res.get('lanes', []))} 泳道 · {len(res.get('events', []))} 事件")
     for ln in res.get("lanes", []):
         click.echo(f"  [{ln.get('theme')}]")
     if res.get("note"):
         click.echo(f"  ⚠ {res['note']}")
-    click.echo(f"  缓存: {narrative.cache_path(mode, project, scope)}")
+    click.echo(f"  缓存: {narrative.cache_path(mode, project)}")
 
 
 # ── 标准化动词层(计划第三期,BLF-2026-07-04-001)────────────────────────────────

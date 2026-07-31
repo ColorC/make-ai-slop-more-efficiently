@@ -1,0 +1,408 @@
+{
+  "schema": "game-observatory.reader-content-taxonomy.v1",
+  "level_labels": {
+    "system": "系统",
+    "system_overview": "系统总览",
+    "journey": "入门路线",
+    "play_loop": "玩法循环",
+    "mechanism": "机制说明",
+    "operation": "操作流程",
+    "interface": "界面说明",
+    "state_reference": "状态与规则",
+    "pattern": "跨系统模式",
+    "unclassified": "待归类内容"
+  },
+  "groups": [
+    {
+      "id": "system.afk-journey.hero-growth",
+      "kind": "system",
+      "game_id": "afk-journey",
+      "slug": "hero-growth",
+      "title": "英雄养成",
+      "summary": "围绕共鸣等级、英雄品质、技能、专属装备与职业装备形成的长期成长系统。",
+      "story_play_slug": "hero-role-growth",
+      "order": 10
+    },
+    {
+      "id": "system.sanguo.chapter-tasks",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "chapter-tasks",
+      "title": "章节任务与奖励",
+      "summary": "章节把建设、占地、培养和战斗编成连续目标，并分别处理任务进度、单项奖励与整章结算。",
+      "order": 10
+    },
+    {
+      "id": "system.sanguo.city-construction",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "city-construction",
+      "title": "主城建设",
+      "summary": "玩家升级主城建筑，提高繁荣度、基础产能和后续建筑或能力的解锁范围。",
+      "order": 20
+    },
+    {
+      "id": "system.sanguo.resource-economy",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "resource-economy",
+      "title": "资源经济与交易",
+      "summary": "资源从土地和建筑持续产出，经库存与容量约束保存，并可在集市中按报价交换。",
+      "order": 30
+    },
+    {
+      "id": "system.sanguo.territory-expansion",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "territory-expansion",
+      "title": "领地经营与地图扩张",
+      "summary": "玩家在大地图上寻找土地、组织出征取得所有权，再通过开垦提升土地等级和持续产出。",
+      "order": 40
+    },
+    {
+      "id": "system.sanguo.general-growth",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "general-growth",
+      "title": "武将与战法培养",
+      "summary": "武将通过等级、属性分配和战法学习形成可持续调整的个人成长与战斗构筑。",
+      "order": 50
+    },
+    {
+      "id": "system.sanguo.army-formation",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "army-formation",
+      "title": "部队编成与阵型",
+      "summary": "系统保存五支部队及其成员槽、阵型、站位和兵力；配将助手提供候选方案，战前页面另行记录本次出征选择。",
+      "story_play_slug": "force-composition",
+      "order": 60
+    },
+    {
+      "id": "system.sanguo.troop-supply",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "troop-supply",
+      "title": "征兵、预备兵与战损",
+      "summary": "征兵所提供预备兵，玩家在队伍与战前界面分配兵力，战斗损耗又会回到下一轮补兵需求。",
+      "order": 70
+    },
+    {
+      "id": "system.sanguo.martial-exercise",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "martial-exercise",
+      "title": "军演",
+      "summary": "军演由逐关挑战、胜负结算、兵力检查和挂机奖励共同构成可反复推进的战斗玩法。",
+      "story_play_slug": "martial-exercise-progression",
+      "order": 80
+    },
+    {
+      "id": "system.sanguo.alliance",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "alliance",
+      "title": "同盟治理与协作",
+      "summary": "同盟把成员、城池、荣耀、集体章节与日程组织在一起，支持长期协作和共同进度。",
+      "order": 90
+    },
+    {
+      "id": "system.sanguo.activities",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "activities",
+      "title": "活动与签到",
+      "summary": "限时活动以任务、日期或阶段记录进度，并通过单项、累计或阶梯奖励推动参与。",
+      "order": 100
+    },
+    {
+      "id": "system.sanguo.mail-notifications",
+      "kind": "system",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "mail-notifications",
+      "title": "邮件与通知",
+      "summary": "邮件负责消息和附件交付，未读、待领取与红点提示分别记录玩家尚未处理的内容。",
+      "story_play_slug": "mail-inbox-read",
+      "order": 110
+    },
+    {
+      "id": "collection.sanguo.conquest-entry",
+      "kind": "collection",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "conquest-entry",
+      "title": "征服玩法入口",
+      "summary": "征服菜单负责把玩家带到军演、演武和远征等独立玩法；它是跨玩法入口，不是一个玩法系统。",
+      "order": 200
+    },
+    {
+      "id": "collection.sanguo.attention-routing",
+      "kind": "collection",
+      "game_id": "sanguo-mouding-tianxia",
+      "slug": "attention-routing",
+      "title": "红点与注意力路由",
+      "summary": "红点会把玩家带向邮件、活动、同盟、倒计时或身份门槛等不同原因；它描述跨系统的提示模式，不归任何一个业务系统独占。",
+      "story_play_slug": "red-dot-attention-routing",
+      "order": 210
+    }
+  ],
+  "entries": [
+    {
+      "game_id": "afk-journey",
+      "play_slug": "hero-role-growth",
+      "level": "system",
+      "group_id": "system.afk-journey.hero-growth",
+      "order": 10
+    },
+    {
+      "game_id": "minecraft-java",
+      "play_slug": "first-night-fire-food",
+      "level": "play_loop",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "newcomer-foundation",
+      "level": "journey",
+      "reader_visibility": "index_only",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "chapter-course",
+      "level": "interface",
+      "group_id": "system.sanguo.chapter-tasks",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "chapter-reward-settlement",
+      "level": "mechanism",
+      "group_id": "system.sanguo.chapter-tasks",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "city-ruler-building-progression",
+      "level": "mechanism",
+      "group_id": "system.sanguo.city-construction",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "residence-copper-production",
+      "level": "mechanism",
+      "group_id": "system.sanguo.city-construction",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "resource-production-attribution",
+      "level": "interface",
+      "group_id": "system.sanguo.resource-economy",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "warehouse-capacity-overflow",
+      "level": "state_reference",
+      "group_id": "system.sanguo.resource-economy",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "market-shop-trade",
+      "level": "operation",
+      "group_id": "system.sanguo.resource-economy",
+      "order": 30
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "land-discovery-filter-ownership",
+      "level": "operation",
+      "group_id": "system.sanguo.territory-expansion",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "land-occupation",
+      "level": "state_reference",
+      "group_id": "system.sanguo.territory-expansion",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "land-battle-dispatch-settlement",
+      "level": "operation",
+      "group_id": "system.sanguo.territory-expansion",
+      "order": 30
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "land-cultivation-leveling",
+      "level": "mechanism",
+      "group_id": "system.sanguo.territory-expansion",
+      "order": 40
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "general-roster-growth",
+      "level": "interface",
+      "group_id": "system.sanguo.general-growth",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "general-attribute-allocation",
+      "level": "operation",
+      "group_id": "system.sanguo.general-growth",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "tactic-learning-upgrade",
+      "level": "mechanism",
+      "group_id": "system.sanguo.general-growth",
+      "order": 30
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "force-composition",
+      "level": "system_overview",
+      "group_id": "system.sanguo.army-formation",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "formation-bond",
+      "level": "mechanism",
+      "group_id": "system.sanguo.army-formation",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "lineup-assistant-recommendation-application",
+      "level": "operation",
+      "group_id": "system.sanguo.army-formation",
+      "order": 30
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "conscription-reserve-production",
+      "level": "mechanism",
+      "group_id": "system.sanguo.troop-supply",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "reinforcement-reserve-allocation",
+      "level": "operation",
+      "group_id": "system.sanguo.troop-supply",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "battle-loss-recovery",
+      "level": "state_reference",
+      "group_id": "system.sanguo.troop-supply",
+      "order": 30
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "martial-exercise-progression",
+      "level": "system_overview",
+      "group_id": "system.sanguo.martial-exercise",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "martial-exercise-idle-reward",
+      "level": "mechanism",
+      "group_id": "system.sanguo.martial-exercise",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "alliance-overview-routing",
+      "level": "interface",
+      "group_id": "system.sanguo.alliance",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "alliance-city-pool",
+      "level": "interface",
+      "group_id": "system.sanguo.alliance",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "alliance-glory",
+      "level": "interface",
+      "group_id": "system.sanguo.alliance",
+      "order": 30
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "alliance-journey-rewards",
+      "level": "mechanism",
+      "group_id": "system.sanguo.alliance",
+      "order": 40
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "alliance-schedule",
+      "level": "interface",
+      "group_id": "system.sanguo.alliance",
+      "order": 50
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "activity-first-bloom",
+      "level": "mechanism",
+      "group_id": "system.sanguo.activities",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "activity-land-expansion",
+      "level": "mechanism",
+      "group_id": "system.sanguo.activities",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "activity-signin-calendar",
+      "level": "mechanism",
+      "group_id": "system.sanguo.activities",
+      "order": 30
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "mail-inbox-read",
+      "level": "interface",
+      "group_id": "system.sanguo.mail-notifications",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "mail-attachment-delivery",
+      "level": "operation",
+      "group_id": "system.sanguo.mail-notifications",
+      "order": 20
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "red-dot-attention-routing",
+      "level": "pattern",
+      "group_id": "collection.sanguo.attention-routing",
+      "order": 10
+    },
+    {
+      "game_id": "sanguo-mouding-tianxia",
+      "play_slug": "conquest-mode-routing",
+      "level": "interface",
+      "group_id": "collection.sanguo.conquest-entry",
+      "order": 10
+    }
+  ]
+}

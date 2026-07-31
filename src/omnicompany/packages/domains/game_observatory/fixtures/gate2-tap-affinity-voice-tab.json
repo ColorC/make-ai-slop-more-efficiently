@@ -1,0 +1,18 @@
+{
+  "action": {
+    "type": "tap",
+    "x": 850,
+    "y": 1035
+  },
+  "target_name": "信赖度页签：语音",
+  "target_bounds": {
+    "x": 730,
+    "y": 985,
+    "width": 250,
+    "height": 100
+  },
+  "settle_threshold": 0.01,
+  "required_consecutive": 2,
+  "settle_timeout_seconds": 5.0,
+  "sample_interval_seconds": 0.25
+}

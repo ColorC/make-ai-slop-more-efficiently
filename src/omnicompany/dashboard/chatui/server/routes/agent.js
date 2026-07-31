@@ -10,7 +10,6 @@ import { spawnCursor } from '../cursor-cli.js';
 import { queryCodex } from '../openai-codex.js';
 import { spawnGemini } from '../gemini-cli.js';
 import { spawnOpenCode } from '../opencode-cli.js';
-import { spawnKimi } from '../kimi-cli.js';
 import { Octokit } from '@octokit/rest';
 import { providerModelsService } from '../modules/providers/services/provider-models.service.js';
 import { IS_PLATFORM } from '../constants/config.js';
@@ -863,8 +862,8 @@ router.post('/', validateExternalApiKey, async (req, res) => {
     return res.status(400).json({ error: 'message is required' });
   }
 
-  if (!['claude', 'cursor', 'codex', 'gemini', 'opencode', 'kimi'].includes(provider)) {
-    return res.status(400).json({ error: 'provider must be "claude", "cursor", "codex", "gemini", "opencode", or "kimi"' });
+  if (!['claude', 'cursor', 'codex', 'gemini', 'opencode'].includes(provider)) {
+    return res.status(400).json({ error: 'provider must be "claude", "cursor", "codex", "gemini", or "opencode"' });
   }
 
   // Validate GitHub branch/PR creation requirements
@@ -945,7 +944,6 @@ router.post('/', validateExternalApiKey, async (req, res) => {
     const codexModels = (await providerModelsService.getProviderModels('codex')).models;
     const geminiModels = (await providerModelsService.getProviderModels('gemini')).models;
     const opencodeModels = (await providerModelsService.getProviderModels('opencode')).models;
-    const kimiModels = (await providerModelsService.getProviderModels('kimi')).models;
 
     // Start the appropriate session
     if (provider === 'claude') {
@@ -997,15 +995,6 @@ router.post('/', validateExternalApiKey, async (req, res) => {
         cwd: finalProjectPath,
         sessionId: sessionId || null,
         model: model || opencodeModels.DEFAULT
-      }, writer);
-    } else if (provider === 'kimi') {
-      console.log('Starting Kimi CLI session');
-
-      await spawnKimi(message.trim(), {
-        projectPath: finalProjectPath,
-        cwd: finalProjectPath,
-        sessionId: sessionId || null,
-        model: model || kimiModels.DEFAULT
       }, writer);
     }
 

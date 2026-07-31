@@ -1,6 +1,6 @@
 # [OMNI] origin=ai-ide domain=decisions ts=2026-06-17T00:00:00Z type=format status=active
 # [OMNI] summary="decisions domain 的 Material(Format)定义。决策记录的统一数据契约:一条决策/猜想/评论的标准记录 + 抽取观测 + 索引。"
-# [OMNI] why="主线=决策记录(非提取)。决策有多源(对话/API消息/策划文档/札记)多落地面,必须一套源无关、面无关的公共契约把它们汇成一棵可搜索的决策树(符号统一体系)。"
+# [OMNI] why="主线=决策记录(非提取)。决策有多源(对话/collab platform/策划文档/札记)多落地面,必须一套源无关、面无关的公共契约把它们汇成一棵可搜索的决策树(符号统一体系)。"
 # [OMNI] tags=decisions,format,material,decision-record,schema
 """decisions domain Materials —— 决策记录的统一数据契约。
 
@@ -29,15 +29,14 @@ from omnicompany.protocol.format import Format, FormatRegistry
 
 # ── 公共子结构(anchor / origin / links)在多个 Format 间复用 ────────────────
 
-# anchor = 「中间契约甜蜜点」: 这条决策/猜想挂在哪个富信息载体上(文档/代码/AI产物/API消息…)。
+# anchor = 「中间契约甜蜜点」: 这条决策/猜想挂在哪个富信息载体上(文档/代码/AI产物/collab platform消息…)。
 _ANCHOR = {
     "type": "object",
     "description": "决策依附的中间契约(甜蜜点):富信息、好读好改、可插人类控制节点的载体。",
     "properties": {
         "kind": {
             "type": "string",
-            # NOTE(2026-07-31): schema 契约值脱敏改名, "feishu_msg" → "api_msg"。
-            "enum": ["doc", "code", "ai_output", "api_msg", "spec", "prefab", "note", "other"],
+            "enum": ["doc", "code", "ai_output", "feishu_msg", "spec", "prefab", "note", "other"],
         },
         "ref": {"type": "string", "description": "路径 / url / message_id / 文件:行"},
         "excerpt": {"type": "string", "description": "引文(承载决策的那段原文)"},
@@ -51,8 +50,7 @@ _ORIGIN = {
     "properties": {
         "channel": {
             "type": "string",
-            # NOTE(2026-07-31): schema 契约值脱敏改名, "feishu" → "api_msg", "demogame_doc" → "internal_doc"。
-            "enum": ["claude", "codex", "api_msg", "note", "internal_doc", "manual"],
+            "enum": ["claude", "codex", "feishu", "note", "demogame_doc", "manual"],
         },
         "session_ref": {"type": "string", "description": "会话/文档/消息定位(jsonl 路径、wiki token、doc id…)"},
         "observed_at": {"type": "string", "description": "ISO 时间:这条决策在源里发生的时刻"},
@@ -75,7 +73,7 @@ _LINKS = {
             "items": {"type": "string"},
             "description": (
                 "执法载体标识列表(值不是记录 id):此裁决被编译进哪个执法器,"
-                "如 example_domain.design_doc_lint.check7_self_reference / frontend_design.frostpane.css#token。"
+                "如 demogame.design_doc_lint.check7_self_reference / frontend_design.frostpane.css#token。"
                 "记录时的权威声明,与 LLM 事后推断的因果边(causal sidecar)分家。"
             ),
         },
@@ -315,7 +313,7 @@ DECISION_OBSERVATION = Format(
     id="decision.observation",
     name="DecisionObservation",
     description=(
-        "抽取态:从某个源(对话/API消息/札记/策划文档)抽出的一条原始决策信号,尚未去重/精炼/接树。"
+        "抽取态:从某个源(对话/collab platform/札记/策划文档)抽出的一条原始决策信号,尚未去重/精炼/接树。"
         "下游 refine 把它判成 decision|belief|comment、补 anchor/links、并进统一库。"
     ),
     tags=["domain.decisions", "stage.extracted", "kind.internal"],
@@ -324,8 +322,7 @@ DECISION_OBSERVATION = Format(
         "properties": {
             "channel": {
                 "type": "string",
-                # NOTE(2026-07-31): schema 契约值脱敏改名, "feishu" → "api_msg", "demogame_doc" → "internal_doc"。
-                "enum": ["claude", "codex", "api_msg", "note", "internal_doc", "manual"],
+                "enum": ["claude", "codex", "feishu", "note", "demogame_doc", "manual"],
             },
             "raw_quote": {"type": "string", "description": "原话(不改写,留作证据)"},
             "gist": {"type": "string", "description": "一句话概括"},

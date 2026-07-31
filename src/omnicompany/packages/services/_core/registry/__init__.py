@@ -11,7 +11,7 @@ MetaTypeRegistry，支持未来添加 Knowledge / Prompt / DataSource 等类型�
 
     reg = get_registry()          # 获取默认 InstanceRegistry（data/registry/）
     scan(reg)                     # 扫描 source_root，填充 registry
-    result = query(reg).type("router").package("example_domain.example_team").execute()
+    result = query(reg).type("router").package("demogame.team_table").execute()
     for entry in result:
         print(entry.entity_id, entry.attrs.get("format_in"))
 """

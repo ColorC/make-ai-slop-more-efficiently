@@ -6,9 +6,8 @@
   - TeamTopologyCheck     (原 PipelineTopologyCheckWorker)  — 一站式拓扑诊断
   - TeamLineageExtractor  (原 PipelineLineageWorker)         — 跨 Team material 产消图
 
-拓扑检查引擎 (Finding / CheckContext / run_pipeline_checks 等) 在
-`pipeline_topology_engine.py` (2026-07-26 OMNI-040 Stage 3 迁出 _archive),
-由本 shim re-export.
+拓扑检查引擎 (Finding / CheckContext / run_pipeline_checks 等) 保留在
+`_archive/pipeline_topology_legacy.py` 作基础设施, 由本 shim re-export.
 """
 from __future__ import annotations
 
@@ -25,7 +24,7 @@ PipelineTopologyCheckWorker = TeamTopologyCheck   # legacy class-name alias
 PipelineLineageWorker = TeamLineageExtractor
 
 # ─── 模块级类/函数 re-export (基础设施) ─────────────────────────────────
-from .pipeline_topology_engine import (  # noqa: E402
+from ._archive.pipeline_topology_legacy import (  # noqa: E402
     # dataclasses + context
     Finding,
     CheckContext,

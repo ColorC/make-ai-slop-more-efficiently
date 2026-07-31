@@ -76,20 +76,12 @@
 3. ✅ CLI `omni decisions`(record / list / find / show / link / mark / doctor / reindex / status)。`record` 用 `--choose`/`--reject` 强制显化被否决项。
 4. ✅ 产物落 `data/domains/decisions/library/{records.jsonl,index.json}`;首条种子=本次会话真实决策 DEC-2026-06-18-001(rests_on BLF-2026-06-18-001)。
 
-## 已补齐（2026-07-15 对话增量抽取与跨项目投影）
-
-1. ✅ `conversation.py` 同时扫描 Claude 与 Codex 会话；Codex 只接收根会话中的真实 user/assistant 消息，并过滤环境、权限、技能目录与浏览器状态等注入块。
-2. ✅ `extract_run.py` 按文件字节偏移增量抽取。会话继续增长时只处理新增尾部；每个块把 session、offset、chunk、added 与状态写入 `data/domains/decisions/runs/extraction_progress.json`。
-3. ✅ `omni decisions extract-run` 支持 `--source`、精确 `--session-id` 与 `--chunk-chars`，便于先做目标范围抽取，再安排全库回填。
-4. ✅ `narrative_scopes.yaml` 提供命名范围。`outward-publishing` 将个人网站、内部文章、demogame、小红书及通用发布设施映射到一个可重复查询的集合。
-5. ✅ `omni decisions narrative --mode scope --scope outward-publishing --deterministic` 从统一库生成确定性、可重建的跨项目投影；投影不成为第二事实源。
-
 ## 待加(下一刀,按序)
 
-1. collab platform消息源:取数层加 `feishu_messages`,产 observation。
-2. demogame 落地面:record→标准化中间文档的渲染器(在执行端,共用契约)。
-3. 决策树视图:沿 `links.rests_on` 反向链,某 belief `falsified` 时列出受影响决策(证伪传播)。
-4. 发布范围细分:在不改写事实记录的前提下，为跨项目投影增加阶段、主题与候选文章簇，减少路线帖选材时的二次阅读。
+1. 抽取管线:`observation` 生产者(先对话源,复用 work_history 数据源),refine 节点判 kind + 补 anchor/links + 经 `library.upsert` 并库。
+2. collab platform消息源:取数层加 `feishu_messages`,产 observation。
+3. demogame 落地面:record→标准化中间文档的渲染器(在执行端,共用契约)。
+4. 决策树视图:沿 `links.rests_on` 反向链,某 belief `falsified` 时列出受影响决策(证伪传播)。
 
 ## 复用的现成积木
 

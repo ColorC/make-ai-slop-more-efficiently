@@ -7,19 +7,19 @@
 注册 roots/快速工作选项(skill)/links/最新进展指针), 卡片一键复制的就是它的路径。
 
 约定(重要): index 文件是本机 omnicompany 内部档(含硬编码本机路径), 只能住在
-omnicompany 内部, 绝不放进会被上传分享的外部目录(如共享同步盘)——
-否则同步到队友电脑里那些路径全是坏的。外部根目录的项目(代码在工作区之外),
-index 统一放 <project-root>/docs/projects/<id>/PROJECT_INDEX.md; root 仍指向真实代码位置。
+omnicompany 内部, 绝不放进会被上传分享的外部目录(如 d:/P4/main/AIWorkSpace)——
+否则同步到队友电脑里那些路径全是坏的。外部根目录的项目(代码在 AIWorkSpace 等),
+index 统一放 omnicompany/docs/projects/<id>/PROJECT_INDEX.md; root 仍指向真实代码位置。
 
 例:
-  omni project register my-project --name "我的项目" --group other \\
-      --root "<workspace-root>" \\
-      --index "<project-root>/docs/projects/my-project/PROJECT_INDEX.md" \\
-      --desc "一句话说明"
+  omni project register demogame-config --name "demogame 配表" --group demogame \\
+      --root "d:/P4/main/AIWorkSpace" \\
+      --index "E:/WindowsWorkspace/omnicompany/docs/projects/demogame-config/PROJECT_INDEX.md" \\
+      --plan-cat demogame --desc "游戏数据自动配置(赛季手册/装饰抽奖/商店)"
   omni project list --json          # 总控读这个了解全部项目
-  omni project show my-project      # 含 index 浮出的 quick_actions
+  omni project show demogame-config    # 含 index 浮出的 quick_actions
   omni project index-check --all    # 校验所有 index 文件结构
-  omni project index-init my-project --path "<project-root>/docs/projects/my-project/PROJECT_INDEX.md"
+  omni project index-init demogame-config --path "E:/WindowsWorkspace/omnicompany/docs/projects/demogame-config/PROJECT_INDEX.md"
 """
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ def cmd_project() -> None:
 @cmd_project.command("register")
 @click.argument("project_id")
 @click.option("--name", default=None, help="显示名")
-@click.option("--group", default=None, help="主分组(omnicompany/indie-game/other 或自定义)")
+@click.option("--group", default=None, help="主分组(demogame/omnicompany/indie-game/other 或自定义)")
 @click.option("--tag", "tags", multiple=True, help="标签(可多个)")
 @click.option("--desc", default=None, help="一句话说明")
 @click.option("--root", "roots", multiple=True, help="项目根目录(可多个)")

@@ -1,0 +1,14 @@
+{
+  "schema": "game-observatory.ai-player.account-metric-definition.v1",
+  "id": "metric-definition.sanguo.account.power.v2",
+  "game_id": "sanguo-mouding-tianxia",
+  "metric_key": "sanguo.account.power",
+  "label": "势力值",
+  "category": "account_progression",
+  "unit": "point",
+  "numeric_format": "integer",
+  "improvement_direction": "higher_is_favorable",
+  "minimum_value": 0,
+  "maximum_value": 1000000000,
+  "minimum_ocr_confidence": 0.95
+}

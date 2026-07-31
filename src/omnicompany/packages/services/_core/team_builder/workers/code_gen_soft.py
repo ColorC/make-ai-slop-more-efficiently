@@ -1,6 +1,5 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-24T00:00:00Z type=worker
 # [OMNI] material_id="material:core.team_builder.soft_agent_generators.orchestrator_design.py"
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """CodeGenerator 子 team · SOFT 部分 (2026-04-24 · 分形重构).
 
 两个 Worker:

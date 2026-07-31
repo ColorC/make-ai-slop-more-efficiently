@@ -119,4 +119,3 @@ def install_exception_filter(loop: asyncio.AbstractEventLoop) -> None:
 
     loop.set_exception_handler(handler)
     setattr(loop, "_omni_accept_filter", True)
-

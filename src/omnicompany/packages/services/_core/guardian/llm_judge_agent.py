@@ -2,7 +2,6 @@
 # [OMNI] migrated 2026-05-02: 旧 runtime.agent.agent_node_loop.AgentNodeLoop 已 deprecate
 # [OMNI] 现在用 packages.services._core.agent.AgentNodeLoop (router 化新基础设施)
 # [OMNI] material_id="material:core.guardian.llm_single_file_judge.implementation.py"
-# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """LLMJudgeAgent — AgentNodeLoop 版本的 LLM 裁判员 (新 router 化架构, 2026-05-02 迁).
 
 替代 patrol.LLMJudge 的单轮调用 + 200 行硬截断问题。
@@ -199,7 +198,7 @@ class LLMJudgeAgent(AgentNodeLoop):
     输入 (传给 run() 的 dict):
         {
             "path":         "src/omnicompany/packages/services/knowledge/store.py",
-            "abs_path":     "<project-root>/src/..." ,
+            "abs_path":     "E:/WindowsWorkspace/omnicompany/src/..." ,
             "change_type":  "A" | "M",
             "rule_hits":    ["OMNI-013", ...] (规则引擎已命中的规则),
             "file_lines":   401,   # 行数提示, agent 决定分段读取策略

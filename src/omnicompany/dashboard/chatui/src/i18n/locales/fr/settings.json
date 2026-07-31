@@ -332,9 +332,6 @@
       "opencode": {
         "description": "Assistant CLI OpenCode"
       },
-      "kimi": {
-        "description": "Assistant CLI Kimi Code"
-      },
       "omni_agent": {
         "description": "Assistant Omni Agent"
       },
@@ -436,7 +433,6 @@
       "cursor": "Les serveurs Model Context Protocol fournissent des outils et sources de données supplémentaires à Cursor",
       "codex": "Les serveurs Model Context Protocol fournissent des outils et sources de données supplémentaires à Codex",
       "opencode": "Les serveurs Model Context Protocol fournissent des outils et sources de données supplémentaires à OpenCode",
-      "kimi": "Les serveurs Model Context Protocol fournissent des outils et sources de données supplémentaires à Kimi",
       "omni_agent": "Les serveurs Model Context Protocol fournissent des outils et sources de données supplémentaires à Omni Agent"
     },
     "addButton": "Ajouter un serveur MCP",

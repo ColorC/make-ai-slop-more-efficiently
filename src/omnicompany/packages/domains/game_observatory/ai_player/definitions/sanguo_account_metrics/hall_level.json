@@ -1,0 +1,14 @@
+{
+  "schema": "game-observatory.ai-player.account-metric-definition.v1",
+  "id": "metric-definition.sanguo.city.hall-level.v1",
+  "game_id": "sanguo-mouding-tianxia",
+  "metric_key": "sanguo.city.hall_level",
+  "label": "君王殿等级",
+  "category": "account_progression",
+  "unit": "level",
+  "numeric_format": "integer",
+  "improvement_direction": "higher_is_favorable",
+  "minimum_value": 1,
+  "maximum_value": 1000,
+  "minimum_ocr_confidence": 0.95
+}

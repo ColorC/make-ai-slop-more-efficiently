@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="从外部玩家视角复原游戏系统、流程、规则、资源与玩家声音。">
+  <title>游戏观测站 · Game Observatory</title>
+  <link rel="stylesheet" href="/game-observatory/styles.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="masthead">
+    <a class="brand" href="/game-observatory/" data-home>
+      <span class="brand-mark">GO</span>
+      <span><strong>游戏观测站</strong><small>GAME OBSERVATORY</small></span>
+    </a>
+    <nav>
+      <button class="nav-link is-active" data-home>档案</button>
+      <button class="nav-link" data-scroll="method">方法</button>
+      <a class="nav-link" href="/api/game-observatory/catalog">API</a>
+    </nav>
+    <div class="live-pill" data-live><i></i><span>设施连接中</span></div>
+  </header>
+
+  <main id="app" data-testid="game-observatory-app">
+    <section class="hero">
+      <p class="eyebrow">PUBLIC GAME DESIGN FIELD NOTES</p>
+      <h1>把“玩过”变成<br><em>可以复核的设计知识</em></h1>
+      <p class="hero-copy">从明确版本下的真实流程出发，连接界面、机制、资源和玩家反馈。每条内容保留来源；截图只是证据，语义才是可查询的真源。</p>
+      <div class="hero-stats" data-stats></div>
+    </section>
+
+    <section class="catalog-shell" data-catalog-shell>
+      <aside class="filters">
+        <label class="search-box">
+          <span>搜索档案</span>
+          <input type="search" placeholder="系统、机制、玩家问题…" data-search>
+        </label>
+        <div class="filter-label">主题标签</div>
+        <div class="tag-cloud" data-tags></div>
+        <button class="clear-filter" data-clear>清除筛选</button>
+        <div class="method-card" id="method">
+          <span>方法边界</span>
+          <p>直接观察、公开声明、玩家表达与分析解释分开保存。不推测竞品内部经营数据，不用总分掩盖证据。</p>
+        </div>
+      </aside>
+      <section class="catalog">
+        <div class="section-head">
+          <div><p class="eyebrow">SYSTEM ARCHIVES</p><h2>系统档案</h2></div>
+          <span data-result-count>载入中</span>
+        </div>
+        <div class="report-grid" data-report-grid></div>
+      </section>
+    </section>
+
+    <section class="report-view" data-report-view hidden></section>
+  </main>
+
+  <footer>
+    <span>游戏观测站 · 外部玩家视角的公开设计资料设施</span>
+    <span data-footer-status>Canonical JSON → public projection</span>
+  </footer>
+  <script type="module" src="/game-observatory/app.js"></script>
+</body>
+</html>

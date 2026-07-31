@@ -1,0 +1,108 @@
+/* ============================================================
+   管线看板(team_board) · 蓝图 G 页面形态(2026-07-19 阶段四第四波;
+   合同=TRIFORM-UX-REDESIGN-V2/demo/MAPPING.md + analysis/team_board.md):
+   · 页签内形态(G.3⑤): 无大标题顶栏,页面从筛选工具行开始(chrome 区铺格纸)。
+   · 59 个全宽 accent「打开拓扑」主按钮已杀死 —— 整卡可点(v2-card 厚框纸件),
+     次动作 kebab hover 才现(触屏恒 .7)。
+   · 状态 chip(未进G2/设计/已注册)合并为 gate 阶段轨(.tb-gate 两站轨);
+     年龄文本 → 新鲜度色点(.tb-fdot 热/温/冷)+ ⊢N⊣ 尺寸标注。
+   · 组头: 空心描边大字 + chevron + ⊢N⊣ 计数 + 组内状态构成迷你条(.tb-comp)。
+   · 页首全板阶段分布条(.tb-dist)收进工具行右端。纹理分区铁律:卡片/文字面平滑纸面。
+   ============================================================ */
+
+.tb-page { position: relative; height: 100%; display: flex; flex-direction: column; min-height: 0;
+  color: var(--fp-text); background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */
+  box-sizing: border-box; }
+
+/* 筛选工具行(chrome 区:格纸 + 收薄 padding) */
+.tb-tools { display: flex; align-items: center; gap: 10px; padding: 8px 22px; flex-wrap: wrap;
+  flex-shrink: 0; border-bottom: 1px solid var(--fp-border-subtle);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+.tb-tools .tools-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+/* 全板阶段分布条(三桶:已注册/仅设计/未进G2;真实构成,非装饰) */
+.tb-dist { display: inline-flex; align-items: center; gap: 8px; }
+.tb-dist .bar { display: inline-flex; width: 108px; height: 10px; gap: 1px; border: 1px solid var(--fp-border);
+  border-radius: 2px; padding: 1px; box-sizing: border-box; }
+.tb-dist .bar i { display: block; min-width: 0; }
+.tb-dist .seg-reg, .tb-comp .seg-reg { background: repeating-linear-gradient(45deg, rgba(127,212,168,.85) 0 2px, rgba(127,212,168,.25) 2px 5px); }
+.tb-dist .seg-des, .tb-comp .seg-des { background: repeating-linear-gradient(45deg, rgba(111,168,255,.85) 0 2px, rgba(111,168,255,.25) 2px 5px); }
+.tb-dist .seg-none, .tb-comp .seg-none { background: repeating-linear-gradient(45deg, rgba(110,140,184,.55) 0 2px, transparent 2px 5px); }
+
+/* 列表体(内容容器铺在格纸上,卡片浮在格上) */
+.tb-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 22px 40px; }
+.tb-body-inner { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 4px; }
+
+/* 分组折叠头(整行可点;空心描边大字 + chevron + 计数尺寸标注 + 构成迷你条) */
+.tb-ghead { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 14px 4px 8px; color: var(--fp-text-2); background: transparent; border: 0;
+  cursor: pointer; font: inherit; box-sizing: border-box; }
+.tb-ghead:hover { color: var(--fp-text); }
+.tb-ghead .chev { display: inline-flex; align-items: center; color: var(--fp-text-3); flex: none;
+  transition: transform var(--fp-t-fast) var(--fp-ease); }
+.tb-ghead[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.tb-ghead .gh-name { color: transparent; -webkit-text-stroke: 1px rgba(235,245,255,.68);
+  font-family: var(--fp-font-mono); font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-ghead .bp-dim { color: var(--fp-bp-brass-hi); flex: none; }
+
+/* 组内状态构成迷你条(与全板分布条同语言,小号) */
+.tb-comp { display: inline-flex; align-items: center; flex: none; }
+.tb-comp .bar { display: inline-flex; width: 64px; height: 8px; gap: 1px; border: 1px solid var(--fp-border);
+  border-radius: 2px; padding: 1px; box-sizing: border-box; }
+.tb-comp .bar i { display: block; min-width: 0; }
+
+/* 卡片网格 */
+.tb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px;
+  padding-bottom: 6px; }
+.tb-grid.hidden { display: none; }
+
+/* 管线卡(整卡可点;v2-card 厚框纸件;纵向布局) */
+.tb-card { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 14px; }
+.tb-card .tc-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tb-card .tc-icon { width: 40px; height: 40px; border-radius: 2px; border: 1px solid rgba(235,245,255,.45);
+  display: grid; place-items: center; flex: none; color: var(--fp-text-2); box-sizing: border-box; }
+.tb-card .tc-t { flex: 1; min-width: 0; font-weight: 600; color: var(--fp-text);
+  font-size: var(--fp-fs-2); font-family: var(--fp-bp-font-display);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-card .tc-pkg { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-card .tc-foot { display: flex; align-items: center; gap: 10px; }
+.tb-card .tc-foot .bp-dim { flex: none; }
+/* kebab 次动作 hover 才现(触屏恒 .7) */
+.tb-card .kebab-wrap { opacity: 0; transition: opacity var(--fp-t-fast); flex: none; display: inline-flex; }
+.tb-card:hover .kebab-wrap, .tb-card .kebab-wrap:focus-within { opacity: 1; }
+@media (pointer: coarse) { .tb-card .kebab-wrap { opacity: .7; } }
+
+/* gate 阶段轨(设计 → G2 两站;当前阶段点亮,未进 G2 = 全灭+文字回退) */
+.tb-gate { display: inline-flex; align-items: center; gap: 0; flex: none; }
+.tb-gate .g-stop { display: inline-flex; align-items: center; gap: 5px; }
+.tb-gate .g-dot { width: 9px; height: 9px; border-radius: 1px; border: 1.5px solid var(--fp-border-strong);
+  background: transparent; box-sizing: border-box; }
+.tb-gate .g-stop.on .g-dot { border-color: rgba(210,235,255,.85);
+  background: repeating-linear-gradient(45deg, rgba(200,235,255,.68) 0 1.5px, transparent 1.5px 4px); }
+.tb-gate .g-stop.on.final .g-dot { border-color: var(--fp-ok);
+  background: repeating-linear-gradient(45deg, var(--fp-ok) 0 1.5px, rgba(127,212,168,.25) 1.5px 4px); }
+.tb-gate .g-lab { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); color: var(--fp-text-3);
+  letter-spacing: .06em; text-transform: uppercase; }
+.tb-gate .g-stop.on .g-lab { color: var(--fp-text-2); }
+.tb-gate .g-link { width: 14px; height: 5px; position: relative; border-top: 1px solid var(--fp-border); margin: 0 4px; }
+.tb-gate .g-none { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); color: var(--fp-text-3);
+  letter-spacing: .06em; }
+
+/* 新鲜度色点(热<7d=ok / 温<45d=warn / 冷=idle 蓝灰;陈旧是分布信息,不是警报) */
+.tb-fdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.tb-fdot.f-hot { background: var(--fp-ok); }
+.tb-fdot.f-warm { background: var(--fp-warn); }
+.tb-fdot.f-cold { background: var(--fp-idle); }
+
+/* 窄屏(phone <600): 工具行/列表 padding 收窄;组头字缩;seg 可横滑不撑出横向溢出 */
+@media (max-width: 599px) {
+  .tb-tools { padding: 8px 12px; gap: 8px; }
+  .tb-tools .v2-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .tb-tools .v2-seg::-webkit-scrollbar { display: none; }
+  .tb-body { padding: 8px 12px 32px; }
+  .tb-ghead .gh-name { font-size: 16px; }
+  .tb-dist .bar { width: 72px; }
+  .tb-grid { grid-template-columns: minmax(0, 1fr); }
+}

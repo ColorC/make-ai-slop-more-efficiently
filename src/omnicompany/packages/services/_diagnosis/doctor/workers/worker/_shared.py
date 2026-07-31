@@ -7,13 +7,11 @@ import ast
 import logging
 from pathlib import Path
 
-from omnicompany.core.config import omni_workspace_root
-
 logger = logging.getLogger("omnicompany.doctor.router")
 
 
 # 默认 source root (omnicompany 项目的 src/omnicompany/)
-DEFAULT_SOURCE_ROOT = omni_workspace_root() / "src" / "omnicompany"
+DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
 
 
 # 已知模型名称模式 (R-11 检测硬编码模型名)
@@ -50,11 +48,6 @@ PROTOCOL_LEAK_PATTERNS = (
 # ════════════════════════════════════════════════════════════════
 # AST 工具函数
 # ════════════════════════════════════════════════════════════════
-
-def get_source_lines(source_root: Path) -> list[str]:
-    """获取 source 文件内容行（用于行号上下文提取）。"""
-    return []
-
 
 def classify_self_assignment(var_name: str, context: str) -> str:
     """将 self.xxx = ... 分类为 INFO / SUSPICIOUS / LIKELY_VIOLATION."""

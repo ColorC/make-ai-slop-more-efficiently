@@ -53,12 +53,12 @@ _SUMMARY_PROMPT = """\
 {
   "activities": [
     {
-      "purpose": "修改 DataConfig 的 FieldType 字段",
-      "behavior": "读取 Excel → 按类别+是否新增推断 FieldType → 写回 Excel",
-      "tools_used": ["read_excel", "write_excel", "git_commit"],
-      "domain": "my_domain/sample",
-      "input_artifacts": ["DataConfig.xlsm"],
-      "output_artifacts": ["DataConfig.xlsm (modified)"]
+      "purpose": "修改 TavernPool 配表的 PoolType 字段",
+      "behavior": "读取 Excel → 按种族+是否新UP推断 PoolType → 写回 Excel",
+      "tools_used": ["read_excel", "write_excel", "p4_submit"],
+      "domain": "demogame/tavern",
+      "input_artifacts": ["TavernPool.xlsm"],
+      "output_artifacts": ["TavernPool.xlsm (modified)"]
     }
   ]
 }

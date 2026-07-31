@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Game Observatory Exploration Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "surface_summary",
+    "action_type",
+    "x",
+    "y",
+    "x2",
+    "y2",
+    "duration_ms",
+    "seconds",
+    "text",
+    "keycode",
+    "package",
+    "button",
+    "pressed",
+    "rationale",
+    "expected_change"
+  ],
+  "properties": {
+    "surface_summary": {"type": "string"},
+    "action_type": {
+      "type": "string",
+      "enum": ["tap", "swipe", "text", "key", "launch", "wait", "back", "home", "stop"]
+    },
+    "x": {"type": ["integer", "null"]},
+    "y": {"type": ["integer", "null"]},
+    "x2": {"type": ["integer", "null"]},
+    "y2": {"type": ["integer", "null"]},
+    "duration_ms": {"type": "integer", "minimum": 0, "maximum": 30000},
+    "seconds": {"type": "number", "minimum": 0, "maximum": 30},
+    "text": {"type": ["string", "null"]},
+    "keycode": {"type": ["integer", "null"]},
+    "package": {"type": ["string", "null"]},
+    "button": {"type": ["string", "null"]},
+    "pressed": {"type": ["boolean", "null"]},
+    "rationale": {"type": "string"},
+    "expected_change": {"type": "string"}
+  }
+}

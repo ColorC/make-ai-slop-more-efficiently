@@ -28,7 +28,7 @@ relations:
 provenance:
   created_from: "H-034 falsification chain"
   created_at: "2026-05-07"
-  source_artifact: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/h034b_upgraded_2026-05-07.md"
+  source_artifact: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v22_h034b_upgraded_2026-05-07.md"
 
 open_questions:
   - "是否还有第六种、第七种错误处理模式？"

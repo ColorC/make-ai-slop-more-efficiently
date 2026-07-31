@@ -1,0 +1,47 @@
+{
+  "schema": "game-observatory.ai-player.live-step-request.v1",
+  "target_id": "device://mumu/0",
+  "environment_id": "environment.sanguo.bilibili.mumu.account.lueyang-zhenwei-jiang.server-1641.world-toubian-duanshui.1_31_0",
+  "session_id": "ai-player-session.sanguo.login-conflict-recovery.20260716.v1",
+  "viewport_width": 1080,
+  "viewport_height": 1920,
+  "game_id": "sanguo-mouding-tianxia",
+  "build_scope_id": "nslg-bilibili-1.31.0-versionCode-13100-20260715",
+  "action": {
+    "type": "tap",
+    "x": 540,
+    "y": 1580
+  },
+  "target_name": "点击开始游戏",
+  "target_bounds": {
+    "x": 280,
+    "y": 1500,
+    "width": 520,
+    "height": 135
+  },
+  "account_action_intent": {
+    "id": "intent.sanguo.click-start-after-conflict.20260716.v1",
+    "category": "native_game_automation",
+    "summary": "Use the cached game entry to return to the AI account after the cross-device conflict.",
+    "game_internal": true
+  },
+  "expectation": {
+    "summary": "The start page changes to a cached-login loading state, account selection, or the playable world.",
+    "kind": "visual_change",
+    "min_visual_distance": 0.02,
+    "stop_conditions": [
+      "The start page remains unchanged after the action.",
+      "External identity, QR code, real credentials, or payment appears.",
+      "The action runtime reaches 60 seconds."
+    ]
+  },
+  "actor": "sanguo-player-day1",
+  "holder": "sanguo-player-day1",
+  "lease_ttl_seconds": 120,
+  "max_runtime_seconds": 60,
+  "settle_threshold": 0.01,
+  "required_consecutive": 1,
+  "settle_timeout_seconds": 2.0,
+  "sample_interval_seconds": 0.2,
+  "capture_profile": "compact_static"
+}

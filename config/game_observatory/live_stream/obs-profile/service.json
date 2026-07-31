@@ -1,8 +1,0 @@
-{
-  "settings": {
-    "server": "http://127.0.0.1:8889/game-observatory/whip",
-    "bearer_token": ""
-  },
-  "type": "whip_custom"
-}
-

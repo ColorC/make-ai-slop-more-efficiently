@@ -1,0 +1,19 @@
+{
+  "action": {
+    "type": "tap",
+    "x": 548,
+    "y": 1136,
+    "duration_ms": 250
+  },
+  "target_name": "罗万主动技能有效落点",
+  "target_bounds": {
+    "x": 485,
+    "y": 1070,
+    "width": 130,
+    "height": 135
+  },
+  "settle_threshold": 0.03,
+  "required_consecutive": 3,
+  "settle_timeout_seconds": 14.0,
+  "sample_interval_seconds": 0.25
+}

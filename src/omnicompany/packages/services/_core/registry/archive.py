@@ -61,7 +61,7 @@ class HealthSnapshot:
     """某实体在某时刻的健康状态快照。一行 JSONL。"""
 
     entity_id: str
-    """注册体系的实体 ID（如 router:example_domain.example_team.SchemaAssembler）。"""
+    """注册体系的实体 ID（如 router:demogame.team_table.SchemaAssembler）。"""
 
     timestamp: str = field(default_factory=_now_iso)
     """诊断时间（ISO 8601）。"""
@@ -116,7 +116,7 @@ class HealthArchive:
     目录结构：
         {archive_dir}/{type}/{safe_entity_id}.jsonl
 
-    例：data/registry/health/router/router_example_domain.example_team.SchemaAssembler.jsonl
+    例：data/registry/health/router/router_demogame.team_table.SchemaAssembler.jsonl
     """
 
     def __init__(self, archive_dir: Path) -> None:

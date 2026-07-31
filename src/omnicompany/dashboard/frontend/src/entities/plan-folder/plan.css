@@ -1,0 +1,114 @@
+/* ============================================================
+   plan 计划详情 · 蓝图 G(2026-07-19 阶段四第四波;对照 analysis/plan.md):
+   · 头部 = 状态摘要卡(衬线题名+日期/归档徽章+活跃对话+plan.md 一句摘要+两个主动作),
+     替代"标题+63 行时间线洪流";唯一主按钮=启动执行(朱红 seal 描边)。
+   · 时间线 63 行流水 → 按日分组折叠(默认只展开最近一天) + 同分钟爆发合并
+     ("产出 N 个文件"组行,可展开) + 类型 segmented(全部/记录/产出)。
+   · "全部文件"第二平铺 → 与时间线合并为单区(视图 seg: 文件/时间线) + 搜索 + 类型 seg
+     (md/图片/其他,带计数);非 md 不可点行=dashed 降权;文件大小 mono 尺寸标注族。
+   · 关联 cc_sessions / 草稿札记: 空态自动收起(无内容不出整壳)。
+   · 手写 Consolas 栈/纯黑底清零 → var(--fp-font-mono)/token(带 CJK 回落)。
+   纹理分区铁律: 页面/工具行/组头=chrome 格纸;卡片/行文字面=平滑纸面禁纹理。
+   ============================================================ */
+
+.pl-page { display: flex; flex-direction: column; height: 100%; overflow: auto;
+  color: var(--fp-text); box-sizing: border-box;
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+.pl-inner { max-width: 880px; width: 100%; margin: 0 auto; padding: 12px 20px 48px; box-sizing: border-box; }
+
+/* 状态摘要卡(2px 白框纸件;主焦点复位) */
+.pl-head { flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 16px; cursor: default; }
+.pl-head:active { transform: none; box-shadow: var(--fp-shadow-sm); }
+.pl-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-family: var(--fp-bp-font-display); font-size: 17px; font-weight: 700; color: var(--fp-text); }
+.pl-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  color: var(--fp-text-3); font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); }
+.pl-meta .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pl-sum { color: var(--fp-text-2); font-size: var(--fp-fs-3); line-height: 1.55;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pl-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+/* 主按钮(唯一): 启动执行 = 朱红 seal 描边 */
+.pl-btn-primary { display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  border: 2px solid var(--fp-bp-seal); border-radius: var(--fp-r1); background: var(--fp-bp-paper-2);
+  color: var(--fp-text); font-size: var(--fp-fs-3); font-weight: 600; font-family: inherit;
+  padding: 6px 14px; box-shadow: var(--fp-shadow-sm); transition: all var(--fp-t-fast); }
+.pl-btn-primary:hover:not(:disabled) { border-color: #ff6f6a; background: var(--fp-bg-overlay); }
+.pl-btn-primary:active:not(:disabled) { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(6,16,38,.5); }
+.pl-btn-primary:disabled { opacity: .55; cursor: wait; }
+/* 次动作: 打开 plan.md = 虚线件 */
+.pl-btn-ghost { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px dashed var(--fp-border); border-radius: var(--fp-r1); background: transparent;
+  color: var(--fp-text-2); font-size: var(--fp-fs-3); font-family: inherit;
+  padding: 5px 12px; transition: all var(--fp-t-fast); }
+.pl-btn-ghost:hover { border-style: solid; border-color: var(--fp-border-strong); color: var(--fp-text); }
+.pl-btn-ghost:active { transform: translateY(1px); }
+.pl-runmsg { font-size: var(--fp-fs-3); }
+
+/* 文件/时间线 工具行(chrome) */
+.pl-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0 8px; }
+.pl-tools .v2-search { max-width: 240px; }
+.pl-tools .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* 文件行: 可点(md)=整卡可点;不可点(非 md)=dashed 降权(未探索区语言) */
+.pl-file { flex-direction: column; align-items: stretch; gap: 2px; padding: 8px 12px; margin-bottom: 6px; }
+.pl-file-top { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.pl-fmd { flex: none; min-width: 30px; text-align: center; font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4); color: var(--fp-bp-brass-hi); border: 1px solid var(--fp-bp-brass);
+  border-radius: 2px; padding: 0 4px; line-height: 1.5; }
+.pl-fpath { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--fp-text); font-size: var(--fp-fs-3); }
+.pl-fsize { flex: none; color: var(--fp-text-3); font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); }
+.pl-fsum { color: var(--fp-text-2); font-size: var(--fp-fs-4); line-height: 1.45; margin-left: 40px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pl-file-static { display: flex; align-items: baseline; gap: 10px; padding: 7px 12px; margin-bottom: 6px;
+  border: 1px dashed var(--fp-border-subtle); border-radius: var(--fp-r2); opacity: .68;
+  color: var(--fp-text-3); font-size: var(--fp-fs-3); box-sizing: border-box; }
+
+/* 时间线: 日分组 + 行 */
+.pl-day-head { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 10px 2px 6px; color: var(--fp-text-2); background: transparent; border: 0;
+  cursor: pointer; font: inherit; box-sizing: border-box; }
+.pl-day-head:hover { color: var(--fp-text); }
+.pl-day-head .chev { display: inline-flex; color: var(--fp-text-3); flex: none;
+  transition: transform var(--fp-t-fast) var(--fp-ease); }
+.pl-day-head[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.pl-day-head .d { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); font-weight: 600;
+  letter-spacing: .14em; color: var(--fp-text-2); }
+.pl-day-head .bp-dim { color: var(--fp-bp-brass-hi); flex: none; }
+.pl-tl-rows { padding-bottom: 4px; }
+.pl-tlrow { display: flex; align-items: baseline; gap: 8px; padding: 4px 8px;
+  border-bottom: 1px dashed var(--fp-border-subtle); }
+.pl-tlrow:last-child { border-bottom: 0; }
+.pl-tl-time { flex: none; width: 46px; color: var(--fp-text-3); font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4); font-variant-numeric: tabular-nums; }
+.pl-tl-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; align-self: center; }
+.pl-tl-dot.progress { background: var(--fp-ok); }
+.pl-tl-dot.material { background: transparent; border: 1px solid var(--fp-text-3); }
+.pl-tl-text { flex: 1; min-width: 0; color: var(--fp-text-2); font-size: var(--fp-fs-3); line-height: 1.5; }
+.pl-tl-by { color: var(--fp-text-3); }
+/* 同分钟爆发合并行 */
+.pl-burst { width: 100%; text-align: left; display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px; border: 0; border-bottom: 1px dashed var(--fp-border-subtle);
+  background: transparent; cursor: pointer; font: inherit; color: var(--fp-text-2);
+  font-size: var(--fp-fs-3); box-sizing: border-box; }
+.pl-burst:hover { color: var(--fp-text); }
+.pl-burst .chev { display: inline-flex; color: var(--fp-text-3); flex: none;
+  transition: transform var(--fp-t-fast) var(--fp-ease); }
+.pl-burst[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.pl-burst-items { padding: 2px 8px 6px 62px; }
+
+/* 关联 cc_sessions 行 */
+.pl-cc-row { display: flex; gap: 8px; align-items: baseline; padding: 5px 8px; cursor: pointer;
+  border: 0; border-bottom: 1px dashed var(--fp-border-subtle); background: transparent;
+  width: 100%; text-align: left; font: inherit; font-size: var(--fp-fs-3); color: var(--fp-text-2);
+  box-sizing: border-box; }
+.pl-cc-row:hover { background: var(--fp-bp-paper-2); color: var(--fp-text); }
+
+/* 草稿札记区 */
+.pl-notes { margin-top: 14px; border-top: 1px solid var(--fp-border-subtle); padding-top: 12px; }
+
+@media (max-width: 599px) {
+  .pl-inner { padding: 10px 12px 40px; }
+  .pl-tools .v2-search { max-width: none; }
+  .pl-fsum { margin-left: 0; }
+}

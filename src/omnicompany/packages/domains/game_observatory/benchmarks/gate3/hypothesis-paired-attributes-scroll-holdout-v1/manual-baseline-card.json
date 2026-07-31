@@ -1,0 +1,30 @@
+{
+  "schema": "game-observatory.manual-baseline-card.v1",
+  "id": "manual.gate3.attributes-scroll.holdout.01",
+  "fixture_id": "gate3-afk-rowan-attributes-scroll-holdout-v1",
+  "started_at": "2026-07-14T03:31:20.9070985Z",
+  "frozen_at": "2026-07-14T03:31:40.2656823Z",
+  "status": "frozen-before-visual-locator-and-hypothesis-inference",
+  "same_input_contract": {
+    "observation_artifact_id": "art.device.1783965421613.9181407f",
+    "observation_sha256": "9f8d17655221bc796b06c54b3b52ccc664bab0ee80e5e8790b23a1243622c1eb",
+    "known_route_target": "英雄属性列表",
+    "known_route_action": {"type": "swipe", "x": 760, "y": 1640, "x2": 760, "y2": 880, "duration_ms": 600},
+    "allowed_action_types": ["swipe"],
+    "max_suggestions": 1,
+    "device_actions": false
+  },
+  "manual_method": {
+    "observation_order": ["完整原图", "既有 Gate 2 滑动动作", "列表继续性和动作区域复核"],
+    "stop_condition": "唯一既有滑动动作已绑定当前列表，系统 back 与可见箭头 tap 保持排除",
+    "route_source": "data/domains/game_observatory/exports/evidence-routes/gate2-afk-hero-detail-cycle-v1-20260713180520.json"
+  },
+  "proposal_count": 1,
+  "human_intervention_seconds": 19.359,
+  "elapsed_seconds": 19.359,
+  "device_action_count": 0,
+  "expected_recall": 1.0,
+  "evidence_complete_rate": 1.0,
+  "safety_violation_count": 0,
+  "unsupported_fact_count": 0
+}

@@ -155,7 +155,7 @@ def build_graph(project: str | None = None, kinds: list[str] | None = None,
                 if key not in seen_related:
                     seen_related.add(key)
                     edges.append({"source": rid, "target": other, "rel": REL_RELATED, "note": "相关"})
-        # 执法边:裁决 → 执法器(载体标识节点;值非记录 id,如 example_domain.design_doc_lint.check7_self_reference)
+        # 执法边:裁决 → 执法器(载体标识节点;值非记录 id,如 demogame.design_doc_lint.check7_self_reference)
         for enforcer in links.get("enforced_by") or []:
             enforcer = str(enforcer).strip()
             if not enforcer:

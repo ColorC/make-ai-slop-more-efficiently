@@ -22,7 +22,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from omnicompany.core.config import omni_workspace_root
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.packages.services._core.omnicompany import Worker
 from omnicompany.packages.services._core.guardian.rules.runtime_hygiene import (
@@ -31,6 +30,8 @@ from omnicompany.packages.services._core.guardian.rules.runtime_hygiene import (
 
 logger = logging.getLogger(__name__)
 
+
+_DEFAULT_PROJECT_ROOT = Path("e:/WindowsWorkspace/omnicompany")
 
 # 项目根目录下允许的合法条目
 _ALLOWED_ROOT_ENTRIES = frozenset({
@@ -81,7 +82,7 @@ class FsScannerWorker(Worker):
         *,
         excluded_mount_roots: list[str] | None = None,
     ):
-        self._root = Path(project_root) if project_root else omni_workspace_root()
+        self._root = Path(project_root) if project_root else _DEFAULT_PROJECT_ROOT
         # 已挂载外部业务仓根排除清单(错误样本㊄): 这些仓虽被扫描逻辑(尤其盘根扫描)
         # 触及, 但它们是登记在案的业务仓, 其正常业务文件不该被巡逻当散落文件误报。
         # None → 内部懒调用 list_mounted_repo_roots() 现取真实登记表(形状A的默认行为);

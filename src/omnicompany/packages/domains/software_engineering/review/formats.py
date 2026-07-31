@@ -23,7 +23,6 @@ FORMATS = [
         name="ReviewDiff",
         description="待审查的代码差异: git diff 输出或直接 diff 文本，包含描述信息和来源(git SHA/直接文本)",
         parent="tool-observation",
-        tags=["kind.source"],
     ),
 
     # ── 上下文收集 ──
@@ -32,7 +31,7 @@ FORMATS = [
         name="CodeContext",
         description="diff 涉及的周围代码上下文: 每个修改文件的 imports、被调用函数、调用者、文件级注释",
         parent=f"{DOMAIN}.diff",
-        tags=["context-gathered", "kind.internal"],
+        tags=["context-gathered"],
     ),
 
     # ── 测试覆盖 ──
@@ -41,7 +40,7 @@ FORMATS = [
         name="TestCoverage",
         description="变更对应的测试覆盖情况: 找到的测试文件列表、测试内容摘要、覆盖缺口",
         parent=f"{DOMAIN}.context",
-        tags=["context-gathered", "tests-scanned", "kind.internal"],
+        tags=["context-gathered", "tests-scanned"],
     ),
 
     # ── 累积上下文（信息收集回路载体）──
@@ -50,7 +49,7 @@ FORMATS = [
         name="ReviewContext",
         description="审查累积状态: diff + 已收集的上下文 + 测试覆盖 + 加探过的文件列表 + 是否信息充分",
         parent="agent-state",
-        tags=["stateful", "accumulating", "kind.internal"],
+        tags=["stateful", "accumulating"],
     ),
 
     # ── LLM 审查发现 ──
@@ -59,7 +58,7 @@ FORMATS = [
         name="ReviewFindings",
         description="LLM 审查发现: Critical(🔴)/Important(🟡)/Minor(🔵) 分级问题列表，每个问题含文件、行号、描述",
         parent=f"{DOMAIN}.review-context",
-        tags=["reviewed", "kind.internal"],
+        tags=["reviewed"],
     ),
 
     # ── 交叉验证 ──
@@ -68,7 +67,7 @@ FORMATS = [
         name="ValidatedFindings",
         description="交叉验证后的发现: 检查每个 Critical/Important 发现是否有代码证据支持，过滤无依据的误报",
         parent=f"{DOMAIN}.findings",
-        tags=["reviewed", "validated", "kind.internal"],
+        tags=["reviewed", "validated"],
         required_tags=["reviewed"],
     ),
 
@@ -78,7 +77,7 @@ FORMATS = [
         name="ReviewReport",
         description="最终审查报告: APPROVE/REQUEST_CHANGES/NEEDS_DISCUSSION 结论 + 分级问题列表 + 报告文本",
         parent=f"{DOMAIN}.validated-findings",
-        tags=["reported", "kind.sink"],
+        tags=["reported"],
         required_tags=["validated"],
     ),
 ]
