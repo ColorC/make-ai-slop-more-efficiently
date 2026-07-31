@@ -33,17 +33,6 @@ records:
       目标: 未定, 暂不动
     备注: 结构清晰(材料/文件/封面/批注分离), 普查判定"规范"。
 
-  - id: human-approval
-    名称: 人工审批 / 问询队列
-    位置: data/runtime/buses/human_inbox.db
-    格式: sqlite
-    谁在写: human-inbox 收件箱服务(omni human / omni inquiry)
-    唯一性: 唯一真源
-    保留滚动策略:
-      现状: 无滚动, 单库持续追加
-      目标: 未定, 暂不动
-    备注: 与"进化问询"(见 evolution-inquiries)是两回事, 不要混淆。
-
   - id: evolution-inquiries
     名称: 进化问询(evolution workflow 的 user inquiry 存储)
     位置: data/runtime/buses/inquiries.db
@@ -56,9 +45,8 @@ records:
         OMNI_INQUIRY_DB_PATH + migrate_legacy_inquiry_db()(迁移旧漂移文件带 .bak
         回滚副本); CLI 四个子命令与 orchestrator 默认走锚定路径, 不再传裸相对名。
         磁盘上仍未产生任何实体文件(尚无问询发生), 无历史文件需迁移。
-      目标: 固定落 data/runtime/buses/inquiries.db, 与 human_inbox.db 同级(已达成)
-    备注: 参照物 runtime/buses/human_bus.py::_resolve_inbox_path()(人工审批问询库,
-      本身用同构锚定, 无 cwd 漂移病, 本批核实无需改)。
+      目标: 固定落 data/runtime/buses/inquiries.db(已达成)
+    备注: 这是 evolution workflow 的独立问询库, 不承接 agent 对话中的用户判断。
 
   - id: decisions-library
     名称: 决策库(决策/信念/评论主记录)
@@ -264,25 +252,18 @@ records:
       目标: 各域在本表登记自己的子条目, 新增域记录类型加一行即合法
     备注: domains/demogame/events.db 与顶层 data/events.db 的关系待核(是否同类记录的两个库, 未比对 schema); 已知野记录 domains/demogame_ux/scratch/rule_traces/ 应改为统一 jsonl 追加或按 run-id 目录归档, 第五批处置。
 
-  - id: token-ledger
-    名称: token 记账(会话级用量 + 内部调用账聚合)
-    位置: data/llm/token_ledger/(sessions.jsonl + internal_by_caller_day.jsonl + watermark.json)
-    格式: jsonl(会话级/内部按caller×天) + json(水位线状态)
-    谁在写: omni token-ledger run(CLI) + gov-token-ledger-daily 定时任务(纯扫描不调LLM)
-    唯一性: 派生可重建
+  - id: session-attribution
+    名称: 会话归属统一设施(session → omni项目/计划)
+    位置: data/boss_sight/ccusage_cache/(session_project_labels.json + project_vocab_map.json + labeler_status.json)
+    格式: json(LLM标注缓存/词表映射/心跳)
+    谁在写: ccdaemon 内常驻标注线程(qwen 深读, 增量; 入口=boss_sight/session_attribution.py)
+    唯一性: 派生可重建(五级归属链前四级来自 绑定/cwd/projects_registry/agent_digests 等既有真源)
     保留滚动策略:
-      现状: 每次运行按水位线增量收集新内容, 与已落盘的历史行合并累加后重写文件,
-        不是全量覆盖——sessions.jsonl 按 session_id 合并(命中同 session_id 时按模型
-        累加 token 数与 calls, 否则追加新行), internal_by_caller_day.jsonl 按
-        caller×day×model 三键合并累加, watermark.json 记录三路数据源各自的字节偏移
-        (及 codex 的当前模型/total 基线延续状态)续跑点。落盘账本保留跨多次 run 的
-        完整历史, 不会被下一次增量批次(只含水位线之后的新内容)整份覆盖掉。
+      现状: labels 增量追加, __v 版本迁移时作废 null 重判; vocab 只增
       目标: 未定, 暂不动
-    备注: 派生自 ~/.claude/projects(顶层会话, 排除 subagents/workflows)+ ~/.codex/sessions
-      + data/llm/meter.jsonl 三路只读数据源折算, 本条目本身可随时删除重跑重建(不是唯一真源,
-      唯一真源是那三处); 关联(cwd→项目/cron↔caller)只做确定性匹配, 对不上一律落"未关联"桶,
-      不猜测; 接口=看板 GET /api/boss-sight/token-ledger; 权威=
-      docs/plans/[2026-07-02]SEMANTIC-OS-MAP/overnight-run.md 第六节。
+    备注: 用户2026-07-17指令"对话自动分类做成统一任务, 各渠道禁止各自为战"。任何消费者
+      (ccusage统计/看板/未来渠道)一律走 session_attribution.make_resolver(),
+      接口=GET /api/boss-sight/session-attribution。
 
   - id: kb-annotations
     名称: 知识库标注

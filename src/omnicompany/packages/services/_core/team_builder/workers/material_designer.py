@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:team_builder.workers.material_deepener_orchestrator.worker.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """MaterialDesignerWorker — Phase 4' · AgentNodeLoop (2026-04-23).
 
 Worker 协议:
@@ -304,9 +305,12 @@ class _MaterialDesignSingleAgent(AgentNodeLoop):
     DESCRIPTION: ClassVar[str] = "Phase 4' 单 Material 深化 agent session"
     MAX_RETRIES: ClassVar[int] = 1
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any) -> _MaterialDesignerPromptBuilder:
         return _MaterialDesignerPromptBuilder(template=self.NODE_PROMPT, bus=bus)
@@ -384,6 +388,9 @@ class MaterialDesignerWorker(Worker):
     )
     MAX_CONCURRENT: ClassVar[int] = 4
 
+    def __init__(self, *, model: str | None = None) -> None:
+        self._model = model
+
     async def run(self, input_data: Any) -> Verdict:
         if not isinstance(input_data, dict):
             return Verdict(
@@ -394,6 +401,30 @@ class MaterialDesignerWorker(Worker):
         team_design = input_data.get("_from_team_architect") or input_data.get("team_design") or input_data
         skeletons = team_design.get("materials_skeleton", []) if isinstance(team_design, dict) else []
         if not skeletons:
+            worker_skeletons = (
+                team_design.get("workers_skeleton", [])
+                if isinstance(team_design, dict)
+                else []
+            )
+            existing_only = bool(worker_skeletons) and all(
+                isinstance(item, dict)
+                and str(item.get("impl_type") or "").upper() == "EXISTING"
+                for item in worker_skeletons
+            )
+            if existing_only:
+                return Verdict(
+                    kind=VerdictKind.PASS,
+                    output={
+                        "details": [],
+                        "_meta": {
+                            "worker": "MaterialDesignerWorker",
+                            "stage": "existing_contracts",
+                            "skeletons_count": 0,
+                            "success_count": 0,
+                        },
+                    },
+                    diagnosis="0 materials · formats owned by existing Worker contracts",
+                )
             return Verdict(
                 kind=VerdictKind.FAIL,
                 output={},
@@ -408,7 +439,7 @@ class MaterialDesignerWorker(Worker):
 
         async def _run_one(skeleton: dict) -> dict | None:
             async with sem:
-                agent = _MaterialDesignSingleAgent()
+                agent = _MaterialDesignSingleAgent(model=self._model)
                 sub_input = {
                     "_from_team_architect": team_design,
                     "_from_origin_request_loader": origin_req,

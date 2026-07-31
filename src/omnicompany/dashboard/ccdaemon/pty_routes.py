@@ -22,37 +22,62 @@ server → client:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
+from omnicompany.dashboard.session_workdir import default_session_cwd
+
 from .pty import (
     DEFAULT_COLS, DEFAULT_ROWS, get_manager, resolve_claude_cmd,
-    list_recoverable_sessions,
+    list_recoverable_sessions, _resume_command,
 )
+from . import codex_installer as ci
 from . import installer as si
 
 logger = logging.getLogger(__name__)
 
 cc_router = APIRouter(prefix="/cc", tags=["cc-wrapper"])
+SNAPSHOT_WS_CHARS = 256 * 1024
+SESSION_LIST_CACHE_TTL_S = 2.0
+_session_list_cache: dict[
+    tuple[bool, str | None],
+    tuple[float, dict[str, Any]],
+] = {}
+_session_list_tasks: dict[
+    tuple[bool, str | None],
+    asyncio.Task[dict[str, Any]],
+] = {}
 
 
 class CreateSessionBody(BaseModel):
     cmd: list[str] | None = Field(default=None, description="Override command; defaults to claude CLI on PATH.")
-    cwd: str | None = Field(default=None, description="Working directory; defaults to server CWD.")
+    cwd: str | None = Field(
+        default=None,
+        description="Working directory; defaults to E:\\WindowsWorkspace. Other directories are preserved in session metadata.",
+    )
     cols: int = DEFAULT_COLS
     rows: int = DEFAULT_ROWS
     safe_mode: bool = Field(
         default=False,
-        description="If true, spawn vanilla `claude` (permission prompts ON). "
-                    "Default false → adds `--dangerously-skip-permissions` so the "
-                    "in-dashboard agent doesn't pepper you with prompts. All tool "
-                    "calls remain visible via PreToolUse trace events.",
+        description="If true, do not add the remote CLI's default permission-bypass flag. "
+                    "Default false: Claude bypasses permissions, Codex bypasses approvals "
+                    "and sandboxing, Kimi uses yolo, and OpenCode auto-approves.",
     )
+
+
+class ResumeProviderSessionBody(BaseModel):
+    provider: str = Field(..., min_length=1, max_length=40)
+    provider_session_id: str = Field(..., min_length=1, max_length=200)
+    cwd: str | None = Field(default=None, max_length=4000)
+    cols: int = DEFAULT_COLS
+    rows: int = DEFAULT_ROWS
 
 
 @cc_router.get("/health")
@@ -61,46 +86,62 @@ async def cc_health() -> dict[str, Any]:
         "status": "ok",
         "claude_cli_found": resolve_claude_cmd() is not None,
         "session_count": len(get_manager().list_meta()),
+        "default_cwd": default_session_cwd(),
     }
 
 
 # ── settings install / status (single source of truth — dashboard button calls this,
 #    CLI `omni cc install` calls the same `settings_installer` module) ──
 
+def _integration_installer(provider: str):
+    if provider == "codex":
+        return ci
+    if provider in ("claude", "claude_code", "claude-code"):
+        return si
+    raise HTTPException(400, "provider must be 'claude_code' or 'codex'")
+
+
 @cc_router.get("/install/status")
-async def install_status(scope: str = "project") -> dict[str, Any]:
+async def install_status(scope: str = "project", provider: str = "claude_code") -> dict[str, Any]:
     if scope not in ("project", "user"):
         raise HTTPException(400, "scope must be 'project' or 'user'")
-    return si.status(scope=scope)  # type: ignore[arg-type]
+    report = _integration_installer(provider).status(scope=scope)  # type: ignore[arg-type]
+    report["provider"] = "codex" if provider == "codex" else "claude_code"
+    return report
 
 
 @cc_router.post("/install")
-async def install(scope: str = "project") -> dict[str, Any]:
+async def install(scope: str = "project", provider: str = "claude_code") -> dict[str, Any]:
     if scope not in ("project", "user"):
         raise HTTPException(400, "scope must be 'project' or 'user'")
-    rep = si.install(scope=scope)  # type: ignore[arg-type]
-    return {
+    rep = _integration_installer(provider).install(scope=scope)  # type: ignore[arg-type]
+    payload = {
+        "provider": "codex" if provider == "codex" else "claude_code",
         "settings_path": rep.settings_path,
         "backup": rep.backup,
-        "mcp_added_or_updated": rep.mcp_added,
         "hooks_added_or_updated": rep.hooks_added,
         "hooks_unchanged": rep.hooks_unchanged,
         "note": rep.note,
-        "equivalent_cli": f"omni cc install --scope {scope}",
+        "equivalent_cli": f"omni cc install --provider {provider} --scope {scope}",
     }
+    if hasattr(rep, "mcp_added"):
+        payload["mcp_added_or_updated"] = rep.mcp_added
+    if hasattr(rep, "requires_trust"):
+        payload["requires_trust"] = rep.requires_trust
+    return payload
 
 
 @cc_router.delete("/install")
-async def uninstall(scope: str = "project") -> dict[str, Any]:
+async def uninstall(scope: str = "project", provider: str = "claude_code") -> dict[str, Any]:
     if scope not in ("project", "user"):
         raise HTTPException(400, "scope must be 'project' or 'user'")
-    rep = si.uninstall(scope=scope)  # type: ignore[arg-type]
-    rep["equivalent_cli"] = f"omni cc uninstall --scope {scope}"
+    rep = _integration_installer(provider).uninstall(scope=scope)  # type: ignore[arg-type]
+    rep["provider"] = "codex" if provider == "codex" else "claude_code"
+    rep["equivalent_cli"] = f"omni cc uninstall --provider {provider} --scope {scope}"
     return rep
 
 
-@cc_router.get("/sessions")
-async def list_sessions(
+def _list_sessions_sync(
     include_recoverable: bool = True,
     active_plan: str | None = None,
 ) -> dict[str, Any]:
@@ -127,6 +168,80 @@ async def list_sessions(
     return out
 
 
+def _invalidate_session_list_cache() -> None:
+    _session_list_cache.clear()
+
+
+@cc_router.get("/sessions")
+async def list_sessions(
+    include_recoverable: bool = True,
+    active_plan: str | None = None,
+) -> dict[str, Any]:
+    """Coalesce disk-heavy registry scans without blocking terminal IO."""
+    key = (include_recoverable, active_plan)
+    now = time.monotonic()
+    cached = _session_list_cache.get(key)
+    if cached is not None and now - cached[0] <= SESSION_LIST_CACHE_TTL_S:
+        return cached[1]
+
+    task = _session_list_tasks.get(key)
+    if task is None:
+        task = asyncio.create_task(
+            asyncio.to_thread(
+                _list_sessions_sync,
+                include_recoverable,
+                active_plan,
+            ),
+            name=f"cc-session-list-{int(include_recoverable)}",
+        )
+        _session_list_tasks[key] = task
+    try:
+        payload = await task
+    finally:
+        if _session_list_tasks.get(key) is task:
+            _session_list_tasks.pop(key, None)
+    _session_list_cache[key] = (time.monotonic(), payload)
+    return payload
+
+
+@cc_router.get("/tab-states")
+async def tab_states() -> dict[str, Any]:
+    """前端页签活跃徽章的高频运行态快照(2s 轮询, 多浏览器并存)。
+
+    只取纯内存投影: PTY 侧走 PtyManager.tab_states() —— 不读数 MB 的
+    cc_sessions.json、不做 host 发现(那些在 /sessions、get()、WS attach
+    等低频路径同步); chat 侧只取内存 list_meta(), 不走带消息预览与
+    搜索打分的分页列表。单次请求零磁盘 IO, 状态最多滞后一个轮询周期。
+    """
+    from .chat import get_chat_manager  # 惰性导入: chat 依赖 pty, 避免模块期成环
+
+    chat_items = [
+        {
+            "id": meta["id"],
+            # Multiagent/页签运行态只认 daemon 仍持有的真实 runtime；持久化历史
+            # 会话虽然逻辑上可续接，也不能伪装成正在运行。
+            "alive": bool(meta.get("runtime_alive", meta.get("alive"))),
+            "runtime_alive": bool(meta.get("runtime_alive", meta.get("alive"))),
+            "running": bool(meta.get("running")),
+            "status": (
+                (meta.get("status") or "alive")
+                if meta.get("runtime_alive", meta.get("alive"))
+                else "ended"
+            ),
+            "provider": meta.get("provider"),
+            "cwd": meta.get("cwd"),
+            "name": meta.get("name"),
+            "provider_session_id": meta.get("provider_session_id"),
+            "started_at": meta.get("started_at"),
+            "last_message": meta.get("last_message"),
+            "message_count": meta.get("message_count"),
+            "token_usage": meta.get("token_usage"),
+        }
+        for meta in get_chat_manager().list_meta()
+    ]
+    return {"pty": get_manager().tab_states(), "chat": chat_items}
+
+
 @cc_router.post("/sessions")
 async def create_session(body: CreateSessionBody) -> dict[str, Any]:
     try:
@@ -141,7 +256,57 @@ async def create_session(body: CreateSessionBody) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    _invalidate_session_list_cache()
     return sess.to_meta()
+
+
+@cc_router.post("/sessions/resume-provider")
+async def resume_provider_session(body: ResumeProviderSessionBody) -> dict[str, Any]:
+    """Open a provider-native conversation in a real PTY-backed CLI."""
+    provider = body.provider.strip().lower().replace("-", "_")
+    if provider in {"claude", "claude_code"}:
+        provider = "claude_code"
+    if provider not in {"claude_code", "codex", "kimi", "opencode", "codebuddy"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"provider {body.provider!r} does not support CLI resume",
+        )
+
+    manager = get_manager()
+    for meta in manager.list_meta():
+        native_id = meta.get("provider_session_id") or (
+            meta.get("claude_session_id") if provider == "claude_code" else None
+        )
+        if (
+            meta.get("alive")
+            and str(meta.get("provider") or "") == provider
+            and str(native_id or "") == body.provider_session_id
+        ):
+            return {**meta, "resumed_existing": True}
+
+    try:
+        cmd = _resume_command(provider, body.provider_session_id)
+        sess = await manager.create(
+            cmd=cmd,
+            cwd=body.cwd,
+            cols=body.cols,
+            rows=body.rows,
+            safe_mode=False,
+            resume_claude_session_id=(
+                body.provider_session_id if provider == "claude_code" else None
+            ),
+            resume_provider_session_id=body.provider_session_id,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    _invalidate_session_list_cache()
+    return {
+        **sess.to_meta(),
+        "resumed_provider_session_id": body.provider_session_id,
+    }
 
 
 @cc_router.post("/sessions/{recoverable_id}/resume")
@@ -157,6 +322,7 @@ async def resume_session(recoverable_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
     out = sess.to_meta()
     out["resumed_from"] = recoverable_id
+    _invalidate_session_list_cache()
     return out
 
 
@@ -165,6 +331,7 @@ async def kill_session(sid: str) -> dict[str, Any]:
     ok = await get_manager().kill(sid)
     if not ok:
         raise HTTPException(status_code=404, detail=f"session not found: {sid}")
+    _invalidate_session_list_cache()
     return {"ok": True, "id": sid}
 
 
@@ -285,8 +452,7 @@ def _aggregate_session_io(events: list[dict]) -> dict:
     }
 
 
-@cc_router.get("/sessions/{sid}/context")
-async def get_session_context(sid: str) -> dict[str, Any]:
+def _get_session_context_sync(sid: str) -> dict[str, Any]:
     store = _read_meta_store()
     entry = store.get(sid) or {}
     if not entry:
@@ -299,7 +465,44 @@ async def get_session_context(sid: str) -> dict[str, Any]:
             entry = {}
     events = _query_session_events(sid)
     io = _aggregate_session_io(events)
-    active_plan = entry.get("active_plan")
+    session_binding: dict[str, Any] = {}
+    try:
+        from omnicompany.packages.services._core.identity import all_session_bindings
+
+        provider = str(entry.get("provider") or "")
+        provider_session_id = str(
+            entry.get("provider_session_id")
+            or entry.get("claude_session_id")
+            or ""
+        )
+        for binding in all_session_bindings().values():
+            binding_trace_id = str(binding.get("trace_id") or "")
+            trace_matches_provider_session = bool(
+                provider_session_id
+                and binding_trace_id in {
+                    provider_session_id,
+                    f"codex_{provider_session_id}",
+                    f"cc_{provider_session_id}",
+                }
+            )
+            if binding.get("pty_id") == sid or (
+                provider_session_id
+                and (
+                    trace_matches_provider_session
+                    or (
+                        binding.get("provider") == provider
+                        and (
+                            binding.get("session_id") == provider_session_id
+                            or binding.get("claude_session_id") == provider_session_id
+                        )
+                    )
+                )
+            ):
+                session_binding = dict(binding)
+                break
+    except Exception:
+        session_binding = {}
+    active_plan = entry.get("active_plan") or session_binding.get("active_plan")
     # plan_meta = plan.md frontmatter, project_meta = 所属 project 的 project.md frontmatter
     # 两者都是真信息源 (明文 yaml), AI IDE / Claude Code 共编共看
     plan_meta: dict[str, Any] = {}
@@ -337,10 +540,16 @@ async def get_session_context(sid: str) -> dict[str, Any]:
         "kind": "cc",
         "context": {
             "active_plan": active_plan,
+            "project": session_binding.get("project") or plan_meta.get("project"),
             "plan_meta": plan_meta,
             "project_meta": project_meta,
             "cwd": entry.get("cwd"),
             "provider": entry.get("provider") or entry.get("kind") or "claude_code",
+            "provider_session_id": (
+                entry.get("provider_session_id")
+                or entry.get("claude_session_id")
+            ),
+            "trace_id": session_binding.get("trace_id") or sid,
             "claude_session_id": entry.get("claude_session_id"),
             "started_at": entry.get("started_at"),
             "ended_at": entry.get("ended_at"),
@@ -351,6 +560,13 @@ async def get_session_context(sid: str) -> dict[str, Any]:
         **io,
         "event_count": len(events),
     }
+
+
+@cc_router.get("/sessions/{sid}/context")
+async def get_session_context(sid: str) -> dict[str, Any]:
+    # Registry parsing, SQLite reads, plan resolution and filesystem identity
+    # lookup are control-plane work. Keep them off the terminal WebSocket loop.
+    return await asyncio.to_thread(_get_session_context_sync, sid)
 
 
 # (REMOVED 2026-05-02 round 4) PATCH /sessions/{sid}/context with UserContextPatch
@@ -436,13 +652,13 @@ async def patch_active_plan(sid: str, body: ActivePlanPatch) -> dict[str, Any]:
     import time as _time
     now_ts = _time.time()
     if plan_id is None:
-        # explicit unbind — write null directly (update_meta_field skips None values)
-        cur = store.get(sid) or {}
-        cur["active_plan"] = None
-        cur["active_plan_changed_ts"] = now_ts
-        store[sid] = cur
-        from .pty import _write_meta_store
-        _write_meta_store(store)
+        # Explicit unbind is one of the few intentional null writes.
+        _pty_update_meta(
+            sid,
+            allow_none=True,
+            active_plan=None,
+            active_plan_changed_ts=now_ts,
+        )
     else:
         _pty_update_meta(sid, active_plan=plan_id, active_plan_changed_ts=now_ts)
 
@@ -522,9 +738,31 @@ async def session_ws(ws: WebSocket, sid: str) -> None:
         await ws.close()
         return
 
-    # 1) replay buffered output so xterm can paint the current screen
-    if snapshot:
-        await ws.send_text(json.dumps({"type": "snapshot", "chunks": snapshot}))
+    # Stream replay in bounded frames. A long-running session can hold tens of
+    # megabytes and must not create one giant JSON/WebSocket frame or enqueue
+    # tens of thousands of xterm write callbacks at once.
+    await ws.send_text(json.dumps({
+        "type": "snapshot_begin",
+        "meta": {
+            "provider": sess.provider,
+            "cols": sess.cols,
+            "rows": sess.rows,
+            "buffered_bytes": sess.ring_bytes,
+            "replay_truncated": sess.replay_truncated,
+        },
+    }))
+    batch: list[str] = []
+    batch_chars = 0
+    for chunk in snapshot:
+        if batch and batch_chars + len(chunk) > SNAPSHOT_WS_CHARS:
+            await ws.send_text(json.dumps({"type": "snapshot_chunk", "chunks": batch}))
+            batch = []
+            batch_chars = 0
+        batch.append(chunk)
+        batch_chars += len(chunk)
+    if batch:
+        await ws.send_text(json.dumps({"type": "snapshot_chunk", "chunks": batch}))
+    await ws.send_text(json.dumps({"type": "snapshot_end"}))
 
     import asyncio
 
@@ -533,14 +771,30 @@ async def session_ws(ws: WebSocket, sid: str) -> None:
         # 帧再发. 当 reader 突 burst 时, 这里少发 N-1 个 WS 帧 + 少 N-1 次 JSON 编码.
         # asyncio.QueueEmpty 当 sentinel — 没东西就发当前 buf, 等下个 await get().
         try:
+            pending: Any = None
             while True:
-                chunk = await queue.get()
+                item = pending if pending is not None else await queue.get()
+                pending = None
+                if isinstance(item, dict):
+                    if item.get("type") == "proxy_reconnect":
+                        await ws.close(code=1012, reason="PTY proxy reconnect")
+                        return
+                    if item.get("type") == "exit":
+                        await ws.send_text(json.dumps(item))
+                        await ws.close(code=1000, reason="PTY exited")
+                        return
+                    continue
+                chunk = str(item)
                 # try to drain extra without blocking
                 while True:
                     try:
-                        chunk += queue.get_nowait()
+                        next_item = queue.get_nowait()
                     except asyncio.QueueEmpty:
                         break
+                    if isinstance(next_item, dict):
+                        pending = next_item
+                        break
+                    chunk += str(next_item)
                 await ws.send_text(json.dumps({"type": "output", "data": chunk}))
         except (WebSocketDisconnect, RuntimeError):
             pass
@@ -558,12 +812,35 @@ async def session_ws(ws: WebSocket, sid: str) -> None:
                 data = msg.get("data", "")
                 if isinstance(data, str) and data:
                     try:
-                        await mgr.write(sid, data)
+                        mgr.claim_control(sess, queue)
+                        if "cols" in msg or "rows" in msg:
+                            await mgr.resize(
+                                sid,
+                                msg.get("cols", DEFAULT_COLS),
+                                msg.get("rows", DEFAULT_ROWS),
+                                source=queue,
+                            )
+                        await mgr.write(sid, data, source=queue)
                     except KeyError:
                         break
             elif t == "resize":
                 try:
-                    await mgr.resize(sid, msg.get("cols", DEFAULT_COLS), msg.get("rows", DEFAULT_ROWS))
+                    await mgr.resize(
+                        sid,
+                        msg.get("cols", DEFAULT_COLS),
+                        msg.get("rows", DEFAULT_ROWS),
+                        source=queue,
+                    )
+                except KeyError:
+                    break
+            elif t == "redraw":
+                try:
+                    await mgr.redraw(
+                        sid,
+                        msg.get("cols", DEFAULT_COLS),
+                        msg.get("rows", DEFAULT_ROWS),
+                        source=queue,
+                    )
                 except KeyError:
                     break
             # Unknown types are silently ignored.

@@ -45,6 +45,10 @@ import {
     abortOpenCodeSession,
 } from './opencode-cli.js';
 import {
+    spawnKimi,
+    abortKimiSession,
+} from './kimi-cli.js';
+import {
     spawnOmniAgent,
     abortOmniAgentSession,
 } from './omni-agent-cli.js';
@@ -114,6 +118,7 @@ const wss = createWebSocketServer(server, {
             codex: queryCodex,
             gemini: spawnGemini,
             opencode: spawnOpenCode,
+            kimi: spawnKimi,
             omni_agent: spawnOmniAgent,
             controller: queryController,
         },
@@ -123,6 +128,7 @@ const wss = createWebSocketServer(server, {
             codex: abortCodexSession,
             gemini: abortGeminiSession,
             opencode: abortOpenCodeSession,
+            kimi: abortKimiSession,
             omni_agent: abortOmniAgentSession,
             controller: abortControllerSession,
         },

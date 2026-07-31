@@ -1,0 +1,6 @@
+interface:
+  display_name: "游戏技能结晶"
+  short_description: "将成功轨迹结构化为候选技能并交给独立验收"
+  default_prompt: "Use $game-skill-crystallizer to create a procedural-skill candidate from this closed route and hand it to a separate validator."
+policy:
+  allow_implicit_invocation: false

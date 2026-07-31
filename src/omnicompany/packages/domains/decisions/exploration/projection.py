@@ -92,6 +92,9 @@ def _record_node(rec: dict) -> dict:
         "session_ref": origin.get("session_ref") or "",
         "is_root": False,
     }
+    if rec.get("distilled"):
+        node["distilled"] = True
+        node["book_ref"] = rec.get("book_ref") or ""
     if rkind == "decision" and rec.get("decision_space"):
         node["decision_space"] = rec["decision_space"]
     if rkind == "belief":
@@ -152,7 +155,7 @@ def build_graph(project: str | None = None, kinds: list[str] | None = None,
                 if key not in seen_related:
                     seen_related.add(key)
                     edges.append({"source": rid, "target": other, "rel": REL_RELATED, "note": "相关"})
-        # 执法边:裁决 → 执法器(载体标识节点;值非记录 id,如 demogame.design_doc_lint.check7_self_reference)
+        # 执法边:裁决 → 执法器(载体标识节点;值非记录 id,如 example_domain.design_doc_lint.check7_self_reference)
         for enforcer in links.get("enforced_by") or []:
             enforcer = str(enforcer).strip()
             if not enforcer:

@@ -274,6 +274,40 @@ class ContractAuditorWorker(Worker):
                 diagnosis="no worker_design_detailed instances found in input",
             )
         if not materials:
+            existing_workers = [
+                worker
+                for worker in workers
+                if str(worker.get("impl_type") or "").upper() == "EXISTING"
+                and worker.get("binding_ref")
+            ]
+            if len(existing_workers) == len(workers):
+                return Verdict(
+                    kind=VerdictKind.PASS,
+                    output={
+                        "connections": [],
+                        "orphan_workers": [],
+                        "dangling_materials": [],
+                        "composite_fan_ins": [],
+                        "source_materials": [],
+                        "sink_materials": [],
+                        "lifecycle_overrides": [],
+                        "f15_context_sources_issues": [],
+                        "existing_worker_contracts": [
+                            {
+                                "worker_id": worker.get("worker_id"),
+                                "binding_ref": worker.get("binding_ref"),
+                                "format_in": worker.get("format_in"),
+                                "format_out": worker.get("format_out"),
+                            }
+                            for worker in existing_workers
+                        ],
+                        "overall_ok": True,
+                    },
+                    diagnosis=(
+                        f"contract audit · {len(existing_workers)} existing Worker "
+                        "contracts resolved from live classes"
+                    ),
+                )
             return Verdict(
                 kind=VerdictKind.FAIL,
                 output={},

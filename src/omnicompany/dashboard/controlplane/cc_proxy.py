@@ -32,6 +32,38 @@ logger = logging.getLogger(__name__)
 
 cc_proxy_router = APIRouter(prefix="/api/cc", tags=["cc-proxy"])
 
+_PTY_CLIENT_PROTOCOL = "focused-visible-v1"
+_LOFA_WEBVIEW_ORIGINS = frozenset({
+    "http://localhost",
+    "https://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
+})
+
+
+def _browser_client_needs_upgrade(
+    *,
+    origin: str | None,
+    client_protocol: str | None,
+    user_agent: str | None = None,
+) -> bool:
+    """Return True only for an outdated browser Dashboard PTY client.
+
+    Browser WebSockets carry Origin. CLI probes and native clients generally do
+    not, so they remain protocol-compatible without a query marker. LOFA 1.0.49
+    already implements the focused-visible snapshot protocol but omitted the
+    query marker; accept only its local App origin plus Android WebView UA while
+    deployed clients move to an explicit marker.
+    """
+    if not origin or client_protocol == _PTY_CLIENT_PROTOCOL:
+        return False
+    is_lofa_webview = (
+        origin in _LOFA_WEBVIEW_ORIGINS
+        and "Android" in (user_agent or "")
+        and "; wv)" in (user_agent or "")
+    )
+    return not is_lofa_webview
+
 
 def _daemon_http_base() -> str:
     """读 daemon 状态 → http://127.0.0.1:<port>; 没活就 503."""
@@ -63,6 +95,40 @@ def _filter_headers(headers: dict[str, str]) -> dict[str, str]:
     return {k: v for k, v in headers.items() if k.lower() not in _HOP_BY_HOP}
 
 
+_HTTP_CLIENT: httpx.AsyncClient | None = None
+_HTTP_CLIENT_LOOP: asyncio.AbstractEventLoop | None = None
+
+
+async def _daemon_http_client() -> httpx.AsyncClient:
+    """Reuse the loopback connection instead of paying client setup per request."""
+    global _HTTP_CLIENT, _HTTP_CLIENT_LOOP
+
+    loop = asyncio.get_running_loop()
+    if (
+        _HTTP_CLIENT is None
+        or _HTTP_CLIENT.is_closed
+        or _HTTP_CLIENT_LOOP is not loop
+    ):
+        previous = _HTTP_CLIENT
+        _HTTP_CLIENT = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, read=120.0),
+            limits=httpx.Limits(
+                max_connections=100,
+                max_keepalive_connections=20,
+                keepalive_expiry=60.0,
+            ),
+            trust_env=False,
+        )
+        _HTTP_CLIENT_LOOP = loop
+        if previous is not None and not previous.is_closed:
+            try:
+                await previous.aclose()
+            except RuntimeError:
+                # A test server may already have closed the loop that owned it.
+                pass
+    return _HTTP_CLIENT
+
+
 # ── chatui 自启动 ensure (非透传, 必须在下面 catch-all 之前注册) ──────────────
 # 前端 /chat-standalone 跳转到收编 chatui(:7348)之前先打这个端点; chatui 没起就
 # 在这里拉起来(ensure_chatui_running 内部 spawn + 轮询 ready), 避免落"连接被拒"死页。
@@ -90,20 +156,20 @@ async def http_proxy(path: str, request: Request) -> Response:
     target = f"{base}/cc/{path}"
     body = await request.body()
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=120.0)) as client:
-        try:
-            upstream = await client.request(
-                method=request.method,
-                url=target,
-                headers=_filter_headers(dict(request.headers)),
-                params=request.query_params,
-                content=body,
-            )
-        except httpx.ConnectError as e:
-            # daemon pid/port 文件说活但 connect 失败 (启动中 / 刚崩)
-            raise HTTPException(status_code=503, detail=f"ccdaemon unreachable: {e}")
-        except httpx.HTTPError as e:
-            raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {e}")
+    client = await _daemon_http_client()
+    try:
+        upstream = await client.request(
+            method=request.method,
+            url=target,
+            headers=_filter_headers(dict(request.headers)),
+            params=request.query_params,
+            content=body,
+        )
+    except httpx.ConnectError as e:
+        # daemon pid/port 文件说活但 connect 失败 (启动中 / 刚崩)
+        raise HTTPException(status_code=503, detail=f"ccdaemon unreachable: {e}")
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {e}")
 
     return Response(
         content=upstream.content,
@@ -114,7 +180,12 @@ async def http_proxy(path: str, request: Request) -> Response:
 
 
 # ── WebSocket 透传 ──────────────────────────────────────────────────────────
-async def _ws_bridge(client_ws: WebSocket, daemon_path: str) -> None:
+async def _ws_bridge(
+    client_ws: WebSocket,
+    daemon_path: str,
+    *,
+    enforce_frontend_protocol: bool = False,
+) -> None:
     """双向桥接: 浏览器 WS ↔ dashboard ↔ daemon WS.
 
     任一侧关闭则关闭另一侧. dashboard reload 时本 task 被 cancelled, daemon
@@ -129,6 +200,23 @@ async def _ws_bridge(client_ws: WebSocket, daemon_path: str) -> None:
 
     target = f"{base}{daemon_path}"
     await client_ws.accept()
+    if enforce_frontend_protocol and _browser_client_needs_upgrade(
+        origin=client_ws.headers.get("origin"),
+        client_protocol=client_ws.query_params.get("client_protocol"),
+        user_agent=client_ws.headers.get("user-agent"),
+    ):
+        # The legacy UI's update guard defers reload while entity.alive is true.
+        # Mark only its local view ended; the daemon/PTY keeps running. On its
+        # next 3-second update tick the page reloads and reconnects with the
+        # current protocol marker.
+        await client_ws.send_json({
+            "type": "exit",
+            "reason": "Dashboard UI updated; reloading",
+        })
+        await client_ws.close(code=1012, reason="Dashboard UI update required")
+        return
+    upstream_close_code = 1012
+    upstream_close_reason = "PTY proxy reconnect"
 
     try:
         async with websockets.connect(target, max_size=None) as upstream:
@@ -147,6 +235,7 @@ async def _ws_bridge(client_ws: WebSocket, daemon_path: str) -> None:
                     return
 
             async def daemon_to_browser() -> None:
+                nonlocal upstream_close_code, upstream_close_reason
                 try:
                     async for msg in upstream:
                         if client_ws.client_state != WebSocketState.CONNECTED:
@@ -155,24 +244,54 @@ async def _ws_bridge(client_ws: WebSocket, daemon_path: str) -> None:
                             await client_ws.send_text(msg)
                         else:
                             await client_ws.send_bytes(msg)
-                except websockets.ConnectionClosed:
+                    close_code = getattr(upstream, "close_code", None)
+                    close_reason = getattr(upstream, "close_reason", None)
+                    if isinstance(close_code, int):
+                        upstream_close_code = close_code
+                    if close_reason:
+                        upstream_close_reason = str(close_reason)
+                except websockets.ConnectionClosed as exc:
+                    code = int(getattr(exc, "code", 1012) or 1012)
+                    # 1006 is a receive-side sentinel and cannot be sent in a
+                    # close frame. Treat every abnormal upstream loss as a
+                    # restartable proxy interruption.
+                    upstream_close_code = code if code != 1006 else 1012
+                    upstream_close_reason = str(getattr(exc, "reason", "") or "PTY proxy reconnect")
                     return
 
-            done, pending = await asyncio.wait(
-                [
-                    asyncio.create_task(browser_to_daemon()),
-                    asyncio.create_task(daemon_to_browser()),
-                ],
+            bridge_tasks = [
+                asyncio.create_task(browser_to_daemon()),
+                asyncio.create_task(daemon_to_browser()),
+            ]
+            _done, pending = await asyncio.wait(
+                bridge_tasks,
                 return_when=asyncio.FIRST_COMPLETED,
             )
             for t in pending:
                 t.cancel()
+            # Always retrieve both task results. Otherwise an upstream close
+            # racing a browser send can leave "Task exception was never
+            # retrieved" warnings and retain traceback/frame references during
+            # long multi-browser runs.
+            results = await asyncio.gather(*bridge_tasks, return_exceptions=True)
+            for result in results:
+                if isinstance(result, asyncio.CancelledError):
+                    continue
+                if isinstance(result, BaseException):
+                    logger.warning(
+                        "cc_proxy ws direction ended unexpectedly for %s: %s",
+                        daemon_path,
+                        result,
+                    )
     except (websockets.WebSocketException, ConnectionRefusedError, OSError) as e:
         logger.warning("cc_proxy ws bridge failed for %s: %s", daemon_path, e)
     finally:
         if client_ws.client_state == WebSocketState.CONNECTED:
             try:
-                await client_ws.close()
+                await client_ws.close(
+                    code=upstream_close_code,
+                    reason=upstream_close_reason[:123],
+                )
             except Exception:
                 pass
 
@@ -184,7 +303,11 @@ async def chat_ws_proxy(ws: WebSocket, sid: str) -> None:
 
 @cc_proxy_router.websocket("/sessions/{sid}/ws")
 async def pty_ws_proxy(ws: WebSocket, sid: str) -> None:
-    await _ws_bridge(ws, f"/cc/sessions/{sid}/ws")
+    await _ws_bridge(
+        ws,
+        f"/cc/sessions/{sid}/ws",
+        enforce_frontend_protocol=True,
+    )
 
 
 @cc_proxy_router.websocket("/echo")

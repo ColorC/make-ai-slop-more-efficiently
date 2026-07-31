@@ -1,0 +1,42 @@
+[
+  {
+    "id": "P1",
+    "human": "approve",
+    "llm_score": 0.9,
+    "llm_verdict": "approve",
+    "correct": true,
+    "reasoning": "新描述基于 trace 证据准确补全了最高频工具 local_list，并将原本模糊的探索过程具象化为基于 repomap 指引的迭代工作流，显著提升了对下游 AI 的可操作性指引。内容严格对齐输入输出格式与已知工具链，无幻觉或过度冗余。"
+  },
+  {
+    "id": "P2",
+    "human": "reject",
+    "llm_score": 0.5,
+    "llm_verdict": "borderline",
+    "correct": false,
+    "reasoning": "新描述准确对应了输入输出格式，并清除了易过时的内部版本与原则代号（V3/F-14），符合精简原则；但过度删减丢失了原描述中关于“主动探索、确认内容与信息充分性判断”的关键路由触发条件，对 AI 的路由决策指引有所削弱。"
+  },
+  {
+    "id": "P3",
+    "human": "borderline-approve",
+    "llm_score": 0.9,
+    "llm_verdict": "approve",
+    "correct": true,
+    "reasoning": "增加括号注释直接明确了 F-14 的具体含义，显著提升了描述对未知内部代号 AI 的可读性与自包含性，有效降低外部文档依赖。改动精准必要，完全符合最小修改与信息增益原则。"
+  },
+  {
+    "id": "P4",
+    "human": "reject",
+    "llm_score": 0.4,
+    "llm_verdict": "borderline",
+    "correct": false,
+    "reasoning": "改动仅为同义替换与措辞微调，未增加任何可操作指引或消除原有歧义，对 AI 的实际路由决策无实质增益。"
+  },
+  {
+    "id": "P5",
+    "human": "reject",
+    "llm_score": 0.9,
+    "llm_verdict": "approve",
+    "correct": false,
+    "reasoning": "新增的 web_search 步骤有 trace 证据支撑，准确还原了 Agent 在模块探索阶段获取外部 API 文档的实际行为，显著提升了对后续 AI 的指引价值。改动仅精准补全工具链，符合最小修改原则且无幻觉。"
+  }
+]

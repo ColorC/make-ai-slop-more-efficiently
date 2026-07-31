@@ -144,28 +144,54 @@ def _format_event(ev) -> str:
               help="key=value 形式的输入参数（可多次指定）")
 @click.option("--json-input", "-j", type=str, default=None,
               help="JSON 格式的完整输入字典")
+@click.option(
+    "--json-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="从 UTF-8 JSON 文件读取完整输入字典；适合 Windows 下的嵌套输入",
+)
 @click.option("--db", type=str, default=None,
               help="events.db 路径覆盖")
 @click.option("--max-steps", type=int, default=None,
               help="最大决策步数覆盖")
 @click.option("--output", "-o", type=str, default=None,
               help="把完整 sink material 写到此文件 (str 直写 · dict 转 JSON). 用于黑盒测试/batch 消费.")
-def cmd_run(pipeline_name: str, inputs: tuple, json_input: str | None,
-            db: str | None, max_steps: int | None, output: str | None):
+@click.option("--yes", "-y", is_flag=True, default=False,
+              help="跳过长管线确认门(confirm=True 的管线在非交互环境必须带此开关)")
+def cmd_run(
+    pipeline_name: str,
+    inputs: tuple,
+    json_input: str | None,
+    json_file: Path | None,
+    db: str | None,
+    max_steps: int | None,
+    output: str | None,
+    yes: bool,
+):
     """执行已注册的管线。
 
     \b
     示例:
         omni run agent "列出目录下的文件"
         omni run lap-audit -i target=src/omnicompany/runtime/runner.py
-        omni run demogame-learn -j '{"table": "TavernPool"}'
+        omni run research.run -j '{"query": "market scan"}'
     """
     from omnicompany.core.registry import discover, get_or_raise
     discover()
 
     # 构建输入字典
     input_dict: dict = {}
-    if json_input:
+    if json_input and json_file:
+        raise click.UsageError("--json-input 与 --json-file 只能选择一个")
+    if json_file:
+        try:
+            loaded = json.loads(json_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise click.ClickException(f"--json-file 读取失败: {exc}") from exc
+        if not isinstance(loaded, dict):
+            raise click.ClickException("--json-file 顶层必须是 JSON object")
+        input_dict = loaded
+    elif json_input:
         try:
             input_dict = json.loads(json_input)
         except json.JSONDecodeError as e:
@@ -183,6 +209,29 @@ def cmd_run(pipeline_name: str, inputs: tuple, json_input: str | None,
     click.echo(click.style(f"> {entry.name}", fg="cyan", bold=True)
                + f"  {entry.description}")
     click.echo(click.style(f"  domain={entry.domain}", fg="bright_black"))
+
+    # ── 确认门(接入面纪律 DEC-2026-07-10-002: 长管线声明规模+显式确认) ──
+    if getattr(entry, "confirm", False) and not yes:
+        scale = getattr(entry, "scale", None) or {}
+        parts = [f"{k}={v}" for k, v in scale.items()]
+        click.echo(click.style("  ⚠ 长管线确认门: ", fg="yellow")
+                   + (" · ".join(parts) if parts else "(未声明规模——注册表缺 scale,应补)"))
+        segs = getattr(entry, "segments", ()) or ()
+        if segs:
+            hints = []
+            for s in segs:
+                only = s.get("only") or []
+                if only:
+                    hints.append(f"omni exec {entry.name} --only {','.join(only)} ({s.get('name')})")
+                else:
+                    hints.append(f"{s.get('name')}: {s.get('desc', '')}")
+            click.echo("  小段快速入口(不必跑全程): " + "; ".join(hints))
+        if not sys.stdin.isatty():
+            click.echo(click.style("  非交互环境未带 --yes,拒跑(规模未经确认)。", fg="red"), err=True)
+            sys.exit(3)
+        if not click.confirm("  确认启动?", default=False):
+            click.echo("  已取消。")
+            return
 
     from omnicompany.core.dispatch import dispatch
     try:
@@ -248,8 +297,8 @@ def cmd_exec(pipeline_name: str, only: str | None, node: str | None,
 
     \b
     示例:
-        omni exec demogame-learn --only schema_bootstrap,field_classifier
-        omni exec demogame-learn --node benchmark_validator -j '{"schema": {...}}'
+        omni exec research.run --only schema_bootstrap,field_classifier
+        omni exec research.run --node benchmark_validator -j '{"schema": {...}}'
     """
     from omnicompany.core.registry import discover
     discover()
@@ -425,7 +474,7 @@ def cmd_pipelines(verbose: bool, grep_query: str | None, domain: str | None):
     \b
     示例:
         omni pipelines                    # 列出全部
-        omni pipelines -g demogame           # 按关键词搜索
+        omni pipelines -g research        # 按关键词搜索
         omni pipelines -d sw_verify       # 按 domain 过滤
         omni pipelines -v                 # 含节点数和参数
     """
@@ -504,9 +553,9 @@ def cmd_nodes(grep_query: str | None, format_query: str | None,
     示例:
         omni nodes                           # 全部节点
         omni nodes -g "classifier"           # 按关键词搜索
-        omni nodes -f "demogame.table_schema"   # 找所有接受此 Format 的节点
-        omni nodes -p demogame-learn            # 只看某管线
-        omni nodes -d demogame                  # 按域过滤
+        omni nodes -f "research.report"      # 找所有接受此 Format 的节点
+        omni nodes -p research.run           # 只看某管线
+        omni nodes -d research               # 按域过滤
     """
     from omnicompany.core.registry import discover, list_all, get_or_raise
     from omnicompany.core.dispatch import _call_build_bindings
@@ -641,8 +690,8 @@ def cmd_describe(pipeline_name: str, verbose: bool):
 
     \b
     示例:
-        omni describe demogame-learn
-        omni describe debug -v
+        omni describe research.run
+        omni describe guardian -v
     """
     from omnicompany.core.registry import discover, get_or_raise
     discover()
@@ -697,8 +746,8 @@ def cmd_routers(grep_query: str | None, format_query: str | None,
     示例:
         omni routers                     # 列出所有 Router
         omni routers --grep "分类"        # 按关键词搜索
-        omni routers --format demogame      # 按 Format ID 搜索
-        omni routers --pipeline debug    # 只看 debug 管线的 Router
+        omni routers --format research   # 按 Format ID 搜索
+        omni routers --pipeline guardian # 只看 guardian 管线的 Router
     """
     from omnicompany.core.registry import discover
     discover()
@@ -782,7 +831,7 @@ def cmd_formats(pipeline_name: str | None):
 
     \b
     示例:
-        omni formats demogame-learn      # 某管线的 Format
+        omni formats research.run     # 某管线的 Format
         omni formats                  # 全局已注册 Format
     """
     from omnicompany.core.registry import discover
@@ -864,7 +913,7 @@ def cmd_errors(domain: str, limit: int):
     \b
     示例:
         omni errors                    # 全部 domain
-        omni errors --domain demogame     # 只看 demogame
+        omni errors --domain research  # 只看 research
         omni errors -n 5              # 最近 5 条
     """
     from omnicompany.core.observe import tail_events

@@ -102,7 +102,7 @@ class ReadImageRouter(SingleToolRouter):
         if not path.is_file():
             raise ToolExecutionError(f"非文件: {path_arg}")
 
-        # 路径白名单 (复用 screenshot 同字段; 业务侧把 _test_assets / _scratch / demogame-knowledge-base 加进去)
+        # 路径白名单 (复用 screenshot 同字段; 业务侧把 _test_assets / _scratch / <domain>-knowledge-base 加进去)
         roots = (
             getattr(ctx, "allowed_image_roots", None)
             or getattr(ctx, "allowed_screenshot_roots", None)

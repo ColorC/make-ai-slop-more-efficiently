@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_supervisor/workers ts=2026-04-26T00:00:00Z type=worker
 # [OMNI] material_id="material:core.team_supervisor.workers.product_form_analyzer.explorer.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """ProductFormAnalyzerWorker — team_supervisor Worker #2 (AGENT).
 
 Worker 协议:

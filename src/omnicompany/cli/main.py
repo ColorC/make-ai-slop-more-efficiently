@@ -25,14 +25,12 @@ from .commands.round_ import cmd_round
 from .commands.node import cmd_node
 from .commands.loops import cmd_loops
 from .commands.pain import cmd_pain
-from .commands.evo import cmd_evo
 from .commands.domain import cmd_domain
-from .commands.inquiry import cmd_inquiry
 from .commands.guardian import cmd_guardian
+from .commands.home import cmd_home
 from .commands.debt import cmd_debt
 from .commands.registry import cmd_registry
 from .commands.assistant import cmd_assistant
-from .commands.human import cmd_human
 from .commands.llm_audit import cmd_llm, cmd_pipeline
 from .commands.docauthor import cmd_docauthor
 from .commands.cc import cmd_cc
@@ -58,19 +56,18 @@ from .commands.cron import cmd_cron
 from .commands.testmap import cmd_testmap
 from .commands.plan_gate import cmd_plan_complete_gate
 from .commands.semantic import cmd_semantic
-from .commands.vilo import cmd_vilo
 from .commands.research import cmd_research
 from .commands.decisions import cmd_decisions
 from .commands.notify import cmd_notify
 from .commands.refs import cmd_refs
 from .commands.agents import cmd_agents
 from .commands.dispatch import cmd_dispatch
+from .commands.briefing import cmd_briefing
 from .commands.notes import cmd_notes
 from .commands.task import cmd_task
 from .commands.atlas import cmd_atlas
 from .commands.ledger import cmd_ledger
 from .commands.resolve import cmd_resolve
-from .commands.token_ledger import cmd_token_ledger
 
 # 统一命令组（执行 + 观测 + 管理）
 from .unified import (
@@ -179,7 +176,6 @@ cli.add_command(cmd_round)
 cli.add_command(cmd_node)
 cli.add_command(cmd_loops)
 cli.add_command(cmd_pain)
-cli.add_command(cmd_evo)
 cli.add_command(cmd_domain)
 
 # ── 统一执行命令 ──
@@ -206,11 +202,9 @@ cli.add_command(cmd_nodes)
 cli.add_command(cmd_errors)
 cli.add_command(cmd_diagnose)
 
-# ── 用户询问 ──
-cli.add_command(cmd_inquiry)
-
 # ── 守护检查 ──
 cli.add_command(cmd_guardian)
+cli.add_command(cmd_home)  # 远控家中已引导好的 Windows 主机(SSH 仅密钥 + 默认 deny+白名单)
 cli.add_command(cmd_debt)
 
 # ── 注册体系查询 ──
@@ -255,9 +249,6 @@ cli.add_command(cmd_team)
 # ── Assistant 上下文 + 外部任务派发（claude -p 对齐） ──
 cli.add_command(cmd_assistant)
 
-# ── Human Bus · 人类审批 inbox / resolve (A1 2026-04-23) ──
-cli.add_command(cmd_human)
-
 # ── LLM 调用档案查询 (Phase 2.5) ──
 cli.add_command(cmd_llm)
 
@@ -287,8 +278,6 @@ cli.add_command(cmd_atlas)
 cli.add_command(cmd_decisions)
 # 留痕账本 — 一条只追加的事件流 (2026-07-02): target-architecture.md 3.3 节骨架
 cli.add_command(cmd_ledger)
-# token 记账 v1 (2026-07-03): claude/codex 会话用量 + 内部调用账三路归并, overnight-run.md 第六节
-cli.add_command(cmd_token_ledger)
 # AI 推带跳转的提醒到铃铛 (2026-06-27): 我做完东西推一条, 用户点了直达对应页面
 cli.add_command(cmd_notify)
 
@@ -299,6 +288,8 @@ cli.add_command(cmd_refs)
 # 一条消息 → 跳转已活跃窗口 / 发给 poof 窗格 / 带项目新起 / 最强模型新起 / 问用户。
 cli.add_command(cmd_agents)
 cli.add_command(cmd_dispatch)
+# 晨报+按需报告 (2026-07-26): 手动唤起才工作, 默认零 LLM 只读; 工作族分类共用统一任务族真源
+cli.add_command(cmd_briefing)
 cli.add_command(cmd_notes)  # 操控 poof 笔记元素(经文件桥)· 2026-06-22
 cli.add_command(cmd_task)  # task 一等对象 + 投递观测介入兜底 · 2026-06-25 (WORK-LIFECYCLE-AND-DISPATCH)
 
@@ -318,9 +309,6 @@ cli.add_command(cmd_governance)
 cli.add_command(cmd_cron)  # 统一定时调度面(心跳 tick + 任务管理)· 2026-06-23
 cli.add_command(cmd_testmap)  # 功能点-测试台账查询面(list/show/verify/gaps)· 2026-07-03
 cli.add_command(cmd_plan_complete_gate)  # 计划完成硬闸查询面(allow/refuse, whatnow patch_task 消费)· 2026-07-04
-
-# Vilo 内容管线 (2026-06-13 内化): 管线代码进 domains/vilo, 产物进 data/domains/vilo, 走 omni 调用
-cli.add_command(cmd_vilo)
 
 # BOSS SIGHT cli subcommands (2026-05-25): 把 17 个总控 function call tool 迁移到 omni cli.
 # 新增 / 扩展:

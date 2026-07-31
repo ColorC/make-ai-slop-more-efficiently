@@ -4,7 +4,7 @@
 
 **契约变更 #02 (2026-04-25)**: 去 health_score/health_grade · severity 归一 critical/major/minor.
 - 不打分 (分数无统一尺度, 铁律)
-- 用 health_record_v2.build_health_record 构造 v2 schema
+- 用 health_record.build_health_record 构造 v2 schema
 - 孤立 Router 检测保留 · is_isolated 字段
 - 摘要保留语义描述 (不含分数/等级词)
 
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from omnicompany.packages.services._diagnosis.doctor.health_record_v2 import build_health_record
+from omnicompany.packages.services._diagnosis.doctor.health_record import build_health_record
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 # 可选 HealthArchive 集成

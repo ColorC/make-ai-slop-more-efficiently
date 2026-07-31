@@ -36,7 +36,7 @@ _TAGS_PROMPT = """你是 omnicompany LAP 协议专家。任务：只为 PASS Ver
 ## granted_tags 规范
 - 格式：`"granted_tags": ["tag1", "tag2", ...]`，加到 PASS Verdict 的 output dict 中
 - 常用命名空间：domain.xxx / content.xxx / state.xxx / lap.output.xxx / lap.analyst.xxx
-- domain.xxx: FORMAT_OUT 前缀（demogame→domain.demogame）
+- domain.xxx: FORMAT_OUT 前缀（example_domain→domain.example_domain）
 - content.xxx: FORMAT_OUT 描述的内容类型（schema/diff/report/script...）
 - state.xxx: 数据经过本节点后的状态（classified/analyzed/validated/generated...）
 - lap.output.xxx: 本节点输出给下一阶段什么（classifier/analyzer/validator/generator...）

@@ -93,6 +93,35 @@ def cmd_dashboard_status() -> None:
     }, ensure_ascii=False, indent=2))
 
 
+@cmd_dashboard.command("uploads")
+@click.option("--limit", type=click.IntRange(1, 200), default=20, show_default=True,
+              help="返回最近多少个上传批次。")
+@click.option("--paths-only", is_flag=True,
+              help="只输出仍可直接交给 Agent 使用的绝对文件路径。")
+@any_caller
+def cmd_dashboard_uploads(limit: int, paths_only: bool) -> None:
+    """查询浏览器/手机投递到 Agent 暂存区的上传记录。"""
+    from omnicompany.dashboard.controlplane.file_bridge import (
+        read_upload_history,
+        upload_history_path,
+    )
+
+    batches = read_upload_history(limit)
+    if paths_only:
+        for batch in batches:
+            for item in batch.get("items") or []:
+                path = item.get("path")
+                if path:
+                    click.echo(path)
+        return
+    click.echo(json.dumps({
+        "ok": True,
+        "history_path": str(upload_history_path()),
+        "batches": batches,
+        "hint": "只取路径: omni dashboard uploads --paths-only",
+    }, ensure_ascii=False, indent=2))
+
+
 @cmd_dashboard.command("ui-update")
 @any_caller
 def cmd_dashboard_ui_update() -> None:
@@ -152,10 +181,24 @@ def cmd_dashboard_ext_reload() -> None:
 def _kill_port_win(port: int) -> None:
     script = (
         f"$conns = Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue; "
-        "foreach ($c in $conns) { taskkill /PID $c.OwningProcess /T /F | Out-Null }"
+        "$pids = @($conns | Select-Object -ExpandProperty OwningProcess -Unique); "
+        "foreach ($pidToCheck in $pids) { "
+        "$proc = Get-CimInstance Win32_Process -Filter \"ProcessId=$pidToCheck\" "
+        "-ErrorAction SilentlyContinue; "
+        "if ($proc -and $proc.CommandLine -like '*omnicompany.dashboard.app:app*') { "
+        "Stop-Process -Id $pidToCheck -Force -ErrorAction Stop "
+        "} "
+        "}"
     )
-    subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-                   capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    proc = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+        capture_output=True,
+        text=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    if proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip() or f"exit={proc.returncode}"
+        raise click.ClickException(f"dashboard restart preflight failed: {detail}")
 
 
 @cmd_dashboard.command("restart")

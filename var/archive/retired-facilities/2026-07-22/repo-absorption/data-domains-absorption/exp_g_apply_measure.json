@@ -1,0 +1,41 @@
+{
+  "before": {
+    "label": "BEFORE",
+    "findings": 10,
+    "iteration": 1,
+    "total_turns": 70,
+    "local_list_calls": 11,
+    "local_read_calls": 33,
+    "local_grep_calls": 22,
+    "submit_module_calls": 19,
+    "total_tool_calls": 92,
+    "tool_distribution": {
+      "local_read": 33,
+      "local_grep": 22,
+      "submit_module": 19,
+      "local_list": 11,
+      "think": 6,
+      "finish": 1
+    },
+    "elapsed_s": 1147.0
+  },
+  "after": {
+    "label": "AFTER",
+    "findings": 10,
+    "iteration": 1,
+    "total_turns": 77,
+    "local_list_calls": 0,
+    "local_read_calls": 38,
+    "local_grep_calls": 8,
+    "submit_module_calls": 22,
+    "total_tool_calls": 77,
+    "tool_distribution": {
+      "local_read": 38,
+      "submit_module": 22,
+      "think": 8,
+      "local_grep": 8,
+      "finish": 1
+    },
+    "elapsed_s": 930.4
+  }
+}

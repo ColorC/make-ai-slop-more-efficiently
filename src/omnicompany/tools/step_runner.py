@@ -5,19 +5,19 @@
 用法（Python API）:
     from omnicompany.tools.step_runner import StepRunner
 
-    runner = StepRunner(pipeline_name="demogame-table-learning", domain="demogame")
+    runner = StepRunner(pipeline_name="my-pipeline", domain="my_domain")
     result = await runner.run_step(
         node_id="schema_bootstrap",
         input_data=my_input,
-        fixture_overrides={"p4_fetcher_fn": my_fetcher},  # 不可序列化的值
+        fixture_overrides={"fetcher_fn": my_fetcher},  # 不可序列化的值
     )
-    # 结果自动保存到 data/demogame/scratch/steps/schema_bootstrap.json
+    # 结果自动保存到 data/my_domain/scratch/steps/schema_bootstrap.json
 
     # 下一节点：从上一步的保存状态恢复
     result2 = await runner.run_step(
         node_id="multi_version_diff",
         from_step="schema_bootstrap",           # 加载上一步的 JSON
-        fixture_overrides={"p4_fetcher_fn": my_fetcher},
+        fixture_overrides={"fetcher_fn": my_fetcher},
     )
 
 用途：逐节点调试，观察每步输出，不依赖完整管线注册。
@@ -76,7 +76,7 @@ class StepRunner:
     def __init__(
         self,
         pipeline_name: str,
-        domain: str = "demogame",
+        domain: str = "default",
         steps_dir: str | Path | None = None,
         pipeline_input: dict | None = None,
     ):

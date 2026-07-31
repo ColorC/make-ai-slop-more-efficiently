@@ -30,3 +30,9 @@ mounts:
       本次只接 testmaps 键(功能点-测试台账), 不暴露任何 pipelines。testmap.yaml
       登记 18 个专项 e2e、自动战斗核心契约、G7.6 内容质量门与 vitest 主干功能点;
       不由挂载机制执行任何 gate(重活留验收阶段另跑)。
+  - path: "E:/MinecraftWorkspace"
+    owner: voxelcraft-minecraft
+    note: >
+      2026-07-11 只接 testmaps 键(proto-world/testmap.yaml: 手记设定系统 e2e 门+
+      纯逻辑单测+既有机器门指针), 不暴露 pipelines(本仓是 Java mod, 无 Python 管线,
+      见其 .omni-mount.yaml 头注)。gate 由 testmap gates-run 或人工触发, 挂载机制不执行。

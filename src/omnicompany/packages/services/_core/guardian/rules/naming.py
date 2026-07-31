@@ -67,6 +67,25 @@ _FORBIDDEN_ALIASES: dict[str, list[str]] = {
 # scratch 目录豁免的临时文件规则
 _SCRATCH_RE = re.compile(r"[/\\]scratch[/\\]", re.IGNORECASE)
 
+# OMNI-030 域级白名单（裁决 2026-07-26）：bilibili_publish episodes 的版本化文件
+# （EP0_FACTS_v29.md / VERSION_SNAPSHOT_v25.md / blocks-v25.json 等）是该域
+# 版本化迭代的正常工作流产物 —— 每次 revision 都产新文件，规则与工作流冲突，
+# 裁决为该域整目录豁免。对应 REGISTRY 存量条目由 omni debt reconcile 批量销账。
+_OMNI_030_DOMAIN_WHITELIST: tuple[str, ...] = (
+    "src/omnicompany/packages/domains/bilibili_publish/episodes/",
+)
+
+# 快照/隔离区豁免 (2026-07-26 技术债裁决): 以下区域里的版本化文件名属于
+# 数据产物或被隔离对象自身的历史, 命名纪律不适用:
+#   data/_workspaces/               — team_builder 动态 worktree (外部仓库快照)
+#   data/services/repo_exporter/jobs/ — 仓库导出暂存快照
+#   .omni/quarantine/               — 污染隔离区 (holding zone, 同 scratch 性质)
+_OMNI_030_SNAPSHOT_EXEMPTIONS: tuple[str, ...] = (
+    "data/_workspaces/",
+    "data/services/repo_exporter/jobs/",
+    ".omni/quarantine/",
+)
+
 # 仅检查 omnicompany 包内的文件（排除 vendors/外部/迁移期非严格文件）
 def _in_omnicompany_pkg(ctx: FileContext) -> bool:
     p = ctx.path.replace("\\", "/")
@@ -96,6 +115,13 @@ def _check_versioned_filename(ctx: FileContext) -> bool:
         return False
     # scratch 豁免 (2026-05-08 立): scratch 是自由开获区, 字面版号自由
     if _is_scratch(ctx):
+        return False
+    # 域级白名单 (裁决 2026-07-26): bilibili_publish episodes 版本化是正常工作流
+    p_norm = ctx.path.replace("\\", "/")
+    if any(p_norm.startswith(prefix) for prefix in _OMNI_030_DOMAIN_WHITELIST):
+        return False
+    # 快照/隔离区豁免 (2026-07-26): 数据产物与隔离对象的版本名不属命名纪律
+    if any(p_norm.startswith(prefix) for prefix in _OMNI_030_SNAPSHOT_EXEMPTIONS):
         return False
 
     stem = Path(ctx.path).stem  # 去掉最后一个后缀
@@ -295,7 +321,7 @@ def _check_forbidden_alias_in_header(ctx: FileContext) -> bool:
             if type_val in [f.lower() for f in forbidden_list]:
                 return True
 
-    # 检查 domain= 字段的最后一段（如 demogame/table_learning → 只检查 table_learning 部分）
+    # 检查 domain= 字段的最后一段（如 example_domain/table_learning → 只检查 table_learning 部分）
     domain_val = ctx.omnimark.get("domain", "").lower().strip()
     if domain_val:
         # domain 格式是 category/name，检查两部分

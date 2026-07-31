@@ -186,7 +186,7 @@ class ScreenshotCompareRouter(SingleToolRouter):
     TOOL_NAME: ClassVar[str] = "screenshot_compare"
     DESCRIPTION: ClassVar[str] = (
         "用 vision LLM 看 2 张截图 (实物 + baseline) 答相似度 + 具体差距. "
-        "适合: 跟 hifi 设计稿对照 / 跟真 demogame 截图对照 / 跟前一版本对照. "
+        "适合: 跟 hifi 设计稿对照 / 跟真实产品截图对照 / 跟前一版本对照. "
         "比单图 inspect 更适合 '布局/风格是否一致'. 单次 ~¥0.06. "
         "两张图都必须在 allowed_screenshot_roots 内."
     )
@@ -205,7 +205,7 @@ class ScreenshotCompareRouter(SingleToolRouter):
                 "type": "string",
                 "description": (
                     "你想让 LLM 看双图后答的问题. 例: "
-                    "'实物棋盘是否跟 baseline 一样用了 demogame cellmap 风格 (含 banned/block 过渡)?', "
+                    "'实物棋盘是否跟 baseline 一样用了同款 cellmap 风格 (含 banned/block 过渡)?', "
                     "'实物商店按钮位置是否跟 baseline 一致?', "
                     "'估计实物跟 baseline 的视觉相似度 (0-100%) 并列出 3 个最大差距点.'"
                 ),
@@ -259,7 +259,7 @@ class ScreenshotCompareRouter(SingleToolRouter):
             {
                 "type": "text",
                 "text": (
-                    f"请看 2 张截图. **第 1 张是实物**, **第 2 张是 baseline (目标 / 设计稿 / 真 demogame)**. "
+                    f"请看 2 张截图. **第 1 张是实物**, **第 2 张是 baseline (目标 / 设计稿 / 真实产品)**. "
                     f"对比答问题, 用中文, 具体到元素 (不要笼统说 '差不多').\n\n"
                     f"问题: {question}"
                 ),

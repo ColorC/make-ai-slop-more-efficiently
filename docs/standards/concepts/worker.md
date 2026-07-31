@@ -390,6 +390,12 @@ Worker 产出 `verdict.output` 带特殊字段 `_emit_as_new_job: True` 时, dis
 
 > 溯源: 2026-06-23 我（Claude Code）沉淀 team 时嫌统一 AgentNodeLoop（async+bus）麻烦, 自建了同步 ReAct 循环（`runtime/agent/tool_agent.py`）。用户裁决"你重建了一个 agent?…如果统一实现不够好, 你就改进统一实现, 不要二重 / 不要搞第二套, 用统一设施执行"。已删 fork、改用统一 `AgentNodeLoop`、立此规 + Guardian OMNI-095。
 
+### R-27 · LLM 工作必须进入标准管线；文件校验在同一 Agent 会话闭环（2026-07-14 用户立 · ⚠硬规则 · Guardian OMNI-094）
+
+业务代码只能在注册 Team/Worker/Agent 内调用 `call_json`、batch 或 Agent 设施；一次性文件工作走受审计的 `omni worker run`。禁止在 `docs/`、`scripts/`、`.omni/sandbox/` 或仓根写临时 LLM 包装脚本。调用前先按 Atlas `llm-workflow` Skill 选型。
+
+当产物是文件且需要格式、长度、事实或结构校验时，必须选 AGENT：Agent 直接写文件并运行声明的 lint/test；失败输出作为当前会话的下一轮上下文，Agent 就地修改后重跑。lint 失败不得由外层重新调用模型、不得重建会话、不得从头生成整份文件。单次结构化工具适合固定 schema 数据，不承担长文或多文件编辑协议。
+
 ### 反模式（R-18~R-26 相关）
 
 | 编号 | 名称 | 描述 | 后果 |
@@ -402,3 +408,4 @@ Worker 产出 `verdict.output` 带特殊字段 `_emit_as_new_job: True` 时, dis
 | RA-17 | FORMAT_IN list 无 MODE | 违反 R-24, `FORMAT_IN = list[str]` 不显式声明 AND/OR | 未来 dispatcher 语义变化时 worker 行为错乱 |
 | RA-18 | Worker 内部 while 循环持状态 | 违反 R-07 Statelessness + R-25, 应用 `_emit_as_new_job` 让 dispatcher 驱动循环 | 无法 replay / 不可观测 / 阶段 D AgentNodeLoop 替换后更痛苦 |
 | RA-19 | 重复造 agent | 违反 R-26, 手搓 ReAct/工具循环(循环内直调 LLM + 自拼 tool 回合)而非用统一 AgentNodeLoop | 核心设施二重化 / 失去统一审计·压缩·重试·工具治理 / Guardian OMNI-095 |
+| RA-20 | 临时 LLM 包装脚本 | 违反 R-27, 在非标准位置直接调用 LLM/Agent, 或 lint 失败后新开调用从头生成 | 审计断链 / 重复推理 / 丢失上一轮错误上下文 / Guardian OMNI-094 |

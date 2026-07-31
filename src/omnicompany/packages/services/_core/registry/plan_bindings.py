@@ -155,7 +155,9 @@ def list_bindings() -> dict[str, dict[str, Any]]:
 
 
 def _is_exempt_block(review: Optional[dict[str, Any]]) -> bool:
-    review = review or {}
+    # 存量注册表曾出现过 review="tests" 这类旧形态。巡检/看板必须把它
+    # 当作“未豁免的脏数据”继续报告，而不能因一次 .get() 让全局扫描崩溃。
+    review = review if isinstance(review, dict) else {}
     return review.get("mode") == "exempt" and bool((review.get("reason") or "").strip())
 
 

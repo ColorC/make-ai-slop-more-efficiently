@@ -189,14 +189,14 @@ def _active_plan_id(payload: dict, cwd: str) -> str | None:
     session_id = payload.get("session_id") or payload.get("sessionId") or ""
     plan = sh.detect_active_plan(
         hint_cwd=cwd,
-        claude_session_id=str(session_id) if session_id else None,
+        provider=sh.binding_provider(payload),
+        session_id=str(session_id) if session_id else None,
     )
     return sh.plan_id_of(plan) if plan else None
 
 
-def main() -> int:
-    """PreToolUse hook entry. 通过 stdin 拿 tool_use_id / tool_name / tool_input."""
-    payload = sh.read_stdin_json()
+def _handle_payload(payload: dict) -> int:
+    """Evaluate one Claude-style per-file tool payload."""
     tool_name = payload.get("tool_name") or payload.get("toolName") or ""
 
     # 顶层 stray 实时守卫 (覆盖 Bash + 写工具)。返回 2 = enforce 阻断; None = 放行/已 warn。
@@ -386,6 +386,30 @@ def main() -> int:
         print(msg, file=sys.stderr)
     except OSError:
         pass
+    return 0
+
+
+def main() -> int:
+    """PreToolUse entry, including Codex multi-file ``apply_patch`` calls."""
+
+    payload = sh.read_stdin_json()
+    tool_name = payload.get("tool_name") or payload.get("toolName") or ""
+    if tool_name != "apply_patch":
+        return _handle_payload(payload)
+
+    tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+    command = tool_input.get("command") if isinstance(tool_input, dict) else ""
+    targets = sh.apply_patch_targets(str(command or ""))
+    if not targets:
+        return 0
+
+    for normalized_tool, file_path in targets:
+        per_file = dict(payload)
+        per_file["tool_name"] = normalized_tool
+        per_file["tool_input"] = {"file_path": file_path}
+        result = _handle_payload(per_file)
+        if result == 2:
+            return 2
     return 0
 
 

@@ -8,7 +8,7 @@
 判定链:
   1. 确定性: 按段算 CJK 占比, 定"本段应为中文"; 段内取非白名单英文 token 作候选; forbidden_aliases 直接命中(给建议中文, 不走 LLM)。
   2. 性价比模型: 对去重后的候选 token(+样本上下文)逐条判 keep / change_to_chinese / unsure + 理由 + 建议中文。
-  3. 只报 findings(不自动改); change_to_chinese 的可进 human-inbox。
+  3. 只报 findings(不自动改); change_to_chinese 可合并进 Reviewstage。
 单一真源 = docs/standards/prose_terms.yaml(经 terms.py)。
 """
 from __future__ import annotations
@@ -146,8 +146,8 @@ _JUDGE_SCHEMA = {
 
 
 def run_lang_scan(*, include_code: bool = False, limit: int | None = None,
-                  model: str | None = None, push_inbox: bool = False,
-                  root: Path | None = None, echo: Any = None) -> dict[str, Any]:
+                  model: str | None = None, submit_review: bool = False,
+                  root: Path | None = None, echo: Any = None, review_store=None) -> dict[str, Any]:
     """非中文泄漏全量扫描 + LLM 复判。"""
     from omnicompany.runtime.llm.structured import call_json
     base = root or omni_workspace_root()
@@ -202,25 +202,11 @@ def run_lang_scan(*, include_code: bool = False, limit: int | None = None,
                           "reason": v.get("reason", ""), "occurrences": len(c["locs"]),
                           "locs": c["locs"][:8], "sample": c["sample"]})
 
-    inbox_opened = 0
-    if push_inbox and (leaks or all_forbidden):
-        from omnicompany.runtime.buses import HumanBus, HumanKind
-        hb = HumanBus()
-        body = ["【非中文泄漏·建议改中文】"]
-        body += [f"  {x['token']} → {x['suggest_zh']}  ({x['occurrences']}处) {x['reason'][:40]}" for x in leaks[:15]]
-        if all_forbidden:
-            body.append("【禁用英文代称(确定性)】")
-            body += [f"  {x['token']} → {x['suggest_zh']}  @ {x['doc']}:{x['line']}" for x in all_forbidden[:10]]
-        hb.ask(question="语言治理(非中文泄漏): " + "\n".join(body), kind=HumanKind.HUMAN_BLOCKING,
-               context={"facility": "prose_steward.lang", "leaks": leaks, "forbidden": all_forbidden},
-               source="prose_steward.lang")
-        inbox_opened = 1
-
     payload = {
         "kind": "prose_lang", "generated_at": _now(), "model": model,
         "scanned_files": len(targets), "skipped_english_files": skipped_english,
         "forbidden_hits": all_forbidden, "candidate_tokens": len(tokens_all),
-        "judged_tokens": len(tokens), "capped": capped, "leaks": leaks, "inbox_opened": inbox_opened,
+        "judged_tokens": len(tokens), "capped": capped, "leaks": leaks,
         "counts": {"forbidden": len(all_forbidden), "leak_change": len(leaks),
                    "kept_or_unsure": len(tokens) - len(leaks)},
     }
@@ -229,4 +215,25 @@ def run_lang_scan(*, include_code: bool = False, limit: int | None = None,
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     (report_dir() / "prose_lang-latest.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    if submit_review and (leaks or all_forbidden):
+        if review_store is None:
+            from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+            review_store = get_store()
+        from omnicompany.dashboard.boss_sight.reviewstage.report_submission import submit_markdown_report
+        body = ["# 非中文泄漏巡检", "", "## 建议改中文", ""]
+        body += [f"- `{x['token']}` → {x['suggest_zh']} ({x['occurrences']}处) · {x['reason'][:80]}" for x in leaks[:60]]
+        if all_forbidden:
+            body += ["", "## 禁用英文代称", ""]
+            body += [f"- `{x['token']}` → {x['suggest_zh']} · `{x['doc']}:{x['line']}`" for x in all_forbidden[:60]]
+        payload["review_material"] = submit_markdown_report(
+            review_store,
+            title="非中文泄漏合并报告",
+            content="\n".join(body),
+            source_plan_id="omnicompany-governance/[2026-06-27]SEMANTIC-SPACE-HEALTH",
+            reason="语言巡检发现有明确证据的非中文泄漏或禁用代称; 请按合并清单核对。",
+            dedupe_key="prose-lang-review",
+            stable_payload=json.dumps({"leaks": leaks, "forbidden": all_forbidden}, ensure_ascii=False, sort_keys=True),
+            version_family="prose-lang-review",
+            extra={"report_path": str(report_dir() / "prose_lang-latest.json")},
+        )
     return payload

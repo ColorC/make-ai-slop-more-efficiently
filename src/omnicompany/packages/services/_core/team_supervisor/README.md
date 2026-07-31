@@ -33,7 +33,7 @@ L1 2026-04-26 P3.B v4 真达成后立项. 跟 [doctor](../../_diagnosis/doctor/)
 
 **反模式禁令**: 禁字段 `complexity_score` / `quality_rating` / `maturity_level` / `tier` / `tags` / `kind` (语义 vibe 评分). 仅允许物理度量 (count) + 协议层硬枚举.
 
-**最终目标** (当下能认知的): 跑通几个真 Team (csv-to-md / repo-absorption / docauthor 等), 验证三问机制泛化能力.
+**最终目标** (当下能认知的): 跑通几个当前真 Team (csv-to-md / docauthor 等), 验证三问机制泛化能力；不使用已退役设施作样例.
 
 ## 规划
 

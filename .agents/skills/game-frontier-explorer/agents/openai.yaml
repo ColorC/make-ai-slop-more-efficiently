@@ -1,0 +1,6 @@
+interface:
+  display_name: "游戏前沿探索"
+  short_description: "选择信息增量高的未知交互并阻止重复失败与转圈"
+  default_prompt: "Use $game-frontier-explorer to choose one novel, safe, evidence-producing interaction from the current state."
+policy:
+  allow_implicit_invocation: false

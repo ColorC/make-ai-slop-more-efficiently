@@ -1,0 +1,58 @@
+{
+  "schema": "xiaohongshu.checklist-report.v1",
+  "passed": false,
+  "review_mode": "same_agent",
+  "checks": {
+    "publication_summary_read": false,
+    "fact_ledger_complete": false,
+    "uncompressed_master_complete": false,
+    "current_work_first": false,
+    "all_first_use_explained": false,
+    "concept_disposition_checked": false,
+    "numbers_expanded": false,
+    "motives_sourced": false,
+    "prior_post_repetition_removed": false,
+    "carrier_capacity_checked": false,
+    "minimum_font_checked": false,
+    "writer_self_review_complete": false,
+    "independent_review_complete": false,
+    "model_round_budget_checked": false,
+    "public_surfaces_scanned": false,
+    "agent_name_origin_matched": false,
+    "exact_models_recorded": false,
+    "isolated_bash_workspaces_validated": false,
+    "guarded_output_paths_validated": false,
+    "colorc_perspective_checked": false,
+    "public_agent_tag_valid": false,
+    "internal_provenance_recorded": false,
+    "html_css_cards_validated": false,
+    "direct_full_card_image_generation_absent": false,
+    "reviewstage_neutral": false
+  },
+  "actors": [
+    {
+      "role": "writer",
+      "agent_name": "纸鸢",
+      "model_id": "qwen3.7-max",
+      "bash_workspace": "path/to/writer-workspace",
+      "bash_guard_passed": false,
+      "output_path_guard_passed": false
+    }
+  ],
+  "visual": {
+    "source_type": "html_css",
+    "all_images_1080x1440": false,
+    "minimum_font_passed": false,
+    "dom_overflow_absent": false,
+    "full_card_direct_generation": true,
+    "reviewstage_style": "neutral"
+  },
+  "digests": {
+    "publication_summary": "sha256:<hex>",
+    "content_brief": "sha256:<hex>",
+    "fact_ledger": "sha256:<hex>",
+    "uncompressed_master": "sha256:<hex>",
+    "carrier_plan": "sha256:<hex>",
+    "visual_source": "sha256:<hex>"
+  }
+}

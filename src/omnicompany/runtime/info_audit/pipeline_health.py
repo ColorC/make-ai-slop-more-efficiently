@@ -5,8 +5,8 @@
 提供三个功能:
 
 1. maybe_probe_baseline(pipeline, domain)
-   dispatch() 调用: pipeline 首次跑时自动做 probe 体检, 结果缓存 7 天.
-   缓存期内只读缓存 + 打 warning, 不重跑 LLM. 永不阻塞主流程.
+   dispatch() 调用: 仅在 OMNICOMPANY_AUTO_PROBE_BASELINE=1 时做 LLM probe,
+   结果缓存 7 天. 默认关闭，避免真实任务启动时发生隐藏模型调用.
 
 2. append_pipeline_health(...)
    runner.run() 末尾调用: 把 post_hoc 审计结果写入
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -49,7 +50,7 @@ def _domain_from_pipeline_id(pipeline_id: str) -> str:
     支持多种分隔符:
       'absorption-module-driven'  → 'absorption'
       'absorption.v3'  → 'absorption'
-      'demogame-learn'    → 'demogame'
+      'mydomain-learn' → 'mydomain'
       'doctor-format'  → 'doctor'
     """
     if not pipeline_id:
@@ -65,7 +66,7 @@ def _domain_from_pipeline_id(pipeline_id: str) -> str:
 def maybe_probe_baseline(pipeline: Any, *, domain: str) -> None:
     """dispatch() 里的 probe 体检钩子.
 
-    首次跑时自动做 probe baseline, 结果缓存 7 天.
+    显式 opt-in 后，首次跑时做 probe baseline, 结果缓存 7 天.
     缓存期内只读缓存并打 warning (若存在 critical 缺口).
     永不抛异常, 永不阻塞主流程.
 
@@ -73,6 +74,19 @@ def maybe_probe_baseline(pipeline: Any, *, domain: str) -> None:
         pipeline: TeamSpec 对象 (有 nodes / id 属性).
         domain:   pipeline 所属 domain (来自 PipelineEntry.domain).
     """
+    if os.environ.get("OMNICOMPANY_AUTO_PROBE_BASELINE", "").strip().casefold() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        logger.debug(
+            "[probe] %s: automatic LLM baseline disabled; run it explicitly or set "
+            "OMNICOMPANY_AUTO_PROBE_BASELINE=1",
+            getattr(pipeline, "id", "?"),
+        )
+        return
+
     try:
         baseline_path = _probe_baseline_path(domain)
         existing: dict[str, Any] | None = None

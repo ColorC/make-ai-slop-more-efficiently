@@ -128,7 +128,7 @@ def check_contract(root: Path | None = None) -> list[IndexFinding]:
 # ③b: frontmatter yaml 路径字段(roots[].path / entry_points[].path / quick_actions[].where) ——
 #     这些不是 markdown `](...)` 链接, plan_repairs 的 token 替换不适用; 用同款
 #     _repo_index/_suffix_overlap 匹配逻辑另写一层, 只对"在仓库根之下的相对/绝对路径"生效
-#     (仓外绝对路径如 d:/P4/... 环境相关, 不归仓库体检管——与 doc_steward 对 d:/ C:\ 的处理一致)。
+#     (仓外绝对路径如 D:/external/... 环境相关, 不归仓库体检管——与 doc_steward 对 d:/ C:\ 的处理一致)。
 
 _YAML_PATH_FIELDS = (  # (frontmatter 顶层键, 是否列表, 取值用的字段名)
     ("roots", "path"),
@@ -147,7 +147,7 @@ def _is_external_path(p: str) -> bool:
 
 
 def _resolve_field_path(p: str, base: Path) -> Path:
-    """frontmatter 路径字段可能是仓内绝对路径(E:/WindowsWorkspace/omnicompany/...)或相对路径。"""
+    """frontmatter 路径字段可能是仓内绝对路径或相对路径。"""
     pp = Path(p)
     if pp.is_absolute():
         return pp
@@ -301,7 +301,10 @@ def compute_actions_check() -> dict[str, Any]:
     from omnicompany.core.projects_registry import list_projects, parse_index_file
 
     skill_dirs = [
+        Path.home() / ".agents" / "skills",
         Path.home() / ".claude" / "skills",
+        Path.home() / ".codex" / "skills",  # legacy Codex read-only fallback
+        omni_workspace_root() / ".agents" / "skills",
         omni_workspace_root() / ".claude" / "skills",
     ]
     known = {d.name for sd in skill_dirs if sd.is_dir() for d in sd.iterdir() if d.is_dir()}
@@ -545,7 +548,7 @@ def _existing_candidate_lines(text: str) -> list[str]:
 
 # 路径/文件名 token(basename): 反引号包裹的代码/路径片段, 或裸的 a/b/c、a.py、
 # E:/x/y 这类(可选 Windows 盘符前缀 —— 2026-07-04 实测坐实: gpt-5.5 常直接写
-# 不带反引号的绝对路径如 "E:/WindowsWorkspace/omnicompany/...", 漏收盘符前缀会让
+# 不带反引号的绝对路径如 "<project-root>/...", 漏收盘符前缀会让
 # 正则从冒号处断开, 整条路径 token 抽取失败, 去重形同虚设)。
 # 这是最强去重信号——LLM 每轮复述同一条发现措辞会大幅改写(整句都不同, 纯文本/整句
 # Jaccard 命中率极低), 但引用的具体路径/文件名/commit 摘要(来自同一份只读 git log

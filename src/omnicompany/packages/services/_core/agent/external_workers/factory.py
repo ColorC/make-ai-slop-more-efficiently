@@ -14,6 +14,15 @@ from omnicompany.packages.services._core.agent.external_workers.claude_code impo
 from omnicompany.packages.services._core.agent.external_workers.codex import (
     CodexExecWorker,
 )
+from omnicompany.packages.services._core.agent.external_workers.kimi import (
+    KimiExecWorker,
+)
+from omnicompany.packages.services._core.agent.external_workers.opencode import (
+    OpenCodeRunWorker,
+)
+from omnicompany.packages.services._core.agent.external_workers.omni_native import (
+    OmniNativeWorkspaceWorker,
+)
 
 
 def build_default_external_agent_worker_registry(
@@ -30,6 +39,9 @@ def build_default_external_agent_worker_registry(
     registry = ExternalAgentWorkerRegistry()
     registry.register("codex", lambda **kw: CodexExecWorker(bus=bus, **kw))
     registry.register("claude-code", lambda **kw: ClaudeCodeSdkWorker(bus=bus, **kw))
+    registry.register("opencode", lambda **kw: OpenCodeRunWorker(bus=bus, **kw))
+    registry.register("kimi", lambda **kw: KimiExecWorker(bus=bus, **kw))
+    registry.register("omni-native", lambda **kw: OmniNativeWorkspaceWorker(bus=bus, **kw))
     return registry
 
 

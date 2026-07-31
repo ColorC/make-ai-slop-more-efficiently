@@ -17,7 +17,7 @@
 - 状态可靠性(2026-06-26): 工作线 threads 是项目状态的结构化真源(取代正文手写"活跃");
   机器真活跃晚于 index 声明日(updated / threads[].updated)超 STALE_AFTER_DAYS 天
   → index_stale=True(及时提示, 让"文件在动但状态冻住"被自动揪出)。
-- plan 关联: plan_categories 里既可写类目前缀(如 "demogame/figma-to-prefab")也可写完整
+- plan 关联: plan_categories 里既可写类目前缀(如 "my_domain/sample-feature")也可写完整
   plan id, 匹配规则 = 精确相等 或 前缀+"/"。
 - 纯模块(不依赖 FastAPI): omni project CLI 与 dashboard controlplane/projects.py 共用。
   路由挂 dashboard 进程(8210, 可自由重启), 不挂 ccdaemon。
@@ -39,9 +39,9 @@ from omnicompany.packages.services._core.omnicompany.formats import PROJECT
 from omnicompany.packages.services._core.omnicompany.material_events import publish_material_event
 
 # 主分组(可自由扩展, 这里是展示顺序的默认值; 用户 2026-06-12 给的常用组)
-DEFAULT_GROUPS_ORDER: list[str] = ["demogame", "omnicompany", "indie-game", "other"]
+DEFAULT_GROUPS_ORDER: list[str] = ["my-project", "omnicompany", "indie-game", "other"]
 GROUP_LABELS: dict[str, str] = {
-    "demogame": "demogame",
+    "my-project": "My Project",
     "omnicompany": "Omnicompany",
     "indie-game": "Indie Game",
     "other": "其他",
@@ -54,7 +54,7 @@ STALE_AFTER_DAYS = 7
 
 _OPTIONAL_FIELDS = (
     "name", "short", "group", "tags", "desc", "roots", "index_path", "bg", "icon",
-    "plan_categories", "links", "pinned",
+    "plan_categories", "links", "pinned", "team_ids", "primary_team_id",
 )
 
 _lock = threading.Lock()
@@ -118,11 +118,49 @@ def groups_order() -> list[str]:
     return list(_read().get("groups_order", DEFAULT_GROUPS_ORDER))
 
 
+def _normalize_team_ids(value: Any) -> list[str]:
+    """规范化 Project -> TeamSpec.id 引用，保留顺序并去重。
+
+    Project registry 是这条关系的唯一权威；TeamSpec 不保存反向 project_id，
+    从而避免两边各维护一份归属关系。
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_ids = [value]
+    elif isinstance(value, (list, tuple)):
+        raw_ids = list(value)
+    else:
+        raise ValueError("team_ids 须为字符串列表")
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_id in raw_ids:
+        if not isinstance(raw_id, str):
+            raise ValueError("team_ids 的每一项都须为字符串")
+        team_id = raw_id.strip()
+        if not team_id:
+            raise ValueError("team_ids 不能包含空字符串")
+        if team_id not in seen:
+            normalized.append(team_id)
+            seen.add(team_id)
+    return normalized
+
+
 def set_project(project_id: str, *, by: str = "human", **fields: Any) -> dict[str, Any]:
     """新增/更新一个项目(字段不传则保留原值)。"""
     project_id = (project_id or "").strip()
     if not project_id or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project_id):
         raise ValueError(f"项目 id 须为小写字母/数字/中划线, 收到 {project_id!r}")
+
+    if "team_ids" in fields and fields["team_ids"] is not None:
+        fields["team_ids"] = _normalize_team_ids(fields["team_ids"])
+    if "primary_team_id" in fields and fields["primary_team_id"] is not None:
+        primary_team_id = fields["primary_team_id"]
+        if not isinstance(primary_team_id, str) or not primary_team_id.strip():
+            raise ValueError("primary_team_id 须为非空字符串")
+        fields["primary_team_id"] = primary_team_id.strip()
+
     with _lock:
         data = _read()
         projects: list[dict] = data["projects"]
@@ -142,6 +180,15 @@ def set_project(project_id: str, *, by: str = "human", **fields: Any) -> dict[st
         for f in _OPTIONAL_FIELDS:
             if f in fields and fields[f] is not None:
                 item[f] = fields[f]
+
+        # Project 只保存 TeamSpec.id；primary 始终属于 team_ids。
+        if "team_ids" in item or item.get("primary_team_id"):
+            team_ids = _normalize_team_ids(item.get("team_ids"))
+            primary_team_id = item.get("primary_team_id")
+            if primary_team_id and primary_team_id not in team_ids:
+                team_ids.insert(0, primary_team_id)
+            item["team_ids"] = team_ids
+
         item.setdefault("name", project_id)
         item.setdefault("group", "other")
         _write(data)
@@ -235,7 +282,7 @@ def parse_index_file(index_path: str | Path) -> dict[str, Any]:
 
 
 # ── 计划治理 (plan_steward 产物): plan→project 显式覆盖 + 中文标题 ──────────────
-# 2026-06-12 用户: 人工/前缀分类不可靠("demogame-KB-INGEST 这种很明显放的位置不对"),
+# 2026-06-12 用户: 人工/前缀分类不可靠("SOME-KB-INGEST 这种很明显放的位置不对"),
 # 由治理部门(omni governance plans-run, deepseek-v4-pro)逐计划判定写覆盖表。
 # 归属规则: 覆盖表里有这个计划 → 以它的 project 为准(null=不属于任何项目);
 #           没有(新计划还没治理) → 退回 plan_categories 前缀规则。
@@ -288,7 +335,7 @@ def resolve_project_plans(project_id: str, cats: list[str] | None,
 
 
 def _plan_catalogue() -> list[dict[str, Any]]:
-    """plan 目录全量(含嵌套, 如 demogame/figma-to-prefab/plans/*)。
+    """plan 目录全量(含嵌套, 如 my_domain/sample-feature/plans/*)。
 
     与前端 /api/plans **同一个扫描源**(controlplane/plans._scan, 自带 mtime-token 缓存) —
     2026-06-12 复查教训: 之前计数走 boss_sight 聚合器(只扫顶层)而列表走这里, 双源不一致。

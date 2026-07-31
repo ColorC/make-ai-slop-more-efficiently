@@ -91,6 +91,24 @@ class Router(ABC):
     REFLECTION_INFO_THRESHOLD: int = 2
     """DEPRECATED (D4, 2026-04-09): 设置无效。"""
 
+    def bind_runtime_context(
+        self,
+        *,
+        bus: Any,
+        trace_id: str,
+        parent_event_id: str,
+    ) -> None:
+        """Bind the authoritative TeamRunner execution context.
+
+        Composite routers should override this method, call ``super()``, and
+        propagate the same context to their children.  Keeping this operation
+        on the Router contract avoids TeamRunner having to know each composite
+        router's private object graph.
+        """
+        self._bus = bus
+        self._trace_id = trace_id
+        self._parent_event_id = parent_event_id
+
     def _maybe_inject_reflection(self, system_prompt: str) -> str:
         """DEPRECATED (D4). 直接返回原 prompt, 不再注入 <self_assessment> 指令。
 

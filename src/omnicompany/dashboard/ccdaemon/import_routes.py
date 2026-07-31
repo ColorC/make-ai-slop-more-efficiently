@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -288,13 +289,31 @@ def _codex_user_text(obj: dict) -> str:
     return ""
 
 
+def _is_codex_subagent_meta(meta: dict[str, Any]) -> bool:
+    """Return whether a rollout is an internal Codex subagent step.
+
+    Codex persists every spawned subagent as its own rollout and copies the
+    parent conversation into that file.  Those rollouts are useful execution
+    evidence, but they are not independent user conversations and must not be
+    offered as Dashboard resume/import targets.
+    """
+    if str(meta.get("thread_source") or "").strip().lower() == "subagent":
+        return True
+    source = meta.get("source")
+    return isinstance(source, dict) and "subagent" in source
+
+
 def _scan_codex() -> list[dict]:
     root = Path.home() / ".codex" / "sessions"
     out: list[dict] = []
-    for mtime, f in _recent_files(root, _MAX_FILES):
+    # Subagent-heavy runs can consume most of the newest-file window.  Inspect
+    # a wider candidate set, but still return at most _MAX_FILES user sessions.
+    for mtime, f in _recent_files(root, _MAX_FILES * 4):
         sid = ""
         cwd = ""
         preview = ""
+        meta_seen = False
+        internal_subagent = False
         try:
             with f.open("r", encoding="utf-8", errors="replace") as fh:
                 for i, line in enumerate(fh):
@@ -307,10 +326,14 @@ def _scan_codex() -> list[dict]:
                         obj = json.loads(line)
                     except Exception:  # noqa: BLE001
                         continue
-                    if obj.get("type") == "session_meta":
+                    if obj.get("type") == "session_meta" and not meta_seen:
                         p = obj.get("payload") or {}
+                        meta_seen = True
                         sid = sid or str(p.get("id") or p.get("conversation_id") or p.get("session_id") or "")
                         cwd = cwd or str(p.get("cwd") or p.get("working_directory") or "")
+                        if _is_codex_subagent_meta(p):
+                            internal_subagent = True
+                            break
                     if not preview:
                         txt = _codex_user_text(obj)
                         if txt and not _looks_internal(txt):
@@ -318,6 +341,8 @@ def _scan_codex() -> list[dict]:
                     if sid and cwd and preview:
                         break
         except OSError:
+            continue
+        if internal_subagent:
             continue
         if not sid:
             m = _UUID_RE.search(f.name)
@@ -330,7 +355,49 @@ def _scan_codex() -> list[dict]:
             "preview": _clip(preview),
             "file": str(f),
         })
+        if len(out) >= _MAX_FILES:
+            break
     return out
+
+
+# ── 全量扫盘缓存(stale-while-revalidate) ──────────────────────────────────
+# _scan_claude/_scan_codex 要 rglob + stat 本机全部 jsonl(几千个, 合计几十 GB, 单扫 3s+),
+# 前端每次开页都打 /active。策略: TTL 内直接吃缓存; 过期时秒回旧扫描、起后台线程刷新 ——
+# /active 除进程冷启第一问外永不现付全量扫盘, 代价是新会话最迟晚一个刷新周期出现(下次轮询即到)。
+# 写缓存整体替换(新 list 对象), 不原地改旧列表。
+_SCAN_CACHE_TTL_SEC = 20.0
+_SCAN_CACHE: dict[str, Any] = {"ts": 0.0, "items": [], "refreshing": False}
+
+
+def _scan_all_now() -> list[dict]:
+    try:
+        return _scan_claude() + _scan_codex()
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _scan_refresh_bg() -> None:
+    scanned = _scan_all_now()
+    _SCAN_CACHE["items"] = scanned
+    _SCAN_CACHE["ts"] = time.time()
+    _SCAN_CACHE["refreshing"] = False
+
+
+def _scan_all_cached() -> list[dict]:
+    now = time.time()
+    items = _SCAN_CACHE["items"]
+    if now - float(_SCAN_CACHE["ts"]) < _SCAN_CACHE_TTL_SEC:
+        return items
+    if items:
+        if not _SCAN_CACHE["refreshing"]:
+            _SCAN_CACHE["refreshing"] = True
+            threading.Thread(target=_scan_refresh_bg, daemon=True, name="active-scan-refresh").start()
+        return items  # 旧扫描先用着, 刷新在后台跑
+    # 进程内第一问(没有任何旧扫描可回): 本线程同步扫(调用方已在线程池, 不堵事件循环)
+    scanned = _scan_all_now()
+    _SCAN_CACHE["items"] = scanned
+    _SCAN_CACHE["ts"] = time.time()
+    return scanned
 
 
 # ── 完成感知: 读 transcript 尾部判"运行中/已完成/等待" + 抽"完成了什么" ──────────
@@ -373,10 +440,11 @@ def _claude_user_prompt(content: Any) -> str:
     return ""
 
 
-def _claude_tail_status(lines: list[str]) -> dict[str, str]:
+def _claude_tail_status(lines: list[str]) -> dict[str, Any]:
     last_role = ""
     last_assistant = ""
     last_user = ""  # 最后一条真实用户 prompt(跳过 tool_result 回灌/注入), 给"无摘要"行兜底显示
+    recent_reversed: list[dict[str, str]] = []
     for ln in reversed(lines):
         try:
             obj = json.loads(ln)
@@ -392,19 +460,27 @@ def _claude_tail_status(lines: list[str]) -> dict[str, str]:
             txt = _claude_msg_text(msg.get("content"))
             if txt.strip():
                 last_assistant = txt
+        txt = _claude_msg_text(msg.get("content")) if role == "assistant" else _claude_user_prompt(msg.get("content"))
         if role == "user" and not last_user:
-            txt = _claude_user_prompt(msg.get("content"))
             if txt and not _looks_internal(txt):
                 last_user = txt
-        if last_role and last_assistant and last_user:
+        if txt and (role != "user" or not _looks_internal(txt)) and len(recent_reversed) < 4:
+            recent_reversed.append({"role": role, "text": _clip(txt, 1600)})
+        if last_role and last_assistant and last_user and len(recent_reversed) >= 4:
             break
-    return {"last_role": last_role, "last_assistant": _clip(last_assistant, 200), "last_user": _clip(last_user, 200)}
+    return {
+        "last_role": last_role,
+        "last_assistant": _clip(last_assistant, 200),
+        "last_user": _clip(last_user, 200),
+        "recent_messages": list(reversed(recent_reversed)),
+    }
 
 
-def _codex_tail_status(lines: list[str]) -> dict[str, str]:
+def _codex_tail_status(lines: list[str]) -> dict[str, Any]:
     last_role = ""
     last_assistant = ""
     last_user = ""
+    recent_reversed: list[dict[str, str]] = []
     for ln in reversed(lines):
         try:
             obj = json.loads(ln)
@@ -415,6 +491,7 @@ def _codex_tail_status(lines: list[str]) -> dict[str, str]:
             continue
         ptype = str(payload.get("type") or "").lower()
         role = payload.get("role")
+        txt = ""
         if role == "assistant" or "agent" in ptype or "output" in ptype:
             txt = _codex_msg_text(payload.get("content")) or _first_text(payload.get("text"))
             if txt.strip():
@@ -429,16 +506,45 @@ def _codex_tail_status(lines: list[str]) -> dict[str, str]:
                 txt = _codex_msg_text(payload.get("content")) or _first_text(payload.get("text"))
                 if txt.strip() and not _looks_internal(txt):
                     last_user = txt
-        if last_role and last_assistant and last_user:
+        normalized_role = "assistant" if role == "assistant" or "agent" in ptype or "output" in ptype else "user"
+        if txt.strip() and (normalized_role != "user" or not _looks_internal(txt)) and len(recent_reversed) < 4:
+            recent_reversed.append({"role": normalized_role, "text": _clip(txt, 1600)})
+        if last_role and last_assistant and last_user and len(recent_reversed) >= 4:
             break
-    return {"last_role": last_role, "last_assistant": _clip(last_assistant, 200), "last_user": _clip(last_user, 200)}
+    return {
+        "last_role": last_role,
+        "last_assistant": _clip(last_assistant, 200),
+        "last_user": _clip(last_user, 200),
+        "recent_messages": list(reversed(recent_reversed)),
+    }
 
 
-def _tail_status(provider: str, path: Path) -> dict[str, str]:
+def _tail_status(provider: str, path: Path) -> dict[str, Any]:
     lines = _tail_lines(path)
     if not lines:
-        return {"last_role": "", "last_assistant": ""}
+        return {"last_role": "", "last_assistant": "", "last_user": "", "recent_messages": []}
     return _codex_tail_status(lines) if provider == "codex" else _claude_tail_status(lines)
+
+
+# ── _tail_status 缓存: 按 (路径, mtime) 键, 文件没再写(mtime 不变)就不用重读尾部 128KB ──
+# 上限 512 条防无限增长; 超限清最旧一半(按插入序即可, 没必要精确 LRU, 反正 mtime 一变旧
+# key 自然失效变孤儿)。命中返回浅拷贝, 不能把缓存里的字典原件交出去被下游改。
+_TAIL_STATUS_CACHE: dict[tuple[str, float], dict[str, Any]] = {}
+_TAIL_STATUS_CACHE_CAP = 512
+
+
+def _tail_status_cached(provider: str, path: Path, mtime: float) -> dict[str, Any]:
+    key = (str(path), mtime)
+    cached = _TAIL_STATUS_CACHE.get(key)
+    if cached is not None:
+        return dict(cached)
+    result = _tail_status(provider, path)
+    _TAIL_STATUS_CACHE[key] = result
+    if len(_TAIL_STATUS_CACHE) > _TAIL_STATUS_CACHE_CAP:
+        stale_keys = list(_TAIL_STATUS_CACHE.keys())[: len(_TAIL_STATUS_CACHE) // 2]
+        for k in stale_keys:
+            _TAIL_STATUS_CACHE.pop(k, None)
+    return dict(result)
 
 
 def _derive_run_status(age_sec: float, last_role: str) -> str:
@@ -452,38 +558,34 @@ def _derive_run_status(age_sec: float, last_role: str) -> str:
     return "idle"
 
 
-@import_sessions_router.get("/active")
-async def list_active_sessions(window_sec: int = 600, limit: int = 30) -> dict[str, Any]:
-    """真正在跑的会话 = transcript(.jsonl)近 window_sec 秒有写入。含 omni 之外别的目录里的
-    claude/codex 对话(用户反馈: 别处真活跃的对话没被捕捉到)。按最近活动排序。
-
-    每条附 status(运行态) + last_did(最后一段助手回复 = "完成了什么"), 供多 agent 视图直接显示。
-    尾部读只对返回的 ≤limit 条做, I/O 有界。"""
+def _list_active_sync(window_sec: int, limit: int) -> dict[str, Any]:
+    """list_active_sessions 的同步实现体: 全量扫盘(经 TTL 缓存)+ 过滤 + 排序 + 尾部富化(经
+    mtime 缓存)+ agent_digest/agent_registry 懒触发, 从头到尾都是阻塞 I/O, 端点用
+    asyncio.to_thread 扔进线程池跑, 不堵事件循环(同进程 boss-sight 审阅台接口否则会被排队拖慢)。"""
     window_sec = max(60, min(int(window_sec), 7 * 86400))
     limit = max(1, min(int(limit), 80))
     now = time.time()
     active: list[dict] = []
-    try:
-        scanned = _scan_claude() + _scan_codex()
-    except Exception:  # noqa: BLE001
-        scanned = []
+    scanned = _scan_all_cached()
     for it in scanned:
         if not it.get("session_id"):
             continue
         if (now - float(it.get("mtime") or 0)) <= window_sec:
-            active.append(it)
+            # 缓存命中时 it 是缓存里的共享对象, 浅拷贝后再改, 绝不能碰到缓存原件。
+            active.append(dict(it))
     active.sort(key=lambda it: it.get("mtime", 0), reverse=True)
     total = len(active)
     items = active[:limit]
     for it in items:
         try:
-            st = _tail_status(str(it.get("provider")), Path(it["file"]))
+            st = _tail_status_cached(str(it.get("provider")), Path(it["file"]), float(it.get("mtime") or 0))
         except Exception:  # noqa: BLE001
             st = {"last_role": "", "last_assistant": ""}
         age = now - float(it.get("mtime") or 0)
         it["status"] = _derive_run_status(age, st.get("last_role", ""))
         it["last_did"] = st.get("last_assistant", "")
         it["last_user"] = st.get("last_user", "")  # 最后一句用户 prompt, 无摘要时兜底显示
+        it["recent_messages"] = st.get("recent_messages", [])
     # 附性价比模型维护的对话摘要(项目/计划/在做什么/最近一步)+ 懒触发一次刷新。
     # 摘要只在后台线程里由便宜模型算(单飞+节流), 不堵本响应; 没摘要的行前端回退到原始 preview。
     try:
@@ -506,19 +608,27 @@ async def list_active_sessions(window_sec: int = 600, limit: int = 30) -> dict[s
     return {"count": total, "window_sec": window_sec, "items": items}
 
 
+@import_sessions_router.get("/active")
+async def list_active_sessions(window_sec: int = 600, limit: int = 30) -> dict[str, Any]:
+    """真正在跑的会话 = transcript(.jsonl)近 window_sec 秒有写入。含 omni 之外别的目录里的
+    claude/codex 对话(用户反馈: 别处真活跃的对话没被捕捉到)。按最近活动排序。
+
+    每条附 status(运行态) + last_did(最后一段助手回复 = "完成了什么"), 供多 agent 视图直接显示。
+    尾部读只对返回的 ≤limit 条做, I/O 有界。
+
+    扫描+尾部读全是同步阻塞 I/O(rglob 几千个 jsonl 全 stat, 合计几十 GB), 丢线程池跑, 不堵
+    本进程事件循环(同进程 boss-sight 审阅台接口共用一个循环, 堵住会被一起拖慢)。"""
+    return await asyncio.to_thread(_list_active_sync, window_sec, limit)
+
+
 @import_sessions_router.get("/importable")
 async def list_importable_sessions(limit: int = 40) -> dict[str, Any]:
     """列出可载入续接的本机历史会话(Claude Code + Codex), 按最近修改排序。"""
     limit = max(1, min(int(limit), 120))
-    items: list[dict] = []
-    try:
-        items.extend(_scan_claude())
-    except Exception:  # noqa: BLE001
-        pass
-    try:
-        items.extend(_scan_codex())
-    except Exception:  # noqa: BLE001
-        pass
+    items = [
+        dict(item)
+        for item in await asyncio.to_thread(_scan_all_cached)
+    ]
     # 过滤掉抠不到 id 的(没法 resume), 再按 mtime 排序裁剪。
     items = [it for it in items if it.get("session_id")]
     items.sort(key=lambda it: it.get("mtime", 0), reverse=True)

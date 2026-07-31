@@ -27,6 +27,8 @@ from contextlib import asynccontextmanager
 # 让 Windows 下 SDK spawn claude.cmd 子进程不弹空 console 窗口
 from . import _subprocess_hide
 _subprocess_hide.install_subprocess_hide()
+from . import _windows_accept
+_windows_accept.install_resilient_accept()
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
@@ -58,6 +60,9 @@ async def lifespan(app: FastAPI):
     subagent.* 事件, 转成 controller session 的 user.message inject. 也更新
     SubagentStatusAggregator. lifespan 只负责挂钩, 不起独立后台 task.
     """
+    import asyncio as _asyncio
+
+    _windows_accept.install_exception_filter(_asyncio.get_running_loop())
     pid = os.getpid()
     # uvicorn 解析后实际监听端口由 server config 决定; 没有官方钩子拿端口, 走环境变量
     port = int(os.environ.get("OMNI_CC_DAEMON_PORT", str(lifecycle.DEFAULT_PORT)))
@@ -68,10 +73,20 @@ async def lifespan(app: FastAPI):
     lifecycle.write_pid(pid)
     lifecycle.write_port(port)
     lifecycle.install_atexit_hook()
+    # P0 性能批 (2026-07): 事件落库改批量 — emit_event 原实现每条事件新建连接+
+    # insert+commit, 每条聊天消息 ≥2 次, 同步 sqlite IO 堵事件循环。启用后 push 进
+    # 队列, 后台线程 ~100ms/50 条批量 executemany (hooks/_shared.py, atexit 兜底 flush)。
+    # hooks 子进程不经过这里, 保持同步直写不变。
+    try:
+        from .hooks._shared import enable_batched_events
+        enable_batched_events()
+    except Exception:  # noqa: BLE001
+        logger.exception("ccdaemon: enable_batched_events failed (事件落库退回同步直写)")
     started_at = time.time()
     app.state.started_at = started_at
     app.state.daemon_pid = pid
     app.state.daemon_port = port
+    resource_monitor = None
 
     # BOSS SIGHT 块 3: 挂 ControllerWaker + SubagentStatusAggregator
     try:
@@ -166,15 +181,44 @@ async def lifespan(app: FastAPI):
                 build_material_registry(limit=1)
             except Exception:  # noqa: BLE001
                 pass
+            # 顺手把首屏三大慢扫描端点的快照建好(routes._snapshot_cached 首建即入缓存):
+            # 否则 daemon 冷启后第一个访问者要现付全套冷扫(实测可达 20s+)。
+            try:
+                from ..boss_sight import routes as _bs_routes
+                _bs_routes._snapshot_cached("plans", 15.0, _bs_routes._list_plans_sync)
+                _bs_routes._snapshot_cached("briefing", 15.0, _bs_routes._get_briefing_sync)
+                _bs_routes._snapshot_cached(
+                    "workflow-summary:40", 15.0, lambda: _bs_routes._get_workflow_summary_sync(40)
+                )
+            except Exception:  # noqa: BLE001
+                pass
 
         _threading.Thread(target=_prewarm, name="boss-sight-prewarm", daemon=True).start()
     except Exception:  # noqa: BLE001
         pass
 
+    # Read-only process/resource observation. It records attribution and
+    # confirmed anomalies, but intentionally exposes no kill/suspend action.
+    try:
+        from .resource_monitor import get_resource_monitor
+
+        resource_monitor = get_resource_monitor()
+        resource_monitor.start()
+        app.state.resource_monitor = resource_monitor
+        print(
+            f"[ccdaemon] resource monitor started interval={resource_monitor.interval_s}s "
+            "(read-only, cleanup requires human confirmation)",
+            flush=True,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("ccdaemon: resource monitor failed to start")
+
     print(f"[ccdaemon] started pid={pid} port={port}", flush=True)
     try:
         yield
     finally:
+        if resource_monitor is not None:
+            await resource_monitor.stop()
         lifecycle.clear_pid()
         print(f"[ccdaemon] stopped pid={pid}", flush=True)
 
@@ -203,6 +247,12 @@ try:
     app.include_router(cc_router)
 except ImportError as e:
     logger.warning("ccdaemon: pty router not loaded: %s", e)
+
+try:
+    from .resource_routes import resource_router
+    app.include_router(resource_router)
+except ImportError as e:
+    logger.warning("ccdaemon: resource monitor router not loaded: %s", e)
 
 # 载入已有会话 (#2 / A1): 列出本机 Claude Code / Codex 历史会话供 BOSS SIGHT 载入续接。
 try:

@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import fsSync from 'node:fs';
+import path from 'node:path';
 
 import crossSpawn from 'cross-spawn';
 import Database from 'better-sqlite3';
@@ -11,6 +12,23 @@ import { notifyRunFailed, notifyRunStopped } from './services/notification-orche
 import { createCompleteMessage, createNormalizedMessage, getOpenCodeDatabasePath } from './shared/utils.js';
 
 const spawnFunction = process.platform === 'win32' ? crossSpawn : spawn;
+
+/**
+ * On Windows the npm `opencode.cmd` shim re-parses argv through cmd.exe, which
+ * truncates multi-line prompts at the first newline. Bypass the shim: spawn
+ * the native opencode.exe directly (verified on opencode 1.18.2).
+ */
+function resolveOpenCodeLaunch() {
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    const direct = path.join(
+      process.env.APPDATA, 'npm', 'node_modules', 'opencode-ai', 'bin', 'opencode.exe',
+    );
+    if (fsSync.existsSync(direct)) {
+      return direct;
+    }
+  }
+  return 'opencode';
+}
 
 const activeOpenCodeProcesses = new Map();
 
@@ -208,7 +226,7 @@ async function spawnOpenCode(command, options = {}, ws) {
         args.push(command.trim());
       }
 
-      opencodeProcess = spawnFunction('opencode', args, {
+      opencodeProcess = spawnFunction(resolveOpenCodeLaunch(), args, {
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },

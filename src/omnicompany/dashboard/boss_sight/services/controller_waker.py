@@ -36,17 +36,18 @@ def _auto_wake_enabled() -> bool:
 
     历史上 ControllerWaker 从不读这个开关 —— 设置面板里的「总控自动唤起」是个**摆设**,
     关了也照样唤起。这里把它接通: 关闭时所有唤起(subagent 完成/阻断、审阅评论)都不再注入总控。
-    读不到(store 异常)按 True 处理, 沿用历史默认 = 开。
+    2026-07 总控止血「非确认不主动」: 该控制位默认 False; 读不到(store 异常)也按 False
+    处理(fail-closed), 不在故障时擅自恢复自动唤起。
     """
     try:
         from omnicompany.dashboard.boss_sight.services.control_observability_store import (
             get_control_observability_store,
         )
         controls = get_control_observability_store().list_controls().get("by_key", {})
-        return bool(controls.get("controller.auto_wake", {}).get("value", True))
+        return bool(controls.get("controller.auto_wake", {}).get("value", False))
     except Exception:  # noqa: BLE001
-        _log.exception("ControllerWaker: read controller.auto_wake failed, default on")
-        return True
+        _log.exception("ControllerWaker: read controller.auto_wake failed, default off")
+        return False
 
 
 def _is_delegated_subagent(sess: Any) -> bool:

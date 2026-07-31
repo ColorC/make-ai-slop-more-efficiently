@@ -8,11 +8,9 @@ from __future__ import annotations
 from omnicompany.packages.services._learning.trace_induction.formats import register_formats
 from omnicompany.packages.services._learning.trace_induction.routers import (
     NoiseFilterRouter,
-    RegistrarRouter,
     ReqWriterRouter,
     SOPGeneratorRouter,
     TraceReaderRouter,
-    WFCallerRouter,
 )
 from omnicompany.runtime.routing.router import Router
 
@@ -37,6 +35,4 @@ def build_bindings(input_dict: dict | None = None, *, model: str | None = None) 
         "noise_filter": NoiseFilterRouter(client=client),
         "sop_generator": SOPGeneratorRouter(client=client),
         "req_writer": ReqWriterRouter(client=client),
-        "wf_caller": WFCallerRouter(),
-        "registrar": RegistrarRouter(),
     }

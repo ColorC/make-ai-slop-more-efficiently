@@ -2,10 +2,10 @@
 # [OMNI] material_id="material:utility.color_spectrum.spectrum_runner.aggregator.py"
 """color_spectrum — 跨域共用 · 测试判别力色谱核心组件 (2026-04-25 立).
 
-立题: voxelcraft 路径 mechanism / item / entity 都需要"色谱测试" — 验证 probe 在
+立题: 业务域路径 mechanism / item / entity 都需要"色谱测试" — 验证 probe 在
 不同错误程度的 stub 上能给出**单调对应**的判决 (浅错给浅判 / 深错给深判 / 完全对给 PASS).
 
-之前 mechanism 路径手工写了 5 档色谱脚本 (`scripts/voxelcraft_tier3_color_spectrum_e2e.py`),
+之前 mechanism 路径手工写了 5 档色谱脚本 (散在 scripts/ 下),
 但每次新增 probe 都要重写一份, 这是用户 2026-04-25 命定的"高频操作应入核心层共用".
 
 本模块提供:
@@ -21,7 +21,7 @@
 
 参考:
 - 立档 plan: docs/plans/[2026-04-25]CORE-FOUNDATIONS-FROM-N1A-FEEDBACK/plan.md §四
-- 范例使用: scripts/voxelcraft_tier3_color_spectrum_e2e.py 改造为消费此模块 (B 阶段后续)
+- 范例使用: scripts/ 下既有 tier3 色谱 E2E 脚本改造为消费此模块 (B 阶段后续)
 """
 from __future__ import annotations
 

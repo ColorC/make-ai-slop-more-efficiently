@@ -1,10 +1,13 @@
 # [OMNI] origin=codex domain=runtime/llm ts=2026-06-13T00:00:00Z type=infra
 # [OMNI] material_id="material:runtime.llm.structured_json_call.py"
-"""Single authority for one-shot structured JSON LLM calls.
+"""Single authority for native structured LLM calls.
 
-This module deliberately stays above provider specifics: LLMClient owns network
-transport, retries, metering, and audit logging; call_json owns the structured
-JSON contract shared by governance and future departments.
+LLMClient owns transport, streaming, metering, and audit logging. ``call_json``
+binds one native output tool, accepts only that tool's arguments, and validates
+them locally. Prompt-shaped JSON, fenced JSON extraction, and text repair are
+deliberately excluded from this authority. When a native tool call is missing or
+its arguments are invalid, the same model conversation receives a tool error and
+may submit the native tool again.
 """
 
 from __future__ import annotations
@@ -16,11 +19,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 DEFAULT_STRUCTURED_MODEL_ENV = "OMNI_STRUCTURED_LLM_MODEL"
-DEFAULT_STRUCTURED_MODEL = "deepseek-v4-pro"
+DEFAULT_STRUCTURED_MODEL = "qwen3.7-max"
 DEFAULT_MODEL = os.environ.get(DEFAULT_STRUCTURED_MODEL_ENV, DEFAULT_STRUCTURED_MODEL).strip() or DEFAULT_STRUCTURED_MODEL
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)
-_SCHEMA_PROMPT_LIMIT = 8000
+_OUTPUT_TOOL_NAME = "submit_structured_result"
 
 
 class StructuredJSONError(ValueError):
@@ -89,49 +92,89 @@ def call_json(
     role: str | None = None,
     caller: str = "structured.call_json",
     max_tokens: int = 8000,
-    max_corrections: int = 1,
+    max_corrections: int = 2,
     client_factory: ClientFactory | None = None,
 ) -> Any:
-    """Call an LLM once for strict JSON, with local schema validation and correction retry."""
+    """Call an LLM once and accept only native output-tool arguments.
+
+    ``max_corrections`` is retained as a compatibility name for the number of
+    same-conversation follow-ups allowed when the model reasons or answers in
+    prose without calling the output tool, or when native tool arguments fail
+    local validation. It never asks the model to repair or emit JSON text.
+    """
     effective_model = model or (None if role else default_structured_model())
     model_label = effective_model or f"role:{role}"
     factory = client_factory or _default_client_factory
-    client_kwargs: dict[str, Any] = {"max_tokens": max_tokens}
+    output_schema: Mapping[str, Any] = schema or {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": True,
+    }
+    output_tool = {
+        "name": _OUTPUT_TOOL_NAME,
+        "description": "Submit the complete structured result for this task.",
+        "input_schema": dict(output_schema),
+    }
+    client_kwargs: dict[str, Any] = {
+        "max_tokens": max_tokens,
+        "tools": [output_tool],
+        # 结构化管线自己持有会话内纠错。传输层遇到 4xx/配置错误应立即暴露,
+        # 不能按 30/60/120s 静默退避把永久错误伪装成长时间思考。
+        "max_retry_attempts": 0,
+    }
     if effective_model:
         client_kwargs["model"] = effective_model
     if role:
         client_kwargs["role"] = role
     client = factory(**client_kwargs)
     messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
-    effective_system = _with_structured_contract(system, schema)
-    last_error: Exception | None = None
-    last_text = ""
-
-    for _attempt in range(max(0, max_corrections) + 1):
+    for turn in range(max(0, max_corrections) + 1):
         result = client.call(
             messages=messages,
-            system=effective_system,
+            system=system,
+            tool_choice="auto",
+            response_format=None,
             caller=caller,
             info_audit=False,
         )
-        last_text = _extract_text(result)
         try:
-            parsed = parse_json_block(last_text)
-            issues = validate_json_schema(parsed, schema)
-            if issues:
-                raise StructuredJSONError(_format_issues(issues))
-            return parsed
-        except Exception as exc:  # noqa: BLE001 - surface one uniform structured-call error.
-            last_error = exc
-            messages = messages + [
-                {"role": "assistant", "content": last_text[:4000]},
-                {"role": "user", "content": _correction_prompt(exc, schema)},
-            ]
-
-    raise StructuredJSONError(
-        f"model {model_label} did not return schema-valid JSON after "
-        f"{max(0, max_corrections) + 1} attempt(s): {last_error}"
-    )
+            parsed = _extract_output_tool_input(result)
+        except StructuredJSONError:
+            if turn >= max(0, max_corrections):
+                raise
+            messages.extend([
+                _assistant_continuation_message(result),
+                {
+                    "role": "user",
+                    "content": (
+                        "Continue the same task with the reasoning above. "
+                        "Now call the single provided output tool with the complete result."
+                    ),
+                },
+            ])
+            continue
+        issues = validate_json_schema(parsed, schema)
+        if issues:
+            issue_text = _format_issues(issues)
+            if turn >= max(0, max_corrections):
+                raise StructuredJSONError(
+                    f"model {model_label} returned invalid native tool arguments: "
+                    f"{issue_text}"
+                )
+            messages.extend(
+                _native_tool_error_messages(
+                    result,
+                    tool_name=_OUTPUT_TOOL_NAME,
+                    error_text=(
+                        "Native tool arguments failed validation: " + issue_text + ". "
+                        "Keep the reasoning and task context, then call the same output "
+                        "tool again with complete valid arguments. Do not emit JSON text."
+                    ),
+                )
+            )
+            continue
+        return parsed
+    raise StructuredJSONError(f"model {model_label} did not call the native output tool")
 
 
 def _default_client_factory(**kwargs: Any) -> Any:
@@ -140,42 +183,77 @@ def _default_client_factory(**kwargs: Any) -> Any:
     return LLMClient(**kwargs)
 
 
-def _extract_text(result: Any) -> str:
-    from omnicompany.runtime.llm.llm import _extract_response_text
-
-    text = _extract_response_text(result) or ""
-    if text:
-        return text
-    direct = getattr(result, "text", "")
-    if isinstance(direct, str):
-        return direct
-    if isinstance(result, str):
-        return result
-    return ""
-
-
-def _with_structured_contract(system: str, schema: Mapping[str, Any] | None) -> str:
-    parts = [system.strip() if system else ""]
-    parts.append(
-        "Return only one strict JSON value. Do not include markdown, prose, comments, "
-        "or trailing text."
+def _extract_output_tool_input(result: Any) -> dict[str, Any]:
+    for block in getattr(result, "content", None) or []:
+        if getattr(block, "name", "") != _OUTPUT_TOOL_NAME:
+            continue
+        value = getattr(block, "input", None)
+        if isinstance(value, dict):
+            return value
+    raise StructuredJSONError(
+        "model did not call the native structured-output tool; free text is rejected"
     )
-    if schema:
-        schema_text = json.dumps(schema, ensure_ascii=False, sort_keys=True)
-        parts.append(f"The JSON value must satisfy this JSON Schema subset:\n{schema_text[:_SCHEMA_PROMPT_LIMIT]}")
-    return "\n\n".join(part for part in parts if part)
 
 
-def _correction_prompt(error: Exception, schema: Mapping[str, Any] | None) -> str:
-    parts = [
-        "The previous response was not valid JSON for this contract.",
-        f"Error: {error}",
-        "Return only the corrected JSON value. No markdown or explanation.",
-    ]
-    if schema:
-        schema_text = json.dumps(schema, ensure_ascii=False, sort_keys=True)
-        parts.append(f"Required JSON Schema subset:\n{schema_text[:_SCHEMA_PROMPT_LIMIT]}")
-    return "\n\n".join(parts)
+def _assistant_continuation_message(result: Any) -> dict[str, Any]:
+    text = "".join(
+        str(getattr(block, "text", ""))
+        for block in getattr(result, "content", None) or []
+        if getattr(block, "text", "")
+    )
+    message: dict[str, Any] = {
+        "role": "assistant",
+        "content": ([{"type": "text", "text": text}] if text else []),
+    }
+    reasoning = getattr(result, "reasoning_content", "")
+    if isinstance(reasoning, str) and reasoning:
+        message["reasoning_content"] = reasoning
+    return message
+
+
+def _native_tool_error_messages(
+    result: Any,
+    *,
+    tool_name: str,
+    error_text: str,
+) -> list[dict[str, Any]]:
+    """Preserve a rejected native tool call and return its error in-protocol."""
+    text_blocks: list[dict[str, Any]] = []
+    tool_blocks: list[dict[str, Any]] = []
+    tool_use_id = ""
+    for block in getattr(result, "content", None) or []:
+        text = getattr(block, "text", "")
+        if text:
+            text_blocks.append({"type": "text", "text": str(text)})
+        if getattr(block, "name", "") == tool_name:
+            tool_use_id = str(getattr(block, "id", "") or "native_output_tool")
+            tool_blocks.append(
+                {
+                    "type": "tool_use",
+                    "id": tool_use_id,
+                    "name": tool_name,
+                    "input": getattr(block, "input", {}) or {},
+                }
+            )
+    assistant: dict[str, Any] = {
+        "role": "assistant",
+        "content": [*text_blocks, *tool_blocks],
+    }
+    reasoning = getattr(result, "reasoning_content", "")
+    if isinstance(reasoning, str) and reasoning:
+        assistant["reasoning_content"] = reasoning
+    tool_result = {
+        "role": "user",
+        "content": [
+            {
+                "type": "tool_result",
+                "tool_use_id": tool_use_id or "native_output_tool",
+                "content": error_text,
+                "is_error": True,
+            }
+        ],
+    }
+    return [assistant, tool_result]
 
 
 def _format_issues(issues: list[ValidationIssue]) -> str:

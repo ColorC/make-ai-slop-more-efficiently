@@ -4,8 +4,8 @@
 # [OMNI] tags=research,router,worker,intake,library
 """research.run 首尾 RULE 节点。
 
-intake(查重门)→ [planner → orchestrator → synthesize → claim_verify] → library_write(落统一库)
-中段四节点在 deep.py / synth.py。
+当前三节点：intake(查重门) → native(外部 Codex 原生搜索) → library_write(落统一库)。
+交互式调研不走这条 Team，而由前台 agent 原生搜索后调用 check/save。
 """
 
 from __future__ import annotations
@@ -20,6 +20,27 @@ from omnicompany.runtime.routing.router import Router
 
 from .. import library
 from .._paths import RUNS_ROOT, ensure_dirs
+
+
+DEFAULT_TOTAL_TIMEOUT_S = 600.0
+DEFAULT_IDLE_TIMEOUT_S = 60.0
+DEFAULT_MAX_RESULTS = 12
+
+
+def _positive_float(value: Any, default: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _positive_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
 
 
 # ── 节点 1: 入题 + 查重门(拆题交给下游 planner)──────────────────────────
@@ -43,15 +64,15 @@ class TopicIntake(Router):
         run_dir.mkdir(parents=True, exist_ok=True)
 
         existing = library.lookup_by_topic(topic_norm)  # 查重门
+        timeout_s = _positive_float(req.get("timeout_s"), DEFAULT_TOTAL_TIMEOUT_S)
+        idle_timeout_s = _positive_float(req.get("idle_timeout_s"), DEFAULT_IDLE_TIMEOUT_S)
+        max_results = _positive_int(req.get("max_results"), DEFAULT_MAX_RESULTS)
         (run_dir / "intake.json").write_text(
             json.dumps({"topic": topic, "topic_norm": topic_norm,
-                        "existing_record_id": (existing or {}).get("record_id")},
+                        "existing_record_id": (existing or {}).get("record_id"),
+                        "timeout_s": timeout_s, "idle_timeout_s": idle_timeout_s,
+                        "max_results": max_results},
                        ensure_ascii=False, indent=2), encoding="utf-8")
-
-        try:
-            timeout_s = float(req.get("timeout_s", 900) or 900)
-        except (TypeError, ValueError):
-            timeout_s = 900.0
 
         diag = f"入题 '{topic}'"
         if existing:
@@ -61,6 +82,7 @@ class TopicIntake(Router):
             output={
                 "topic": topic, "topic_norm": topic_norm, "run_dir": str(run_dir),
                 "existing": existing, "timeout_s": timeout_s,
+                "idle_timeout_s": idle_timeout_s, "max_results": max_results,
             },
             diagnosis=diag,
             granted_tags=["domain.research", "stage.intake"],
@@ -81,13 +103,37 @@ class LibraryWrite(Router):
         topic = out["topic"]
         run_dir = Path(out["run_dir"])
 
+        synthesis = out.get("synthesis") or {}
+        sources = out.get("sources") or []
+        if out.get("research_ok") is not True or not synthesis.get("summary"):
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={"topic": topic, "run_dir": str(run_dir), "saved": False},
+                diagnosis="上游调研失败或为空，拒绝写入研究库",
+            )
+
+        snapshot_texts = {
+            str(source.get("url") or "").strip(): source["snapshot_text"]
+            for source in sources
+            if str(source.get("url") or "").strip()
+            and isinstance(source.get("snapshot_text"), str)
+            and source["snapshot_text"].strip()
+        }
+        # The run-local native.json owns the full captured text.  The unified
+        # record keeps its SHA and snapshot_path, avoiding duplicate large text.
+        library_sources = [
+            {key: value for key, value in source.items() if key != "snapshot_text"}
+            for source in sources
+        ]
+
         # 落库核心三路共用(library.save_research_record): 组装 + upsert + catalog 投影 + 渲 report。
         saved, is_dup, report_path = library.save_research_record(
             topic,
-            out.get("synthesis") or {},
-            out.get("sources") or [],
+            synthesis,
+            library_sources,
             coverage=out.get("coverage") or {},
             run_id=run_dir.name,
+            snapshot_texts=snapshot_texts or None,
         )
         # run_dir 内也留一份(单次产物自带)
         (run_dir / "report.md").write_text(library.render_report(saved), encoding="utf-8")

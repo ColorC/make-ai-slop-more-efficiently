@@ -32,6 +32,8 @@ _HOP_BY_HOP = {
 _ALIASES = {
     "progress": "progress-service",
     "whatnow": "progress-service",
+    "aigc": "aigc-review",
+    "aigc-lab": "aigc-review",
 }
 _service_locks: dict[str, asyncio.Lock] = {}
 
@@ -43,6 +45,7 @@ def _repo_root() -> Path:
 def _registry() -> dict[str, dict[str, Any]]:
     repo = _repo_root()
     progress_url = os.environ.get("OMNI_PROGRESS_SERVICE_URL", "http://127.0.0.1:8230").rstrip("/")
+    aigc_review_url = os.environ.get("OMNI_AIGC_REVIEW_URL", "http://127.0.0.1:8077").rstrip("/")
     return {
         "progress-service": {
             "id": "progress-service",
@@ -57,6 +60,15 @@ def _registry() -> dict[str, dict[str, Any]]:
             "manual_start": str(
                 repo / "services" / "_progress" / "progress_service" / "start-progress-service.cmd"
             ),
+            "timeout": httpx.Timeout(10.0, read=120.0),
+        },
+        "aigc-review": {
+            "id": "aigc-review",
+            "aliases": ["aigc", "aigc-lab"],
+            "base": aigc_review_url,
+            "health_path": "/api/health",
+            # configure via env var: 启动命令不再硬编码本机路径
+            "manual_start": os.environ.get("OMNI_AIGC_REVIEW_START_CMD", ""),
             "timeout": httpx.Timeout(10.0, read=120.0),
         },
     }
@@ -156,6 +168,13 @@ async def _ensure_service(service: str, *, wait_secs: float = 12.0) -> dict[str,
         status = await _service_status(service_id)
         if status.get("running"):
             return {"ok": True, "status": status, "ensured": False}
+
+        if not cfg.get("ensure_cmd"):
+            return {
+                "ok": False,
+                "status": status,
+                "ensure": {"ok": False, "reason": "no ensure command registered"},
+            }
 
         ensure_result = await run_in_threadpool(_run_ensure_command, cfg)
         deadline = time.monotonic() + wait_secs

@@ -6,7 +6,7 @@ OMNI-041: data/ 下新建的目录必须在 archmap.yaml `data.allowed_subdirs` 
 OMNI-042: 归档目录命名必须统一为 `_archive/<topic>/`，禁止 `_archived/`、`_archive_<xxx>/` 等变体
 
 背景:
-    2026-04-21 B3/B4 治理发现 data/ 下长期存在 18+ 非法 subdir (voxelcraft/crystallize/
+    2026-04-21 B3/B4 治理发现 data/ 下长期存在 18+ 非法 subdir (业务数据目录/crystallize/
     doctor/llm_audit 等) 违反 archmap.yaml `forbid_new_subdirs: true`, 但 Guardian
     没扫到。根因: fs_scanner_worker.py 自己维护了一份 13 entries 的 hardcoded 白名单,
     与 archmap.yaml 的 3 entries 严重不一致 (B3b 发现).
@@ -44,15 +44,20 @@ def _load_archmap_data_allowed() -> tuple[set[str], set[str], set[str]]:
             _ARCHMAP_CACHE["patterns"],     # type: ignore[return-value]
         )
     # archmap 在 <repo>/docs/archmap.yaml
-    # 本文件 parents[5] = src/omnicompany/packages/services/guardian/rules/directory_hygiene.py
-    # parents[5] = src, parents[6] = <repo>
-    repo_root = Path(__file__).resolve().parents[6]
-    archmap_path = repo_root / "docs" / "archmap.yaml"
+    # 2026-07-26 修: 原硬编码 parents[6] 在文件迁入 _core/ 后 off-by-one
+    # (指向 src/, archmap 加载静默失败 → allowed_subdirs 为空 → 所有 data/
+    # 新路径全报违规, 460 条存量误报的根因). 改为向上逐级找 docs/archmap.yaml.
+    archmap_path: Path | None = None
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "docs" / "archmap.yaml"
+        if candidate.exists():
+            archmap_path = candidate
+            break
     allowed_subdirs: set[str] = set()
     allowed_files: set[str] = set()
     allowed_patterns: set[str] = set()
     try:
-        if archmap_path.exists():
+        if archmap_path is not None and archmap_path.exists():
             data = yaml.safe_load(archmap_path.read_text(encoding="utf-8")) or {}
             data_section = (data.get("src_omnicompany") or {}).get("data")
             # 顶层 "repo_root" + "data" 在 v12 schema 下可能在不同位置, 容错搜索

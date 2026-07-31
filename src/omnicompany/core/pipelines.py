@@ -3,7 +3,7 @@
 """omnicompany.core.pipelines — 管线懒加载注册（基础设施）
 
 将所有已知管线注册到全局 Registry，但使用延迟 import 避免在 CLI 启动时
-拉入 demogame/unity/evolution 等重依赖。
+拉入业务域等重依赖。
 
 原则：
 - 简单管线（workflow 类）直接在自己的模块里 _register()
@@ -75,53 +75,8 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip format-repair: %s", e)
 
-    try:
-        register(PipelineEntry(
-            name="project-audit",
-            description=(
-                "项目遍历 + 据真源(我的原始prompt + 真实代码内容 + 文件树)逐条核实完成度 — 不信报告/说明/复选框.\n"
-                "  omni run project-audit -i name=quant-lab -i root=E:/WindowsWorkspace/quant-lab\n"
-                "  产出: 真实规模 + 采到的原始 prompt + 读过的代码 + 每条计划项 done/partial/not_done/uncertain (claimed 与 verdict 不一致点是重点)"
-            ),
-            domain="project_audit",
-            build_team=_lazy("omnicompany.packages.services._diagnosis.project_audit.team",
-                                 "build_team"),
-            build_bindings=_lazy_fn("omnicompany.packages.services._diagnosis.project_audit.run",
-                                    "build_bindings"),
-            default_db_dir="data/services/project_audit",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(name="name", help="项目名 (自有项目可点名)"),
-                CliArg(name="root", help="项目根目录绝对路径", required=True),
-                CliArg(name="max_plans", help="单次审计计划数上限 (默认 12, 防失控)"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip project-audit: %s", e)
-
-    # ── 项目发现 — 据真源(会话 cwd + 仓库扫描)枚举我真做过的项目, 归属过滤掉纯开源 ──
-    try:
-        register(PipelineEntry(
-            name="project-discovery",
-            description=(
-                "据真源发现'我真做过的项目' — 扫 ~/.claude+~/.codex 会话真实 cwd 频次 + 仓库扫描, 按归属边界标 owned.\n"
-                "  omni run project-discovery\n"
-                "  产出: 项目清单 (name/root/owned/session_count/evidence) — 完整性铁律: owned=True 的需逐个遍历核实"
-            ),
-            domain="project_audit",
-            build_team=_lazy("omnicompany.packages.services._diagnosis.project_audit.team",
-                                 "build_discovery_team"),
-            build_bindings=_lazy_fn("omnicompany.packages.services._diagnosis.project_audit.run",
-                                    "build_discovery_bindings"),
-            default_db_dir="data/services/project_audit",
-            default_max_steps=5,
-            cli_args=[
-                CliArg(name="repo_roots", help="仓库扫描根, 逗号分隔 (默认 E:/WindowsWorkspace,D:/P4/main/AIWorkSpace)"),
-                CliArg(name="min_sessions", help="一个 cwd 至少出现几次会话才算项目 (默认 1)"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip project-discovery: %s", e)
+    # project-audit / project-discovery 于 2026-07-22 退役：多次真实运行无产出或识别 0 项。
+    # 项目盘点由 Project Atlas 承担；计划审计改用 omni plan audit 与计划自身的测试/审阅证据。
 
     # ── ux-audit — 前端三维 UX 审计(交互/信息/跳转)· 确定性枚举 + 据矩阵/层级打错位标记 ──
     try:
@@ -129,7 +84,7 @@ def register_all() -> None:
             name="ux-audit",
             description=(
                 "前端 src 三维 UX 审计 — 交互/信息/跳转 确定性枚举 + 据频率×重要性矩阵/信息层级打错位标记(平铺/删除无保护/无层级/说明冗余).\n"
-                "  omni run ux-audit -i src_root=E:/WindowsWorkspace/omnicompany/src/omnicompany/dashboard/frontend/src -i app=omnidashboard\n"
+                "  omni run ux-audit -i src_root=<your-frontend-src> -i app=omnidashboard\n"
                 "  产出: 每界面交互/信息/跳转计数 + 错位界面清单 + markdown 总表(落 data/services/ux_audit/). 可复跑于 lofa/poof/whatnow.\n"
                 "  口径: frostpane/REBUILD-STANDARD.md + INTERACTION-AUDIT.md. 语义两轴(重要性/频率/含义)留 LLM 增补节点(SOFT 待加)."
             ),
@@ -147,28 +102,6 @@ def register_all() -> None:
         ))
     except Exception as e:
         logger.debug("skip ux-audit: %s", e)
-
-    # ── 完整性临界 — 每个 owned 项目都有真源报告+到-bar 页才算完, 否则列出缺失打回 ──
-    try:
-        register(PipelineEntry(
-            name="audit-completeness",
-            description=(
-                "完整性临界 — 核对每个 owned 项目是否都有真源报告+到九维-bar 的作品页; 缺一 FAIL 并列 missing.\n"
-                "  (一般由编排工作流调用, 传入 owned_projects/reports/pages)"
-            ),
-            domain="project_audit",
-            build_team=_lazy("omnicompany.packages.services._diagnosis.project_audit.team",
-                                 "build_completeness_team"),
-            build_bindings=_lazy_fn("omnicompany.packages.services._diagnosis.project_audit.run",
-                                    "build_completeness_bindings"),
-            default_db_dir="data/services/project_audit",
-            default_max_steps=5,
-            cli_args=[
-                CliArg(name="owned_projects", help="应覆盖的项目名, 逗号分隔"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip audit-completeness: %s", e)
 
     # lap-audit pipeline 移除 (2026-05-05 诊断重制 step 3) — lap_auditor 整体归档,
     # 概念并入 doctor _spec/ 子域. 详 docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/plan.md
@@ -313,368 +246,8 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip skill-import-verify: %s", e)
 
-    # ── Repo Architect — 仓库架构深度分析 (absorption 核心工具) ──
-    try:
-        register(PipelineEntry(
-            name="repo-architect",
-            description=(
-                "仓库架构深度分析管线 — 输入 GitHub URL 或本地路径, 输出完整架构报告 + "
-                "覆盖率证明 + OmniKB 条目。翻译自 yzddmr6/repo-analyzer SOTA skill, "
-                "20 节点 DAG 覆盖 16 Format 完整链路 (人工补齐 workflow-factory 首轮截断)"
-            ),
-            domain="workflow",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.repo.architect.run",
-                "build_repo_architect_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.repo.architect.run",
-                "build_repo_architect_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=40,
-            cli_args=[
-                CliArg(name="url", help="GitHub 仓库 URL"),
-                CliArg(name="local_path", help="本地仓库路径 (和 url 互斥)"),
-                CliArg(name="focus", help="分析焦点 (自然语言, <=2000 字符)"),
-                CliArg(name="mode", help="分析模式 quick/standard/deep"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip repo-architect: %s", e)
-
-    # ── Repo Learner — 带目的的 repo 学习支流 (AgentNodeLoop 主 agent + sub agent) ──
-    try:
-        register(PipelineEntry(
-            name="repo-learner",
-            description=(
-                "带目的的 repo 学习支流 — 主 agent (150 turns) 自由读仓库, 最多 spawn "
-                "3 个子 agent (50 turns each) 深读模块, 产出自由格式 learning report "
-                "(Learning Value + Learning Locations 两段必含)。与 repo-architect 并列, "
-                "共享前 4 个基础节点 (input_validator / repo_acquirer / repo_identity_anchor "
-                "/ scale_surveyor)。"
-            ),
-            domain="workflow",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.repo.learner.run",
-                "build_repo_learner_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.repo.learner.run",
-                "build_repo_learner_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=10,  # pipeline 外层只有 6 节点; AgentNodeLoop 内部 turns 才是大头
-            cli_args=[
-                CliArg(name="url", help="GitHub 仓库 URL"),
-                CliArg(name="local_path", help="本地仓库路径 (和 url 互斥)"),
-                CliArg(name="focus", help="学习焦点 hint (自然语言, 可空)"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip repo-learner: %s", e)
-
-    # ── OmniKB 知识库审计 ──
-    # 设计文档: docs/plans/[2026-04-09]KNOWLEDGE-REVIVAL-AND-ABSORPTION-REDESIGN/
-    try:
-        register(PipelineEntry(
-            name="omnikb-audit",
-            description=(
-                "OmniKB 全量审计 — 校验知识库引用完整性、code_anchor 漂移、"
-                "孤儿 Router、Format 覆盖"
-            ),
-            domain="knowledge",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.knowledge.run",
-                "build_audit_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.knowledge.run",
-                "build_audit_bindings",
-            ),
-            default_db_dir="data/services/knowledge",
-            default_max_steps=5,
-        ))
-    except Exception as e:
-        logger.debug("skip omnikb-audit: %s", e)
-
-    # ── Repo Absorption (Stage 1: Survey & Triage) ──
-    # 设计文档: docs/plans/[2026-04-08]REPO-ABSORPTION-WORKFLOW/
-    # 当前为骨架冒烟阶段，4 个 Router 都是 stub。后续 Stage 增量扩展。
-    try:
-        register(PipelineEntry(
-            name="absorption-survey",
-            description=(
-                "Repo Absorption · Stage 1 Survey & Triage — "
-                "从 GitHub 仓库列表识别值得吸纳的地标，不下载源码"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_survey_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_survey_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=15,
-            cli_args=[
-                CliArg(
-                    name="repos",
-                    help="目标仓库列表 (JSON 数组或逗号分隔)，如 'openai/codex,google-gemini/gemini-cli'",
-                    required=True,
-                ),
-                CliArg(
-                    name="profile",
-                    help="吸纳 Profile: framework_absorption | domain_absorption",
-                    default="framework_absorption",
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-survey: %s", e)
-
-    # ── Repo Absorption V3 (模块驱动四层地图, Phase A: RepoMapper 实化) ──
-    # 设计文档: docs/plans/[2026-04-13]REPO-ABSORPTION-V3/DESIGN.md
-    try:
-        register(PipelineEntry(
-            name="absorption-module-driven",
-            description=(
-                "Repo Absorption V3 · 模块驱动四层地图管线 — "
-                "RepoMapper 全量扫描双层地图，ModulePicker LLM 语义选模块，"
-                "ModuleReader 展开代码，LearningExtractor 提炼发现"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(
-                    name="repo_name",
-                    help="目标 repo 名称，如 'hermes-agent'",
-                    required=True,
-                ),
-                CliArg(
-                    name="repo_local_path",
-                    help="本地克隆路径（已 git clone 的目录）",
-                    required=True,
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-module-driven: %s", e)
-
-    # ── Repo Absorption V3 Stage 3 (工作流修改管线, Phase 1 骨架) ──
-    # 设计文档: docs/plans/[2026-04-14]STAGE3-WORKFLOW-MODIFIER/plan.md
-    try:
-        register(PipelineEntry(
-            name="absorption-workflow-modifier",
-            description=(
-                "Repo Absorption V3 Stage 3 · 工作流修改管线 — "
-                "SpecParser 解析改进提案，HumanApprovalGate 人工审批，"
-                "WorkflowGenerator 生成变更（Phase 2），DangerGate + Validator 检查（Phase 3）"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_stage3_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_stage3_bindings",
-            ),
-            default_db_dir="data/domains/absorption",
-            default_max_steps=5,
-            cli_args=[
-                CliArg(
-                    name="repo_name",
-                    help="目标 repo 名称，如 'hermes-agent'",
-                    required=True,
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-workflow-modifier: %s", e)
-
-    # ── Repo Absorption V2 (问题驱动定向深读, Phase 1 骨架) ──
-    # 设计文档: docs/plans/[2026-04-13]REPO-ABSORPTION-V2/plan.md
-    try:
-        register(PipelineEntry(
-            name="absorption-baseline",
-            description=(
-                "Repo Absorption V2 · 问题驱动定向深读管线 — "
-                "以自画像缺口(G1-G7)为问题来源，带着问题进行定向深读，终止条件是'问题被回答'"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v2_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v2_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=30,
-            cli_args=[
-                CliArg(
-                    name="repo_name",
-                    help="目标 repo 名称，如 'gemini-cli'",
-                    required=True,
-                ),
-                CliArg(
-                    name="repo_local_path",
-                    help="本地克隆路径（已 git clone 的目录）",
-                    required=True,
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-baseline: %s", e)
-
-    # ── Unity 探索 ──
-    try:
-        register(PipelineEntry(
-            name="unity-explore",
-            description="Unity 游戏环境探索管线 — 自动化 UI 交互与观察",
-            domain="unity",
-            build_team=_lazy("omnicompany.packages.domains.demogame.unity_explore.pipeline",
-                                "build_unity_explore_pipeline"),
-            build_bindings=_lazy_fn("omnicompany.packages.domains.demogame.unity_explore.run_pipeline",
-                                "build_explore_bindings"),
-            default_db_dir="data/domains/unity_qa",
-            default_max_steps=50,
-        ))
-    except Exception as e:
-        logger.debug("skip unity-explore: %s", e)
-
-    # ── Unity QA (新版：discover / playtest / design / execute / fix) ──
-    try:
-        register(PipelineEntry(
-            name="unity-discover",
-            description="AI 驱动的 Unity 游戏广度探索 — 自动发现界面、建图、记录 bug",
-            domain="unity-qa",
-            build_team=_lazy(
-                "omnicompany.packages.domains.demogame.unity_qa.discover.pipeline",
-                "build_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.domains.demogame.unity_qa.discover.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/domains/unity_qa",
-            default_max_steps=100,
-            cli_args=[
-                CliArg(name="max_steps", help="最大探索步数", default="50"),
-                CliArg(name="bridge_port", help="AgentBridge 端口", default="18820"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip unity-discover: %s", e)
-
-    try:
-        register(PipelineEntry(
-            name="unity-playtest",
-            description="AI 驱动的 Unity 游戏目标导向游玩 — 在指定界面完成具体任务",
-            domain="unity-qa",
-            build_team=_lazy(
-                "omnicompany.packages.domains.demogame.unity_qa.playtest.pipeline",
-                "build_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.domains.demogame.unity_qa.playtest.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/domains/unity_qa",
-            default_max_steps=50,
-            cli_args=[
-                CliArg(name="target_state", help="目标界面状态名", required=True),
-                CliArg(name="task", help="任务描述", required=True),
-                CliArg(name="bridge_port", help="AgentBridge 端口", default="18820"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip unity-playtest: %s", e)
-
-    try:
-        register(PipelineEntry(
-            name="unity-execute",
-            description="Unity 测试执行器 — 执行 TestSuite 并产出 TestReport",
-            domain="unity-qa",
-            build_team=_lazy(
-                "omnicompany.packages.domains.demogame.unity_qa.execute.pipeline",
-                "build_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.domains.demogame.unity_qa.execute.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/domains/unity_qa",
-            default_max_steps=200,
-            cli_args=[
-                CliArg(name="suite", help="TestSuite YAML 路径或内联定义", required=True),
-                CliArg(name="bridge_port", help="AgentBridge 端口", default="18820"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip unity-execute: %s", e)
-
-    try:
-        register(PipelineEntry(
-            name="unity-fix",
-            description="AI 驱动的 Roadmap 修复 — 诊断失败路径、修复 detect 规则、回归验证",
-            domain="unity-qa",
-            build_team=_lazy(
-                "omnicompany.packages.domains.demogame.unity_qa.fix.pipeline",
-                "build_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.domains.demogame.unity_qa.fix.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/domains/unity_qa",
-            default_max_steps=30,
-            cli_args=[
-                CliArg(name="issue", help="问题描述", required=True),
-                CliArg(name="target_state", help="问题相关状态"),
-                CliArg(name="bridge_port", help="AgentBridge 端口", default="18820"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip unity-fix: %s", e)
-
-    try:
-        register(PipelineEntry(
-            name="unity-design",
-            description="AI 驱动的测试用例生成 — 视觉探索 UI、自动生成 TestSuite",
-            domain="unity-qa",
-            build_team=_lazy(
-                "omnicompany.packages.domains.demogame.unity_qa.design.pipeline",
-                "build_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.domains.demogame.unity_qa.design.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/domains/unity_qa",
-            default_max_steps=20,
-            cli_args=[
-                CliArg(name="target_module", help="目标游戏模块（如 Tavern）", required=True),
-                CliArg(name="test_type", help="测试类型 smoke/functional/boundary", default="smoke"),
-                CliArg(name="test_focus", help="测试重点描述"),
-                CliArg(name="bridge_port", help="AgentBridge 端口", default="18820"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip unity-design: %s", e)
+    # Repo absorption 实验族已于 2026-07-22 退出活跃注册。
+    # 外部仓库学习改走 research + 明确问题驱动的手工 SOP；历史实现保存在 _graveyard。
 
     # ── 跨语言改写 ──
     try:
@@ -721,28 +294,6 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip equiv-test: %s", e)
 
-    # ── 通用调试器 ──
-    try:
-        register(PipelineEntry(
-            name="debug",
-            description="假设驱动调试工作流 — 通用跨语言 debug 管线",
-            domain="debug",
-            build_team=_lazy("omnicompany.packages.domains.software_engineering.debugger.team",
-                                "build_team"),
-            build_bindings=_lazy_fn("omnicompany.packages.domains.software_engineering.debugger.run",
-                                   "build_bindings"),
-            default_db_dir="data/_runtime/debug",
-            default_max_steps=50,
-            cli_args=[
-                CliArg(name="error_output", help="编译/测试错误输出", required=True),
-                CliArg(name="language", help="目标语言", default="typescript"),
-                CliArg(name="compile_command", help="编译/测试命令"),
-                CliArg(name="work_dir", help="工作目录"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip debug: %s", e)
-
     # ── 守护检查 ──
     try:
         register(PipelineEntry(
@@ -764,19 +315,21 @@ def register_all() -> None:
         logger.debug("skip guardian: %s", e)
 
     # guardian-patrol pipeline 移除 (2026-05-05 诊断重制 step 8) — patrol_worker LLM 巡查归档,
-    # 概念并入 doctor _hypothesis/. guardian 留纯规则部分.
+    # 概念并入 doctor 诊断假设体系(data/services/doctor/hypotheses/ 的 H-*.yaml 断言,
+    # 与决策库 belief/探索学习 hypothesis 管线是同名异物, 见合并清单#3). guardian 留纯规则部分.
 
     # pipeline-ci pipeline 移除 (2026-05-05 诊断重制 step 5) — pipeline_ci 整体归档,
-    # 三 Auditor 概念并入 doctor _spec/ 跟 _hypothesis/. 详 docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/plan.md
+    # 三 Auditor 概念并入 doctor _spec/ 跟 doctor 诊断假设体系(同上, 非决策库 belief).
+    # 详 docs/plans/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/plan.md
 
     # ── hypothesis 假设探索管线 ──
     try:
         register(PipelineEntry(
             name="hypothesis",
             description=(
-                "假设探索 — agent 自由探索目标系统，自动归纳假设到主题文档。"
-                "产出 data/knowledge/hypotheses/<domain>.md。"
-                "真实多轮循环由 hypothesis.pipeline.run_session 驱动。"
+                "假设探索 — agent 自由探索目标系统，把可证伪猜想沉进统一决策库(kind=belief,"
+                "tags=[hypothesis-explore, domain:<x>])。主题摘要=生成投影(omni decisions knowledge)。"
+                "真实多轮循环由 hypothesis.team.run_session 驱动。"
             ),
             domain="hypothesis",
             build_team=_lazy("omnicompany.packages.services._learning.hypothesis.team",
@@ -790,165 +343,15 @@ def register_all() -> None:
                 CliArg(name="goal", help="探索目标", required=True),
                 CliArg(name="max_iterations", help="最大迭代次数（默认 2）", default="2"),
             ],
+            when={"semantic": "要摸清一个陌生系统/工具的行为、把探索所得沉成可证伪猜想时",
+                  "match_keys": ["hypothesis", "explore"], "judge": "llm"},
+            scale={"tier": "long", "minutes": "10-30", "cost": "Experimenter+Reflector 双 agent 多轮"},
+            confirm=True,
+            book_refs=("docs/ontology/20-探索通则.md#反证优先",
+                       "docs/ontology/20-探索通则.md#回传必做(收工钩子)"),
         ))
     except Exception as e:
         logger.debug("skip hypothesis: %s", e)
-
-    # ── gddecon 游戏设计拆解管线 (事件型) ──
-    try:
-        register(PipelineEntry(
-            name="gddecon-aspect-tree",
-            description=(
-                "游戏设计拆解 — 读设计源 + 当前 build，用方面发现法（透镜×展开规则×完备性）"
-                "产出方面树（设计应被拆成哪些维度）。产出 data/knowledge/aspect_trees/<game>.md。"
-            ),
-            domain="gddecon",
-            engine="event",
-            build_team=_lazy("omnicompany.packages.services._learning.gddecon.run",
-                             "build_team_workers"),
-            build_bindings=lambda *a, **k: {},
-            entry_material="gddecon.deconstruction-request",
-            default_db_dir="data/services/gddecon",
-            default_max_steps=4,
-            cli_args=[
-                CliArg(name="game_name", help="游戏名", required=True),
-                CliArg(name="build_root", help="当前 build 根目录", default=""),
-                CliArg(name="design_sources", help="设计文档/目录路径（逗号分隔）", default=""),
-                CliArg(name="focus", help="可选：只下钻某子领域", default=""),
-                CliArg(name="project_root", help="只读寻址根", default="E:/WindowsWorkspace"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip gddecon-aspect-tree: %s", e)
-
-    # ── gddecon 差距分析管线 (事件型) ──
-    try:
-        register(PipelineEntry(
-            name="gddecon-gap-report",
-            description=(
-                "游戏设计差距盘点 — 对方面树每个方面做应然↔实然↔差距分析（无现成树先跑拆解）。"
-                "产出 data/knowledge/aspect_trees/<game>-差距.md。"
-            ),
-            domain="gddecon",
-            engine="event",
-            build_team=_lazy("omnicompany.packages.services._learning.gddecon.run",
-                             "build_gap_workers"),
-            build_bindings=lambda *a, **k: {},
-            entry_material="gddecon.deconstruction-request",
-            default_db_dir="data/services/gddecon",
-            default_max_steps=4,
-            cli_args=[
-                CliArg(name="game_name", help="游戏名", required=True),
-                CliArg(name="build_root", help="当前 build 根目录", default=""),
-                CliArg(name="design_sources", help="设计文档/目录路径（逗号分隔）", default=""),
-                CliArg(name="project_root", help="只读寻址根", default="E:/WindowsWorkspace"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip gddecon-gap-report: %s", e)
-
-    # ── gddecon UI 设计 · 跟进UI标准 (事件型) ──
-    try:
-        register(PipelineEntry(
-            name="gddecon-ui-standard",
-            description=(
-                "跟进UI标准 — 从 UI 规格 + 方面树 UI 簇制定可检查的 UI 标准库（信息/交互两类，每条带证据与检查法）。"
-                "产出 data/knowledge/aspect_trees/<game>-UI标准.md。"
-            ),
-            domain="gddecon",
-            engine="event",
-            build_team=_lazy("omnicompany.packages.services._learning.gddecon.run",
-                             "build_ui_standard_workers"),
-            build_bindings=lambda *a, **k: {},
-            entry_material="gddecon.deconstruction-request",
-            default_db_dir="data/services/gddecon",
-            default_max_steps=4,
-            cli_args=[
-                CliArg(name="game_name", help="游戏名", required=True),
-                CliArg(name="design_sources", help="UI 设计规格路径（逗号分隔）", default=""),
-                CliArg(name="build_root", help="当前 build 根目录", default=""),
-                CliArg(name="project_root", help="只读寻址根", default="E:/WindowsWorkspace"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip gddecon-ui-standard: %s", e)
-
-    # ── gddecon UI 设计 · 建立UI设计稿(按真后端) (事件型) ──
-    try:
-        register(PipelineEntry(
-            name="gddecon-ui-build",
-            description=(
-                "建立UI设计稿 — 读真实后端代码(game-state/command/segment…)产出 complete-expression "
-                "界面设计稿(把后端所有状态+操作完整暴露,先不美化)。产出 data/knowledge/ui_mockups/<game>-<scope>-backend-design.html。"
-            ),
-            domain="gddecon",
-            engine="event",
-            build_team=_lazy("omnicompany.packages.services._learning.gddecon.run",
-                             "build_ui_build_workers"),
-            build_bindings=lambda *a, **k: {},
-            entry_material="gddecon.deconstruction-request",
-            default_db_dir="data/services/gddecon",
-            default_max_steps=4,
-            cli_args=[
-                CliArg(name="game_name", help="游戏名", required=True),
-                CliArg(name="build_root", help="游戏 build 根(读真后端代码)", required=True),
-                CliArg(name="scope", help="范围(默认 战斗屏)", default="战斗屏"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip gddecon-ui-build: %s", e)
-
-    # ── gddecon UI 设计 · 制定信息层级(界面信息维度) (事件型) ──
-    try:
-        register(PipelineEntry(
-            name="gddecon-info-hierarchy",
-            description=(
-                "制定信息层级 — 把一屏完整表达清单按玩家注意力/行为频次排成层级表(常驻/揭示)，"
-                "并把'展开信息'当操作记录(揭示即操作)。产出 data/knowledge/ui_mockups/<game>-<scope>-信息层级.md。"
-            ),
-            domain="gddecon",
-            engine="event",
-            build_team=_lazy("omnicompany.packages.services._learning.gddecon.run",
-                             "build_info_hierarchy_workers"),
-            build_bindings=lambda *a, **k: {},
-            entry_material="gddecon.deconstruction-request",
-            default_db_dir="data/services/gddecon",
-            default_max_steps=4,
-            cli_args=[
-                CliArg(name="game_name", help="游戏名", required=True),
-                CliArg(name="scope", help="范围(默认 战斗屏)", default="战斗屏"),
-                CliArg(name="inventory", help="完整表达清单文本", default=""),
-                CliArg(name="concept", help="游戏核心循环", default=""),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip gddecon-info-hierarchy: %s", e)
-
-    # ── gddecon UI 设计 · 操作交互模型(界面操作维度) (事件型) ──
-    try:
-        register(PipelineEntry(
-            name="gddecon-interaction-model",
-            description=(
-                "操作交互模型 — 把一屏操作全集(指令+揭示)逐操作排成交互规范(频次×手势/反馈/确认安全/可用相位/选择模型)，"
-                "界面操作维度、信息层级的对偶。产出 data/knowledge/ui_mockups/<game>-<scope>-操作交互模型.md。"
-            ),
-            domain="gddecon",
-            engine="event",
-            build_team=_lazy("omnicompany.packages.services._learning.gddecon.run",
-                             "build_interaction_model_workers"),
-            build_bindings=lambda *a, **k: {},
-            entry_material="gddecon.deconstruction-request",
-            default_db_dir="data/services/gddecon",
-            default_max_steps=4,
-            cli_args=[
-                CliArg(name="game_name", help="游戏名", required=True),
-                CliArg(name="scope", help="范围(默认 战斗屏)", default="战斗屏"),
-                CliArg(name="ops", help="操作全集文本", default=""),
-                CliArg(name="concept", help="游戏核心循环", default=""),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip gddecon-interaction-model: %s", e)
 
     # ── Selftest e2e 功能自测 ──
     try:
@@ -1023,7 +426,7 @@ def register_all() -> None:
     try:
         register(PipelineEntry(
             name="trace-induction",
-            description="轨迹归纳 — 从历史 trace 提取 SOP → 生成需求 → WF 产出 pipeline → 注册",
+            description="按需轨迹归纳 — 从真实 trace 提取 SOP 与可审阅需求候选；不自动生成或注册 pipeline",
             domain="workflow",
             build_team=_lazy(
                 "omnicompany.packages.services._learning.trace_induction.team",
@@ -1036,6 +439,22 @@ def register_all() -> None:
             default_db_dir="data/services/trace_induction",
             default_max_steps=30,
             cli_args=[
+                CliArg(
+                    name="source",
+                    help="轨迹来源: auto、intent 或 external",
+                    default="auto",
+                ),
+                CliArg(
+                    name="provider",
+                    help="外部 Agent: codex、claude 或 kimi",
+                    default="",
+                ),
+                CliArg(
+                    name="sync",
+                    help="读取前仅增量同步指定会话",
+                    type=bool,
+                    default=True,
+                ),
                 CliArg(name="purpose", help="归纳目的描述"),
                 CliArg(name="trace_ids", help="逗号分隔的 trace ID 列表"),
             ],
@@ -1043,198 +462,8 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip trace-induction: %s", e)
 
-    # ── pattern-discovery 后台模式发现管线 ──
-    try:
-        register(PipelineEntry(
-            name="pattern-discovery",
-            description="后台模式发现 — 从行为保全摘要中聚类发现重复模式 → 自动触发轨迹归纳",
-            domain="workflow",
-            build_team=_lazy(
-                "omnicompany.packages.services._core.pattern_discovery.team",
-                "build_team",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._core.pattern_discovery.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/services/pattern_discovery",
-            default_max_steps=50,
-            cli_args=[
-                CliArg(name="db_path", help="compression_summaries 所在的数据库路径"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip pattern-discovery: %s", e)
-
-    # ── voxelcraft 游戏制作所管线 ──
-    _bw_pkg = "omnicompany.packages.domains.voxelcraft"
-
-    try:
-        register(PipelineEntry(
-            name="voxelcraft.qa.balance",
-            description="voxelcraft 战斗平衡闭环 — config → build → server → RCON test → evolve (原 voxelcraft.combat_test, 1-5 改名)",
-            domain="voxelcraft",
-            build_team=_lazy(f"{_bw_pkg}.qa.balance.team", "build_combat_test_pipeline"),
-            build_bindings=_lazy_fn(f"{_bw_pkg}.run", "build_combat_test_bindings"),
-            default_db_dir="data/domains/voxelcraft",
-            default_max_steps=30,
-            aliases=("voxelcraft.combat_test",),
-        ))
-        register(PipelineEntry(
-            name="voxelcraft.assimilate.mods",
-            description="voxelcraft mod 同化 — Modrinth 搜索/下载/分析/许可证校验 (原 voxelcraft.art, 1-5 改名)",
-            domain="voxelcraft",
-            build_team=_lazy(f"{_bw_pkg}.content.assimilation.mod_intake.team", "build_art_pipeline"),
-            build_bindings=_lazy_fn(f"{_bw_pkg}.run", "build_art_bindings"),
-            default_db_dir="data/domains/voxelcraft",
-            default_max_steps=15,
-            aliases=("voxelcraft.art",),
-        ))
-        register(PipelineEntry(
-            name="voxelcraft.assimilate.troop_visuals",
-            description="voxelcraft 兵种外观同化 — mod探索→贴图评估→映射→等距渲染→真机加载 (原 voxelcraft.visual_assets, 1-5 改名)",
-            domain="voxelcraft",
-            build_team=_lazy(f"{_bw_pkg}.content.assimilation.troop_visuals.team", "build_visual_asset_pipeline"),
-            build_bindings=_lazy_fn(f"{_bw_pkg}.run", "build_visual_assets_bindings"),
-            default_db_dir="data/domains/voxelcraft",
-            default_max_steps=25,
-            aliases=("voxelcraft.visual_assets",),
-        ))
-        register(PipelineEntry(
-            name="voxelcraft.assimilate.structures",
-            description="voxelcraft 建筑结构同化 — schematic 搜索→解析→评估→方块替换→校验→FillOp Java (原 voxelcraft.structures, 1-5 改名)",
-            domain="voxelcraft",
-            build_team=_lazy(f"{_bw_pkg}.content.assimilation.structures.team", "build_structure_pipeline"),
-            build_bindings=_lazy_fn(f"{_bw_pkg}.run", "build_structures_bindings"),
-            default_db_dir="data/domains/voxelcraft",
-            default_max_steps=15,
-            aliases=("voxelcraft.structures",),
-        ))
-
-        # ── 五条内容路径 (阶段一 1-5 补 B3 缺口): event 引擎 + worktree 隔离 run_context ──
-        from omnicompany.core.registry import CliArg as _CliArg  # noqa: F811
-
-        def _bw_run_context(input_dict):
-            from omnicompany.packages.domains.voxelcraft.run import voxelcraft_worktree_context
-            return voxelcraft_worktree_context(input_dict)
-
-        _BW_PATH_CLI = [
-            CliArg(name="text", help="内容愿景 (自然语言, 如: 我想要一颗银色的宝石)", required=True),
-            CliArg(name="author", help="需求提出者", default="omni-cli"),
-            CliArg(name="run_id", help="run 标识 (缺省时间戳; 亦是 worktree 目录名)"),
-            CliArg(name="keep_worktree", help="保留隔离副本供调试", is_flag=True),
-        ]
-        for _path, _steps in (("block", 1000), ("item", 1000), ("entity", 1000),
-                              ("mechanism", 1000), ("worldgen", 1000)):
-            register(PipelineEntry(
-                name=f"voxelcraft.content.{_path}",
-                description=(
-                    f"voxelcraft {_path} 内容路径 — vision→Designer→AssetPicker→Engineer→LoadChecker; "
-                    "全程 eternal-war worktree 隔离副本 (run_context), 通过后归档 approved_samples"
-                ),
-                domain="voxelcraft",
-                engine="event",
-                build_team=_lazy_fn(f"{_bw_pkg}.run", f"build_{_path}_path_workers"),
-                build_bindings=lambda *a, **k: {},
-                entry_material=f"bw.{_path}.vision",
-                run_context=_bw_run_context,
-                default_db_dir="data/domains/voxelcraft",
-                default_max_steps=_steps,
-                cli_args=list(_BW_PATH_CLI),
-            ))
-    except Exception as e:
-        logger.debug("skip voxelcraft pipelines: %s", e)
-
-    # ── vilo 内容评测管线（2026-06-13 框架级内化）──
-    _vilo_pkg = "omnicompany.packages.domains.vilo"
-    try:
-        register(PipelineEntry(
-            name="vilo.eval.domestic",
-            description="Vilo 国产模型对照评测 — 上下文→多模型(统一 LLMClient)→报告",
-            domain="vilo",
-            build_team=_lazy(f"{_vilo_pkg}.team", "build_domestic_pipeline"),
-            build_bindings=_lazy_fn(f"{_vilo_pkg}.run", "build_domestic_bindings"),
-            default_db_dir="data/domains/vilo",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(name="models", help="逗号分隔参试模型(默认 deepseek/glm/kimi/qwen)", default=""),
-                CliArg(name="max_tokens", help="单模型 max_tokens", type=int, default=3000),
-                CliArg(name="max_context_chars", help="上下文字符上限", type=int, default=60000),
-                CliArg(name="dry_run", help="只建上下文不调模型", is_flag=True),
-            ],
-        ))
-        register(PipelineEntry(
-            name="vilo.eval.matrix",
-            description="Vilo 文本矩阵评测 — 准备→执行(统一 LLMClient)→评分报告",
-            domain="vilo",
-            build_team=_lazy(f"{_vilo_pkg}.team", "build_matrix_pipeline"),
-            build_bindings=_lazy_fn(f"{_vilo_pkg}.run", "build_matrix_bindings"),
-            default_db_dir="data/domains/vilo",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(name="models", help="逗号分隔参试模型", default=""),
-                CliArg(name="task_set", help="full/smoke", default="smoke"),
-                CliArg(name="tasks", help="显式任务 id(逗号分隔,如 A1,C9)", default=""),
-                CliArg(name="execute", help="真调模型(否则仅准备)", is_flag=True),
-            ],
-        ))
-        register(PipelineEntry(
-            name="vilo.eval.source_first",
-            description="Vilo source-first 评测 — 准备→执行(统一 LLMClient,硬超时)→报告",
-            domain="vilo",
-            build_team=_lazy(f"{_vilo_pkg}.team", "build_source_first_pipeline"),
-            build_bindings=_lazy_fn(f"{_vilo_pkg}.run", "build_source_first_bindings"),
-            default_db_dir="data/domains/vilo",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(name="models", help="逗号分隔参试模型", default=""),
-                CliArg(name="task_set", help="full/smoke", default="smoke"),
-                CliArg(name="tasks", help="显式任务 id(逗号分隔)", default=""),
-                CliArg(name="execute", help="真调模型(否则仅准备)", is_flag=True),
-            ],
-        ))
-        for _vname, _vbuild, _vbind, _vdesc in [
-            ("vilo.eval.agentic", "build_agentic_pipeline", "build_agentic_bindings",
-             "Vilo agentic worker 评测 — 准备工作区→工具循环(统一 LLMClient)→报告"),
-            ("vilo.eval.concrete", "build_concrete_pipeline", "build_concrete_bindings",
-             "Vilo 具体文本 v5 评测 — 准备→工具循环(自审/重写)→整合报告"),
-            ("vilo.rank.anonymous", "build_anonymous_pipeline", "build_anonymous_bindings",
-             "Vilo 匿名质量排名 — 候选+评委工作区→盲评工具循环→排名聚合"),
-        ]:
-            register(PipelineEntry(
-                name=_vname,
-                description=_vdesc,
-                domain="vilo",
-                build_team=_lazy(f"{_vilo_pkg}.team", _vbuild),
-                build_bindings=_lazy_fn(f"{_vilo_pkg}.run", _vbind),
-                default_db_dir="data/domains/vilo",
-                default_max_steps=10,
-                cli_args=[
-                    CliArg(name="models", help="逗号分隔参试模型", default=""),
-                    CliArg(name="execute", help="真跑 agent(否则仅准备)", is_flag=True),
-                    CliArg(name="max_turns", help="agent 最大轮数", type=int, default=12),
-                ],
-            ))
-        for _vname, _vbuild, _vbind, _vdesc in [
-            ("vilo.assets.card_index", "build_card_index_pipeline", "build_card_index_bindings",
-             "Vilo 卡片资产索引 — 从 wiki/demo 重建卡片内容资产(确定性)"),
-            ("vilo.assets.matrix_md", "build_matrix_md_pipeline", "build_matrix_md_bindings",
-             "Vilo 矩阵整合 markdown — 从已有矩阵 run 重建整合报告(确定性)"),
-            ("vilo.fetch.style_texts", "build_fetch_style_pipeline", "build_fetch_style_bindings",
-             "Vilo 参考文本抓取 — 下载开放版权文本到外部参考库(网络,确定性)"),
-        ]:
-            register(PipelineEntry(
-                name=_vname,
-                description=_vdesc,
-                domain="vilo",
-                build_team=_lazy(f"{_vilo_pkg}.team", _vbuild),
-                build_bindings=_lazy_fn(f"{_vilo_pkg}.run", _vbind),
-                default_db_dir="data/domains/vilo",
-                default_max_steps=5,
-                cli_args=[CliArg(name="only", help="(fetch)仅抓取某作品 id", default="")],
-            ))
-    except Exception as e:
-        logger.debug("skip vilo pipelines: %s", e)
+    # pattern-discovery 自动聚类/自动触发已于 2026-07-22 退役。
+    # trace-induction 只在真实重复操作出现后按需调用。
 
     # ── research 公开调研管线（2026-06-14 新开;2026-06-30 转原生搜索)──
     _research_pkg = "omnicompany.packages.domains.research"
@@ -1275,6 +504,9 @@ def register_all() -> None:
                 CliArg(name="ruler_ref", help="标尺真源指针(默认 frostpane)", default=""),
                 CliArg(name="baseline_ref", help="相对评审基准图(可选)", default=""),
             ],
+            when={"semantic": "改完 dashboard 类网页(驾驶舱/poof/lofa)的界面要过设计审查门时;小改动(改个按钮)走快速路径直改+亮线检查,不必跑本管线",
+                  "match_keys": ["dashboard", "frontend", "ui-review"], "judge": "llm"},
+            scale={"tier": "short", "minutes": "3-10", "cost": "确定性门禁+1-2 次 VLM 评审"},
         ))
         register(PipelineEntry(
             name="frontend_design.webgame",
@@ -1293,38 +525,12 @@ def register_all() -> None:
                 CliArg(name="ruler_ref", help="标尺真源指针(默认 tabletop-engine/README)", default=""),
                 CliArg(name="baseline_ref", help="相对评审基准图(上一版, 可选)", default=""),
             ],
+            when={"semantic": "webgame UI 屏改动后要过设计审查门时(游戏屏全屏+悬浮HUD 标准)",
+                  "match_keys": ["webgame", "frontend", "ui-review"], "judge": "llm"},
+            scale={"tier": "short", "minutes": "3-10", "cost": "确定性门禁+1-2 次 VLM 评审"},
         ))
     except Exception as e:
         logger.debug("skip frontend_design pipelines: %s", e)
-
-    # ── demogame.design_lint 细化案门禁管线（2026-07-05 收编; 用户拍板"都接入"统一设计工作室）──
-    # 收编 design_doc_lint 的 lint.py + semantic_review.py 成 omni run: lexicon(可选)→lint→
-    # semantic_review(--no-llm 默认)→landing(审阅台材料 project=demogame-design)。节点全 RULE。
-    _design_lint_pkg = "omnicompany.packages.domains.demogame.design_doc_lint.pipeline"
-    try:
-        register(PipelineEntry(
-            name="demogame.design_lint",
-            description=(
-                "细化案门禁 — lint(协作/交付) + 语义审查(命名白名单三层网, --no-llm 默认) → 仓内 gate_reports 报告.\n"
-                "  omni run demogame.design_lint -i doc=<细化案.md> -i mode=协作\n"
-                "  omni run demogame.design_lint -i doc=<细化案.md> -i mode=交付 -i no_llm=0  (开 LLM 兜底)\n"
-                "  落点: 默认 data/domains/demogame/designer_workflow/gate_reports/ 文件; 过程报告不进审阅台, 显式 -i land=1 才建材料(track=细化案协作稿|细化案交付稿)"
-            ),
-            domain="demogame_design_doc",
-            build_team=_lazy(_design_lint_pkg, "build_design_lint_pipeline"),
-            build_bindings=_lazy_fn(_design_lint_pkg, "build_design_lint_bindings"),
-            default_db_dir="data/domains/demogame/design_doc_lint",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(name="doc", help="要审的细化案 md 路径(绝对或相对)", required=True),
-                CliArg(name="mode", help="协作|交付(默认 协作)", default="协作"),
-                CliArg(name="no_llm", help="语义审查是否只跑确定性扫描(默认 1=是; -i no_llm=0 开 LLM 兜底)", default="1"),
-                CliArg(name="model", help="语义审查 LLM 兜底模型(no_llm=0 时用, 默认 gpt-5.5)", default="gpt-5.5"),
-                CliArg(name="build_lexicon", help="是否重建权威词表(默认否; 读外部 wiki 真源)", default=""),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip demogame.design_lint pipeline: %s", e)
 
     # ── project_atlas 项目及业务收集管线（2026-06-21 新开, 挂 omnidashboard 下）──
     _project_atlas_pkg = "omnicompany.packages.domains.project_atlas"
@@ -1390,7 +596,7 @@ def register_all() -> None:
             default_db_dir="data/domains/publish",
             default_max_steps=10,
             cli_args=[
-                CliArg(name="src", help="AIWorkSpace 根(默认 d:/P4/main/AIWorkSpace 或 OMNI_AIWORKSPACE_ROOT)", default=""),
+                CliArg(name="src", help="快照源根(OMNI_AIWORKSPACE_ROOT 环境变量)", default=""),
                 CliArg(name="dry_run", help="只算清单+diff 预览, 不提交不推送", is_flag=True),
                 CliArg(name="push", help="提交后推送到 gitee(默认只本地提交, 显式 --push 才推)", is_flag=True),
                 CliArg(name="max_file_mb", help="单文件大小上限 MB(超过当数据跳过)", type=int, default=2),
@@ -1398,55 +604,6 @@ def register_all() -> None:
         ))
     except Exception as e:
         logger.debug("skip publish pipelines: %s", e)
-
-    # ── personal_site 作品集生产管线（2026-06-20 内化）──
-    _psite_pkg = "omnicompany.packages.domains.personal_site"
-    try:
-        register(PipelineEntry(
-            name="personal_site.run",
-            description=(
-                "colorc.cc 作品集/dev-log 生产 — 入题→生成(起 claude-code 工人深读真源)→改造"
-                "(本质意译去术语+加结构+真demo)→对抗门→落地建索引→脱敏门发布→[可选]demo分支(委托 slidecast 出会动演示)。默认 --dry_run 短路工人。"
-            ),
-            domain="personal_site",
-            build_team=_lazy(f"{_psite_pkg}.team", "build_personal_site_pipeline"),
-            build_bindings=_lazy_fn(f"{_psite_pkg}.run", "build_personal_site_bindings"),
-            default_db_dir="data/domains/personal_site",
-            default_max_steps=12,
-            cli_args=[
-                CliArg(name="targets", help="目标 JSON 数组 [{kind:work|devlog,slug,report,repo,focus,company?,tags?}]", default=""),
-                CliArg(name="stages", help="要跑的阶段(逗号分隔);加 demo 则过审后出演示deck", default="generate,restyle,verify,place,publish"),
-                CliArg(name="dry_run", help="短路工人,只走确定性节点(冒烟/查拓扑)", is_flag=True),
-                CliArg(name="deploy", help="发布节点脱敏门过后提示部署命令(管线不直接 ssh,留人工闸)", is_flag=True),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip personal_site pipelines: %s", e)
-
-    # ── narrative 叙事管线 ──
-    # narrative.a5_loop / narrative.beat.generate 已退役(2026-07-04,统一设计工作室计划 D1):
-    # 域 DESIGN.md 自判"简陋雏形不要再推进",真正的叙事工作台=packages/narrative_studio;
-    # 模块文件带 superseded 标头留档,注册摘除。csl.ingest 保留。
-    _narrative_pkg = "omnicompany.packages.domains.narrative"
-    try:
-        register(PipelineEntry(
-            name="narrative.csl.ingest",
-            description="Narrative CSL 摄入 — scene 写完后自动记账，提议 anchor/state/hook 供作者确认",
-            domain="narrative",
-            build_team=_lazy(f"{_narrative_pkg}.team_csl", "build_csl_ingest_pipeline"),
-            build_bindings=_lazy_fn(f"{_narrative_pkg}.run", "build_csl_ingest_bindings"),
-            default_db_dir="data/domains/narrative",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(name="scene_id", help="Scene ID", required=True),
-                CliArg(name="entity_refs", help="涉及的实体 ID（逗号分隔）", default=""),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip narrative pipelines: %s", e)
-
-
-
 
     # ── csv-to-md · 由 team_builder V3 生成 (dry_run · 2026-04-23) ──
     try:
@@ -1517,6 +674,7 @@ def register_all() -> None:
             default_max_steps=1000,
             cli_args=[
                 CliArg(name="target_team_id", help="待测目标团队 id"),
+                CliArg(name="model", help="两个 AGENT 节点使用的显式模型 id"),
             ],
         ))
     except Exception as e:
@@ -1573,7 +731,7 @@ def register_all() -> None:
             default_db_dir="data/services/absorption_runtime_test",
             default_max_steps=1000,
             cli_args=[
-                CliArg(name="target_team_id", help="待测目标团队 id (如 'repo-absorption')"),
+                CliArg(name="target_team_id", help="待测目标团队 id"),
             ],
         ))
     except Exception as e:
@@ -1587,7 +745,7 @@ def register_all() -> None:
             description=(
                 "通用 team 健康监督 — 三问 (Q1 产物形式 / Q2 设计目的 / Q3 健康判据) + "
                 "假设进化 + 信号模式. 只产 health_report, 不修复 target. "
-                "首批喂 repo-absorption."
+                "与 runtime-test 的能力收口仍需一次真实诊断任务验证。"
             ),
             domain="team_supervisor",
             build_team=_lazy(
@@ -1601,7 +759,7 @@ def register_all() -> None:
             default_db_dir="data/services/team_supervisor",
             default_max_steps=1000,
             cli_args=[
-                CliArg(name="target_team_id", help="待监督的 team id (如 'repo-absorption')"),
+                CliArg(name="target_team_id", help="待监督的已注册 team id"),
             ],
         ))
     except Exception as e:
@@ -1656,11 +814,6 @@ def _register_sedimented_event_teams() -> None:
          "focus",
          "omnicompany.packages.services._focus.plan_progress_recorder.workers",
          "planprog.request"),
-        ("conversation-operation-sedimenter",
-         "[沉淀·事件型] 从 CC/codex 对话提取常见操作并提出可沉淀 team 骨架(脑子=gpt-5.5 tool-agent)",
-         "agent_framework",
-         "omnicompany.packages.services._learning.conversation_sedimenter.workers",
-         "convop.request"),
     ]
     for args in teams:
         try:
@@ -1883,8 +1036,8 @@ def _derive_domain_from_path(source_file: str) -> str:
 
     例: 'src/omnicompany/packages/services/_authoring/mass_materialization/teams/x.yaml'
        → '_authoring.mass_materialization'
-    例: 'src/omnicompany/packages/domains/demogame/.../x.yaml'
-       → 'demogame'
+    例: 'src/omnicompany/packages/domains/research/.../x.yaml'
+       → 'research'
     """
     parts = source_file.replace("\\", "/").split("/")
     try:

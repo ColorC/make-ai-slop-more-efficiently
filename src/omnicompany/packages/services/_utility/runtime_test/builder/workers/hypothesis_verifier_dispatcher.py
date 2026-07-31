@@ -30,10 +30,12 @@ from typing import Any, ClassVar
 from omnicompany.packages.services._core.omnicompany import Worker
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
+from .._paths import PROJECT_ROOT
+
 logger = logging.getLogger(__name__)
 
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[6]
+_PROJECT_ROOT = PROJECT_ROOT
 
 
 # pattern id → (executor_kind, target_pipeline_id_or_None, pretty_name)
@@ -73,24 +75,26 @@ max_steps = int(sys.argv[4]) if len(sys.argv) > 4 else 1000
 with open(input_path, 'r', encoding='utf-8') as f:
     input_data = json.load(f)
 
-from omnicompany.core.dispatch import dispatch
-from omnicompany.core.registry import discover
-discover()
-
-result = asyncio.run(dispatch(target_id, input_data, max_steps=max_steps))
-
 verdict = 'FAIL'
 output = {}
 diag = ''
-if hasattr(result, 'kind'):
-    verdict = result.kind.value.upper() if hasattr(result.kind, 'value') else str(result.kind).upper()
-    if hasattr(result, 'output') and isinstance(result.output, dict):
-        output = result.output
-    if hasattr(result, 'diagnosis') and result.diagnosis:
-        diag = result.diagnosis
-elif isinstance(result, dict):
-    output = result
-    verdict = 'PASS'
+try:
+    from omnicompany.core.dispatch import dispatch
+    from omnicompany.core.registry import discover
+    discover()
+    result = asyncio.run(dispatch(target_id, input_data, max_steps=max_steps))
+    if hasattr(result, 'kind'):
+        verdict = result.kind.value.upper() if hasattr(result.kind, 'value') else str(result.kind).upper()
+        if hasattr(result, 'output') and isinstance(result.output, dict):
+            output = result.output
+        if hasattr(result, 'diagnosis') and result.diagnosis:
+            diag = result.diagnosis
+    elif isinstance(result, dict):
+        output = result
+        verdict = 'PASS'
+except Exception as exc:
+    verdict = 'FAIL'
+    diag = f'{type(exc).__name__}: {exc}'
 
 with open(output_path, 'w', encoding='utf-8') as f:
     json.dump({'verdict': verdict, 'output': output, 'diagnosis': diag}, f, ensure_ascii=False)
@@ -396,10 +400,9 @@ def _audit_robust(target_team_id: str) -> dict:
             crashed += 1
             diags.append(f"input #{i+1}: 未知 verdict={v}")
 
-    # 判定: 只要没有"假装成功 (PASS)"就算健壮 (raise/crash 跟 rejected 都是"识别错输入"的形式).
-    # 喂错也返 PASS = silently 吞错 = 不健壮.
+    # 跑挂不是拒绝：只有三个坏输入都产出可解释的 FAIL/PARTIAL，才能验证健壮。
     crit = len(violations)
-    passed = accepted == 0 and (rejected + crashed) >= 1
+    passed = rejected == len(bad_inputs) and accepted == 0 and crashed == 0
     return {
         "passed": passed,
         "violations": violations,
@@ -407,6 +410,7 @@ def _audit_robust(target_team_id: str) -> dict:
         "rejected_count": rejected,
         "accepted_count": accepted,
         "crashed_count": crashed,
+        "all_crashed": crashed == len(bad_inputs),
         "diagnoses": diags,
     }
 
@@ -429,21 +433,36 @@ def _audit_observable(target_team_id: str, project_root: Path) -> dict:
             "event_types": [],
         }
 
-    # source 在 events.db 里通常是 pkg_name (snake_case), 不是 target_team_id (snake-case 或 dash)
+    # source 在 events.db 里通常是 pkg_name (snake_case), 不是 target_team_id.
     pkg_name = target_team_id.replace("-", "_")
     try:
         conn = _sqlite.connect(str(db_path))
         cur = conn.cursor()
         cur.execute(
-            "SELECT COUNT(*) FROM events WHERE source = ?",
+            "SELECT trace_id FROM events "
+            "WHERE source = ? AND event_type = 'task.finish' "
+            "ORDER BY timestamp DESC LIMIT 1",
             (pkg_name,),
         )
-        count = cur.fetchone()[0]
+        trace_row = cur.fetchone()
+        if trace_row is None:
+            conn.close()
+            return {
+                "passed": False,
+                "violations": [
+                    f"[critical] events.db 里没有 source='{pkg_name}' 的完整 task.finish trace"
+                ],
+                "counts": {"critical": 1, "minor": 0},
+                "event_count": 0,
+                "event_types": [],
+            }
+        trace_id = trace_row[0]
         cur.execute(
-            "SELECT DISTINCT event_type FROM events WHERE source = ? LIMIT 20",
-            (pkg_name,),
+            "SELECT event_type, source, data FROM events "
+            "WHERE trace_id = ? ORDER BY timestamp",
+            (trace_id,),
         )
-        types = [r[0] for r in cur.fetchall()]
+        rows = cur.fetchall()
         conn.close()
     except Exception as e:
         return {
@@ -454,29 +473,49 @@ def _audit_observable(target_team_id: str, project_root: Path) -> dict:
             "event_types": [],
         }
 
+    count = len(rows)
+    types = sorted({row[0] for row in rows})
+    nodes: set[str] = set()
+    models: set[str] = set()
+    for _event_type, _source, raw_data in rows:
+        try:
+            payload = json.loads(raw_data).get("payload", {})
+        except Exception:
+            continue
+        node_id = payload.get("node")
+        if isinstance(node_id, str) and node_id:
+            nodes.add(node_id)
+        model = payload.get("model")
+        if isinstance(model, str) and model:
+            models.add(model)
+
     violations: list[str] = []
     crit = 0
     minor = 0
 
-    if count == 0:
+    if count < 5:
         violations.append(
-            f"[critical] events.db 里 source='{pkg_name}' 0 个事件 · target 从没跑过或没挂 EventBus"
+            f"[critical] trace={trace_id} 仅 {count} 个事件, 无法证明完整执行链"
         )
         crit += 1
-    elif count < 5:
-        violations.append(
-            f"[minor] events.db 里 source='{pkg_name}' 仅 {count} 个事件, 量很少 (target 跑过几次但 trace 量小)"
-        )
-        minor += 1
 
-    # 看是否含核心事件类型 (LLM 调用 / tool 调用 / verdict)
-    core_markers = ("agent.llm", "agent.tool", "verdict", "anchor")
-    has_core = any(any(m in t for m in core_markers) for t in types)
-    if count > 0 and not has_core:
+    required_types = {"task.intent", "task.finish"}
+    missing_types = sorted(required_types - set(types))
+    if missing_types:
         violations.append(
-            f"[minor] events.db 含 {count} 事件但缺 LLM/tool/verdict 类核心事件类型 (实际 types={types[:5]})"
+            f"[critical] trace={trace_id} 缺终态事件: {missing_types}"
         )
-        minor += 1
+        crit += 1
+    if len(nodes) < 3:
+        violations.append(
+            f"[critical] trace={trace_id} 只看见节点 {sorted(nodes)}, 不足三节点"
+        )
+        crit += 1
+    if "external_agent.started" in types and not models:
+        violations.append(
+            f"[critical] trace={trace_id} 有外部 Agent 启动事件但没有 model 证据"
+        )
+        crit += 1
 
     passed = crit == 0
     return {
@@ -485,6 +524,9 @@ def _audit_observable(target_team_id: str, project_root: Path) -> dict:
         "counts": {"critical": crit, "minor": minor},
         "event_count": count,
         "event_types": types,
+        "trace_id": trace_id,
+        "nodes": sorted(nodes),
+        "models": sorted(models),
     }
 
 
@@ -616,15 +658,32 @@ def _audit_five_elements(pkg_path: Path) -> dict:
             "reason": f"target 没 formats.py ({formats_path}), 五要素扫不适用",
         }
 
+    # Prefer live registered Material objects. AST-only inspection cannot
+    # distinguish a missing schema from a schema loaded through the canonical
+    # contract function (for example json_schema=route_decision_schema()).
+    materials: list[dict] = []
     try:
-        tree = _ast.parse(formats_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        return {
-            "passed": False,
-            "violations": [f"[critical] formats.py 解析失败: {e}"],
-            "counts": {"critical": 1, "minor": 0},
-            "scanned_materials": 0,
-        }
+        import importlib
+
+        relative_module = formats_path.relative_to(_PROJECT_ROOT / "src").with_suffix("")
+        module_name = ".".join(relative_module.parts)
+        module = importlib.import_module(module_name)
+        for material in getattr(module, "ALL_MATERIALS", []) or []:
+            materials.append(
+                {
+                    "id": getattr(material, "id", None),
+                    "parent": getattr(material, "parent", None),
+                    "json_schema": getattr(material, "json_schema", None),
+                    "_json_schema_keys": list(
+                        (getattr(material, "json_schema", None) or {}).keys()
+                    ),
+                    "description": getattr(material, "description", ""),
+                    "tags": list(getattr(material, "tags", []) or []),
+                }
+            )
+    except Exception:
+        # External/unimportable targets keep the conservative AST fallback.
+        materials = []
 
     def _extract_material_dict(node: _ast.AST) -> dict | None:
         """从 Material(...) Call 或 dict literal 抽五要素字段."""
@@ -673,11 +732,20 @@ def _audit_five_elements(pkg_path: Path) -> dict:
                 out.extend(_scan_for_materials(elt))
         return out
 
-    materials: list[dict] = []
-    for node in tree.body:
-        if not isinstance(node, _ast.Assign):
-            continue
-        materials.extend(_scan_for_materials(node.value))
+    if not materials:
+        try:
+            tree = _ast.parse(formats_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            return {
+                "passed": False,
+                "violations": [f"[critical] formats.py 解析失败: {e}"],
+                "counts": {"critical": 1, "minor": 0},
+                "scanned_materials": 0,
+            }
+        for node in tree.body:
+            if not isinstance(node, _ast.Assign):
+                continue
+            materials.extend(_scan_for_materials(node.value))
 
     violations: list[str] = []
     crit = 0
@@ -1371,11 +1439,23 @@ class HypothesisVerifierDispatcherWorker(Worker):
                         })
                 elif executor_kind == "inline_robust":
                     audit = _audit_robust(target_team_id)
-                    crit = audit["counts"]["critical"]
                     rej = audit["rejected_count"]
                     acc = audit["accepted_count"]
                     crashed = audit["crashed_count"]
-                    if audit["passed"]:
+                    if acc:
+                        status = "verified_fail"
+                        excerpt = (
+                            f"健壮性: 喂 3 组错输入 · {acc} 错误返 PASS · "
+                            f"{rej} 拒绝 · {crashed} 跑挂"
+                        )
+                    elif crashed:
+                        status = "execution_error"
+                        excerpt = (
+                            f"健壮性未完成: 喂 3 组错输入 · {rej} 可解释拒绝 · "
+                            f"{crashed} 跑挂；跑挂不能算 PASS"
+                        )
+                        pending_count += 1
+                    elif audit["passed"]:
                         status = "verified_pass"
                         excerpt = (
                             f"健壮性: 喂 3 组错输入 · {rej} 正确拒绝 · {acc} 错误接受 · {crashed} 跑挂"
@@ -1383,7 +1463,8 @@ class HypothesisVerifierDispatcherWorker(Worker):
                     else:
                         status = "verified_fail"
                         excerpt = (
-                            f"健壮性: 喂 3 组错输入 · {acc} 错误返 PASS · {rej} 拒绝 · {crashed} 跑挂"
+                            f"健壮性未通过: 喂 3 组错输入 · {rej} 拒绝 · "
+                            f"{acc} 错误接受 · {crashed} 跑挂"
                         )
                     results.append({
                         "hypothesis_id": hyp_id,

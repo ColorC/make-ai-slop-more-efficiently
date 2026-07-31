@@ -119,7 +119,7 @@ def create_plan(body: CreatePlanBody) -> dict[str, Any]:
         fm = ["---", f"title: {title}", f"date: '{date}'"]
         if body.project_id:
             fm.append(f"project: {body.project_id}")
-        fm += [f"work_type: {body.work_type}", "status: active", "exit_criteria: []",
+        fm += [f"work_type: {body.work_type}", "authority: whatnow", "exit_criteria: []",
                "binding:", "  workspace: .", "---", "", body_md.rstrip(), ""]
         (folder / "plan.md").write_text("\n".join(fm), encoding="utf-8")
     except OSError as e:

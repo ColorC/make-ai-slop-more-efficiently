@@ -14,7 +14,7 @@
 参考:
   - 反例: stage_e_design_point_extractor / _test_coverage_mapper /
           _test_gap_filler / _semantic_acceptance_gate 都有 _parse_evidence
-  - 正例: packages/domains/demogame/ux/routers/prefab_rule_extraction_loop.py
+  - 正例: packages/domains/example_domain/ux/routers/prefab_rule_extraction_loop.py
           的 SubmitReportRouter (TOOL_NAME='submit_report' + INPUT_SCHEMA)
 
 扫描思路 (AST):
@@ -157,7 +157,7 @@ RULES: list[GuardianRule] = [
             "正确做法: 自定义 SubmitXxxRouter 子类 SingleToolRouter, INPUT_SCHEMA 定义结构化字段, "
             "LLM 给 args dict, _execute 直接消费 — 不做 text parse. "
             "memory: feedback_no_manual_parse_use_structured_output (2026-04-25 跨项目铁律). "
-            "正例: packages/domains/demogame/ux/routers/prefab_rule_extraction_loop.py SubmitReportRouter."
+            "正例: packages/domains/example_domain/ux/routers/prefab_rule_extraction_loop.py SubmitReportRouter."
         ),
         check=_check_manual_evidence_parse,
         disposition=["warn"],
@@ -166,6 +166,9 @@ RULES: list[GuardianRule] = [
             "若是 LLM tool result 手解 → 改 SubmitXxxRouter + INPUT_SCHEMA 结构化 args. "
             "若解析外部 JSON 数据源 → 加 # noqa-OMNI-080 注释或路径加豁免."
         ),
-        certainty="high",
+        certainty="needs_judgment",  # 2026-07-26 裁决: 规则自述"粗筛保守, LLM 复核区分
+        # 真反模式 vs 合法解析外部 JSON", 原 certainty="high" 却让候选绕过复核直按
+        # 确认违规入账 (patrol shim 只把 needs_judgment 送 GuardianAgent), 416 条
+        # 未复核存量因此积压. 改回 needs_judgment 与规则设计一致.
     ),
 ]

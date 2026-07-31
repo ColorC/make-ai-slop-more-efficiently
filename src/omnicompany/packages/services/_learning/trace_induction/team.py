@@ -1,9 +1,12 @@
 # [OMNI] origin=claude-code domain=trace_induction/pipeline.py ts=2026-04-08T03:23:37Z
 # [OMNI] material_id="material:learning.trace_induction.pipeline_topology.spec.py"
-"""trace_induction pipeline — 轨迹归纳管线拓扑（7 节点）
+"""trace_induction pipeline — 按需轨迹归纳拓扑（4 节点）
 
 trace_reader (HARD) → noise_filter (SOFT) → sop_generator (SOFT)
-  → req_writer (SOFT) → wf_caller (SOFT/SubPipeline) → registrar (HARD)
+  → req_writer (SOFT/EMIT)
+
+输出停在可审阅的 SOP 与需求候选。是否生成或注册新工作流，必须由真实工作中的
+明确需求另行决定；本管线不再自动调用 workflow-factory。
 """
 
 from omnicompany.protocol.anchor import (
@@ -103,49 +106,7 @@ def build_team() -> TeamSpec:
                 validator=ValidatorSpec(
                     id="v_req_writer",
                     kind=ValidatorKind.SOFT,
-                    description="LLM 将 SOP 转化为 Workflow Factory 可消费的 Markdown 需求文档",
-                ),
-                routes={
-                    VerdictKind.PASS: Route(action=RouteAction.NEXT, target="wf_caller"),
-                    VerdictKind.FAIL: Route(action=RouteAction.HALT),
-                },
-            ),
-        ),
-
-        # ── [5] wf_caller — SubTeamWorker 调用 workflow-factory ──
-        TeamNode(
-            id="wf_caller",
-            kind=NodeKind.ANCHOR,
-            anchor=AnchorSpec(
-                id="a_wf_caller",
-                name="wf_caller",
-                format_in="ti.requirement",
-                format_out="ti.wf-result",
-                validator=ValidatorSpec(
-                    id="v_wf_caller",
-                    kind=ValidatorKind.SOFT,
-                    description="通过 SubTeamWorker 调用 workflow-factory，共享 EventBus 保持可观测性",
-                ),
-                routes={
-                    VerdictKind.PASS: Route(action=RouteAction.NEXT, target="registrar"),
-                    VerdictKind.FAIL: Route(action=RouteAction.RETRY, max_retries=2),
-                },
-            ),
-        ),
-
-        # ── [6] registrar — 确定性注册 ──
-        TeamNode(
-            id="registrar",
-            kind=NodeKind.ANCHOR,
-            anchor=AnchorSpec(
-                id="a_registrar",
-                name="registrar",
-                format_in="ti.wf-result",
-                format_out="ti.done",
-                validator=ValidatorSpec(
-                    id="v_registrar",
-                    kind=ValidatorKind.HARD,
-                    description="将 WF 产出注册到 pipeline_index 语义索引",
+                    description="LLM 将 SOP 转化为可审阅的 Markdown 需求候选",
                 ),
                 routes={
                     VerdictKind.PASS: Route(action=RouteAction.EMIT),
@@ -159,16 +120,14 @@ def build_team() -> TeamSpec:
         TeamEdge(source="trace_reader", target="noise_filter", condition=VerdictKind.PASS),
         TeamEdge(source="noise_filter", target="sop_generator", condition=VerdictKind.PASS),
         TeamEdge(source="sop_generator", target="req_writer", condition=VerdictKind.PASS),
-        TeamEdge(source="req_writer", target="wf_caller", condition=VerdictKind.PASS),
-        TeamEdge(source="wf_caller", target="registrar", condition=VerdictKind.PASS),
     ]
 
     return TeamSpec(
         id="trace-induction",
         name="trace-induction",
         description=(
-            "轨迹归纳：从历史 trace 读取步骤 → 过滤噪音 → 提炼 SOP → "
-            "生成需求文档 → 调用 Workflow Factory → 注册产出"
+            "按需轨迹归纳：从历史 trace 读取步骤 → 过滤噪音 → 提炼 SOP → "
+            "生成可审阅的需求候选；不自动生成或注册工作流"
         ),
         entry="trace_reader",
         nodes=nodes,

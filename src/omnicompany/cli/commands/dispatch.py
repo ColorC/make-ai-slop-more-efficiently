@@ -80,12 +80,15 @@ def cmd_dispatch_route(message: str | None, context: str | None, input_b64: str 
 @click.option("--title-hint", default=None, help="多窗口时优选标题含该串的")
 @click.option("--copy", "copy_text", default=None, help="顺手把这段文字放进剪贴板(粘贴即用)")
 @click.option("--paste", is_flag=True, help="激活后发 Ctrl+V 粘进聚焦输入框(复制到对话框里)")
+@click.option("--submit", is_flag=True, help="粘贴后自动提交，不需要用户再按回车")
+@click.option("--yes", is_flag=True, help="确认执行物理动作(激活窗口/写剪贴板/粘贴提交)；物理动作默认硬关闭，不带此 flag 一律拒绝")
 @click.option("--dry", is_flag=True, help="只找窗口不激活(验证用, 不抢焦点)")
 @click.option("--json", "as_json", is_flag=True)
 @any_caller
 def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str | None,
-                          copy_text: str | None, paste: bool, dry: bool, as_json: bool) -> None:
-    """把某个 app 的窗口激活到最前(send_active_window 的执行端)。"""
+                          copy_text: str | None, paste: bool, submit: bool,
+                          yes: bool, dry: bool, as_json: bool) -> None:
+    """把某个 app 的窗口激活到最前(send_active_window 的执行端)。物理动作默认硬关闭，需显式 --yes。"""
     from omnicompany.dashboard.boss_sight.services import winjump
 
     if not location and key:
@@ -96,10 +99,12 @@ def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str
             title_hint = title_hint or rec.get("name")
     if not location:
         raise click.ClickException("要么给 --location, 要么给能在注册表里查到的 --key")
+    if submit and not copy_text:
+        raise click.ClickException("--submit 必须同时提供 --copy，禁止提交未知剪贴板内容")
 
     if copy_text:
         from omnicompany.dashboard.boss_sight.services import winjump as _wj
-        _wj.set_clipboard(copy_text)  # CF_UNICODETEXT, 中文不乱
+        _wj.set_clipboard(copy_text, confirmed=yes)  # CF_UNICODETEXT, 中文不乱
 
     if dry:
         # 只列出该位置匹配到的窗口, 不激活
@@ -109,7 +114,13 @@ def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str
                 if _proc_name(p).lower().removesuffix(".exe") in want]
         out = {"dry": True, "location": location, "matches": hits}
     else:
-        out = winjump.activate_location(location, title_hint=title_hint, paste=paste)
+        out = winjump.activate_location(
+            location,
+            title_hint=title_hint,
+            paste=paste or submit,
+            submit=submit,
+            confirmed=yes,
+        )
 
     click.echo(json.dumps(out, ensure_ascii=False) if as_json else json.dumps(out, ensure_ascii=False, indent=2))
 

@@ -66,6 +66,7 @@ class ProviderOptions(TypedDict, total=False):
     allowed_tools: list[str]
     disallowed_tools: list[str]
     env: dict[str, str]
+    effort: str
 
 
 class BaseProvider(ABC):

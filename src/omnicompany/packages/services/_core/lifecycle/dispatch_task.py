@@ -115,11 +115,23 @@ def dispatch_task(task_id: str, *, agent: str | None = None, plan_id: str | None
                 "carrier": carrier, "agent": agent, "prompt": prompt,
                 "summary": f"[dry] 将投递 task[{t.id}] → {agent or '自动路由'} via {carrier}"}
 
-    # 记绑定 + 状态
+    # 记绑定 + 状态 (task_bindings.json 保留投递态: carrier/status/agent 名)
     binds = _load_bindings()
     binds[t.id] = {"task_id": t.id, "plan_id": pid, "agent": agent, "carrier": carrier,
                    "status": "dispatched", "bound_at": time.time()}
     _save_bindings(binds)
+
+    # 收敛 (plan 4.6): 把 task↔会话镜像进统一的会话绑定台账 —— "哪些会话在做这个 task"
+    # 只认这一份真源, dispatch 与自绑定同源。best-effort, 失败不挡投递。
+    try:
+        _rec = _resolve_agent_session(agent)
+        if _rec and _rec.get("session_id"):
+            from omnicompany.packages.services._core.identity import bind_task_for_session
+            from omnicompany.packages.services._core.lifecycle.task import canonical_task_id
+            bind_task_for_session(_rec.get("provider"), _rec.get("session_id"),
+                                  task_id=canonical_task_id(pid, t.id), plan_id=pid)
+    except Exception:  # noqa: BLE001
+        pass
     try:
         if t.status == "pending":
             store.set_status(t.id, "in_progress", pid)
@@ -138,21 +150,27 @@ def dispatch_task(task_id: str, *, agent: str | None = None, plan_id: str | None
 
 
 def _dispatch_vscode(task: Any, plan_id: str, prompt: str, agent: str | None) -> dict[str, Any]:
-    """vscode 真实会话档: winjump 注入到目标窗口 (注入失败=绑定已记, 留人工接)。"""
+    """vscode 真实会话档: winjump 注入并自动提交到目标窗口。"""
     rec = _resolve_agent_session(agent)
     location = (rec or {}).get("location") or "vscode"
     try:
         from omnicompany.dashboard.boss_sight.services import winjump
-        winjump.set_clipboard(prompt)
-        res = winjump.activate_location(location, paste=True)
-        injected = bool(res.get("ok")) if isinstance(res, dict) else bool(res)
+        if not winjump.set_clipboard(prompt):
+            raise RuntimeError("写入剪贴板失败")
+        res = winjump.activate_location(location, paste=True, submit=True)
+        submitted = (
+            bool(res.get("ok") and res.get("pasted") and res.get("submitted"))
+            if isinstance(res, dict)
+            else False
+        )
     except Exception as e:  # noqa: BLE001
-        return {"ok": True, "task_id": task.id, "carrier": "vscode", "agent": agent,
-                "injected": False, "injection_error": str(e),
-                "summary": f"✓ task[{task.id}] 已绑定 {agent or location}(注入未成: {e}; 绑定已记, 可 omni task inject 重试)"}
-    return {"ok": True, "task_id": task.id, "carrier": "vscode", "agent": agent,
-            "location": location, "injected": injected,
-            "summary": f"✓ task[{task.id}] 投递到 {agent or location}{' 并注入' if injected else ' (注入待确认)'}"}
+        return {"ok": False, "task_id": task.id, "carrier": "vscode", "agent": agent,
+                "injected": False, "submitted": False, "injection_error": str(e),
+                "summary": f"task[{task.id}] 未能提交到 {agent or location}: {e}"}
+    return {"ok": submitted, "task_id": task.id, "carrier": "vscode", "agent": agent,
+            "location": location, "injected": submitted, "submitted": submitted,
+            "summary": f"{'✓' if submitted else '✗'} task[{task.id}] "
+                       f"{'已提交到' if submitted else '未能提交到'} {agent or location}"}
 
 
 def _dispatch_sdk(task: Any, plan_id: str, prompt: str, agent: str | None,
@@ -317,13 +335,20 @@ def inject_to_task(task_id: str, message: str, *, plan_id: str | None = None) ->
     location = (rec or {}).get("location") or "vscode"
     try:
         from omnicompany.dashboard.boss_sight.services import winjump
-        winjump.set_clipboard(message)
-        res = winjump.activate_location(location, paste=True)
-        ok = bool(res.get("ok")) if isinstance(res, dict) else bool(res)
+        if not winjump.set_clipboard(message):
+            raise RuntimeError("写入剪贴板失败")
+        res = winjump.activate_location(location, paste=True, submit=True)
+        ok = (
+            bool(res.get("ok") and res.get("pasted") and res.get("submitted"))
+            if isinstance(res, dict)
+            else False
+        )
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "summary": f"注入失败: {e}"}
-    return {"ok": ok, "task_id": task_id, "location": location,
-            "summary": f"{'✓' if ok else '✗'} 注入到 {b.get('agent') or location}: {message[:40]}"}
+    return {"ok": ok, "task_id": task_id, "location": location, "submitted": ok,
+            "summary": f"{'✓' if ok else '✗'} "
+                       f"{'已提交到' if ok else '未能提交到'} "
+                       f"{b.get('agent') or location}: {message[:40]}"}
 
 
 def reassign_task(task_id: str, agent: str, *, plan_id: str | None = None) -> dict[str, Any]:

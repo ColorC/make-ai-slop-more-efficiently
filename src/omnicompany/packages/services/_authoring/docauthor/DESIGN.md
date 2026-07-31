@@ -97,7 +97,7 @@ docauthor.review-verdict (kind.internal)
 ```
 
 ## 已知局限
-- **扫描上下文全量拼接易超 LLM 窗口**: Author Worker 将目录树、现有 DESIGN.md、plan history 直接拼入 prompt, 超大服务目录可能触发上下文截断或稀释关键信息. 升级路径: 引入动态摘要层 (summary agent) 或接入 OmniKB 语义检索, 按文件权重/近期修改时间动态截取关键片段, 替代全量 dump.
+- **扫描上下文全量拼接易超 LLM 窗口**: Author Worker 将目录树、现有 DESIGN.md、plan history 直接拼入 prompt, 超大服务目录可能触发上下文截断或稀释关键信息. 升级路径: 先用统一材料寻址 (`omni lookup`) 定位候选，再按文件权重/近期修改时间生成动态摘要，替代全量 dump；不再依赖独立知识库。
 - **grep_plan_history 仅字面匹配**: 当前实现用 service/package 名做纯字符串 grep, 可能漏掉"隐喻引用"或误带无关历史 plan. 升级路径: 替换为轻量 LLM 过滤层 (`call_llm_json` 判相关性) 或向量化检索匹配, 提升计划上下文召回精度.
 - **Domain 顶层聚合目录处理未自适应**: 若 target 指向 `domains/<dom>/` 顶层且含多个子包, Worker 当前按单包逻辑线性扫描, 可能遗漏子包 data 路径或产出过大 manifest. 升级路径: 增加前置 `is_domain_aggregate` 路由判断, 识别后自动拆分为多个子 author job 并行处理.
 - **Sentinel 自动触发链路未闭合**: 当前 `run_job` 与 CLI 入口已就绪, 但缺乏常驻哨兵定时扫描仓库赤字目标并自动投递 request. 升级路径: 实现独立 `DocSentinelWorker`, 接入系统 crontab 或 inotify 监听 `src/` 变更事件, 定时产出 `<kind>-request` 投递 SQLiteBus 实现零人工干预.

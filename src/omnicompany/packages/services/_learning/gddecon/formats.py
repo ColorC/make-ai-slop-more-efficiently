@@ -29,8 +29,8 @@ GDDECON_REQUEST = Format(
         "上游承诺: design_sources 与 build_root 路径存在可读。"
         "下游用途: 拆解 agent 读这些源, 应用发现法产出方面树。"
         "最小样例: {\"game_name\":\"行者无乡\","
-        "\"design_sources\":[\"E:/WindowsWorkspace/故事/walker-universe\"],"
-        "\"build_root\":\"E:/WindowsWorkspace/webworks/apps/walker-game\","
+        "\"design_sources\":[\"/path/to/design/sources\"],"
+        "\"build_root\":\"/path/to/build/root\","
         "\"focus\":\"\"}"
     ),
     tags=["domain.gddecon", "kind.source", "stage.request"],
@@ -49,8 +49,8 @@ GDDECON_REQUEST = Format(
     examples=[
         {
             "game_name": "行者无乡",
-            "design_sources": ["E:/WindowsWorkspace/故事/walker-universe"],
-            "build_root": "E:/WindowsWorkspace/webworks/apps/walker-game",
+            "design_sources": ["/path/to/design/sources"],
+            "build_root": "/path/to/build/root",
             "focus": "",
         }
     ],

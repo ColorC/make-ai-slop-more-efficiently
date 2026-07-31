@@ -11,7 +11,7 @@ Get-WmiObject / 操作 .exe / npm.cmd / Test-Path 在 Windows 路径) git bash �
   - -NoProfile -NonInteractive (不读 user profile, 不开 UI)
   - 输出 stdout + stderr + exit code 合并 (跟 DevBash 同 pattern)
   - 5MB 输出截断 + thread 边读边截 (OOM 安全)
-  - timeout 默认 120s 上限 1200s
+  - 无隐式总时限；可显式 deadline，且运行中发送 material heartbeat
 
 设计选择:
   - cwd 走 ToolContext.allowed_powershell_roots (跟 bash 各自 allowlist, 区分权限)
@@ -25,13 +25,27 @@ import os
 import re
 import subprocess
 import threading
+import time
 from pathlib import Path
 from typing import Any, ClassVar
 
+from omnicompany.packages.services._core.agent.event_bridge import (
+    publish_agent_event_sync,
+)
 from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
     ToolContext,
     ToolExecutionError,
+)
+from omnicompany.packages.services._core.agent.routers.execution_limits import (
+    FACILITY_TIMEOUT_MARKER,
+    SHELL_POLICY_MARKER,
+    ShellCommandPolicyError,
+    powershell_utf8_command,
+    reject_decode_replacement,
+    resolve_shell_timeout,
+    utf8_subprocess_env,
+    validate_shell_command,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,9 +82,11 @@ class PowerShellRouter(SingleToolRouter):
         "Get-WmiObject / Test-Path Windows 路径 / .cmd .exe 调用 / Service 控制 等.\n"
         "- cwd 必须在 ctx.allowed_powershell_roots 内.\n"
         "- 危险 cmdlet (Stop-Computer / Format-Volume / IEX(IWR) 等) 拒.\n"
+        "- `head`/`find`、Bash 语法、目录创建和 Shell 文本写入一律拒绝；改用专用 Read/Glob/Grep/Write/Edit 工具.\n"
+        "- PowerShell 与子进程均强制 UTF-8；发现替换字符会停止并报错.\n"
         "- 默认 -NonInteractive -NoProfile (不读 user profile, 不开 UI).\n"
         "- stdout + stderr + exit code 合并返回, 各 5MB 截断防 OOM.\n"
-        "- timeout 默认 120s, 上限 1200s. 长流程改 nohup 模式 (Start-Process -NoNewWindow).\n"
+        "- timeout_sec 仅在任务有真实 deadline 时设置；省略则无总时限，运行中仍可观测和中止.\n"
         "- Linux/Mac 上调用此工具会报错 (Windows-only)."
     )
     INPUT_SCHEMA: ClassVar[dict] = {
@@ -87,8 +103,7 @@ class PowerShellRouter(SingleToolRouter):
             "timeout_sec": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 1200,
-                "description": "Timeout seconds. Default 120, max 1200.",
+                "description": "Optional caller-selected total deadline in seconds; omitted means none.",
             },
         },
         "required": ["command", "cwd"],
@@ -104,11 +119,20 @@ class PowerShellRouter(SingleToolRouter):
             )
         cmd = (args.get("command") or "").strip()
         raw_cwd = (args.get("cwd") or "").strip()
-        timeout = max(1, min(int(args.get("timeout_sec", 120)), 1200))
+        try:
+            timeout = resolve_shell_timeout(args)
+        except ValueError as exc:
+            raise ToolExecutionError(str(exc)) from exc
         if not cmd:
             raise ToolExecutionError("command is required")
         if not raw_cwd:
             raise ToolExecutionError("cwd is required (absolute path within allowed_powershell_roots)")
+        try:
+            cmd = validate_shell_command(cmd, dialect="powershell")
+        except ShellCommandPolicyError as exc:
+            raise ToolExecutionError(
+                f"{SHELL_POLICY_MARKER} powershell REFUSED: {exc}"
+            ) from exc
 
         # 黑名单
         danger = _ps_danger(cmd)
@@ -160,8 +184,15 @@ class PowerShellRouter(SingleToolRouter):
         )
         try:
             proc = subprocess.Popen(
-                [ps_path, "-NoProfile", "-NonInteractive", "-Command", cmd],
+                [
+                    ps_path,
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    powershell_utf8_command(cmd),
+                ],
                 cwd=str(cwd_abs),
+                env=utf8_subprocess_env(),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -207,10 +238,51 @@ class PowerShellRouter(SingleToolRouter):
         t_err = threading.Thread(target=_capped_read, args=(proc.stderr, err_buf), daemon=True)
         t_out.start(); t_err.start()
         timed_out = False
-        try:
-            proc.wait(timeout=timeout)
-            rc = proc.returncode
-        except subprocess.TimeoutExpired:
+        started_at = time.monotonic()
+        deadline = started_at + timeout if timeout is not None else None
+        next_heartbeat = started_at + 10.0
+        abort_event = getattr(ctx, "abort_event", None)
+        while True:
+            now = time.monotonic()
+            remaining = deadline - now if deadline is not None else None
+            if remaining is not None and remaining <= 0:
+                timed_out = True
+                break
+            try:
+                proc.wait(timeout=min(0.5, remaining) if remaining is not None else 0.5)
+                rc = proc.returncode
+                break
+            except subprocess.TimeoutExpired:
+                if abort_event is not None and abort_event.is_set():
+                    timed_out = False
+                    rc = -15
+                    break
+                now = time.monotonic()
+                if now >= next_heartbeat:
+                    trace_id = str(getattr(ctx, "trace_id", "") or "")
+                    if trace_id:
+                        publish_agent_event_sync(
+                            trace_id=trace_id,
+                            parent_id=str(getattr(ctx, "tool_use_id", "") or "") or None,
+                            event_type="agent.tool.heartbeat",
+                            source="agent.tool.powershell",
+                            payload={
+                                "material_kind": "tool-heartbeat",
+                                "tool": self.TOOL_NAME,
+                                "turn": int(getattr(ctx, "turn", 0) or 0),
+                                "runtime_ms": int((now - started_at) * 1000),
+                            },
+                            tags=[
+                                "omni.material",
+                                "agent.material",
+                                "material:tool-heartbeat",
+                                "tool:powershell",
+                            ],
+                        )
+                    next_heartbeat = now + 10.0
+                continue
+
+        if timed_out or rc == -15:
             try:
                 subprocess.run(
                     ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
@@ -223,22 +295,43 @@ class PowerShellRouter(SingleToolRouter):
             except subprocess.TimeoutExpired:
                 try: proc.kill()
                 except Exception: pass
-            rc = -9
-            timed_out = True
+            if timed_out:
+                rc = -9
         t_out.join(timeout=2); t_err.join(timeout=2)
         stdout, sout_total, sout_trunc = out_buf[0] if out_buf else ("", 0, False)
         stderr, serr_total, serr_trunc = err_buf[0] if err_buf else ("", 0, False)
         stdout = stdout.rstrip("\n"); stderr = stderr.rstrip("\n")
+        try:
+            reject_decode_replacement(stdout, stderr)
+        except ShellCommandPolicyError as exc:
+            raise ToolExecutionError(
+                f"{SHELL_POLICY_MARKER} powershell REFUSED: {exc}"
+            ) from exc
         if sout_trunc:
             stdout += f"\n\n[TRUNCATED · stdout 5 MiB cap · 实读 {sout_total} bytes]"
         if serr_trunc:
             stderr += f"\n\n[TRUNCATED · stderr 5 MiB cap · 实读 {serr_total} bytes]"
 
         if timed_out:
+            assert timeout is not None
             raise ToolExecutionError(
-                f"powershell TIMEOUT after {timeout}s (killed). Command: `{cmd[:120]}...`\n"
+                f"{FACILITY_TIMEOUT_MARKER} powershell TIMEOUT after {timeout}s (process tree killed). "
+                f"The Agent path must stop here; do not retry the same command. Command: `{cmd[:120]}...`\n"
                 f"stdout: {stdout[:300]}\nstderr: {stderr[:300]}\n"
                 f"For long-running PS, use `Start-Process -NoNewWindow ...` background pattern."
+            )
+
+        if rc == -15:
+            raise ToolExecutionError(
+                f"powershell ABORTED by external signal (process tree killed). Command: `{cmd[:120]}...`\n"
+                f"stdout: {stdout[:300]}\nstderr: {stderr[:300]}"
+            )
+
+        if rc != 0:
+            raise ToolExecutionError(
+                f"powershell command failed with exit code {rc}. Command: `{cmd[:200]}`\n"
+                f"stdout:\n{stdout[:4000]}\n"
+                f"stderr:\n{stderr[:4000]}"
             )
 
         parts = []

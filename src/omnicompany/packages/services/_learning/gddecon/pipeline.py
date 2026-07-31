@@ -25,14 +25,16 @@ import pathlib
 import uuid
 from typing import Any
 
+from omnicompany.core.config import omni_workspace_root
+
 log = logging.getLogger(__name__)
 
 _PKG_DIR = pathlib.Path(__file__).resolve().parent
 _PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[6]  # 仓根 .../omnicompany (parents[5]=src)
-_METHOD_PATH = _PKG_DIR / "discovery_method.md"
-_GAP_METHOD_PATH = _PKG_DIR / "gap_method.md"
-_UI_STD_METHOD_PATH = _PKG_DIR / "ui_standard_method.md"
-_DEFAULT_PROJECT_ROOT = "E:/WindowsWorkspace"
+_METHOD_PATH = _PKG_DIR / "prompts" / "discovery_method.md"
+_GAP_METHOD_PATH = _PKG_DIR / "prompts" / "gap_method.md"
+_UI_STD_METHOD_PATH = _PKG_DIR / "prompts" / "ui_standard_method.md"
+_DEFAULT_PROJECT_ROOT = str(omni_workspace_root().parent)
 _OUT_DIR = _PROJECT_ROOT / "data" / "knowledge" / "aspect_trees"
 
 
@@ -550,7 +552,7 @@ def run_ui_standard(config: dict) -> dict:
 # UI 设计生命周期 · 建立UI设计稿（按真后端逻辑·complete-expression）
 # ═══════════════════════════════════════════════════════════
 
-_UI_BUILD_METHOD_PATH = _PKG_DIR / "ui_build_method.md"
+_UI_BUILD_METHOD_PATH = _PKG_DIR / "prompts" / "ui_build_method.md"
 _BACKEND_FILES = (
     "src/game/core/game-state.ts",
     "src/game/core/game-command.ts",
@@ -743,7 +745,7 @@ def run_ui_build(config: dict) -> dict:
 # UI 设计生命周期 · 制定信息层级（界面信息维度·常驻/揭示 + 揭示即操作）
 # ═══════════════════════════════════════════════════════════
 
-_INFO_HIER_METHOD_PATH = _PKG_DIR / "info_hierarchy_method.md"
+_INFO_HIER_METHOD_PATH = _PKG_DIR / "prompts" / "info_hierarchy_method.md"
 _TIER_BUCKETS = (
     ("T0", "T0 一眼必看（常驻）"),
     ("T1", "T1 常驻次级（常驻，可弱化）"),
@@ -887,7 +889,7 @@ def run_info_hierarchy(config: dict) -> dict:
 # UI 设计生命周期 · 操作交互模型（界面操作维度·信息层级的对偶）
 # ═══════════════════════════════════════════════════════════
 
-_INTERACTION_METHOD_PATH = _PKG_DIR / "interaction_model_method.md"
+_INTERACTION_METHOD_PATH = _PKG_DIR / "prompts" / "interaction_model_method.md"
 _OP_GROUPS = ("布阵", "重整", "时间控制", "揭示")
 
 

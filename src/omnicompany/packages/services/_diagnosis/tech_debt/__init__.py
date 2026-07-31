@@ -36,6 +36,15 @@ from .drift_checker import (
     check_plan_drift,
     run_drift_audit,
 )
+from .reconciler import (
+    RESOLVE_WHITELIST,
+    reconcile_registry,
+)
+from .autotriage import (
+    TRIAGE_MODEL,
+    run_autotriage,
+    write_digest,
+)
 
 __all__ = [
     "RegistryRow",
@@ -57,4 +66,9 @@ __all__ = [
     "check_design_md_drift",
     "check_plan_drift",
     "run_drift_audit",
+    "RESOLVE_WHITELIST",
+    "reconcile_registry",
+    "TRIAGE_MODEL",
+    "run_autotriage",
+    "write_digest",
 ]

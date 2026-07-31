@@ -19,6 +19,7 @@ FORMATS = [
         name="TDDPlan",
         description="TDD 计划输入: 分步计划文本 + 项目目录",
         parent="sw.task-input",
+        tags=["kind.source"],
     ),
 
     # ── 测试代码 ──
@@ -27,7 +28,7 @@ FORMATS = [
         name="TDDTestCode",
         description="agent_loop 生成的测试文件: 文件列表 + 代码 + 测试命令",
         parent=f"{DOMAIN}.plan",
-        tags=["generated"],
+        tags=["generated", "kind.internal"],
     ),
 
     # ── 测试结果 ──
@@ -36,7 +37,7 @@ FORMATS = [
         name="TDDTestResult",
         description="测试执行结果: exit_code + stdout/stderr + 通过/失败数",
         parent="sw.test-exec-result",
-        tags=["executed"],
+        tags=["executed", "kind.internal"],
     ),
 
     # ── 实现代码 ──
@@ -45,7 +46,7 @@ FORMATS = [
         name="TDDImplCode",
         description="agent_loop 生成的实现代码: 文件列表 + 代码",
         parent=f"{DOMAIN}.test-result",
-        tags=["generated"],
+        tags=["generated", "kind.internal"],
     ),
 
     # ── TDD 报告 ──
@@ -54,7 +55,7 @@ FORMATS = [
         name="TDDReport",
         description="TDD 执行报告: report_text + conclusion + metrics",
         parent="sw.report",
-        tags=["finalized"],
+        tags=["finalized", "kind.sink"],
         required_tags=["executed"],
     ),
 ]

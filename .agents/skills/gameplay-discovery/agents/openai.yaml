@@ -1,0 +1,6 @@
+interface:
+  display_name: "玩法自动发现"
+  short_description: "从真实状态、规则线索和资源关系闭合玩法候选边界"
+  default_prompt: "Use $gameplay-discovery to turn the observed route into an evidence-backed gameplay candidate."
+policy:
+  allow_implicit_invocation: true

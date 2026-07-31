@@ -1,12 +1,12 @@
 # [OMNI] origin=claude-code domain=services/_core/semantic_fs ts=2026-06-27T00:00:00Z type=router
-# [OMNI] summary="产出即 material(语义文件系统里程碑二)。分类器走统一 call_json(喂受控 type+tag 词表), 输出对齐受控集合的 semantic_tags+summary;materialize 落盘钩子=分类→omni register(复用 register_dispatcher 形状 subprocess)→set_semantic 写回, 把打标从人工负担变产出副产物。置信不足进 human-inbox。"
+# [OMNI] summary="产出即 material。分类后自动入册并写回 semantic 字段; 低置信结果进入当前会话可读回的 Reviewstage。"
 # [OMNI] why="Notion/Roam 死于人手打标。解法=产出即打标、AI 填值、受控词表兜边界、不达标进人审, 绝不自由发挥出孤儿标签。"
 # [OMNI] tags=semantic-os,material,auto-classify,auto-register
 # [OMNI] material_id="material:core.semantic_fs.classify.py"
 """产出分类 + 自动入册(里程碑二)。
 
 materialize(path): 落盘钩子 —— 分类(LLM 对齐受控词表)→ omni register(subprocess 复用现成)
-→ set_semantic 写回 attrs。置信不足/标签越界 → human-inbox, 不静默乱写。
+→ set_semantic 写回 attrs。置信不足/标签越界 → Reviewstage, 不静默乱写。
 """
 from __future__ import annotations
 
@@ -113,10 +113,10 @@ def _register_inprocess(p: Path, kind: str, base: Path) -> str:
 
 
 def materialize(path: str | Path, *, model: str | None = None, root: Path | None = None,
-                push_inbox: bool = True, force: bool = False) -> dict[str, Any]:
+                submit_review: bool = True, force: bool = False, review_store=None) -> dict[str, Any]:
     """落盘钩子: 分类 → 进程内注册 → set_semantic 写回。
 
-    置信不足 / 有越界标签 → 仍登记但进 human-inbox 待人核;不静默写脏标签。
+    置信不足 / 有越界标签 → 仍登记但提交一份可由当前会话读回的审阅材料。
     """
     base = root or omni_workspace_root()
     p = Path(path).resolve()
@@ -135,19 +135,31 @@ def materialize(path: str | Path, *, model: str | None = None, root: Path | None
     sem = SC.set_semantic(entity_id, semantic_tags=c["semantic_tags"],
                           content_time=mday, ingested_time=_today(), root=base)
     needs_review = c["confidence"] == "low" or bool(c["invalid_tags"])
-    if push_inbox and needs_review:
-        from omnicompany.runtime.buses import HumanBus, HumanKind
-        HumanBus().ask(
-            question=(f"产出已自动入册但置信不足/有越界标签, 请核分类: {c['path']}\n"
-                      f"  kind={c['register_kind']} tags={c['semantic_tags']} "
-                      f"越界={c['invalid_tags']} 置信={c['confidence']}\n  摘要: {c['summary']}"),
-            kind=HumanKind.HUMAN_BLOCKING,
-            context={"facility": "semantic_fs.materialize", "entity_id": entity_id, "classify": c},
-            source="semantic_fs.materialize")
+    review_material = None
+    if submit_review and needs_review:
+        if review_store is None:
+            from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+            review_store = get_store()
+        from omnicompany.dashboard.boss_sight.reviewstage.report_submission import submit_markdown_report
+        content = (
+            "# 语义分类待核\n\n"
+            f"- 文件: `{c['path']}`\n- entity: `{entity_id}`\n"
+            f"- kind: `{c['register_kind']}`\n- tags: `{c['semantic_tags']}`\n"
+            f"- 越界标签: `{c['invalid_tags']}`\n- 置信: `{c['confidence']}`\n"
+            f"- 摘要: {c['summary']}\n"
+        )
+        review_material = submit_markdown_report(
+            review_store, title=f"语义分类待核 · {p.name}", content=content,
+            source_plan_id="format-material/[2026-06-27]SEMANTIC-FILESYSTEM-ALL-MATERIAL",
+            reason="自动分类置信不足或出现越界标签; 请只核分类结果。",
+            dedupe_key=f"semantic-classify:{entity_id}",
+            stable_payload=str(c), version_family=f"semantic-classify:{entity_id}",
+        )
     return {"ok": True, "entity_id": entity_id, "register_kind": c["register_kind"],
             "semantic_tags": c["semantic_tags"], "summary": c["summary"],
             "confidence": c["confidence"], "invalid_tags": c["invalid_tags"],
-            "needs_review": needs_review, "semantic_written": sem.get("ok", False)}
+            "needs_review": needs_review, "semantic_written": sem.get("ok", False),
+            "review_material": review_material}
 
 
 _SWEEP_SKIP = {"_archive", "_graveyard", "__pycache__", ".git", "venv", ".venv",
@@ -171,7 +183,7 @@ def _sweep_dirs(root: Path) -> list[str]:
     cfg.parent.mkdir(parents=True, exist_ok=True)
     import json as _j
     cfg.write_text(_j.dumps({"dirs": _DEFAULT_SWEEP_DIRS,
-                             "_note": "管线产出落这些目录会被 gov-materialize-sweep 每日自动纳入 material;加目录即扩覆盖"},
+                             "_note": "这些目录只是显式 material 注册或领域 intake 的候选来源；不依赖已退役的全仓自动 sweep"},
                             ensure_ascii=False, indent=2), encoding="utf-8")
     return _DEFAULT_SWEEP_DIRS
 
@@ -186,7 +198,7 @@ def _registered_source_files(root: Path) -> set[str]:
 
 
 def sweep(*, dirs: list[str] | None = None, model: str | None = None, limit: int = 40,
-          push_inbox: bool = False, root: Path | None = None, echo: Any = None) -> dict[str, Any]:
+          submit_review: bool = False, root: Path | None = None, echo: Any = None) -> dict[str, Any]:
     """每日自动纳管: 扫产出目录, 把**还没入册**的产出文件(.md/.csv)materialize 成 material。
 
     跳运行态/缓存目录;只处理新文件(已注册的跳过, 稳态便宜);超 limit 下轮再扫(透明记数)。
@@ -220,7 +232,7 @@ def sweep(*, dirs: list[str] | None = None, model: str | None = None, limit: int
              + (f" → 本轮 {limit}(其余下轮)" if capped else "") )
     done = 0
     for p in todo:
-        r = materialize(p, model=model, root=base, push_inbox=push_inbox)
+        r = materialize(p, model=model, root=base, submit_review=submit_review)
         if r.get("ok"):
             done += 1
         if echo:
@@ -230,7 +242,7 @@ def sweep(*, dirs: list[str] | None = None, model: str | None = None, limit: int
 
 
 def materialize_dir(directory: str | Path, *, model: str | None = None, limit: int | None = None,
-                    root: Path | None = None, push_inbox: bool = False,
+                    root: Path | None = None, submit_review: bool = False,
                     echo: Any = None) -> dict[str, Any]:
     """扫一个产出目录, 把还没入册的文件逐个 materialize(产出即 material 的批量/补扫形态)。"""
     base = root or omni_workspace_root()
@@ -244,7 +256,7 @@ def materialize_dir(directory: str | Path, *, model: str | None = None, limit: i
         files = files[:limit]
     results = []
     for p in files:
-        res = materialize(p, model=model, root=base, push_inbox=push_inbox)
+        res = materialize(p, model=model, root=base, submit_review=submit_review)
         results.append(res)
         if echo:
             echo(f"  {'OK' if res.get('ok') else 'ERR'} {p.name}: "

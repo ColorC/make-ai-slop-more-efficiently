@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "enforce": false,
+  "policy": {
+    "target_identity_count": 5,
+    "new_device_approval": "local-workstation-or-approved-lofa-admin",
+    "hostname_requirement": "mandatory_for_new_devices",
+    "network_requirement": "exact_observed_ip_or_explicitly_approved_alias",
+    "credential_requirement": "http_only_device_credential_after_enrollment"
+  },
+  "devices": [
+    {
+      "id": "local-workstation",
+      "label": "本机 L-20260227CXLFJ",
+      "kind": "computer",
+      "status": "approved",
+      "roles": [
+        "owner",
+        "approver",
+        "operator"
+      ],
+      "hostnames": [
+        "L-20260227CXLFJ"
+      ],
+      "ips": [
+        "127.0.0.0/8",
+        "::1",
+        "10.3.43.246"
+      ],
+      "lofa_device_ids": [
+        "lofa-75mshzht8s3q"
+      ],
+      "fingerprint_rule": {
+        "platforms": [
+          "Windows"
+        ]
+      },
+      "bootstrap": {
+        "allow_without_credential": true,
+        "expires_at": 1785686399
+      },
+      "notes": "唯一不可撤销的本机恢复身份；回环入口始终保留。"
+    },
+    {
+      "id": "operator-pc-current",
+      "label": "当前操控 Windows 设备",
+      "kind": "computer",
+      "status": "approved",
+      "roles": [
+        "operator"
+      ],
+      "hostnames": [],
+      "ips": [
+        "10.3.7.25"
+      ],
+      "network_policy": "feilian_private",
+      "credential_networks": [
+        "10.0.0.0/8"
+      ],
+      "fingerprint_rule": {
+        "ua_contains_all": [
+          "Windows",
+          "Edg/"
+        ],
+        "platforms": [
+          "Windows"
+        ]
+      },
+      "trusted_clients": [
+        {
+          "name": "remote-node-report",
+          "methods": [
+            "POST"
+          ],
+          "paths": [
+            "/api/remote-nodes/report"
+          ],
+          "networks": [
+            "10.0.0.0/8"
+          ],
+          "fingerprint_rule": {
+            "ua_contains_all": [
+              "WindowsPowerShell/"
+            ]
+          }
+        }
+      ],
+      "bootstrap": {
+        "allow_without_credential": true,
+        "expires_at": 1785686399
+      },
+      "notes": "2026-07-26 活跃控制链；PTR/NetBIOS 均未返回主机名。首次登记后关闭迁移通道。"
+    },
+    {
+      "id": "operator-pc-secondary",
+      "label": "第二台 Windows 设备",
+      "kind": "computer",
+      "status": "approved",
+      "roles": [
+        "operator"
+      ],
+      "hostnames": [],
+      "ips": [
+        "10.3.43.247"
+      ],
+      "network_policy": "feilian_private",
+      "credential_networks": [
+        "10.0.0.0/8"
+      ],
+      "fingerprint_rule": {
+        "ua_contains_all": [
+          "Windows",
+          "Edg/"
+        ],
+        "platforms": [
+          "Windows"
+        ]
+      },
+      "bootstrap": {
+        "allow_without_credential": true,
+        "expires_at": 1785686399
+      },
+      "notes": "同网段邻居 MAC 34-5A-60-47-C7-76；浏览器历史指纹为 1920x1080、28 线程。"
+    },
+    {
+      "id": "lofa-tablet",
+      "label": "LOFA 平板 HONOR YLP-W00",
+      "kind": "tablet",
+      "status": "approved",
+      "roles": [
+        "operator",
+        "approver"
+      ],
+      "hostnames": [
+        "HONORYLP-W00"
+      ],
+      "ips": [
+        "10.3.7.21",
+        "10.1.3.23"
+      ],
+      "fingerprint_rule": {
+        "ua_contains_all": [
+          "Android",
+          "YLP-W00"
+        ],
+        "platforms": [
+          "Android"
+        ],
+        "models": [
+          "YLP-W00"
+        ]
+      },
+      "bootstrap": {
+        "allow_without_credential": true,
+        "expires_at": 1785686399
+      },
+      "notes": "两个 IP 是同一平板在不同已观测网络路径下的地址；具备设备批准权限。"
+    },
+    {
+      "id": "lofa-phone",
+      "label": "LOFA 手机 lofa-nue7lfm4q8rh",
+      "kind": "phone",
+      "status": "approved",
+      "roles": [
+        "operator",
+        "approver"
+      ],
+      "hostnames": [
+        "lofa-nue7lfm4q8rh"
+      ],
+      "ips": [],
+      "lofa_device_ids": [
+        "lofa-nue7lfm4q8rh"
+      ],
+      "fingerprint_rule": {
+        "ua_contains_all": [
+          "Android"
+        ],
+        "platforms": [
+          "Android"
+        ]
+      },
+      "bootstrap": {
+        "allow_without_credential": false,
+        "expires_at": 1785686399
+      },
+      "notes": "LOFA ?? IP ?????????? device_id?????/token ????????IP ???? last_ip/observed_ips ???????????",
+      "network_policy": "observe_only"
+    }
+  ]
+}

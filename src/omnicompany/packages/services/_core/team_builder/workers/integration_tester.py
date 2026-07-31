@@ -17,7 +17,7 @@ Worker 协议:
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from .._archive.routers_legacy import IntegrationTesterRouter as _Legacy
+from ..routers_legacy import IntegrationTesterRouter as _Legacy
 
 
 class IntegrationTesterWorker(Worker, _Legacy):

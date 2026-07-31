@@ -97,7 +97,7 @@ def _desired_mcp_entry() -> dict:
     return {
         "type": "stdio",
         "command": _python_cmd(),
-        "args": ["-m", "omnicompany.dashboard.cc_wrapper.mcp_server"],
+        "args": ["-m", "omnicompany.dashboard.ccdaemon.mcp_server"],
         "env": {},
         "_omnicompany": _HOOK_MARK,
     }
@@ -107,24 +107,16 @@ def _desired_settings_slice() -> dict:
     """The fragments we own in settings.json (HOOKS only — MCP lives in .mcp.json)."""
     return {
         "hooks": {
-            "SessionStart": [_hook_block("SessionStart", "omnicompany.dashboard.cc_wrapper.hooks.session_start")],
-            "PreCompact":   [_hook_block("PreCompact",   "omnicompany.dashboard.cc_wrapper.hooks.compact")],
-            "PostToolUse":  [
-                _hook_block("PostToolUse", "omnicompany.dashboard.cc_wrapper.hooks.todos", matcher="TodoWrite|Edit|Write|MultiEdit"),
-                _hook_block("PostToolUse", "omnicompany.dashboard.cc_wrapper.hooks.trace", matcher="*"),
-            ],
+            "SessionStart": [_hook_block("SessionStart", "omnicompany.dashboard.ccdaemon.hooks.session_start")],
+            "PreCompact":   [_hook_block("PreCompact",   "omnicompany.dashboard.ccdaemon.hooks.compact")],
             "PreToolUse":   [
-                _hook_block("PreToolUse",  "omnicompany.dashboard.cc_wrapper.hooks.trace", matcher="*"),
-                # G4 实时拦截 (2026-05-02): 写入工具前判定路径合法性. mode=warn 不阻断只 stderr; enforce 阻断
-                _hook_block("PreToolUse",  "omnicompany.dashboard.cc_wrapper.hooks.lock_pretooluse",
-                            matcher="Edit|Write|MultiEdit|NotebookEdit"),
+                _hook_block("PreToolUse",  "omnicompany.dashboard.ccdaemon.hooks.lock_pretooluse",
+                            matcher="Bash|Edit|Write|MultiEdit|NotebookEdit"),
             ],
             "UserPromptSubmit": [
-                # CC-PLAN-SESSION-CONTEXT 段二 b 方案 (2026-05-04): alive cc_session 切 plan 后, 下条
-                # 用户输入触发, 用 additionalContext 注入新 plan_meta (不破系统提示词缓存)
-                _hook_block("UserPromptSubmit", "omnicompany.dashboard.cc_wrapper.hooks.user_prompt_submit"),
+                _hook_block("UserPromptSubmit", "omnicompany.dashboard.ccdaemon.hooks.user_prompt_submit"),
             ],
-            "Stop":         [_hook_block("Stop",        "omnicompany.dashboard.cc_wrapper.hooks.trace")],
+            "Stop":         [_hook_block("Stop",        "omnicompany.dashboard.ccdaemon.hooks.trace")],
         },
     }
 
@@ -193,18 +185,26 @@ def install(scope: Scope = "project") -> InstallReport:
         else:
             existing["mcpServers"] = legacy_mcp
 
-    # hooks merge — drop our previous marked entries, add fresh ones
+    # Hooks merge — drop every previously owned block, including events removed
+    # from the current profile, then add the fresh minimal defaults.
     hooks_existing = existing.get("hooks") or {}
-    for event, our_blocks in desired["hooks"].items():
+    merged_hooks: dict[str, list] = {}
+    all_events = set(hooks_existing) | set(desired["hooks"])
+    for event in sorted(all_events):
         cur_list = hooks_existing.get(event) or []
         kept = [b for b in cur_list if not _is_omni_block(b)]
-        new_list = kept + our_blocks
-        if new_list != cur_list:
-            hooks_added.append(event)
-        else:
-            hooks_unchanged.append(event)
-        hooks_existing[event] = new_list
-    existing["hooks"] = hooks_existing
+        new_list = kept + desired["hooks"].get(event, [])
+        if new_list:
+            merged_hooks[event] = new_list
+        if event in desired["hooks"]:
+            if new_list != cur_list:
+                hooks_added.append(event)
+            else:
+                hooks_unchanged.append(event)
+    if merged_hooks:
+        existing["hooks"] = merged_hooks
+    else:
+        existing.pop("hooks", None)
 
     p.write_text(json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8")
 

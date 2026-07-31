@@ -1,0 +1,269 @@
+{
+  "ts": 1776252923.980739,
+  "pipeline": "absorption.v3",
+  "per_node": {
+    "repo_mapper": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.35,
+      "missing_info": [
+        {
+          "description": "未提供 absorption.request 的具体字段结构，无法确认是否包含完整的 repo 文件树、内容快照或访问句柄",
+          "critical": true,
+          "suggested_source": "节点上游输出定义或系统数据流文档",
+          "confidence": 0.5
+        },
+        {
+          "description": "描述要求'按行数×关键词分数排序'，但 request 中是否预置了关键词词表、权重计算规则及打分逻辑未知",
+          "critical": true,
+          "suggested_source": "节点 prompt 或内部配置参数",
+          "confidence": 0.5
+        },
+        {
+          "description": "coarse_view 与 detail_views 的切分策略、采样比例或过滤阈值未在输入格式中明确",
+          "critical": false,
+          "suggested_source": "节点内部算法说明或 prompt 指令",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "输入格式命名过于抽象，缺乏可审计的字段定义，难以直接支撑'全量扫描+排序计算'",
+        "未提供实际运行的 prompt 与输出片段，无法交叉验证计算所需数据是否齐备",
+        "若 request 仅为用户自然语言指令或轻量级元数据，则必然无法独立完成 repo 级计算"
+      ],
+      "attention_focus": "核实 absorption.request 是否已内聚 repo 结构数据与评分配置；确认 prompt 中是否包含硬编码的扫描与排序逻辑以弥补输入字段缺失。",
+      "format_in": "absorption.request",
+      "format_out": "absorption.repomap",
+      "kind": "ANCHOR"
+    },
+    "module_explorer": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.35,
+      "missing_info": [
+        {
+          "description": "未提供该节点本次运行的真实 prompt 片段，无法确认 local_grep 的搜索目标、任务上下文或筛选条件是否已完整传入",
+          "critical": true,
+          "suggested_source": "运行时 prompt / 上游 task 上下文",
+          "confidence": 0.5
+        },
+        {
+          "description": "absorption.repomap 仅含仓库结构/映射信息，缺乏驱动主动发现的具体查询语义或业务目标",
+          "critical": true,
+          "suggested_source": "系统提示词或前序节点输出的 query/goal 字段",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "仅凭 repomap 无法直接推导需读取的具体代码文件，AgentLoop 的启动高度依赖外部目标注入",
+        "未提供 prompt 导致无法评估 '选择发生在读取之后' 这一设计是否在实际执行中形成信息闭环"
+      ],
+      "attention_focus": "验证 prompt 中是否显式包含搜索意图、模块筛选标准及 ≤25 文件预算的具体分配逻辑",
+      "format_in": "absorption.repomap",
+      "format_out": "absorption.module.code",
+      "kind": "ANCHOR"
+    },
+    "learning_extractor": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.3,
+      "missing_info": [
+        {
+          "description": "G1-G7 的具体定义、分类体系或映射逻辑",
+          "critical": true,
+          "suggested_source": "系统提示词/领域知识库/前置上下文",
+          "confidence": 0.5
+        },
+        {
+          "description": "absorption.learning 的标准数据结构或 JSON Schema",
+          "critical": true,
+          "suggested_source": "接口文档/节点契约定义",
+          "confidence": 0.5
+        },
+        {
+          "description": "portability 评级的量化标准、分级阈值与判定规则",
+          "critical": true,
+          "suggested_source": "业务评估规范/System Prompt",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "未提供实际运行的 Prompt 与输出样例，无法确认关键上下文是否已通过隐式上下文传递",
+        "缺乏结构化约束易导致 LLM 自由发散，绑定关系与评级结果将缺乏可复现性",
+        "portability 评级若缺乏明确维度（如依赖类型、环境耦合度、配置分离程度等），LLM 将给出主观随意值"
+      ],
+      "attention_focus": "必须核实 System Prompt 是否已完整注入 G1-G7 定义、输出模板及 portability 判定标准；若未提供，仅凭代码输入无法保证结构化输出的准确性与一致性。",
+      "format_in": "absorption.module.code",
+      "format_out": "absorption.learning",
+      "kind": "ANCHOR"
+    },
+    "report_writer": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.3,
+      "missing_info": [
+        {
+          "description": "未提供 absorption.learning 的具体数据结构与字段定义",
+          "critical": true,
+          "suggested_source": "上游节点 Schema 或数据字典",
+          "confidence": 0.5
+        },
+        {
+          "description": "未提供 absorption.report.v3 的目标输出规范与模板要求",
+          "critical": true,
+          "suggested_source": "下游消费方规范或报告结构定义",
+          "confidence": 0.5
+        },
+        {
+          "description": "缺少本次 LLM 调用的 System/User Prompt 实际内容",
+          "critical": true,
+          "suggested_source": "节点配置文件或 Prompt 模板",
+          "confidence": 0.5
+        },
+        {
+          "description": "未明确 repo 名称、iteration 等运行时变量的注入方式",
+          "critical": false,
+          "suggested_source": "节点运行时上下文配置",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "仅凭高层级描述无法验证 input 字段是否覆盖 v3 报告所需的全部维度（如分类发现、证据链、置信度等）。",
+        "缺乏 Prompt 文本导致无法判断 LLM 是否被正确引导以填充 structured 摘要字段。",
+        "文件写盘路径中的动态占位符 <repo> 和 iteration 若未在 input 或 context 中显式提供，可能导致运行时错误。"
+      ],
+      "attention_focus": "核实 learning findings 原始数据是否包含生成综合报告及结构化摘要所需的全部上下文，以及路径/版本参数的传递机制。",
+      "format_in": "absorption.learning",
+      "format_out": "absorption.report.v3",
+      "kind": "ANCHOR"
+    },
+    "human_feedback_gate": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.4,
+      "missing_info": [
+        {
+          "description": "未提供 format_in (absorption.report.v3) 的实际数据 schema，无法确认输入 payload 是否包含路径构建所需的 <repo> 和 <iteration> 字段",
+          "critical": true,
+          "suggested_source": "检查上游节点输出定义或数据字典文档",
+          "confidence": 0.5
+        },
+        {
+          "description": "缺少本次节点运行的实际 prompt 片段与完整输入上下文",
+          "critical": false,
+          "suggested_source": "提供本次节点调用的完整输入日志",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "节点逻辑强依赖外部文件状态与路径变量绑定，但输入格式未明示参数来源",
+        "“解析方向”缺乏具体的解析目标字段或格式规范说明",
+        "重命名规则 feedback_<iteration>.md.done 严格依赖 iteration 变量，若缺失或类型不符将导致文件操作异常"
+      ],
+      "attention_focus": "验证 absorption.report.v3 是否准确传递 repo 标识与 iteration 编号，并确认“解析方向”的具体字段映射规则及文件系统操作的实际执行上下文。",
+      "format_in": "absorption.report.v3",
+      "format_out": "absorption.feedback",
+      "kind": "ANCHOR"
+    },
+    "feedback_router": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.5,
+      "missing_info": [
+        {
+          "description": "未提供本次运行的真实 Prompt/输入 Payload，无法验证 absorption.feedback 是否实际包含规则判断依赖的 directions 字段及其结构",
+          "critical": true,
+          "suggested_source": "查看节点实际执行的输入数据快照或 format_in 的 Schema 定义",
+          "confidence": 0.5
+        },
+        {
+          "description": "JUMP 携带的 supplement_guidance / previous_findings / context 字段来源未明确，无法确认是直接提取自 input 还是依赖外部全局 State",
+          "critical": false,
+          "suggested_source": "检查节点上下文依赖配置或 Agent State 管理规范",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "仅凭描述无法确认字段到输出的映射逻辑是否真实可行",
+        "directions=[] 时描述为 PASS → EMIT（最终报告锁定），此节点在该分支下不应输出 supplement_request，需确认下游是否兼容条件性输出或跳过机制"
+      ],
+      "attention_focus": "验证输入数据中 directions 数组的完备性，以及空/非空状态下的路由分支是否能正确组装出符合 absorption.supplement_request 规范的载荷",
+      "format_in": "absorption.feedback",
+      "format_out": "absorption.supplement_request",
+      "kind": "ANCHOR"
+    },
+    "supplement_explorer": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.3,
+      "missing_info": [
+        {
+          "description": "未提供 absorption.supplement_request 的具体字段结构，无法确认是否包含描述中明确依赖的 supplement_guidance、已有发现列表、上一轮已读文件等关键上下文",
+          "critical": true,
+          "suggested_source": "查看该数据类型的 Schema 定义或上游节点输出契约",
+          "confidence": 0.5
+        },
+        {
+          "description": "缺失节点实际运行的 Prompt 模板，无法评估 LLM 是否获得足够的上下文过滤指令以实现‘专注新方向’与‘主路径隔离’",
+          "critical": false,
+          "suggested_source": "获取该节点运行时注入的 System Prompt 或上下文组装逻辑",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "仅凭类型名称无法验证数据流是否满足业务描述",
+        "‘不污染初次探索’的隔离逻辑高度依赖具体的上下文传递与状态管理方式，当前信息不足以支撑可靠性判断"
+      ],
+      "attention_focus": "核实 supplement_request 是否严格携带描述中提及的引导要素(指导语/历史发现/已读文件)及路由隔离标识",
+      "format_in": "absorption.supplement_request",
+      "format_out": "absorption.module.code",
+      "kind": "ANCHOR"
+    },
+    "supplement_extractor": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.5,
+      "missing_info": [],
+      "concerns": [
+        "未提供实际运行的 prompt 片段，无法验证提取逻辑的具体约束、上下文注入方式及异常处理策略",
+        "缺少 format_out 的详细 schema 定义，难以独立评估输出数据的可用性与一致性"
+      ],
+      "attention_focus": "确认 LearningExtractorRouter 内部提示词对补充探索模块代码的解析边界、冗余过滤规则，以及与 format_out 的结构对齐情况",
+      "format_in": "absorption.module.code",
+      "format_out": "absorption.learning",
+      "kind": "ANCHOR"
+    },
+    "report_updater": {
+      "sufficiency": "unknown",
+      "confidence_self": 0.3,
+      "missing_info": [
+        {
+          "description": "format_in 与 format_out 的具体字段定义或数据 Schema",
+          "critical": true,
+          "suggested_source": "数据字典、接口文档或上下游节点实际输出样本",
+          "confidence": 0.5
+        },
+        {
+          "description": "‘已有报告’的基线数据或访问路径（描述要求增量融合并覆盖 report.md，但 format_in 仅标注 absorption.learning，未明确基线报告如何传入）",
+          "critical": true,
+          "suggested_source": "文件存储系统、report_writer_v3 输出缓存或节点上下文注入配置",
+          "confidence": 0.5
+        },
+        {
+          "description": "增量融合的具体策略、字段映射逻辑与冲突消解规则",
+          "critical": false,
+          "suggested_source": "节点 Prompt 模板配置或业务规则文档",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "仅凭 absorption.learning 无法完成‘融入已有报告’的动作，存在逻辑断链风险",
+        "未提供实际 prompt 与运行输出，无法确认 LLM 是否被正确约束了‘只做增量不重写’的边界条件",
+        "若缺失基线上下文，LLM 可能错误地将 learning 当作全新草稿处理，导致 downstream human_feedback_gate 接收到结构不一致的报告"
+      ],
+      "attention_focus": "核实 format_in 是否实际隐式携带或可通过环境访问到待融合的 report.md 基线，以及 learning 数据与 report.v3 结构的映射关系",
+      "format_in": "absorption.learning",
+      "format_out": "absorption.report.v3",
+      "kind": "ANCHOR"
+    }
+  },
+  "summary": {
+    "total": 9,
+    "sufficient": 0,
+    "partial": 0,
+    "insufficient": 0,
+    "unknown": 9
+  }
+}

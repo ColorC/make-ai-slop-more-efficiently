@@ -15,6 +15,7 @@ import asyncio
 import importlib
 import logging
 import os
+import pathlib
 import subprocess
 import sys
 import time
@@ -41,6 +42,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -53,18 +55,16 @@ _STATIC_DIR = _DASHBOARD_ROOT / "static"
 # 这是"生产缺口"的补丁: vite dev 有代理, 但用户实际看的是后端 serve 的构建版, 故后端也要代理。
 _WALKER_GAME_UPSTREAM = os.environ.get("OMNI_WALKER_GAME_URL", "http://127.0.0.1:5176").rstrip("/")
 _VILO_DEMO_UPSTREAM = os.environ.get("OMNI_VILO_DEMO_URL", "http://127.0.0.1:8892").rstrip("/")
+_VILO_OS_UPSTREAM = os.environ.get("OMNI_VILO_OS_URL", "http://127.0.0.1:5186").rstrip("/")
 # 叙事工作室 narrative_studio(:8330)同源反向代理目标 —— 让审阅 iframe 与 dashboard 同源,
 # 圈选/快照能读到内容;strip 前缀 + 转发全方法(落地层编辑写回 wiki 走 POST/PUT/DELETE)。
 _NARRATIVE_STUDIO_UPSTREAM = os.environ.get("OMNI_NARRATIVE_STUDIO_URL", "http://127.0.0.1:8330").rstrip("/")
-# voxelcraft 资产库只读浏览 API(:8331)同源反向代理目标 —— 项目级资产审阅视图后端半边,
-# 仅 api/*(page_retired), 让审阅前端与 dashboard 同源读到库数据/预览。
-_voxelcraft_ASSETS_UPSTREAM = os.environ.get("OMNI_voxelcraft_ASSETS_URL", "http://127.0.0.1:8331").rstrip("/")
 # 共享、带连接池/keep-alive 的 httpx 客户端 —— vite dev 把页面拆成几百个小模块逐个请求,
 # 若每个请求新建 client(无 keep-alive)会慢到十几秒; 共享池后回到 ~1-2s。懒建, shutdown 关。
 _walker_client: "httpx.AsyncClient | None" = None
 _vilo_demo_client: "httpx.AsyncClient | None" = None
+_vilo_os_client: "httpx.AsyncClient | None" = None
 _narrative_client: "httpx.AsyncClient | None" = None
-_voxelcraft_assets_client: "httpx.AsyncClient | None" = None
 
 
 def _get_walker_client() -> "httpx.AsyncClient":
@@ -89,6 +89,17 @@ def _get_vilo_demo_client() -> "httpx.AsyncClient":
     return _vilo_demo_client
 
 
+def _get_vilo_os_client() -> "httpx.AsyncClient":
+    global _vilo_os_client
+    if _vilo_os_client is None:
+        _vilo_os_client = httpx.AsyncClient(
+            base_url=_VILO_OS_UPSTREAM,
+            timeout=30.0,
+            limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
+        )
+    return _vilo_os_client
+
+
 def _get_narrative_client() -> "httpx.AsyncClient":
     global _narrative_client
     if _narrative_client is None:
@@ -98,17 +109,6 @@ def _get_narrative_client() -> "httpx.AsyncClient":
             limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
         )
     return _narrative_client
-
-
-def _get_voxelcraft_assets_client() -> "httpx.AsyncClient":
-    global _voxelcraft_assets_client
-    if _voxelcraft_assets_client is None:
-        _voxelcraft_assets_client = httpx.AsyncClient(
-            base_url=_voxelcraft_ASSETS_UPSTREAM,
-            timeout=30.0,
-            limits=httpx.Limits(max_keepalive_connections=24, max_connections=64),
-        )
-    return _voxelcraft_assets_client
 
 
 # ── 网页审阅托管中心: 懒启动注册表 ─────────────────────────────────────────────
@@ -132,19 +132,6 @@ _HOSTED_APPS: "dict[str, dict]" = {
         "cwd": str(_REPO_ROOT),
         "env": {"PYTHONPATH": "src"},  # PYTHONPATH 的相对值按仓根解析(见下)
     },
-    "voxelcraft-assets": {
-        # 项目级资产审阅视图后端(仅 API): 库只读浏览 API, 页面壳由前端半边另做, 本条目
-        # 只作数据通路(api/* 反代)的启动配置存在, 不作托管中心页面条目(page_retired)。
-        "name": "voxelcraft 资产库浏览 API(仅 API)",
-        "page_retired": True,
-        "upstream": _voxelcraft_ASSETS_UPSTREAM,
-        "ready_path": "/api/health",
-        "start": [sys.executable, "-m",
-                  "omnicompany.packages.domains.voxelcraft.content.assets.api",
-                  "serve", "--port", "8331"],
-        "cwd": str(_REPO_ROOT),
-        "env": {"PYTHONPATH": "src"},  # PYTHONPATH 的相对值按仓根解析(见 _ensure_hosted_app)
-    },
     "walker-game": {
         "name": "行者无乡 walker-game",
         "upstream": _WALKER_GAME_UPSTREAM,        # :5176
@@ -160,6 +147,15 @@ _HOSTED_APPS: "dict[str, dict]" = {
         "ready_path": "/",                          # http.server 根目录列表=200
         "start": [sys.executable, "-m", "http.server", "8892"],
         "cwd": str(_WS_ROOT / "webworks"),         # 从 webworks 根起服务
+    },
+    "vilo-os": {
+        "name": "Vilo OS on Web",
+        "upstream": _VILO_OS_UPSTREAM,
+        "ready_path": "/vilo-os/",
+        "start": "npm run dev:dashboard",
+        "shell": True,
+        "cwd": str(_WS_ROOT / "webworks" / "apps" / "vilo-os"),
+        "wait_secs": 60.0,
     },
 }
 
@@ -294,14 +290,53 @@ _cors_origins = (
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+class ImmutableStaticFiles(StaticFiles):
+    """/assets 下的文件是 vite 产物, 文件名带内容哈希(改内容必改名), 可放心打永久缓存,
+    远程(WLAN)访问不必每次都重新拉 2.5MB 主 JS 包。"""
+
+    def file_response(self, *args, **kwargs) -> Response:
+        # 注意: 基类 file_response 是同步方法(被 async get_response 里同步调用、不 await),
+        # 这里若误写成 async def, self.file_response(...) 会返回一个没被 await 的 coroutine
+        # 而不是 Response, 静态文件请求会全部炸掉 —— 必须保持同步签名。
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
+class PathScopedGZip:
+    """纯 ASGI 中间件 —— 只对静态资源 + SPA 入口页做 gzip, 其余一律直通。
+
+    这里不能用全局 GZipMiddleware: dashboard 里挂了 SSE(/api/... 流式)和反向代理路由,
+    全局 gzip 会缓冲/破坏这些流式响应。白名单只列可安全压缩的路径(而非拉黑名单排除流式路径),
+    避免以后新增 SSE/代理路由时被漏判进压缩。
+    """
+
+    def __init__(self, app) -> None:
+        self.app = app
+        self.gzip = GZipMiddleware(app, minimum_size=1024, compresslevel=6)
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http" and (
+            scope["path"].startswith("/assets/")
+            or scope["path"] in ("/", "/chat-standalone", "/review-stage")
+        ):
+            await self.gzip(scope, receive, send)
+        else:
+            await self.app(scope, receive, send)
+
+
+app.add_middleware(PathScopedGZip)
+
 # Production build assets (output of `npm run build` in frontend/)
 _assets_dir = _STATIC_DIR / "assets"
 if _assets_dir.is_dir():
-    app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
+    app.mount("/assets", ImmutableStaticFiles(directory=str(_assets_dir)), name="assets")
 
 # 静态 icon (LLM provider logo SVG 等), 跟 claudecodeui 上游路径对齐 (/icons/*.svg)
 _icons_dir = _STATIC_DIR / "icons"
@@ -353,14 +388,16 @@ _CONTROLPLANE_ROUTERS: list[tuple[str, str, str | None]] = [
     ("omnicompany.dashboard.controlplane.health",      "health_router",      "/api"),
     ("omnicompany.dashboard.controlplane.evolution",   "evolution_router",   "/api"),
     ("omnicompany.dashboard.controlplane.semantic",    "semantic_router",    "/api"),
-    # voxelcraft NPC dialog (跨 packages/domains/, 但挂 dashboard 进程上; 1-3 组D 迁 runtime/dialog)
-    ("omnicompany.packages.domains.voxelcraft.runtime.dialog.route", "voxelcraft_dialog_router", "/api"),
     # LOFA 安卓远程端日志回传 ([2026-06-25] 见 controlplane/android.py)
     ("omnicompany.dashboard.controlplane.android",     "android_router",     None),
     # LOFA 实机操作台反代: devview/ws-scrcpy 收进 8210, 对外只一个口 ([2026-06-28] 见 lofa_proxy.py)
     ("omnicompany.dashboard.controlplane.lofa_proxy",  "lofa_proxy_router",  None),
+    # 远程节点一键引导: bootstrap.bat 下载口 + 落地页 + 装完回报 register + 节点列表 ([2026-07-25] 见 controlplane/remote_nodes.py)
+    ("omnicompany.dashboard.controlplane.remote_nodes", "remote_nodes_router", None),
     # overlay-shell 笔记 HTTP 桥: 网页/手机端共用桌面 overlay-shell 的 BlockSuite 笔记.
     ("omnicompany.dashboard.controlplane.overlay_notes",  "overlay_notes_router",  None),
+    # 受控文件桥: 远端上传到固定暂存区 + 许可根目录的只读反向浏览.
+    ("omnicompany.dashboard.controlplane.file_bridge",  "file_bridge_router",  None),
 ]
 
 for _mod_path, _attr, _prefix in _CONTROLPLANE_ROUTERS:
@@ -374,7 +411,6 @@ for _mod_path, _attr, _prefix in _CONTROLPLANE_ROUTERS:
     except Exception as _e:
         logger.warning("controlplane router not loaded: %s.%s (%s: %s)",
                        _mod_path, _attr, type(_e).__name__, _e)
-
 
 @app.on_event("startup")
 async def _startup() -> None:
@@ -400,19 +436,53 @@ async def _startup() -> None:
     except Exception as e:  # noqa: BLE001
         logger.warning("hosted app prewarm failed: %s", e)
 
+    # 审阅材料封面在提交时落持久队列；8210 Dashboard 只负责后台消费。
+    # worker 的初始化/渲染失败均不得影响 Dashboard 启动与现有控制链路。
+    try:
+        from omnicompany.dashboard.boss_sight.reviewstage.preview_queue import (
+            run_preview_worker,
+        )
+        from omnicompany.dashboard.boss_sight.reviewstage.routes import (
+            get_store as get_reviewstage_store,
+        )
+
+        preview_stop = asyncio.Event()
+        app.state.review_preview_stop = preview_stop
+        app.state.review_preview_task = asyncio.create_task(
+            run_preview_worker(get_reviewstage_store().root, stop_event=preview_stop),
+            name="reviewstage-preview-worker",
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("review preview worker init failed: %s", e)
+
 
 @app.on_event("shutdown")
 async def _shutdown() -> None:
+    preview_stop = getattr(app.state, "review_preview_stop", None)
+    preview_task = getattr(app.state, "review_preview_task", None)
+    if preview_stop is not None:
+        preview_stop.set()
+    if preview_task is not None:
+        preview_task.cancel()
+        try:
+            await preview_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:  # noqa: BLE001
+            logger.warning("review preview worker shutdown failed: %s", e)
     bus = getattr(app.state, "ide_bus", None)
     if bus:
         await bus.close()
-    global _walker_client, _vilo_demo_client
+    global _walker_client, _vilo_demo_client, _vilo_os_client
     if _walker_client is not None:
         await _walker_client.aclose()
         _walker_client = None
     if _vilo_demo_client is not None:
         await _vilo_demo_client.aclose()
         _vilo_demo_client = None
+    if _vilo_os_client is not None:
+        await _vilo_os_client.aclose()
+        _vilo_os_client = None
 
 
 # 产物缺失时返回的"构建中"自愈页(而非裸 503 JSON)。
@@ -621,56 +691,6 @@ async def narrative_studio_proxy(request: Request, path: str = "") -> Response:
     )
 
 
-@app.api_route("/voxelcraft-assets", methods=["GET"])
-@app.api_route("/voxelcraft-assets/{path:path}", methods=["GET"])
-async def voxelcraft_assets_proxy(request: Request, path: str = "") -> Response:
-    """voxelcraft 资产库只读 API 反代(默认 :8331), 仅 api/*(page_retired)。
-
-    项目级资产审阅视图的数据通路(库检索/条目/预览), strip 前缀:
-    /voxelcraft-assets/api/x -> /api/x。只读接口, 只转发 GET。上游未起时自动拉起并重试一次。
-    """
-    if not (path == "api" or path.startswith("api/")):
-        return Response(
-            content="voxelcraft-assets 仅提供只读 API(/voxelcraft-assets/api/*), 无页面壳。",
-            status_code=410, media_type="text/plain; charset=utf-8",
-        )
-    upstream = f"/{path}" if path else "/"
-    if request.url.query:
-        upstream = f"{upstream}?{request.url.query}"
-    fwd = {k: v for k, v in request.headers.items()
-           if k.lower() not in {"host", "accept-encoding", "content-length"}}
-    fwd["accept-encoding"] = "identity"
-    try:
-        resp = await _get_voxelcraft_assets_client().get(upstream, headers=fwd)
-    except httpx.RequestError:
-        # 上游没在跑: 托管中心按标准命令无窗口拉起, 就绪后重试一次。
-        if await _ensure_hosted_app("voxelcraft-assets"):
-            try:
-                resp = await _get_voxelcraft_assets_client().get(upstream, headers=fwd)
-            except httpx.RequestError as exc2:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"voxelcraft-assets 已尝试启动但仍不可达: {exc2}",
-                )
-        else:
-            raise HTTPException(
-                status_code=502,
-                detail=(
-                    "voxelcraft-assets 启动失败或超时。手动: "
-                    "PYTHONPATH=src python -m "
-                    "omnicompany.packages.domains.voxelcraft.content.assets.api serve --port 8331"
-                ),
-            )
-    drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-    headers = {k: v for k, v in resp.headers.items() if k.lower() not in drop}
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        headers=headers,
-        media_type=resp.headers.get("content-type"),
-    )
-
-
 @app.get("/api/host/apps")
 async def host_apps() -> "dict":
     """托管中心: 列已注册 app 及其运行状态(供审阅前端展示卡片/在线点)。"""
@@ -694,6 +714,39 @@ async def host_start(app_id: str) -> "dict":
         raise HTTPException(status_code=404, detail=f"未注册的托管 app: {app_id}")
     running = await _ensure_hosted_app(app_id)
     return {"app_id": app_id, "running": running}
+
+
+@app.api_route("/vilo-os", methods=["GET"])
+@app.api_route("/vilo-os/{path:path}", methods=["GET"])
+async def vilo_os_proxy(request: Request, path: str = "") -> Response:
+    """通过 dashboard 的 HTTPS 入口提供 Vilo OS，避免单独开放开发端口。"""
+    upstream = f"/vilo-os/{path}"
+    if request.url.query:
+        upstream = f"{upstream}?{request.url.query}"
+    try:
+        resp = await _get_vilo_os_client().get(upstream, headers={"accept-encoding": "identity"})
+    except httpx.RequestError:
+        if _wants_html(request):
+            asyncio.get_running_loop().create_task(_ensure_hosted_app("vilo-os"))
+            return _lazy_boot_page("Vilo OS on Web")
+        if await _ensure_hosted_app("vilo-os"):
+            try:
+                resp = await _get_vilo_os_client().get(upstream, headers={"accept-encoding": "identity"})
+            except httpx.RequestError as exc2:
+                raise HTTPException(status_code=502, detail=f"Vilo OS 已尝试启动但仍不可达: {exc2}")
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail="Vilo OS 启动失败或超时。手动: 在 webworks/apps/vilo-os 跑 `npm run dev:dashboard`",
+            )
+    drop = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in drop}
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        headers=headers,
+        media_type=resp.headers.get("content-type"),
+    )
 
 
 @app.api_route("/vilo-demo", methods=["GET"])

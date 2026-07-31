@@ -1,5 +1,7 @@
 # [OMNI] origin=ai-ide ts=2026-05-24 type=infra
 # [OMNI] material_id="material:dashboard.boss_sight.controller.tools.py"
+# noqa-OMNI-094: registered controller routers are the audited orchestration
+# boundary; SpawnSubagentRouter forwards an authorized spawn to ccdaemon.
 """总控的 4 个自定义工具 (SingleToolRouter 子类).
 
 落实块 1 · 总控本体 + 总控和人对接.
@@ -21,7 +23,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, ClassVar
 
-from omnicompany.packages.services._core.agent.routers.single_tool import SingleToolRouter
+from omnicompany.packages.services._core.agent.routers.single_tool import (
+    SingleToolRouter,
+    ToolExecutionError,
+)
 from omnicompany.packages.services._core.agent.spawn_surface import (
     ENTRY_CONTROLLER_SPAWN,
     agent_spawn_metadata,
@@ -39,6 +44,29 @@ def _workspace_root() -> Path:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _local_review_material_url(material_id: str) -> str:
+    from omnicompany.dashboard.boss_sight.reviewstage.links import (
+        review_material_open_url,
+    )
+
+    base = os.environ.get("OMNI_DASHBOARD_URL", "http://127.0.0.1:8210").rstrip("/")
+    return review_material_open_url(base, material_id)
+
+
+def _review_material_url(material_id: str) -> str:
+    """Return the canonical user URL, preferring the registered LAN gateway."""
+
+    try:
+        from omnicompany.dashboard.boss_sight.reviewstage.remote_preflight import (
+            review_remote_material_open_url,
+        )
+
+        remote = review_remote_material_open_url(material_id, _workspace_root())
+    except (OSError, ValueError):
+        remote = None
+    return remote or _local_review_material_url(material_id)
 
 
 def _safe_filename(s: str, max_len: int = 60) -> str:
@@ -297,6 +325,9 @@ def _build_spawn_prompt(
         audit.append(f"tmpl:{tmpl}" + (" [truncated]" if truncated else ""))
 
     # 4.5) 运行环境提示 (2026-05-30: subagent 在 Windows 下 git-bash 跑 PowerShell 命令全挂)
+    # 路径示例用运行时工作区根 (omni_workspace_root()) 动态渲染, 不写死盘符。
+    ws_posix = ws.as_posix()
+    ws_bs_esc = str(ws).replace("\\", "\\\\")
     sections.append(
         "## 运行环境 · 必读 (避免 tool_use_error)\n\n"
         "本会话跑在 **Windows 10**, Bash 工具背后是 git-bash (`/usr/bin/bash`), 不是 PowerShell。\n\n"
@@ -304,7 +335,7 @@ def _build_spawn_prompt(
         "- 列目录: `ls e:/path` (不是 `Get-ChildItem`)\n"
         "- 找文件: `find e:/path -name \"*.md\"` (不是 `Get-ChildItem -Recurse`)\n"
         "- 看文件: `cat e:/path/file.md` (不是 `Get-Content`)\n"
-        "- 路径: 正斜杠 `e:/WindowsWorkspace/...` 或反斜杠双写 `e:\\\\WindowsWorkspace\\\\...`\n\n"
+        f"- 路径: 正斜杠 `{ws_posix}/...` 或反斜杠双写 `{ws_bs_esc}\\\\...`\n\n"
         "**不要直接调 PowerShell cmdlet** (`Get-ChildItem` / `Select-Object` / `Format-Table` / `Sort-Object`) — "
         "git-bash 不认, 会报 'command not found' 然后 sdk 把同批并行 Bash 全 cancel.\n\n"
         "**如果一定要跑 PowerShell**: 用 `powershell.exe -NoProfile -Command \"...\"`。"
@@ -316,15 +347,16 @@ def _build_spawn_prompt(
     #    的问题. 1A 调研结论是 prompt 引导虽有但被埋在末尾, 改文案 + 调位置 + 强示例.
     sections.append(
         "## 交付定义 (deliverable) · 必读, 任务成败由这一条判定\n\n"
-        "**你的 deliverable 不是 markdown 文件, 是审阅台里的一条 material 记录 (mat_xxx ID).**\n\n"
-        "- 拿到 `material submitted: id=mat_xxx` 这种输出 = 任务完成\n"
+        "**你的 deliverable 不是 markdown 文件, 是审阅台里一条有完整名称和可打开链接的材料记录。**\n\n"
+        "- 拿到包含 `name=<完整材料名称>` 和 `url=<可打开链接>` 的 `material submitted` 输出 = 任务完成\n"
         "- 只 Write 了 md 文件然后停止 = **任务未完成 = 任务失败**, 不管文件写得多好\n"
-        "- 没拿到 mat_xxx ID 就 stop, 等同于没干\n\n"
+        "- 没看到 `material submitted` 就 stop, 等同于没干\n\n"
         "### 正确流程 (按顺序, 一步都不能跳)\n\n"
-        "1. 用 Write 把审阅内容落到一个 md 文件 (路径建议 `e:/WindowsWorkspace/omnicompany/data/tmp/<任意名>.md`)\n"
+        f"1. 用 Write 把审阅内容落到一个 md 文件 (路径建议 `{ws_posix}/data/tmp/<任意名>.md`)\n"
         "2. **立刻**调 Bash 跑 `omni review submit ... --file <你刚写的 md 路径>` (见下面模板)\n"
-        "3. 看到 stdout 里 `material submitted: id=mat_xxx` 字样 — 这一步是任务真正结束的标志\n"
-        "4. 这时才能 stop\n\n"
+        "3. 看到 stdout 里完整材料名称与可打开链接都齐全 — 这一步是任务真正结束的标志\n"
+        "4. **向用户汇报时把材料全名和链接报出来**(用户按名字找材料, 不识别任何内部编号)\n"
+        "5. 这时才能 stop\n\n"
         "### 提交命令模板\n\n"
         "```bash\n"
         "omni review submit \\\n"
@@ -355,7 +387,7 @@ def _build_spawn_prompt(
     # 7) 最后再贴一条短提醒 — double tap, 防止长 plan + 长 task 之后又把收尾约定挤出注意力.
     sections.append(
         "## 最后再提醒一遍 (防止你写完 md 就 stop)\n\n"
-        "stop 之前必须看到 `material submitted: id=mat_xxx`. 没看到就还没完成, 继续干, 不要 stop."
+        "stop 之前必须看到包含完整材料名称与可打开链接的 `material submitted` 输出。向用户汇报时只报材料全名和链接, 禁止报内部编号(用户按名字找材料)；没看到 submitted 输出就还没完成，继续干，不要 stop。"
     )
     audit.append("final_reminder_submit")
 
@@ -391,7 +423,7 @@ class SpawnSubagentRouter(SingleToolRouter):
             "plan_id": {
                 "type": "string",
                 "minLength": 1,
-                "description": "omnicompany plan id, e.g. 'voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE'. For team_worker this is the team id (e.g. 'team_supervisor').",
+                "description": "omnicompany plan id, e.g. 'research/[2026-05-17]MC-COMPANY-PIPELINE'. For team_worker this is the team id (e.g. 'team_supervisor').",
             },
             "initial_prompt": {
                 "type": "string",
@@ -966,7 +998,7 @@ class AuditPlansForTodoRouter(SingleToolRouter):
         "properties": {
             "category_filter": {
                 "type": "string",
-                "description": "Optional: only audit this category (e.g. 'dashboard', 'voxelcraft'). Empty = all.",
+                "description": "Optional: only audit this category (e.g. 'dashboard', 'cli'). Empty = all.",
             },
             "max_results": {
                 "type": "integer",
@@ -1056,7 +1088,7 @@ class RecordPlanCompletionRouter(SingleToolRouter):
             "plan_id": {
                 "type": "string",
                 "minLength": 3,
-                "description": "Plan id, e.g. 'voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE'",
+                "description": "Plan id, e.g. 'research/[2026-05-17]MC-COMPANY-PIPELINE'",
             },
             "status": {
                 "type": "string",
@@ -1145,6 +1177,7 @@ class ListPromptArchiveRouter(SingleToolRouter):
     覆盖 §2.11: 总控记录和整理成套的 prompt 和 worker 内容, 汇报和管理已有的 prompt.
 
     扫:
+    - omnicompany/.agents/skills/*/SKILL.md  (Codex/cross-agent skill)
     - omnicompany/.claude/skills/*/SKILL.md  (Claude Code skill)
     - docs/standards/cli/*.md                (CLI 规范)
     - docs/standards/protocol/*.md           (协议规范)
@@ -1154,7 +1187,7 @@ class ListPromptArchiveRouter(SingleToolRouter):
     TOOL_NAME: ClassVar[str] = "list_prompt_archive"
     DESCRIPTION: ClassVar[str] = (
         "List all prompts / skills / standards inventoried in the omnicompany repo. "
-        "Includes Claude Code skills, omnicompany CLI/protocol standards, and "
+        "Includes Codex/Claude Code skills, omnicompany CLI/protocol standards, and "
         "controller's own prompt_archive/. Use to answer '我们有哪些 prompt' "
         "(per user spec §2.11)."
     )
@@ -1204,6 +1237,10 @@ class ListPromptArchiveRouter(SingleToolRouter):
             [".claude/skills/*/SKILL.md", ".claude/skills/*/*.md"],
         )
         _gather(
+            "Codex / cross-agent skills (.agents/skills/)",
+            [".agents/skills/*/SKILL.md", ".agents/skills/*/*.md"],
+        )
+        _gather(
             "CLI standards (docs/standards/cli/)",
             ["docs/standards/cli/*.md"],
         )
@@ -1229,7 +1266,6 @@ class ListWorkerArchiveRouter(SingleToolRouter):
     扫:
     - src/omnicompany/packages/services/_core/team_supervisor/workers/*.py
     - src/omnicompany/packages/services/_core/team_builder/workers/*.py
-    - src/omnicompany/packages/services/_learning/kb/multi_agent/workers/*.py (if exists)
     - data/boss_sight/worker_archive/*
 
     注: 仅列出文件名 + 顶部 docstring 前 200 字, 不读全文 (代码层是 subagent 的活, 总控只索引).
@@ -1292,10 +1328,6 @@ class ListWorkerArchiveRouter(SingleToolRouter):
         _gather_workers(
             "team_builder workers",
             ["src/omnicompany/packages/services/_core/team_builder/workers/*.py"],
-        )
-        _gather_workers(
-            "kb multi_agent workers",
-            ["src/omnicompany/packages/services/_learning/kb/multi_agent/workers/*.py"],
         )
         _gather_workers(
             "Controller worker_archive",
@@ -1599,7 +1631,9 @@ class SubmitToReviewstageRouter(SingleToolRouter):
     """提交一份 material 到审阅台 — 块 4 R2 落实 §2.7.
 
     四种 material kind (Phase A):
-    - image: 必填 file_path (workspace 相对路径) 或 inline_content (base64)
+    - image: 仅可作为报告附件；必填 attachment_of/links.parent，以及 file_path 或 base64
+    - aigc-image: 有 candidate/run 或 candidate reference 的结构化候选可先登记为内部节点；
+      裸图仍必须挂到父报告
     - markdown: 文档内容 inline_content (markdown 文本) 或 file_path
     - html: 网页 inline_content (完整 HTML) 或 file_path
     - key_question: inline_content 是 JSON 字符串 (含 question / options / explanation 字段)
@@ -1615,6 +1649,9 @@ class SubmitToReviewstageRouter(SingleToolRouter):
     DESCRIPTION: ClassVar[str] = (
         "Submit a material to the review stage for user审阅 (per user spec §2.7). "
         "Built-in kinds: image / markdown / html / key_question / custom_web_template; "
+        "image is attachment-only; a structured aigc-image candidate with origin metadata "
+        "may be registered as an internal node before its comparison report, while naked "
+        "aigc images still require attachment_of or links.parent; "
         "extensions must be registered as Format tags review.kind.*. "
         "custom_web_template: subagent 出结构化数据 (JSON via inline_content) + "
         "extra.data_schema_id 指定渲染模板 (§4.2.5 元编程). "
@@ -1672,6 +1709,48 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                     "前端按这个 id 找对应模板组件渲染. 没注册的 schema 会 fallback 用 markdown 显示 JSON."
                 ),
             },
+            "review_context": {
+                "type": "object",
+                "additionalProperties": False,
+                "description": (
+                    "可选的一等审阅场景声明。只声明 profile/schema/typed references；"
+                    "resolution 与 reminders 由服务端按当前能力目录生成。"
+                ),
+                "properties": {
+                    "profile_id": {
+                        "type": "string",
+                        "description": (
+                            "例如 aigc-comparison、spreadsheet-review、workflow-review。"
+                        ),
+                    },
+                    "schema_id": {"type": "string"},
+                    "references": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "target": {"type": "string", "minLength": 1},
+                                "relation": {
+                                    "type": "string",
+                                    "enum": [
+                                        "source",
+                                        "evidence",
+                                        "candidate",
+                                        "comparison_member",
+                                        "embedded_review",
+                                        "external_surface",
+                                        "related",
+                                    ],
+                                },
+                                "label": {"type": "string"},
+                            },
+                            "required": ["target", "relation"],
+                        },
+                    },
+                },
+                "required": ["profile_id"],
+            },
             "extra_json": {
                 "type": "string",
                 "description": (
@@ -1699,6 +1778,19 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                 "type": "string",
                 "description": "版本族(同一份稿的多版本共 family)。省略则默认=title。",
             },
+            "subject_id": {
+                "type": "string",
+                "description": "内容主体唯一 ID，例如视频分期 EP0。声明主体层级的项目生产阶段必填。",
+            },
+            "subject_type": {
+                "type": "string",
+                "description": "内容主体类型，例如 episode。声明主体层级的项目生产阶段必填。",
+            },
+            "revision": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "跨阶段共享的整体修改版本；不同于同材料族的 version。",
+            },
             "links_json": {
                 "type": "string",
                 "description": (
@@ -1706,8 +1798,24 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                     "\"related\": [\"mat_zzz\"]}。值是 material id 或 material id 列表。"
                 ),
             },
+            "attachment_of": {
+                "type": "string",
+                "description": (
+                    "图片附件所属的报告 material id；等价于 links.parent。"
+                    "普通 image 必填；aigc-image 只有在声明 candidate/run 或 candidate "
+                    "reference、作为内部候选节点登记时可省略。"
+                ),
+            },
         },
-        "required": ["kind", "tier", "title", "source_plan_id"],
+        "required": [
+            "kind",
+            "tier",
+            "title",
+            "source_plan_id",
+            "project",
+            "track",
+            "version",
+        ],
     }
     IS_CONCURRENCY_SAFE: ClassVar[bool] = True
     IS_READONLY: ClassVar[bool] = False
@@ -1725,7 +1833,12 @@ class SubmitToReviewstageRouter(SingleToolRouter):
         track = args.get("track")
         version = args.get("version")
         version_family = args.get("version_family")
+        subject_id = args.get("subject_id")
+        subject_type = args.get("subject_type")
+        revision = args.get("revision")
+        review_context = args.get("review_context")
         links_json = args.get("links_json")
+        attachment_of = str(args.get("attachment_of") or "").strip()
         links: dict[str, Any] | None = None
         if links_json:
             try:
@@ -1734,14 +1847,39 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                 return f"ERROR: links_json must be a JSON object: {e}"
             if not isinstance(links, dict):
                 return "ERROR: links_json must be a JSON object"
+        if attachment_of:
+            links = dict(links or {})
+            declared_parent = links.get("parent")
+            if declared_parent not in (None, attachment_of):
+                return "ERROR: attachment_of conflicts with links.parent"
+            links["parent"] = attachment_of
 
         if not file_path and not inline:
             return "ERROR: must provide file_path or inline_content"
+
+        parsed_extra: dict[str, Any] = {}
+        extra_json = args.get("extra_json")
+        if extra_json:
+            try:
+                parsed_extra = json.loads(extra_json)
+            except json.JSONDecodeError as e:
+                return f"ERROR: extra_json must be a JSON object: {e}"
+            if not isinstance(parsed_extra, dict):
+                return "ERROR: extra_json must be a JSON object"
 
         try:
             store = _get_review_store()
         except Exception as e:  # noqa: BLE001
             return f"ERROR: review store init failed: {type(e).__name__}: {e}"
+        try:
+            store.validate_attachment_policy(
+                kind=kind,
+                links=links,
+                extra=parsed_extra,
+                review_context=review_context,
+            )
+        except ValueError as e:
+            return f"ERROR: {e}"
 
         ws = _workspace_root()
 
@@ -1771,19 +1909,9 @@ class SubmitToReviewstageRouter(SingleToolRouter):
         else:
             used_inline = inline
 
-        extra: dict[str, Any] = {}
+        extra: dict[str, Any] = dict(parsed_extra)
         if kind == "custom_web_template" and args.get("data_schema_id"):
             extra["data_schema_id"] = args["data_schema_id"]
-
-        extra_json = args.get("extra_json")
-        if extra_json:
-            try:
-                parsed_extra = json.loads(extra_json)
-            except json.JSONDecodeError as e:
-                return f"ERROR: extra_json must be a JSON object: {e}"
-            if not isinstance(parsed_extra, dict):
-                return "ERROR: extra_json must be a JSON object"
-            extra.update(parsed_extra)
 
         try:
             m = store.create(
@@ -1798,10 +1926,29 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                 track=track,
                 version=version,
                 version_family=version_family,
+                subject_id=subject_id,
+                subject_type=subject_type,
+                revision=revision,
                 links=links,
+                review_context=review_context,
             )
         except ValueError as e:
             return f"ERROR: {e}"
+
+        # 会话绑定台账是“本对话产出了哪些材料”的唯一真源。材料先落盘, 再做幂等反向链接;
+        # 链接失败必须显式回给 agent, 不能悄悄留下快速读回找不到的孤儿材料。
+        source_linked = False
+        source_link_warning = ""
+        try:
+            from omnicompany.dashboard.boss_sight.reviewstage.readback import (
+                link_material_to_current_conversation,
+            )
+            link_result = link_material_to_current_conversation(m.id, source_plan_id)
+            source_linked = bool(link_result.get("linked"))
+            if not source_linked:
+                source_link_warning = f" source_link_warning={link_result.get('reason', 'unknown')}."
+        except Exception as e:  # noqa: BLE001
+            source_link_warning = f" source_link_warning={type(e).__name__}: {e}."
 
         # 块 5 R1: custom_web_template — extra.data_schema_id 走 store extra
         if kind == "custom_web_template" and args.get("data_schema_id"):
@@ -1811,6 +1958,54 @@ class SubmitToReviewstageRouter(SingleToolRouter):
                 store._notify("updated", m)
             except Exception:  # noqa: BLE001
                 _log.exception("failed to set data_schema_id")
+
+        # 远程浏览预检：用端口注册表推导正式 LAN 网关，从提交主机走一次真实材料 GET。
+        # 这能抓 404/空壳/错误类型/TLS 信任问题；physical_remote_verified=false 明确表示
+        # 它不能替代手机/另一台电脑的物理网络与防火墙实测。
+        from omnicompany.dashboard.boss_sight.reviewstage.remote_preflight import (
+            preflight_material_remote_access,
+        )
+
+        try:
+            remote_preflight = preflight_material_remote_access(
+                material_id=m.id,
+                kind=kind,
+                workspace_root=ws,
+            )
+        except Exception as e:  # noqa: BLE001
+            remote_preflight = {
+                "status": "failed",
+                "remote_url": None,
+                "scope": "gateway_from_submit_host",
+                "physical_remote_verified": False,
+                "checked_at": _now_iso(),
+                "error": f"{type(e).__name__}: {e}",
+                "warning": {
+                    "code": "remote_preflight_internal_error",
+                    "severity": "warning",
+                    "message": f"远程浏览预检自身失败：{type(e).__name__}: {e}",
+                    "path": "remote_url",
+                },
+            }
+
+        # 临时测试工作区没有端口注册表时不污染材料结构警告；真实工作区一旦能推导正式
+        # remote_url，就把探测结果和失败提醒持久化，前端/后续 agent 都能看到。
+        if remote_preflight.get("remote_url"):
+            persisted_warnings = list(m.extra.get("structure_warnings") or [])
+            remote_warnings = remote_preflight.get("warnings") or [remote_preflight.get("warning")]
+            for remote_warning in remote_warnings:
+                if isinstance(remote_warning, dict):
+                    code = str(remote_warning.get("code") or "")
+                    if not any(isinstance(item, dict) and item.get("code") == code for item in persisted_warnings):
+                        persisted_warnings.append(remote_warning)
+            m = store.patch_extra(
+                m.id,
+                {
+                    "remote_preflight": remote_preflight,
+                    "structure_warnings": persisted_warnings,
+                },
+                by="review-submit-remote-preflight",
+            )
 
         structure_warnings = m.extra.get("structure_warnings") or []
         warn_msgs = (
@@ -1831,16 +2026,67 @@ class SubmitToReviewstageRouter(SingleToolRouter):
         if warn_msgs:
             hint_lines.append("待补(结构校验):")
             hint_lines.extend(f"  · {w}" for w in warn_msgs)
+        from omnicompany.dashboard.boss_sight.reviewstage.capabilities import (
+            reminders_for_output,
+        )
+        review_reminders = (
+            reminders_for_output(m.review_context)
+            if m.review_context is not None
+            else []
+        )
+        if review_reminders:
+            hint_lines.append("本次提交的审阅场景提醒:")
+            hint_lines.extend(
+                f"  · [{item['severity']}] {item['message']}"
+                for item in review_reminders
+            )
         hint_note = ("\n" + "\n".join(hint_lines)) if hint_lines else ""
 
         warn_count_note = (
             f" structure_warnings={len(structure_warnings)}."
             if isinstance(structure_warnings, list) and structure_warnings else ""
         )
+        remote_status = str(remote_preflight.get("status") or "unknown")
+        remote_url = str(remote_preflight.get("remote_url") or "").strip()
+        from omnicompany.dashboard.boss_sight.reviewstage.remote_preflight import (
+            remote_push_blockers,
+        )
+
+        push_blockers = remote_push_blockers(
+            material_id=m.id,
+            remote_preflight=remote_preflight,
+            remote_verification=(m.extra or {}).get("remote_verification"),
+        )
+        remote_note = (
+            f" remote_preflight={remote_status}"
+            f"(gateway_from_submit_host; physical_remote_verified="
+            f"{str(bool(remote_preflight.get('physical_remote_verified'))).lower()})."
+        )
+        if push_blockers:
+            remote_note += f" push_gate=advisory({','.join(push_blockers)})."
+            status_note = (
+                "Status=pending — registered in 审阅台 but NOT pushed; "
+                "remote gate is advisory-only (2026-07-25 裁定): blockers are "
+                "recorded but no longer block push."
+            )
+        else:
+            remote_note += " push_gate=ready."
+            status_note = "Status=pending — remote diagnostics clean; material is not pushed yet."
+        if remote_preflight.get("ca_url"):
+            remote_note += f" ca_url={remote_preflight['ca_url']}."
         return (
-            f"material submitted: id={m.id} kind={kind} tier={tier} plan={source_plan_id}. "
-            f"Status=pending — user will审阅 in 审阅台."
+            f"material submitted: name={m.title!r} "
+            f"url={_review_material_url(m.id)} kind={kind} tier={tier} plan={source_plan_id} "
+            f"review_profile={m.review_context.profile_id if m.review_context else 'legacy'}. "
+            + (f"remote_url={remote_url}. " if remote_url else "WARNING: 无局域网网关, url 已回退为本机地址, 远程用户打不开. ")
+            + status_note
+            + f" source_linked={str(source_linked).lower()}."
+            + " 向用户汇报时只报材料全名与 url(局域网网关链接), 绝不报 127.0.0.1/localhost 本机地址"
+            + "(用户远程办公, 2026-07-25 裁定);"
+            + " 后续操作(archive/judge/annotate/push/relay)直接拿材料全名引用即可。"
+            + source_link_warning
             + warn_count_note
+            + remote_note
             + (" mandatory! will block spawn for this plan until accepted." if tier == "mandatory" else "")
             + hint_note
         )
@@ -1908,7 +2154,9 @@ class JudgeReviewstageMaterialRouter(SingleToolRouter):
             context=args.get("context") or "",
         ).to_dict()
         payload = {
+            "material_name": m.title,
             "material_id": mid,
+            "url": _review_material_url(mid),
             "status_unchanged": m.status.value if hasattr(m.status, "value") else m.status,
             "kind": kind,
             "tier": tier,
@@ -1948,14 +2196,96 @@ class PushMaterialToUserRouter(SingleToolRouter):
     def _execute(self, args: dict, ctx: ToolContext) -> str:
         mid = args["material_id"]
         reason = args["reason"]
+        m = None
         try:
             store = _get_review_store()
+            m = store.get(mid)
+            if m is None:
+                raise KeyError(mid)
+            kind = m.kind.value if hasattr(m.kind, "value") else str(m.kind)
+            from omnicompany.dashboard.boss_sight.reviewstage.remote_preflight import (
+                preflight_material_remote_access,
+            )
+
+            try:
+                remote_preflight = preflight_material_remote_access(
+                    material_id=mid,
+                    kind=kind,
+                    workspace_root=_workspace_root(),
+                    remote_verification=(m.extra or {}).get("remote_verification"),
+                )
+            except Exception as preflight_error:  # noqa: BLE001
+                remote_preflight = {
+                    "status": "failed",
+                    "remote_url": None,
+                    "scope": "gateway_from_submit_host",
+                    "physical_remote_verified": False,
+                    "checked_at": _now_iso(),
+                    "error": f"{type(preflight_error).__name__}: {preflight_error}",
+                    "warning": {
+                        "code": "remote_preflight_internal_error",
+                        "severity": "warning",
+                        "message": (
+                            "Remote preflight failed internally: "
+                            f"{type(preflight_error).__name__}: {preflight_error}"
+                        ),
+                        "path": "remote_url",
+                    },
+                    "warnings": [],
+                }
+
+            previous_remote = (m.extra or {}).get("remote_preflight") or {}
+            previous_remote_warnings = previous_remote.get("warnings") or [
+                previous_remote.get("warning")
+            ]
+            previous_remote_codes = {
+                str(item.get("code") or "")
+                for item in previous_remote_warnings
+                if isinstance(item, dict)
+            }
+            persisted_warnings = [
+                item
+                for item in list((m.extra or {}).get("structure_warnings") or [])
+                if not (
+                    isinstance(item, dict)
+                    and str(item.get("code") or "") in previous_remote_codes
+                )
+            ]
+            remote_warnings = remote_preflight.get("warnings") or [
+                remote_preflight.get("warning")
+            ]
+            for remote_warning in remote_warnings:
+                if not isinstance(remote_warning, dict):
+                    continue
+                code = str(remote_warning.get("code") or "")
+                if not any(
+                    isinstance(item, dict) and item.get("code") == code
+                    for item in persisted_warnings
+                ):
+                    persisted_warnings.append(remote_warning)
+            m = store.patch_extra(
+                mid,
+                {
+                    "remote_preflight": remote_preflight,
+                    "structure_warnings": persisted_warnings,
+                },
+                by="review-push-remote-preflight",
+            )
             m = store.mark_pushed(mid, reason=reason)
         except KeyError:
             return f"ERROR: material {mid} not found"
+        except PermissionError as e:
+            title = m.title if m is not None else mid
+            return (
+                f"ERROR: push blocked: name={title!r} url={_review_material_url(mid)} "
+                f"{e}"
+            )
         except Exception as e:  # noqa: BLE001
             return f"ERROR: push failed: {type(e).__name__}: {e}"
-        return f"pushed: id={mid} title={m.title!r} reason={reason!r}"
+        return (
+            f"pushed: name={m.title!r} url={_review_material_url(mid)} "
+            f"id={mid} reason={reason!r}"
+        )
 
 
 class AnnotateMaterialRouter(SingleToolRouter):
@@ -2002,6 +2332,9 @@ class AnnotateMaterialRouter(SingleToolRouter):
         target = args.get("target") or {}
         try:
             store = _get_review_store()
+            material = store.get(mid)
+            if material is None:
+                return f"ERROR: material {mid} not found"
             ann = store.add_annotation(
                 mid, content=content, kind=AnnotationKind.ai,
                 author="controller", target=target,
@@ -2012,7 +2345,44 @@ class AnnotateMaterialRouter(SingleToolRouter):
             return f"ERROR: {e}"
         except Exception as e:  # noqa: BLE001
             return f"ERROR: annotate failed: {type(e).__name__}: {e}"
-        return f"annotated: ann_id={ann.id} material={mid}"
+        return (
+            f"annotated: name={material.title!r} url={_review_material_url(mid)} "
+            f"id={mid} ann_id={ann.id}"
+        )
+
+
+class ArchiveReviewstageMaterialRouter(SingleToolRouter):
+    """Soft-archive or restore one reviewstage material without deleting its files."""
+
+    TOOL_NAME: ClassVar[str] = "archive_reviewstage_material"
+    DESCRIPTION: ClassVar[str] = (
+        "Soft-archive or restore a reviewstage material. "
+        "The material metadata, content file, and audit history are preserved."
+    )
+    INPUT_SCHEMA: ClassVar[dict] = {
+        "type": "object",
+        "properties": {
+            "material_id": {"type": "string", "minLength": 3},
+            "archived": {"type": "boolean", "default": True},
+        },
+        "required": ["material_id"],
+    }
+    IS_CONCURRENCY_SAFE: ClassVar[bool] = True
+    IS_READONLY: ClassVar[bool] = False
+
+    def _execute(self, args: dict, ctx: ToolContext) -> str:
+        mid = args["material_id"]
+        archived = bool(args.get("archived", True))
+        try:
+            material = _get_review_store().set_archived(mid, archived, by="cli")
+        except KeyError as exc:
+            raise ToolExecutionError(f"material {mid} not found") from exc
+
+        action = "archived" if material.archived else "restored"
+        return (
+            f"{action}: name={material.title!r} url={_review_material_url(material.id)} "
+            f"id={material.id}"
+        )
 
 
 class ListReviewstageMaterialsRouter(SingleToolRouter):
@@ -2056,14 +2426,14 @@ class ListReviewstageMaterialsRouter(SingleToolRouter):
         items = items[:max_n]
         if not items:
             return "no materials match filter"
-        lines = [f"{len(items)} material(s):"]
+        lines = [f"{len(items)} material(s) — full names and user-openable links:"]
         for m in items:
             tier_v = m.tier.value if hasattr(m.tier, "value") else m.tier
             st_v = m.status.value if hasattr(m.status, "value") else m.status
             kind_v = m.kind.value if hasattr(m.kind, "value") else m.kind
             lines.append(
-                f"  - {m.id} [{tier_v}/{st_v}] kind={kind_v} plan={m.source_plan_id} "
-                f"title={m.title!r}"
+                f"  - name={m.title!r} url={_review_material_url(m.id)} "
+                f"[{tier_v}/{st_v}] kind={kind_v} plan={m.source_plan_id}"
             )
         return "\n".join(lines)
 
@@ -2088,5 +2458,6 @@ __all__ = [
     "JudgeReviewstageMaterialRouter",
     "PushMaterialToUserRouter",
     "AnnotateMaterialRouter",
+    "ArchiveReviewstageMaterialRouter",
     "ListReviewstageMaterialsRouter",
 ]

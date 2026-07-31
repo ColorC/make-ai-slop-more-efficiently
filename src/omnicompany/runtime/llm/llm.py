@@ -2,7 +2,7 @@
 # [OMNI] material_id="material:runtime.llm.multi_protocol_client.registry_and_dispatcher.implementation.py"
 """多协议 LLM 客户端 + 多模型注册表
 
-V4: 自动检测 Anthropic / OpenAI 协议。DashScope 用 Anthropic SDK，the_company proxy 用 OpenAI SDK。
+V4: 自动检测 Anthropic / OpenAI 协议。DashScope 用 Anthropic SDK，聚合代理用 OpenAI SDK。
 模型分配本身也是可进化参数 — 元进化可以调整哪个角色用哪个模型。
 """
 
@@ -16,6 +16,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -51,6 +52,25 @@ _LAST_INFO_AUDIT_VAR: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "llm_last_info_audit",
     default=None,
 )
+
+_AI_PLAYER_PLANNER_MEASUREMENT_HOOK_VAR: contextvars.ContextVar[Any | None] = (
+    contextvars.ContextVar("ai_player_planner_measurement_hook", default=None)
+)
+
+
+@contextlib.contextmanager
+def use_ai_player_planner_measurement_hook(hook: Any):
+    """Bind a fail-closed callback to the exact completed LLM invocation.
+
+    Unlike best-effort audit sinks, callback failures propagate and prevent the
+    planner result from being returned as a usable command.
+    """
+
+    token = _AI_PLAYER_PLANNER_MEASUREMENT_HOOK_VAR.set(hook)
+    try:
+        yield
+    finally:
+        _AI_PLAYER_PLANNER_MEASUREMENT_HOOK_VAR.reset(token)
 
 
 @contextlib.contextmanager
@@ -90,11 +110,27 @@ def get_last_info_audit() -> Any:
 _RETRY_MAX_ATTEMPTS = 5
 _RETRY_BACKOFF_FACTOR = 2.0
 
-# 流式调用的 wall-clock deadline (2026-04-09 加)
-# 背景: OpenAI SDK / httpx 的 timeout 只管 connection + initial byte, 流式长输出时
-# 若代理 keep-alive 空 chunk 不断, python 端会无限等。这里用 monotonic 时钟硬卡。
-_STREAM_WALL_CLOCK_DEADLINE = 600      # 单次流式调用最长 10 分钟
-_STREAM_IDLE_CHUNK_DEADLINE = 60       # 两次非空 chunk 之间最长 60 秒
+# 流式调用默认不设总 wall-clock 上限。长思考、长文和多工具参数
+# 只要仍有 stream event 就属于正常活动，不能因累计时长被截断。
+# 传输层 request/read timeout 仍会捕获真正的“无返回”；特定管线也可显式
+# 传入两个 deadline 做更严格的无进展保护。
+_STREAM_WALL_CLOCK_DEADLINE: float | None = None
+_STREAM_IDLE_CHUNK_DEADLINE: float | None = None
+
+
+def _report_stream_progress(callback: Any | None, event: str, **data: Any) -> None:
+    """Best-effort synchronous stream telemetry hook.
+
+    LLMClient runs synchronously, usually inside a worker thread.  A small
+    synchronous callback lets the Agent layer bridge progress into its async
+    EventBus without coupling this protocol client to a bus implementation.
+    """
+    if callback is None:
+        return
+    try:
+        callback({"event": event, **data})
+    except Exception:
+        logger.debug("LLM stream progress callback failed", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +142,7 @@ class RateLimiter:
     """Per-endpoint rate limiter with **dual constraint**: token bucket + min interval.
 
     2026-04-10 重构: 原来的纯 token bucket 允许 burst (120/min 令牌可以瞬间打光),
-    the_company 聚合 API 的 per-model quota 经常被并发 burst 打爆 (sentinel 后台巡逻 +
+    聚合 API 的 per-model quota 经常被并发 burst 打爆 (sentinel 后台巡逻 +
     workflow-factory 主线程 + LLMJudgeAgent 并发时表现尤其明显)。
 
     新方案 — 两个约束必须同时满足才放行:
@@ -170,12 +206,17 @@ class RateLimiter:
 # ModelRegistry — 角色→模型配置映射
 # ---------------------------------------------------------------------------
 
-_THE_COMPANY_URL = "https://internal-llm-proxy.example.com"
+# OpenAI SDK 会在 base_url 后追加 ``chat/completions``；代理的当前标准接口在 /v1。
+# 少 /v1 会落到旧兼容入口,同一把有效 key 会被误报为 models=['limited']。
+# 通过 OMNI_LLM_BASE_URL 配置你的 OpenAI-compatible 聚合代理（如 LiteLLM / One API）。
+_DEFAULT_LLM_URL = os.environ.get("OMNI_LLM_BASE_URL", "")
+_KIMI_URL = os.environ.get("KIMI_BASE_URL", "https://api.kimi.com/coding/v1")
 
 
 # key_env → default value（环境变量未设置时使用）
 _KEY_DEFAULTS: dict[str, str] = {
-    "THE_COMPANY_API_KEY": os.environ.get("THE_COMPANY_API_KEY", ""),
+    "OMNI_LLM_API_KEY": os.environ.get("OMNI_LLM_API_KEY", os.environ.get("THE_COMPANY_API_KEY", "")),
+    "KIMI_API_KEY": os.environ.get("KIMI_API_KEY", ""),
 }
 
 
@@ -208,11 +249,11 @@ class ModelRegistry:
     ## Fallback 链
 
     任何 role 的 chain = [policy-selected primary, *universal_fallbacks]。
-    兜底只使用 the_company proxy；不再使用外部失效 endpoint。
+    兜底只使用聚合代理；不再使用外部失效 endpoint。
     """
 
     # ── 模型目录（raw model configs）──────────────────────────────────────
-    # the_company 聚合 API 定价对照（$ per 1M tokens, input/output）—— 2026-06-23 用户同步最新价目表：
+    # 聚合 API 定价对照（$ per 1M tokens, input/output）—— 2026-06-23 用户同步最新价目表：
     #   gpt-5.5-expensive     5.00 / 30.00   quality 顶配(贵)
     #   gpt-image-2           5.00 / 10.00   图像
     #   gemini-3-pro-image    2.00 / 12.00   图像(pro)
@@ -238,51 +279,57 @@ class ModelRegistry:
     #   text-embedding-3-large 0.13 / 0.00   embedding
     #   qwen-flash            0.02 / 0.21    ultra-cheap
     _MODELS: dict[str, dict[str, str]] = {
-        # ── the_company proxy (THE_COMPANY_API_KEY) — 2026-06-23 同步最新价目表 ──
+        # ── 聚合代理 (OMNI_LLM_API_KEY) — 2026-06-23 同步最新价目表 ──
         # 旧型号(claude-opus/sonnet/glm-5/kimi-k2.5/qwen3.5-* 等)仍保留: 历史 policy/fallback 引用,
         # 不在新表内的按旧价兜底估算; 新表以下方"★最新"段为权威。
         # quality tier (claude / gpt / opus)
-        "claude-opus-4-6":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "claude-opus-4-7":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "claude-sonnet-4-6":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "claude-haiku-4-5-20251001": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "claude-haiku-4-5@20251001": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gpt-5.3-codex":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gpt-5.4":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gpt-5.5":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gpt-5.5-expensive":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "claude-opus-4-6":      {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "claude-opus-4-7":      {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "claude-sonnet-4-6":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "claude-haiku-4-5-20251001": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "claude-haiku-4-5@20251001": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gpt-5.3-codex":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gpt-5.4":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gpt-5.5":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gpt-5.5-expensive":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gpt-5.6-terra":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
         # standard tier (glm / kimi / qwen-max)
-        "glm-5":                {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "glm-5.1":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "glm-5.2":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "kimi-k2.5":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "kimi-k2.6":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "kimi-k2.7-code":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "qwen3-max":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "qwen3.7-max":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "qwen3.5-plus":         {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "qwen3.6-max-preview":  {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "qwen3.6-plus":         {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "glm-5":                {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "glm-5.1":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "glm-5.2":              {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "kimi-k2.5":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "kimi-k2.6":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "kimi-k2.7-code":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        # Kimi Code direct endpoint. Keep these IDs separate from the aggregation
+        # aliases above so a caller can explicitly choose its credential path.
+        "k3":                    {"base_url": _KIMI_URL, "key_env": "KIMI_API_KEY"},
+        "kimi-for-coding":       {"base_url": _KIMI_URL, "key_env": "KIMI_API_KEY"},
+        "kimi-for-coding-highspeed": {"base_url": _KIMI_URL, "key_env": "KIMI_API_KEY"},
+        "qwen3-max":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen3.7-max":          {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen3.5-plus":         {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen3.6-max-preview":  {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen3.6-plus":         {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
         # cheap / fast tier (deepseek / qwen-flash)
-        "deepseek-v3-2-251201": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "deepseek-v4-flash":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "deepseek-v4-pro":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "qwen3.5-flash":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "qwen-flash":           {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "deepseek-v3-2-251201": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "deepseek-v4-flash":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "deepseek-v4-pro":      {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen3.5-flash":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "qwen-flash":           {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
         # vision tier
-        "qwen3-vl-flash":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-3.1":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-3-flash-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-3.5-flash":             {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-3.1-flash-lite-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-3.1-pro-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen3-vl-flash":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-3.1":                   {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-3-flash-preview":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-3.5-flash":             {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-3.1-flash-lite-preview": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-3.1-pro-preview":       {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
         # image / embedding（非对话, 计价用; role 一般不选）
-        "gpt-image-2":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-3-pro-image-preview":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-3.1-flash-image-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-embedding-001":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "gemini-embedding-2":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
-        "text-embedding-3-large":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-image-2":                   {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-3-pro-image-preview":    {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-3.1-flash-image-preview": {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-embedding-001":          {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "gemini-embedding-2":            {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
+        "text-embedding-3-large":        {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"},
     }
 
     # ── Policies: tier → model (每个 policy 定义四个 tier 的首选模型) ─────
@@ -333,7 +380,7 @@ class ModelRegistry:
         "pain_classify":        "cheap",     # 分类任务用便宜模型
         "vision":               "vision",
         "vision_quality":       "quality",   # 高质量视觉：用 qwen3.6-plus
-        "field_discovery":      "quality",   # demogame 字段公式自主发现 AgentNodeLoop
+        "field_discovery":      "quality",   # 业务域字段公式自主发现 AgentNodeLoop
     }
 
     # role-level override：忽略 policy 的 tier→model 映射，强制特定 role 用指定模型
@@ -347,17 +394,17 @@ class ModelRegistry:
 
     # ── Universal fallback chain: 所有 tier 共享的末位兜底 ──────────────
     _UNIVERSAL_FALLBACK: list[str] = [
-        "glm-5",                          # the_company 最稳定的中端
-        "qwen3.5-flash",                  # the_company 最便宜
+        "glm-5",                          # 聚合代理最稳定的中端
+        "qwen3.5-flash",                  # 聚合代理最便宜
     ]
 
-    # 2026-04-10: the_company 从 120 降到 40 RPM (1.5 秒/次最小间隔)。
+    # 2026-04-10: 聚合代理从 120 降到 40 RPM (1.5 秒/次最小间隔)。
     # 原值 120 允许 2 req/sec burst, 在主管线 + sentinel 后台巡逻并发时经常把
     # 聚合 API 的 per-model quota 打成 429。40 RPM + 强制最小间隔 (见 RateLimiter)
     # 错峰后稳定多了, 单跑 workflow-factory 的 7 次调用仍远低于上限。
-    # 可通过 OMNICOMPANY_THE_COMPANY_RPM env 覆盖。
+    # 可通过 OMNICOMPANY_LLM_RPM env 覆盖。
     _RATE_LIMITS: dict[str, int] = {
-        _THE_COMPANY_URL: int(os.environ.get("OMNICOMPANY_THE_COMPANY_RPM", "40")),
+        _DEFAULT_LLM_URL: int(os.environ.get("OMNICOMPANY_LLM_RPM", "40")),
     }
 
     _DEFAULT_POLICY = "production"
@@ -418,11 +465,11 @@ class ModelRegistry:
         return policy.get(tier) or self._POLICIES[self._DEFAULT_POLICY].get(tier) or "glm-5"
 
     def _model_config(self, model: str) -> dict[str, str]:
-        """根据模型名查 base_url + api_key。未知模型默认走 the_company。"""
+        """根据模型名查 base_url + api_key。未知模型默认走聚合代理。"""
         cfg = self._MODELS.get(model)
         if not cfg:
-            logger.warning("ModelRegistry: unknown model '%s', defaulting to the_company endpoint", model)
-            cfg = {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"}
+            logger.warning("ModelRegistry: unknown model '%s', defaulting to aggregation endpoint", model)
+            cfg = {"base_url": _DEFAULT_LLM_URL, "key_env": "OMNI_LLM_API_KEY"}
         return {
             "model": model,
             "base_url": cfg["base_url"],
@@ -493,7 +540,7 @@ class ModelRegistry:
 # Protocol detection
 # ---------------------------------------------------------------------------
 
-_OPENAI_ENDPOINTS = frozenset([_THE_COMPANY_URL])
+_OPENAI_ENDPOINTS = frozenset([_DEFAULT_LLM_URL, _KIMI_URL])
 
 
 def _is_openai_endpoint(base_url: str) -> bool:
@@ -612,7 +659,7 @@ class _UnifiedResponse:
 
 # ── LLM 计量设施 ──
 
-# 每百万 token 价格（美元），来源: the_company 聚合 API 定价 (2026-04-07)
+# 每百万 token 价格（美元），来源: 聚合 API 定价 (2026-04-07)
 _MODEL_PRICING: dict[str, tuple[float, float]] = {
     # (input_per_M, output_per_M)
     # ── ★2026-06-23 用户同步最新价目表（权威）──
@@ -664,6 +711,7 @@ class LLMCallRecord:
     cost_usd: float
     latency_ms: float
     stop_reason: str
+    invocation_id: str = ""
     # 2026-05-04 prompt cache: 区分 normal input 跟 cache 读/写, 算成本 / 命中率
     cache_read_tokens: int = 0
     cache_creation_tokens: int = 0
@@ -686,6 +734,7 @@ class LLMCallRecord:
             "cost_usd": self.cost_usd,
             "latency_ms": self.latency_ms,
             "stop_reason": self.stop_reason,
+            "invocation_id": self.invocation_id,
         }
 
 
@@ -1024,7 +1073,7 @@ def _add_cache_control_to_tools(tools: list[dict]) -> list[dict]:
 
 
 class LLMClient:
-    """多协议 LLM 客户端 — Anthropic (DashScope) + OpenAI-compatible (the_company proxy)。
+    """多协议 LLM 客户端 — Anthropic (DashScope) + OpenAI-compatible (聚合代理)。
 
     支持两种构造方式：
       1. 直接传参: LLMClient(model=..., base_url=..., api_key=...)
@@ -1066,6 +1115,14 @@ class LLMClient:
         persistent_retry: bool = False,
         heartbeat_interval_sec: float = 30.0,
         heartbeat_callback: Any | None = None,
+        # Optional per-client deadlines.  The default has no aggregate stream
+        # deadline: activity, not elapsed wall time, determines liveness.
+        request_timeout_sec: float | None = None,
+        stream_wall_clock_deadline_sec: float | None = None,
+        stream_idle_chunk_deadline_sec: float | None = None,
+        max_retry_attempts: int | None = None,
+        max_continuation_retries: int | None = None,
+        prefix_tool_errors: bool = True,
     ):
         # Resolve primary model from registry (no cross-model fallback — see call()).
         registry = ModelRegistry.get_instance()
@@ -1081,7 +1138,7 @@ class LLMClient:
             base_url = base_url or model_cfg["base_url"]
             api_key = api_key or model_cfg["api_key"]
 
-        # 默认模型按 endpoint 类型选取：the_company/OpenAI-compatible endpoint 用 the_company 模型
+        # 默认模型按 endpoint 类型选取：聚合代理/OpenAI-compatible endpoint 用聚合模型
         # 注意：此处 base_url 已经被 role chain 或显式参数设置好了
         _effective_base = base_url or os.environ.get("ANTHROPIC_BASE_URL") or ""
         if model:
@@ -1103,13 +1160,34 @@ class LLMClient:
         self._persistent_retry = bool(persistent_retry)
         self._heartbeat_interval = max(0.0, float(heartbeat_interval_sec))
         self._heartbeat_cb = heartbeat_callback
+        self._stream_wall_clock_deadline = (
+            None
+            if stream_wall_clock_deadline_sec is None
+            else max(1.0, float(stream_wall_clock_deadline_sec))
+        )
+        self._stream_idle_chunk_deadline = (
+            None
+            if stream_idle_chunk_deadline_sec is None
+            else max(1.0, float(stream_idle_chunk_deadline_sec))
+        )
+        self._max_retry_attempts = (
+            _RETRY_MAX_ATTEMPTS
+            if max_retry_attempts is None
+            else max(0, int(max_retry_attempts))
+        )
+        self._max_continuation_retries = (
+            self._MAX_CONTINUATION_RETRIES
+            if max_continuation_retries is None
+            else max(0, int(max_continuation_retries))
+        )
+        self._prefix_tool_errors = bool(prefix_tool_errors)
 
         resolved_base = base_url or os.environ.get("ANTHROPIC_BASE_URL")
         # 按 endpoint 类型选择 key，防止 DashScope token 被错误地发送到 OpenAI-compatible 端点
         if _is_openai_endpoint(resolved_base or ""):
             resolved_key = (
                 api_key
-                or os.environ.get("THE_COMPANY_API_KEY")
+                or os.environ.get("OMNI_LLM_API_KEY")
                 or os.environ.get("OPENAI_API_KEY")
                 or "no-key"  # 防止测试环境 None 导致 OpenAI SDK 初始化崩溃
             )
@@ -1126,6 +1204,10 @@ class LLMClient:
             self._rate_limiter = RateLimiter.for_endpoint(resolved_base, limit)
 
         self._is_openai = _is_openai_endpoint(resolved_base or "")
+        self._request_timeout = max(
+            1.0,
+            float(request_timeout_sec if request_timeout_sec is not None else (300.0 if self._is_openai else 120.0)),
+        )
         self._openai_client: Any = None
         self.client: Any = None
         self._resolved_base = resolved_base
@@ -1136,7 +1218,7 @@ class LLMClient:
             self._openai_client = openai.OpenAI(
                 base_url=resolved_base,
                 api_key=resolved_key,
-                timeout=300.0,
+                timeout=self._request_timeout,
                 max_retries=0,
             )
         else:
@@ -1144,7 +1226,7 @@ class LLMClient:
             self.client = anthropic.Anthropic(
                 base_url=resolved_base,
                 api_key=resolved_key or os.environ.get("ANTHROPIC_AUTH_TOKEN"),
-                timeout=120.0,
+                timeout=self._request_timeout,
             )
 
     @classmethod
@@ -1161,6 +1243,7 @@ class LLMClient:
         caller: str = "",
         info_audit: bool | None = None,
         audit_context: dict[str, Any] | None = None,
+        progress_callback: Any | None = None,
     ) -> Any:
         """调用 LLM。
 
@@ -1184,12 +1267,13 @@ class LLMClient:
                 pipeline_id / node_id), runner 传入; 未传则落到 "adhoc"。
         """
         model = self.model
+        invocation_id = uuid.uuid4().hex
         base_url = self._resolved_base or ""
         api_key = self._resolved_key or ""
         if not api_key:
             raise RuntimeError(
                 f"LLM call failed: no api_key for role={self.role or 'default'} "
-                f"model={model} base_url={base_url}. Set THE_COMPANY_API_KEY."
+                f"model={model} base_url={base_url}. Set OMNI_LLM_API_KEY."
             )
 
         # ── Phase 3 预落: 全局信息审计开关 (env override) ──
@@ -1265,25 +1349,44 @@ class LLMClient:
             is_openai = _is_openai_endpoint(base_url)
             if is_openai:
                 import openai
-                oai_client = openai.OpenAI(base_url=base_url, api_key=api_key, timeout=300.0, max_retries=0)
-                result = self._call_openai_with(oai_client, model, messages, effective_system, base_url, response_format=response_format, tool_choice=tool_choice)
+                oai_client = openai.OpenAI(
+                    base_url=base_url,
+                    api_key=api_key,
+                    timeout=self._request_timeout,
+                    max_retries=0,
+                )
+                result = self._call_openai_with(
+                    oai_client, model, messages, effective_system, base_url,
+                    response_format=response_format,
+                    tool_choice=tool_choice,
+                    progress_callback=progress_callback,
+                )
                 # 续写: finish_reason=length (OpenAI) 时, 把已生成内容回灌 + 注入 continue
                 # 提示再调一次, 直到 finish_reason != length 或 重试上限. 跟 Claude Code
                 # 的 max_output_tokens recovery 同模式 (build-src/src/query.ts L1188+).
                 result = self._continue_if_truncated_openai(
                     oai_client, model, messages, effective_system, base_url, result,
-                    response_format=response_format, tool_choice=tool_choice,
+                    response_format=response_format,
+                    tool_choice=tool_choice,
+                    progress_callback=progress_callback,
                 )
             else:
                 import anthropic
-                anth_client = anthropic.Anthropic(base_url=base_url, api_key=api_key, timeout=120.0)
+                anth_client = anthropic.Anthropic(
+                    base_url=base_url,
+                    api_key=api_key,
+                    timeout=self._request_timeout,
+                )
                 result = self._call_anthropic_with(
                     anth_client, model, messages, effective_system,
-                    tool_choice=tool_choice, response_format=response_format,
+                    tool_choice=tool_choice,
+                    response_format=response_format,
+                    progress_callback=progress_callback,
                 )
                 result = self._continue_if_truncated_anthropic(
                     anth_client, model, messages, effective_system, result,
                     tool_choice=tool_choice,
+                    progress_callback=progress_callback,
                 )
             latency_ms = (time.time() - start_ts) * 1000.0
         finally:
@@ -1302,7 +1405,7 @@ class LLMClient:
         cache_creation = getattr(usage, "cache_creation_input_tokens", 0) if usage else 0
         stop = getattr(result, "stop_reason", "unknown")
         cost = _estimate_cost(actual_model, in_tok, out_tok, cache_read, cache_creation)
-        LLMMeter.get_instance().record(LLMCallRecord(
+        meter_record = LLMCallRecord(
             model=actual_model,
             role=self.role or "default",
             caller=caller or f"llm.{self.role or 'direct'}",
@@ -1313,7 +1416,12 @@ class LLMClient:
             cost_usd=cost,
             latency_ms=latency_ms,
             stop_reason=stop,
-        ))
+            invocation_id=invocation_id,
+        )
+        LLMMeter.get_instance().record(meter_record)
+        planner_measurement_hook = _AI_PLAYER_PLANNER_MEASUREMENT_HOOK_VAR.get()
+        if planner_measurement_hook is not None:
+            planner_measurement_hook(result, meter_record)
 
         # ── Phase 2 PIGGYBACK: 解析 info_audit (M1 改造: 优先 tool_use, 兜底文本) ──
         #
@@ -1433,7 +1541,11 @@ class LLMClient:
         return result
 
     @staticmethod
-    def _anthropic_msgs_to_openai(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _anthropic_msgs_to_openai(
+        messages: list[dict[str, Any]],
+        *,
+        prefix_tool_errors: bool = True,
+    ) -> list[dict[str, Any]]:
         """Convert Anthropic-format messages to OpenAI multi-turn format.
 
         Handles:
@@ -1499,7 +1611,7 @@ class LLMClient:
                     # 来源：2026-04-18 BD.6a 实战发现 qwen 空 submit 死循环，单独
                     # is_error 字段不够。
                     raw_content = str(block.get("content", ""))
-                    if block.get("is_error"):
+                    if prefix_tool_errors and block.get("is_error"):
                         prefix = "[TOOL_ERROR] " if not raw_content.lstrip().startswith("[TOOL_ERROR]") else ""
                         raw_content = f"{prefix}{raw_content}"
                     tool_results.append({
@@ -1553,6 +1665,7 @@ class LLMClient:
         base_url: str,
         response_format: dict[str, Any] | None = None,
         tool_choice: dict[str, Any] | None = None,
+        progress_callback: Any | None = None,
     ) -> _UnifiedResponse:
         """OpenAI 协议调用（可指定 client 和 model，供 fallback 链使用）。"""
         import json as _json
@@ -1561,7 +1674,12 @@ class LLMClient:
         oai_messages: list[dict[str, Any]] = []
         if system:
             oai_messages.append({"role": "system", "content": system})
-        oai_messages.extend(self._anthropic_msgs_to_openai(messages))
+        oai_messages.extend(
+            self._anthropic_msgs_to_openai(
+                messages,
+                prefix_tool_errors=self._prefix_tool_errors,
+            )
+        )
 
         oai_tools = self._tools_to_openai()
 
@@ -1573,7 +1691,7 @@ class LLMClient:
         delay = float(_RETRY_INITIAL_DELAY)
         last_error: Exception | None = None
 
-        for attempt in range(_RETRY_MAX_ATTEMPTS + 1):
+        for attempt in range(self._max_retry_attempts + 1):
             if rl:
                 rl.acquire()
             try:
@@ -1586,15 +1704,28 @@ class LLMClient:
                 }
                 if oai_tools:
                     kwargs["tools"] = oai_tools
-                    # 注意: qwen-3.6-plus 等思考模式模型不支持 tool_choice=required 或具体
-                    # 函数对象 (聚合 API 400 拒). 写死 "auto" 是这条限制的妥协.
-                    # caller 想 force tool 就靠 system prompt 引导 + 检测重试.
-                    kwargs["tool_choice"] = "auto"
+                    # 默认保持兼容的 auto；明确传入 tool_choice 的调用者可以选择
+                    # 具体函数。上层必须按模型能力决定是否强制，且验证实际 tool_use。
+                    kwargs["tool_choice"] = tool_choice if tool_choice is not None else "auto"
                 if response_format:
                     kwargs["response_format"] = response_format
+                if self._extra_body:
+                    kwargs["extra_body"] = dict(self._extra_body)
 
                 # 流式调用 — 逐 chunk 拼接，避免长输出超时
+                _report_stream_progress(
+                    progress_callback,
+                    "request_started",
+                    protocol="openai",
+                    model=model,
+                )
                 stream = oai_client.chat.completions.create(**kwargs)
+                _report_stream_progress(
+                    progress_callback,
+                    "stream_opened",
+                    protocol="openai",
+                    model=model,
+                )
 
                 text_parts: list[str] = []
                 reasoning_parts: list[str] = []
@@ -1609,14 +1740,22 @@ class LLMClient:
                 # 这里用 monotonic 时钟硬卡一个上限。
                 # 2026-04-09: 新增, 因为 workflow-factory code_gen 实跑时卡死 15+ min 观察到。
                 _stream_start = time.monotonic()
-                _stream_deadline_sec = _STREAM_WALL_CLOCK_DEADLINE
+                _stream_deadline_sec = self._stream_wall_clock_deadline
                 _last_chunk_time = _stream_start
-                _chunk_idle_sec = _STREAM_IDLE_CHUNK_DEADLINE
+                _chunk_idle_sec = self._stream_idle_chunk_deadline
+                _last_progress_time = _stream_start
+                _chunk_count = 0
+                _text_chars = 0
+                _reasoning_chars = 0
+                _tool_arg_chars = 0
 
                 for chunk in stream:
                     # 整体超时检查
                     _now = time.monotonic()
-                    if _now - _stream_start > _stream_deadline_sec:
+                    if (
+                        _stream_deadline_sec is not None
+                        and _now - _stream_start > _stream_deadline_sec
+                    ):
                         try:
                             stream.close()
                         except Exception:
@@ -1626,7 +1765,10 @@ class LLMClient:
                             f"(model={model}, parts_so_far={len(text_parts)})"
                         )
                     # 空 chunk 死寂检查: 超过 idle 阈值 = upstream 卡死
-                    if _now - _last_chunk_time > _chunk_idle_sec:
+                    if (
+                        _chunk_idle_sec is not None
+                        and _now - _last_chunk_time > _chunk_idle_sec
+                    ):
                         try:
                             stream.close()
                         except Exception:
@@ -1636,8 +1778,31 @@ class LLMClient:
                             f"(model={model}, upstream likely stalled)"
                         )
                     _last_chunk_time = _now
+                    _chunk_count += 1
+
+                    if _chunk_count == 1:
+                        _report_stream_progress(
+                            progress_callback,
+                            "first_chunk",
+                            protocol="openai",
+                            model=model,
+                            elapsed_ms=int((_now - _stream_start) * 1000),
+                        )
 
                     if not chunk.choices:
+                        if _now - _last_progress_time >= 2.0:
+                            _report_stream_progress(
+                                progress_callback,
+                                "stream_progress",
+                                protocol="openai",
+                                model=model,
+                                elapsed_ms=int((_now - _stream_start) * 1000),
+                                chunk_count=_chunk_count,
+                                text_chars=_text_chars,
+                                reasoning_chars=_reasoning_chars,
+                                tool_arg_chars=_tool_arg_chars,
+                            )
+                            _last_progress_time = _now
                         continue
                     delta = chunk.choices[0].delta
                     if chunk.choices[0].finish_reason:
@@ -1655,9 +1820,11 @@ class LLMClient:
                     # 文本内容
                     if delta and delta.content:
                         text_parts.append(delta.content)
+                        _text_chars += len(delta.content)
                     reasoning_delta = getattr(delta, "reasoning_content", None) if delta else None
                     if reasoning_delta:
                         reasoning_parts.append(reasoning_delta)
+                        _reasoning_chars += len(reasoning_delta)
 
                     # tool_calls 增量拼接
                     if delta and delta.tool_calls:
@@ -1677,6 +1844,33 @@ class LLMClient:
                                     buf["name"] = tc_delta.function.name
                                 if tc_delta.function.arguments:
                                     buf["args"] += tc_delta.function.arguments
+                                    _tool_arg_chars += len(tc_delta.function.arguments)
+
+                    if _now - _last_progress_time >= 2.0:
+                        _report_stream_progress(
+                            progress_callback,
+                            "stream_progress",
+                            protocol="openai",
+                            model=model,
+                            elapsed_ms=int((_now - _stream_start) * 1000),
+                            chunk_count=_chunk_count,
+                            text_chars=_text_chars,
+                            reasoning_chars=_reasoning_chars,
+                            tool_arg_chars=_tool_arg_chars,
+                        )
+                        _last_progress_time = _now
+
+                _report_stream_progress(
+                    progress_callback,
+                    "stream_completed",
+                    protocol="openai",
+                    model=resp_model,
+                    elapsed_ms=int((time.monotonic() - _stream_start) * 1000),
+                    chunk_count=_chunk_count,
+                    text_chars=_text_chars,
+                    reasoning_chars=_reasoning_chars,
+                    tool_arg_chars=_tool_arg_chars,
+                )
 
                 content_blocks: list[Any] = []
                 full_text = "".join(text_parts)
@@ -1736,7 +1930,7 @@ class LLMClient:
                             retry_after = float(ra)
                         except ValueError:
                             pass
-                if attempt >= _RETRY_MAX_ATTEMPTS:
+                if attempt >= self._max_retry_attempts:
                     logger.warning(
                         "LLM rate limited [role=%s model=%s], giving up after %d attempts",
                         self.role or "default", model, attempt + 1,
@@ -1745,29 +1939,49 @@ class LLMClient:
                 wait = retry_after if retry_after is not None else delay
                 logger.warning(
                     "LLM rate limited [role=%s model=%s] (attempt %d/%d), sleeping %.0fs (retry-after=%s)...",
-                    self.role or "default", model, attempt + 1, _RETRY_MAX_ATTEMPTS + 1, wait,
+                    self.role or "default", model, attempt + 1, self._max_retry_attempts + 1, wait,
                     "yes" if retry_after is not None else "no",
                 )
                 time.sleep(wait)
                 delay = min(delay * _RETRY_BACKOFF_FACTOR, _RETRY_MAX_DELAY)
             except (_openai.APIConnectionError, _openai.InternalServerError) as e:
                 last_error = e
-                if attempt >= _RETRY_MAX_ATTEMPTS:
+                if attempt >= self._max_retry_attempts:
                     break
                 logger.warning(
                     "LLM connection error [role=%s model=%s] (attempt %d/%d): %s, sleeping %.0fs...",
-                    self.role or "default", model, attempt + 1, _RETRY_MAX_ATTEMPTS,
+                    self.role or "default", model, attempt + 1, self._max_retry_attempts + 1,
                     type(e).__name__, delay,
+                )
+                time.sleep(delay)
+                delay = min(delay * _RETRY_BACKOFF_FACTOR, _RETRY_MAX_DELAY)
+            except _openai.APIStatusError as e:
+                # 400/401/403/404 等请求/鉴权/模型权限错误不会靠等待恢复。
+                # 立即返回给调用方修配置,避免 30/60/120s 的无意义重试。
+                last_error = e
+                status = int(getattr(e, "status_code", 0) or 0)
+                if status and status < 500:
+                    logger.warning(
+                        "LLM permanent API error [role=%s model=%s status=%s], fail fast: %s",
+                        self.role or "default", model, status, e,
+                    )
+                    break
+                if attempt >= self._max_retry_attempts:
+                    break
+                logger.warning(
+                    "LLM server API error [role=%s model=%s status=%s] (attempt %d/%d), sleeping %.0fs...",
+                    self.role or "default", model, status or "?", attempt + 1,
+                    self._max_retry_attempts + 1, delay,
                 )
                 time.sleep(delay)
                 delay = min(delay * _RETRY_BACKOFF_FACTOR, _RETRY_MAX_DELAY)
             except Exception as e:
                 last_error = e
-                if attempt >= _RETRY_MAX_ATTEMPTS:
+                if attempt >= self._max_retry_attempts:
                     break
                 logger.warning(
                     "LLM error [role=%s model=%s] (attempt %d/%d): %s, sleeping %.0fs...",
-                    self.role or "default", model, attempt + 1, _RETRY_MAX_ATTEMPTS,
+                    self.role or "default", model, attempt + 1, self._max_retry_attempts + 1,
                     e, delay,
                 )
                 time.sleep(delay)
@@ -1801,15 +2015,16 @@ class LLMClient:
         first_result: "_UnifiedResponse",
         response_format: dict[str, Any] | None = None,
         tool_choice: dict[str, Any] | None = None,
+        progress_callback: Any | None = None,
     ) -> "_UnifiedResponse":
         """OpenAI 路径续写. finish_reason='length' 时 inject + retry."""
         result = first_result
         accumulated_text = _extract_response_text(result)
         attempts = 0
-        while result.stop_reason == "length" and attempts < self._MAX_CONTINUATION_RETRIES:
+        while result.stop_reason == "length" and attempts < self._max_continuation_retries:
             logger.info(
                 "[continuation] LLM truncated (finish_reason=length, attempt %d/%d), continuing",
-                attempts + 1, self._MAX_CONTINUATION_RETRIES,
+                attempts + 1, self._max_continuation_retries,
             )
             cont_messages = list(original_messages) + [
                 {"role": "assistant", "content": [{"type": "text", "text": accumulated_text}]},
@@ -1818,7 +2033,9 @@ class LLMClient:
             try:
                 next_result = self._call_openai_with(
                     oai_client, model, cont_messages, system, base_url,
-                    response_format=response_format, tool_choice=tool_choice,
+                    response_format=response_format,
+                    tool_choice=tool_choice,
+                    progress_callback=progress_callback,
                 )
             except Exception as e:
                 logger.warning("[continuation] retry %d 失败 %s, 用已有内容封顶", attempts + 1, e)
@@ -1841,15 +2058,16 @@ class LLMClient:
         system: str,
         first_result: Any,
         tool_choice: dict[str, Any] | None = None,
+        progress_callback: Any | None = None,
     ) -> Any:
         """Anthropic 路径续写. stop_reason='max_tokens' 时 inject + retry."""
         result = first_result
         accumulated_text = _extract_response_text(result)
         attempts = 0
-        while getattr(result, "stop_reason", None) == "max_tokens" and attempts < self._MAX_CONTINUATION_RETRIES:
+        while getattr(result, "stop_reason", None) == "max_tokens" and attempts < self._max_continuation_retries:
             logger.info(
                 "[continuation] LLM truncated (stop_reason=max_tokens, attempt %d/%d), continuing",
-                attempts + 1, self._MAX_CONTINUATION_RETRIES,
+                attempts + 1, self._max_continuation_retries,
             )
             cont_messages = list(original_messages) + [
                 {"role": "assistant", "content": [{"type": "text", "text": accumulated_text}]},
@@ -1857,7 +2075,9 @@ class LLMClient:
             ]
             try:
                 next_result = self._call_anthropic_with(
-                    anth_client, model, cont_messages, system, tool_choice=tool_choice,
+                    anth_client, model, cont_messages, system,
+                    tool_choice=tool_choice,
+                    progress_callback=progress_callback,
                 )
             except Exception as e:
                 logger.warning("[continuation] retry %d 失败 %s, 用已有内容封顶", attempts + 1, e)
@@ -1903,6 +2123,7 @@ class LLMClient:
         system: str,
         tool_choice: dict[str, Any] | None = None,
         response_format: dict[str, Any] | None = None,
+        progress_callback: Any | None = None,
     ) -> "anthropic.types.Message":
         """Anthropic 协议调用（可指定 client 和 model，供 fallback 链使用）。
 
@@ -1970,7 +2191,7 @@ class LLMClient:
         last_error: Exception | None = None
         # persistent_retry: unattended 模式 (batch / nohup), 不限重试次数, 仅 cap delay.
         # 同时按 heartbeat_interval 周期回调 (告知 caller "agent 还活着, 在等 retry").
-        _effective_max = 999_999 if self._persistent_retry else _RETRY_MAX_ATTEMPTS
+        _effective_max = 999_999 if self._persistent_retry else self._max_retry_attempts
 
         for attempt in range(_effective_max + 1):
             if self._rate_limiter:
@@ -1985,30 +2206,62 @@ class LLMClient:
                 stop_reason = "stop"
                 resp_model = model
                 stream_usage = None
+                _chunk_count = 0
+                _text_chars = 0
+                _last_progress_time = _stream_start
 
+                _report_stream_progress(
+                    progress_callback,
+                    "request_started",
+                    protocol="anthropic",
+                    model=model,
+                )
                 with anth_client.messages.stream(**kwargs) as stream:
+                    _report_stream_progress(
+                        progress_callback,
+                        "stream_opened",
+                        protocol="anthropic",
+                        model=model,
+                    )
                     for event in stream:
                         _now = time.monotonic()
-                        if _now - _stream_start > _STREAM_WALL_CLOCK_DEADLINE:
+                        if (
+                            self._stream_wall_clock_deadline is not None
+                            and _now - _stream_start > self._stream_wall_clock_deadline
+                        ):
                             raise TimeoutError(
                                 f"Anthropic stream exceeded wall-clock "
-                                f"{_STREAM_WALL_CLOCK_DEADLINE}s "
+                                f"{self._stream_wall_clock_deadline}s "
                                 f"(model={model}, parts_so_far={len(text_parts)})"
                             )
-                        if _now - _last_chunk_time > _STREAM_IDLE_CHUNK_DEADLINE:
+                        if (
+                            self._stream_idle_chunk_deadline is not None
+                            and _now - _last_chunk_time > self._stream_idle_chunk_deadline
+                        ):
                             raise TimeoutError(
                                 f"Anthropic stream idle > "
-                                f"{_STREAM_IDLE_CHUNK_DEADLINE}s between events "
+                                f"{self._stream_idle_chunk_deadline}s between events "
                                 f"(model={model}, upstream likely stalled)"
                             )
                         _last_chunk_time = _now
+                        _chunk_count += 1
+                        if _chunk_count == 1:
+                            _report_stream_progress(
+                                progress_callback,
+                                "first_chunk",
+                                protocol="anthropic",
+                                model=model,
+                                elapsed_ms=int((_now - _stream_start) * 1000),
+                            )
 
                         ev_type = getattr(event, "type", "")
                         # text delta
                         if ev_type == "content_block_delta":
                             delta = getattr(event, "delta", None)
                             if delta and getattr(delta, "type", "") == "text_delta":
-                                text_parts.append(getattr(delta, "text", ""))
+                                text_delta = getattr(delta, "text", "")
+                                text_parts.append(text_delta)
+                                _text_chars += len(text_delta)
                         elif ev_type == "message_start":
                             msg = getattr(event, "message", None)
                             if msg:
@@ -2023,6 +2276,28 @@ class LLMClient:
                             usg = getattr(event, "usage", None)
                             if usg:
                                 stream_usage = usg
+
+                        if _now - _last_progress_time >= 2.0:
+                            _report_stream_progress(
+                                progress_callback,
+                                "stream_progress",
+                                protocol="anthropic",
+                                model=resp_model,
+                                elapsed_ms=int((_now - _stream_start) * 1000),
+                                chunk_count=_chunk_count,
+                                text_chars=_text_chars,
+                            )
+                            _last_progress_time = _now
+
+                _report_stream_progress(
+                    progress_callback,
+                    "stream_completed",
+                    protocol="anthropic",
+                    model=resp_model,
+                    elapsed_ms=int((time.monotonic() - _stream_start) * 1000),
+                    chunk_count=_chunk_count,
+                    text_chars=_text_chars,
+                )
 
                 # 流结束, 获取最终消息 (带完整的 content blocks 和 usage)
                 final_msg = stream.get_final_message()
@@ -2045,7 +2320,7 @@ class LLMClient:
                     or "context" in err_msg and "limit" in err_msg
                     or "prompt is too long" in err_msg
                 )
-                if is_overflow and attempt < _RETRY_MAX_ATTEMPTS:
+                if is_overflow and attempt < _effective_max:
                     # 解析: 尝试从 err 抽 context_limit, current_input. 若抽不到, 砍一半.
                     new_max = _parse_overflow_and_compute_new_max_tokens(
                         err_msg, current_max_tokens=kwargs["max_tokens"],
@@ -2055,7 +2330,7 @@ class LLMClient:
                             "LLM context overflow [role=%s model=%s], reducing max_tokens %d → %d (attempt %d/%d) and retrying",
                             self.role or "default", model,
                             kwargs["max_tokens"], new_max,
-                            attempt + 1, _RETRY_MAX_ATTEMPTS,
+                            attempt + 1, _effective_max + 1,
                         )
                         kwargs["max_tokens"] = new_max
                         delay = min(delay * 1.5, _RETRY_MAX_DELAY)  # 短退避
@@ -2070,7 +2345,7 @@ class LLMClient:
             except anthropic.RateLimitError as e:
                 last_error = e
                 # Rate limit: 最多重试 1 次后快速 fallback
-                if attempt >= 1:
+                if attempt >= min(1, _effective_max):
                     logger.warning(
                         "LLM rate limited [role=%s model=%s], giving up after %d attempts, will fallback",
                         self.role or "default", model, attempt + 1,
@@ -2098,7 +2373,7 @@ class LLMClient:
                     "LLM connection error [role=%s] (attempt %d/%s): %s, sleeping %.0fs...",
                     self.role or "default",
                     attempt + 1,
-                    "∞" if self._persistent_retry else str(_RETRY_MAX_ATTEMPTS),
+                    "∞" if self._persistent_retry else str(self._max_retry_attempts + 1),
                     type(e).__name__, delay,
                 )
                 # heartbeat (persistent_retry mode): 长 sleep 期间周期回调

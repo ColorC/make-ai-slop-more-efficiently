@@ -56,6 +56,15 @@ class LedgerEvent:
             默认空列表, 由调用方在管线开跑前查历史裁决后回填)。
         verdict: 裁决态, 默认 "unverified"(机关一·验证闸门), 只能通过 set_verdict()
             追加关联事件的方式"升级"视图, 不直接改这个字段本身去改写已有行。
+        deviation: 偏离记录(决策本体阶段二;None=本事件无偏离)。约定键(GitOps/Puppet 词表):
+            - "kind": "unmanaged"|"missing"|"modified"|"undecidable"
+              (未纳管=做了陈述库没覆盖的判断 / 已丢失=该消费的陈述没消费 /
+               被改动=实际做法与陈述相悖 / 无法判定)
+            - "handling": "auto_correct"|"alert_only"|"report_only"(处置三档)
+            - "change_mode": "active_change"|"passive_correction"(主动变更声明 vs 被动纠偏)
+            - "refs": [被偏离的陈述 id], "note": 一句话说明
+            纪律:「报告偏离」(本字段/deviation.report 事件)与「提议修订」(候选流水线)是
+            两个显式动作, 回路不得一步改本体(Terraform 读写分离)。
         meta: 任意附加元数据(自由字典, 不做 schema 强校验)。
     """
 
@@ -68,6 +77,7 @@ class LedgerEvent:
     outputs: list[str] = field(default_factory=list)
     consumed_decisions: list[str] = field(default_factory=list)
     verdict: str = _UNVERIFIED
+    deviation: dict[str, Any] | None = None
     meta: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -255,3 +265,70 @@ def set_verdict(event_id: str, verdict: str, *, by: str = "", reason: str = "") 
         },
     )
     return append(update_event)
+
+
+# ── 偏离报告(决策本体阶段二: 「报告偏离」是显式动作, 与「提议修订」分离) ─────────
+
+_DEVIATION_KINDS = ("unmanaged", "missing", "modified", "undecidable")
+_DEVIATION_HANDLINGS = ("auto_correct", "alert_only", "report_only")
+_DEVIATION_MODES = ("active_change", "passive_correction")
+
+
+def report_deviation(
+    *,
+    kind: str,
+    note: str,
+    refs: list[str] | None = None,
+    handling: str = "alert_only",
+    change_mode: str = "passive_correction",
+    agent: str = "",
+    related_event_id: str = "",
+) -> str:
+    """报告一笔偏离(追加 type="deviation.report" 事件), 返回事件 id。
+
+    只报告不修订: 提议修订本体走候选流水线(omni decisions candidate), 本函数绝不改陈述库。
+    refs 里若有记录带 deviation_waiver, 原样附进 meta.waivers 供裁决者参考(不自动豁免)。
+    """
+    if kind not in _DEVIATION_KINDS:
+        raise ValueError(f"kind 须为 {_DEVIATION_KINDS}, 收到 {kind!r}")
+    if handling not in _DEVIATION_HANDLINGS:
+        raise ValueError(f"handling 须为 {_DEVIATION_HANDLINGS}, 收到 {handling!r}")
+    if change_mode not in _DEVIATION_MODES:
+        raise ValueError(f"change_mode 须为 {_DEVIATION_MODES}, 收到 {change_mode!r}")
+    if not (note or "").strip():
+        raise ValueError("note 不可为空(偏离必须带一句话说明)")
+
+    refs = [r for r in (refs or []) if (r or "").strip()]
+    waivers: dict[str, str] = {}
+    if refs:
+        try:
+            from omnicompany.packages.domains.decisions import library as _dlib
+
+            for rid in refs:
+                rec = _dlib.get(rid)
+                if rec and (rec.get("deviation_waiver") or "").strip():
+                    waivers[rid] = rec["deviation_waiver"].strip()
+        except Exception:
+            pass  # 决策库不可用时偏离照记(报告优先, 不因附注失败而丢事件)
+
+    event = LedgerEvent(
+        type="deviation.report",
+        agent=agent,
+        activity=note.strip(),
+        inputs=[related_event_id] if related_event_id else [],
+        deviation={
+            "kind": kind,
+            "handling": handling,
+            "change_mode": change_mode,
+            "refs": refs,
+            "note": note.strip(),
+        },
+        meta={"waivers": waivers} if waivers else {},
+    )
+    return append(event)
+
+
+def list_deviations(n: int = 100) -> list[dict[str, Any]]:
+    """列最近 n 条带偏离的事件(deviation.report 或任何 deviation 非空的事件)。"""
+    out = [rec for rec in _read_lines() if rec.get("deviation")]
+    return out[-n:] if n > 0 else out

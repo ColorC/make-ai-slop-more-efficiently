@@ -31,16 +31,35 @@ from typing import Any, ClassVar
 import yaml
 
 from omnicompany.packages.services._core.omnicompany import Worker
+from omnicompany.packages.services._core.team_builder.package_location import (
+    canonical_team_package_path,
+    team_omni_domain,
+)
 from omnicompany.protocol.anchor import Verdict, VerdictKind
+from omnicompany.protocol.team import (
+    TeamGenerationMethod,
+    TeamGenerationSpec,
+    TeamPositionActivation,
+    TeamPositionSpec,
+)
 
 
 _TODAY = _dt.date.today().isoformat()  # "YYYY-MM-DD"
 
 
-def _omni_header(team_name: str, file_domain: str, file_type: str = "worker") -> str:
+def _omni_header(
+    team_name: str,
+    target_package_path: str,
+    file_domain: str,
+    file_type: str = "worker",
+) -> str:
     """OmniMark 头 · 固定格式."""
+    package_domain = team_omni_domain(
+        target_package_path,
+        team_name=team_name,
+    )
     return (
-        f"# [OMNI] origin=team_builder domain=services/{team_name}/{file_domain} "
+        f"# [OMNI] origin=team_builder domain={package_domain}/{file_domain} "
         f"ts={_TODAY}T00:00:00Z type={file_type}"
     )
 
@@ -113,14 +132,15 @@ def _extract_team_name(input_data: dict) -> str:
 
 
 def _extract_target_package_path(input_data: dict, team_name: str) -> str:
-    """从 workspace_spec 抽 target_package_path · 没有则按 team_name 构造."""
+    """从已验证的 team_design/workspace_spec 抽唯一目标路径."""
     ws = input_data.get("_from_workspace_designer") if isinstance(input_data, dict) else None
-    for cand in (ws, input_data):
+    td = input_data.get("_from_team_architect") if isinstance(input_data, dict) else None
+    for cand in (ws, td, input_data):
         if isinstance(cand, dict):
-            tp = cand.get("target_package_path") or cand.get("generated_package_path")
+            tp = cand.get("target_package_path")
             if isinstance(tp, str) and tp.strip():
-                return tp.rstrip("/") + "/"
-    return f"src/omnicompany/packages/services/{team_name}/"
+                return canonical_team_package_path(tp, team_name=team_name)
+    return canonical_team_package_path(None, team_name=team_name)
 
 
 def _extract_worker_details(input_data: dict) -> list[dict]:
@@ -155,6 +175,60 @@ def _extract_material_details(input_data: dict) -> list[dict]:
     return []
 
 
+def _render_anchor_route_lines(detail: dict) -> list[str]:
+    """Render declared Worker verdict routes without inventing retries."""
+
+    raw_routes = detail.get("routes")
+    routes = dict(raw_routes) if isinstance(raw_routes, dict) else {}
+    routes.setdefault("PASS", {"action": "next"})
+    routes.setdefault("FAIL", {"action": "halt"})
+    routes.setdefault("PARTIAL", {"action": "halt"})
+
+    lines: list[str] = []
+    for verdict_name in ("PASS", "FAIL", "PARTIAL"):
+        raw_route = routes.get(verdict_name)
+        if not isinstance(raw_route, dict):
+            raise ValueError(f"routes.{verdict_name} must be an object")
+        action = str(raw_route.get("action") or "").strip().lower()
+        if action not in {"next", "retry", "jump", "emit", "halt"}:
+            raise ValueError(
+                f"routes.{verdict_name}.action is invalid: {action!r}"
+            )
+        arguments = [f"action=RouteAction.{action.upper()}"]
+        target = raw_route.get("target")
+        if target is not None:
+            if not isinstance(target, str) or not target.strip():
+                raise ValueError(
+                    f"routes.{verdict_name}.target must be a non-empty string"
+                )
+            arguments.append(f"target={target.strip()!r}")
+        if action == "jump" and not target:
+            raise ValueError(f"routes.{verdict_name}.target is required for jump")
+        feedback = raw_route.get("feedback")
+        if feedback is not None:
+            if not isinstance(feedback, str):
+                raise ValueError(
+                    f"routes.{verdict_name}.feedback must be a string"
+                )
+            arguments.append(f"feedback={feedback!r}")
+        if action == "retry":
+            max_retries = raw_route.get("max_retries", 1)
+            if (
+                not isinstance(max_retries, int)
+                or isinstance(max_retries, bool)
+                or max_retries < 0
+            ):
+                raise ValueError(
+                    f"routes.{verdict_name}.max_retries must be a non-negative integer"
+                )
+            arguments.append(f"max_retries={max_retries}")
+        lines.append(
+            f"            VerdictKind.{verdict_name}: "
+            f"Route({', '.join(arguments)}),"
+        )
+    return lines
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Wh1 · FormatsFileGenerator → formats.py
 # ═══════════════════════════════════════════════════════════════════════
@@ -178,9 +252,22 @@ class FormatsFileGenerator(Worker):
         if not isinstance(input_data, dict):
             return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="input_data must be dict")
         team_name = _extract_team_name(input_data)
+        try:
+            target_package_path = _extract_target_package_path(input_data, team_name)
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
         materials = _extract_material_details(input_data)
 
-        header = _omni_header(team_name, "formats", "config")
+        header = _omni_header(
+            team_name,
+            target_package_path,
+            "formats",
+            "config",
+        )
         lines: list[str] = [
             header,
             f'"""{team_name} Team · Material 定义 (团队 builder 自动产出).',
@@ -247,7 +334,7 @@ class FormatsFileGenerator(Worker):
         content = "\n".join(lines)
         return Verdict(
             kind=VerdictKind.PASS,
-            output={"rel_path": "formats.py", "content": content, "team_name": team_name, "target_package_path": f"src/omnicompany/packages/services/{team_name}/"},
+            output={"rel_path": "formats.py", "content": content, "team_name": team_name, "target_package_path": target_package_path},
             diagnosis=f"formats.py · {len(materials)} material · {len(content)} bytes",
         )
 
@@ -275,15 +362,88 @@ class TeamFileGenerator(Worker):
         if not isinstance(input_data, dict):
             return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="input_data must be dict")
         team_name = _extract_team_name(input_data)
+        try:
+            target_package_path = _extract_target_package_path(input_data, team_name)
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
         td = input_data.get("_from_team_architect") or {}
         if not isinstance(td, dict):
             td = {}
+        team_id = str(td.get("team_id") or team_name).strip()
         details = _extract_worker_details(input_data)
         details_by_id = {d.get("worker_id"): d for d in details if d.get("worker_id")}
 
         workers_skeleton = td.get("workers_skeleton") or []
         if not isinstance(workers_skeleton, list):
             workers_skeleton = []
+        workers_by_id = {
+            str(item.get("worker_name") or item.get("worker_id")): item
+            for item in workers_skeleton
+            if isinstance(item, dict)
+            and (item.get("worker_name") or item.get("worker_id"))
+        }
+
+        raw_positions = td.get("positions") or []
+        if not isinstance(raw_positions, list):
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis="team_design.positions must be a list",
+            )
+        try:
+            positions = [
+                TeamPositionSpec.model_validate(item)
+                for item in raw_positions
+            ]
+            generation = TeamGenerationSpec.model_validate(
+                td.get("generation")
+                or {
+                    "method": TeamGenerationMethod.TEAM_BUILDER.value,
+                    "builder_id": "team-builder",
+                }
+            )
+        except (TypeError, ValueError) as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"invalid canonical TeamSpec metadata: {exc}",
+            )
+
+        known_position_ids = {position.id for position in positions}
+        mapped_position_ids = {
+            str(item.get("position_id"))
+            for item in workers_skeleton
+            if isinstance(item, dict) and item.get("position_id")
+        }
+        unknown_position_ids = sorted(mapped_position_ids - known_position_ids)
+        if unknown_position_ids:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=(
+                    "workers_skeleton references unknown TeamPositionSpec ids: "
+                    f"{unknown_position_ids}"
+                ),
+            )
+        active_position_ids = {
+            position.id
+            for position in positions
+            if position.activation == TeamPositionActivation.ACTIVE
+        }
+        unmapped_active = sorted(active_position_ids - mapped_position_ids)
+        if unmapped_active:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=(
+                    "active TeamPositionSpec ids require Worker mappings: "
+                    f"{unmapped_active}"
+                ),
+            )
         purpose = str(td.get("purpose") or f"{team_name} team")
         entry = td.get("entry")
         if not entry and workers_skeleton:
@@ -292,7 +452,12 @@ class TeamFileGenerator(Worker):
             entry = details[0].get("worker_id")
         entry = entry or "unknown_entry"
 
-        header = _omni_header(team_name, "team", "team")
+        header = _omni_header(
+            team_name,
+            target_package_path,
+            "team",
+            "team",
+        )
         lines: list[str] = [
             header,
             f'"""{team_name} Team · 拓扑声明 (team_builder 自动产出)."""',
@@ -302,14 +467,20 @@ class TeamFileGenerator(Worker):
             "    AnchorSpec, Route, RouteAction, ValidatorKind, ValidatorSpec, VerdictKind,",
             ")",
             "from omnicompany.protocol.team import (",
-            "    NodeKind, NodeMaturity, TeamEdge, TeamNode, TeamSpec,",
+            "    NodeKind, NodeMaturity, TeamEdge, TeamGenerationMethod,",
+            "    TeamGenerationSpec, TeamNode, TeamPositionActivation,",
+            "    TeamPositionSpec, TeamSpec,",
             ")",
             "",
             "",
-            "def _anchor(node_id, fmt_in, fmt_out, *, vkind, desc, routes, maturity=NodeMaturity.GROWING):",
+            "def _anchor(",
+            "    node_id, fmt_in, fmt_out, *, vkind, desc, routes,",
+            "    position_id=None, maturity=NodeMaturity.GROWING,",
+            "):",
             "    return TeamNode(",
             "        id=node_id,",
             "        kind=NodeKind.ANCHOR,",
+            "        position_id=position_id,",
             "        maturity=maturity,",
             "        anchor=AnchorSpec(",
             "            id=f'a_{node_id}',",
@@ -324,8 +495,44 @@ class TeamFileGenerator(Worker):
             "",
             "def build_team() -> TeamSpec:",
             f'    """构建 {team_name} Team."""',
-            "    nodes = []",
+            "    positions = [",
         ]
+
+        for position in positions:
+            lines.extend(
+                [
+                    "        TeamPositionSpec(",
+                    f"            id={position.id!r},",
+                    f"            name={position.name!r},",
+                    f"            responsibilities={list(position.responsibilities)!r},",
+                    f"            non_responsibilities={list(position.non_responsibilities)!r},",
+                    (
+                        "            activation="
+                        f"TeamPositionActivation.{position.activation.name},"
+                    ),
+                    (
+                        "            activation_evidence_refs="
+                        f"{list(position.activation_evidence_refs)!r},"
+                    ),
+                    f"            context_refs={list(position.context_refs)!r},",
+                    f"            benchmark_refs={list(position.benchmark_refs)!r},",
+                    f"            exit_conditions={list(position.exit_conditions)!r},",
+                    "        ),",
+                ]
+            )
+        lines.extend(
+            [
+                "    ]",
+                "    generation = TeamGenerationSpec(",
+                f"        method=TeamGenerationMethod.{generation.method.name},",
+                f"        builder_id={generation.builder_id!r},",
+                f"        request_ref={generation.request_ref!r},",
+                f"        source_refs={list(generation.source_refs)!r},",
+                f"        parent_team_id={generation.parent_team_id!r},",
+                "    )",
+                "    nodes = []",
+            ]
+        )
 
         # 渲染每个 worker 节点 (优先 detailed · 否则用 skeleton)
         seen_ids: set[str] = set()
@@ -346,8 +553,15 @@ class TeamFileGenerator(Worker):
 
         for wid in worker_order:
             d = details_by_id.get(wid, {})
+            worker_skeleton = workers_by_id.get(wid) or {}
+            position_id = worker_skeleton.get("position_id")
             impl_type = (d.get("impl_type") or "SOFT").upper()
-            vkind = {"HARD": "HARD", "SOFT": "SOFT", "AGENT": "SOFT"}.get(impl_type, "SOFT")
+            vkind = {
+                "HARD": "HARD",
+                "SOFT": "SOFT",
+                "AGENT": "SOFT",
+                "EXISTING": "HARD",
+            }.get(impl_type, "SOFT")
             fmt_in = d.get("format_in")
             fmt_out = d.get("format_out")
             if isinstance(fmt_in, list):
@@ -358,16 +572,33 @@ class TeamFileGenerator(Worker):
             # desc: rule_spec (HARD) 或 prompt_template.system (SOFT/AGENT)
             # 用 repr() 安全转义换行 / 引号 / 非 ASCII (骨架反例: LLM 产多行 rule_spec 破 string literal)
             pt = d.get("prompt_template") or {}
-            raw_desc = pt.get("system", "") if impl_type != "HARD" else d.get("rule_spec", "")
+            if impl_type == "EXISTING":
+                raw_desc = (
+                    f"复用既有 Worker {d.get('binding_ref')}; "
+                    "执行配置由 AgentSpec 或运行输入提供"
+                )
+            else:
+                raw_desc = (
+                    pt.get("system", "")
+                    if impl_type != "HARD"
+                    else d.get("rule_spec", "")
+                )
             desc = str(raw_desc or f"{wid} ({impl_type})")[:300]
 
             lines.append('    nodes.append(_anchor(')
             lines.append(f'        {wid!r}, {fmt_in_repr}, {fmt_out_repr},')
             lines.append(f"        vkind=ValidatorKind.{vkind},")
             lines.append(f"        desc={desc!r},")
+            lines.append(f"        position_id={position_id!r},")
             lines.append("        routes={")
-            lines.append("            VerdictKind.PASS: Route(action=RouteAction.NEXT),")
-            lines.append("            VerdictKind.FAIL: Route(action=RouteAction.RETRY, max_retries=1),")
+            try:
+                lines.extend(_render_anchor_route_lines(d))
+            except ValueError as exc:
+                return Verdict(
+                    kind=VerdictKind.FAIL,
+                    output={},
+                    diagnosis=f"invalid Worker routes for {wid}: {exc}",
+                )
             lines.append("        },")
             lines.append("    ))")
 
@@ -387,12 +618,14 @@ class TeamFileGenerator(Worker):
                     lines.append(f'    edges.append(TeamEdge(source="{wid}", target="{target}", condition=VerdictKind.{vk}))')
 
         lines.append('    return TeamSpec(')
-        lines.append(f"        id={team_name!r},")
-        lines.append(f"        name={team_name!r},")
+        lines.append(f"        id={team_id!r},")
+        lines.append(f"        name={team_id!r},")
         lines.append(f"        description={purpose[:300]!r},")
         lines.append(f"        entry={entry!r},")
         lines.append("        nodes=nodes,")
         lines.append("        edges=edges,")
+        lines.append("        positions=positions,")
+        lines.append("        generation=generation,")
         lines.append(f"        tags=[{team_name!r}, 'generated'],")
         lines.append("    )")
         lines.append("")
@@ -400,7 +633,7 @@ class TeamFileGenerator(Worker):
         content = "\n".join(lines)
         return Verdict(
             kind=VerdictKind.PASS,
-            output={"rel_path": "team.py", "content": content, "team_name": team_name, "target_package_path": f"src/omnicompany/packages/services/{team_name}/"},
+            output={"rel_path": "team.py", "content": content, "team_name": team_name, "target_package_path": target_package_path},
             diagnosis=f"team.py · {len(worker_order)} nodes · {len(content)} bytes",
         )
 
@@ -428,9 +661,22 @@ class RunFileGenerator(Worker):
         if not isinstance(input_data, dict):
             return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="input_data must be dict")
         team_name = _extract_team_name(input_data)
+        try:
+            target_package_path = _extract_target_package_path(input_data, team_name)
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
         details = _extract_worker_details(input_data)
 
-        header = _omni_header(team_name, "run", "config")
+        header = _omni_header(
+            team_name,
+            target_package_path,
+            "run",
+            "config",
+        )
         lines: list[str] = [
             header,
             f'"""{team_name} Team · build_bindings (team_builder 自动产出)."""',
@@ -442,12 +688,26 @@ class RunFileGenerator(Worker):
             "from .formats import register_formats  # 相对 import · 支持 tmp smoke + 正式部署两场景",
             "",
         ]
+        local_details = [
+            d for d in details if str(d.get("impl_type") or "").upper() != "EXISTING"
+        ]
+        existing_details = [
+            d for d in details if str(d.get("impl_type") or "").upper() == "EXISTING"
+        ]
+
         # per-worker import
-        for d in details:
+        for d in local_details:
             wid = d.get("worker_id") or "unknown"
             cls = _class_name_for(wid)
             module = _module_name_for(wid)
             lines.append(f"from .workers.{module} import {cls}")
+        existing_aliases: dict[str, str] = {}
+        for index, d in enumerate(existing_details):
+            binding_ref = str(d.get("binding_ref") or "")
+            module_name, class_name = binding_ref.rsplit(":", 1)
+            alias = f"_ExistingWorker{index}"
+            existing_aliases[str(d.get("worker_id") or "unknown")] = alias
+            lines.append(f"from {module_name} import {class_name} as {alias}")
         lines.append("")
         lines.append("")
         lines.append("def build_bindings(input_dict: dict | None = None) -> dict[str, Worker]:")
@@ -457,16 +717,24 @@ class RunFileGenerator(Worker):
         lines.append("    return {")
         for d in details:
             wid = d.get("worker_id") or "unknown"
-            cls = _class_name_for(wid)
-            lines.append(f'        "{wid}": {cls}(),')
+            if str(d.get("impl_type") or "").upper() == "EXISTING":
+                cls = existing_aliases[str(wid)]
+                kwargs = d.get("binding_kwargs") or {}
+                lines.append(f'        "{wid}": {cls}(**{kwargs!r}),')
+            else:
+                cls = _class_name_for(wid)
+                lines.append(f'        "{wid}": {cls}(),')
         lines.append("    }")
         lines.append("")
 
         content = "\n".join(lines)
         return Verdict(
             kind=VerdictKind.PASS,
-            output={"rel_path": "run.py", "content": content, "team_name": team_name, "target_package_path": f"src/omnicompany/packages/services/{team_name}/"},
-            diagnosis=f"run.py · {len(details)} bindings · {len(content)} bytes",
+            output={"rel_path": "run.py", "content": content, "team_name": team_name, "target_package_path": target_package_path},
+            diagnosis=(
+                f"run.py · {len(details)} bindings "
+                f"({len(existing_details)} existing) · {len(content)} bytes"
+            ),
         )
 
 
@@ -487,6 +755,17 @@ class PackageInitGenerator(Worker):
 
     def run(self, input_data: Any) -> Verdict:
         team_name = _extract_team_name(input_data if isinstance(input_data, dict) else {"team_name": "unnamed"})
+        try:
+            target_package_path = _extract_target_package_path(
+                input_data if isinstance(input_data, dict) else {},
+                team_name,
+            )
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
         td = input_data.get("_from_team_architect") if isinstance(input_data, dict) else {}
         if not isinstance(td, dict):
             td = {}
@@ -494,7 +773,12 @@ class PackageInitGenerator(Worker):
         purpose_raw = str(td.get("purpose") or f"{team_name} team")
         purpose = purpose_raw.replace("\r", " ").replace("\n", " ").replace('"""', '"')[:200]
 
-        header = _omni_header(team_name, "__init__", "config")
+        header = _omni_header(
+            team_name,
+            target_package_path,
+            "__init__",
+            "config",
+        )
         content = "\n".join([
             header,
             f'"""{team_name} Team · {purpose}',
@@ -511,7 +795,7 @@ class PackageInitGenerator(Worker):
         ])
         return Verdict(
             kind=VerdictKind.PASS,
-            output={"rel_path": "__init__.py", "content": content, "team_name": team_name, "target_package_path": f"src/omnicompany/packages/services/{team_name}/"},
+            output={"rel_path": "__init__.py", "content": content, "team_name": team_name, "target_package_path": target_package_path},
             diagnosis=f"__init__.py · {len(content)} bytes",
         )
 
@@ -537,9 +821,25 @@ class WorkersInitGenerator(Worker):
 
     def run(self, input_data: Any) -> Verdict:
         team_name = _extract_team_name(input_data if isinstance(input_data, dict) else {})
+        try:
+            target_package_path = _extract_target_package_path(
+                input_data if isinstance(input_data, dict) else {},
+                team_name,
+            )
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
         details = _extract_worker_details(input_data if isinstance(input_data, dict) else {})
 
-        header = _omni_header(team_name, "workers/__init__", "config")
+        header = _omni_header(
+            team_name,
+            target_package_path,
+            "workers/__init__",
+            "config",
+        )
         lines: list[str] = [
             header,
             f'"""{team_name} Team · workers 子包导出."""',
@@ -550,6 +850,8 @@ class WorkersInitGenerator(Worker):
         ]
         class_names: list[str] = []
         for d in details:
+            if str(d.get("impl_type") or "").upper() == "EXISTING":
+                continue
             wid = d.get("worker_id") or "unknown"
             cls = _class_name_for(wid)
             module = _module_name_for(wid)
@@ -565,7 +867,7 @@ class WorkersInitGenerator(Worker):
         content = "\n".join(lines)
         return Verdict(
             kind=VerdictKind.PASS,
-            output={"rel_path": "workers/__init__.py", "content": content, "team_name": team_name, "target_package_path": f"src/omnicompany/packages/services/{team_name}/"},
+            output={"rel_path": "workers/__init__.py", "content": content, "team_name": team_name, "target_package_path": target_package_path},
             diagnosis=f"workers/__init__.py · {len(class_names)} exports · {len(content)} bytes",
         )
 
@@ -594,11 +896,19 @@ class WorkspaceYamlGenerator(Worker):
             return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="workspace_spec not dict")
 
         team_name = _extract_team_name(input_data)
+        try:
+            target_package_path = _extract_target_package_path(input_data, team_name)
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
 
         # 只保留规范字段, 丢掉 _meta / _from_*
         canonical_keys = (
             "name", "write_prefixes", "read_prefixes", "bash_cwd_prefixes",
-            "generated_package_path",
+            "target_package_path",
         )
         cleaned = {k: spec[k] for k in canonical_keys if k in spec}
         if not cleaned.get("name"):
@@ -607,6 +917,6 @@ class WorkspaceYamlGenerator(Worker):
         yaml_text = yaml.safe_dump(cleaned, allow_unicode=True, sort_keys=False)
         return Verdict(
             kind=VerdictKind.PASS,
-            output={"rel_path": ".omni/workspace.yaml", "content": yaml_text, "team_name": team_name, "target_package_path": f"src/omnicompany/packages/services/{team_name}/"},
+            output={"rel_path": ".omni/workspace.yaml", "content": yaml_text, "team_name": team_name, "target_package_path": target_package_path},
             diagnosis=f".omni/workspace.yaml · {len(yaml_text)} bytes",
         )

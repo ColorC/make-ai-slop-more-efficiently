@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:team_builder.workers.scale_evaluator.agent_loop.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """ScaleAssessorWorker — Phase 2 · AgentNodeLoop (2026-04-23).
 
 Worker 协议 (composite fan-in and):
@@ -57,7 +58,7 @@ _SYSTEM_PROMPT = """你是 team_builder 第 2 阶段 · ScaleAssessor agent.
 
 **若落 large**: 必须判拆分维度
 - by_capability: 能力边界明确 (分析 / 生成 / 验证)
-- by_domain: 业务子领域明确 (demogame / voxelcraft)
+- by_domain: 业务子领域明确 (research / decisions)
 - by_phase: 阶段明确 (ingest / process / output)
 
 ## 产出 (finish 的 result 字段应为 JSON 字符串)
@@ -225,12 +226,85 @@ class ScaleAssessorWorker(AgentNodeLoop):
     TOOL_ROUTERS: ClassVar[list] = [ReadFileRouter, GlobRouter, GrepRouter, ListDirRouter, FinishRouter]
     NODE_PROMPT: ClassVar[str] = _SYSTEM_PROMPT
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any) -> _ScaleAssessorPromptBuilder:
         return _ScaleAssessorPromptBuilder(template=self.NODE_PROMPT, bus=bus)
 
     def build_extract_result(self, *, bus: Any) -> _ScaleAssessorExtractResult:
         return _ScaleAssessorExtractResult(bus=bus)
+
+    async def run(self, input_data: Any) -> Verdict:
+        deterministic = _explicit_single_existing_shape(input_data)
+        if deterministic is not None:
+            return Verdict(
+                kind=VerdictKind.PASS,
+                output=deterministic,
+                diagnosis="explicit one-node existing-Worker shape; no model call needed",
+            )
+        return await AgentNodeLoop.run(self, input_data)
+
+
+def _explicit_single_existing_shape(input_data: Any) -> dict[str, Any] | None:
+    """Return a fixed small-team assessment only when the request says so explicitly.
+
+    This is intentionally conservative.  It avoids a multi-turn comparison run for
+    the common wrapper shape while leaving ambiguous or genuinely large requests on
+    the existing ScaleAssessor agent path.
+    """
+
+    if not isinstance(input_data, dict):
+        return None
+    intent = input_data.get("_from_intent_analyzer") or input_data
+    try:
+        text = json.dumps(intent, ensure_ascii=False).lower()
+    except (TypeError, ValueError):
+        return None
+    compact = re.sub(r"[`'\"\s：:，,]+", "", text)
+    existing_binding = (
+        "impl_type=existing" in compact
+        or "impl_typeexisting" in compact
+    )
+    one_node = any(
+        phrase in compact
+        for phrase in (
+            "仅允许一个节点",
+            "只允许一个节点",
+            "仅声明一个节点",
+            "只声明一个节点",
+            "exactlyonenode",
+            "onlyonenode",
+        )
+    )
+    no_materials = any(
+        phrase in compact
+        for phrase in (
+            "materials_skeleton为空",
+            "materials_skeleton必须为空",
+            "emptymaterials_skeleton",
+            "materials_skeletonempty",
+        )
+    )
+    if not (existing_binding and one_node and no_materials):
+        return None
+    return {
+        "size": "small",
+        "recommend_decompose": False,
+        "decompose_axis": None,
+        "rationale": (
+            "需求已明确限定为 1 个节点、复用既有 Worker 且不新建 Material；"
+            "结构事实足以判定，无需读取历史 Team 或调用模型。"
+        ),
+        "estimated_worker_count": 1,
+        "estimated_material_count": 0,
+        "_meta": {
+            "worker": "ScaleAssessorWorker",
+            "stage": "deterministic_explicit_shape",
+            "model_called": False,
+        },
+    }

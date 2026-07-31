@@ -18,9 +18,8 @@ _DEFAULT_REGISTRY_LOCK = threading.Lock()
 # 模块缺失/导入失败一律吞掉不阻断审阅台启动(允许先登记后实现)。
 DOMAIN_FORMAT_SOURCES: dict[str, str] = {
     "frontend_design": "omnicompany.packages.domains.frontend_design.formats:register_formats",
-    "demogame_design_doc": "omnicompany.packages.domains.demogame.design_doc_lint.formats:register_formats",
     "narrative": "omnicompany.packages.domains.narrative.formats:register_review_stage_formats",
-    "voxelcraft": "omnicompany.packages.domains.voxelcraft.review_stage_formats:register_review_stage_formats",
+    "bilibili_publish": "omnicompany.packages.domains.bilibili_publish.review_stage_formats:register_review_stage_formats",
 }
 
 
@@ -84,9 +83,12 @@ DEFAULT_REVIEW_KINDS: tuple[str, ...] = (
     "plan",                    # 计划
     "static-report",           # 静态工作报告网页
     "demo",                    # demo 网页
-    "aigc-image",              # AIGC 图片(路由到 aigc-lab 审阅台)
+    "aigc-image",              # AIGC 图片附件(由父报告承载审阅语境)
     "agent-workflow-report",   # Agent 标准工作流程工作报告
 )
+
+# 这些载体可以为报告保存附件，但不能独占普通审阅队列。
+ATTACHMENT_ONLY_REVIEW_KINDS = frozenset({"image", "aigc-image"})
 
 DEFAULT_REVIEW_TIERS: tuple[str, ...] = (
     "mandatory",
@@ -107,6 +109,7 @@ REVIEW_STAGE_TAG_PREFIX = "review.stage."
 REVIEW_STAGE_MEMBER_TAG_PREFIX = "review.stage-member."
 REVIEW_STAGE_EXPECTED_KIND_TAG_PREFIX = "review.stage-expected-kind."
 REVIEW_STAGE_GATE_TAG_PREFIX = "review.stage-gate."
+REVIEW_SUBJECT_TYPE_TAG_PREFIX = "review.subject-type."
 
 
 def _value(value: Any) -> str:
@@ -300,6 +303,29 @@ def project_registered_tracks(project: str, registry: FormatRegistry | None = No
     return tracks
 
 
+def project_subject_types(project: str, registry: FormatRegistry | None = None) -> set[str]:
+    """项目内容资产的主体类型约束，例如视频发布项目的 ``episode``。
+
+    主体类型仍由域成员 Format 登记，不在审阅台硬编码项目名。没有声明的项目保持
+    兼容：Material 可以不带 subject/revision；声明后的项目在在册 track 上由 store
+    强制要求完整主体身份。
+    """
+    if registry is None or not project:
+        return set()
+    domains = project_domains(project, registry)
+    out: set[str] = set()
+    for fmt in registry.all_formats():
+        if not any(f"{REVIEW_STAGE_MEMBER_TAG_PREFIX}{domain}.{project}" in fmt.tags for domain in domains):
+            continue
+        out.update(
+            tag[len(REVIEW_SUBJECT_TYPE_TAG_PREFIX):].strip()
+            for tag in fmt.tags
+            if tag.startswith(REVIEW_SUBJECT_TYPE_TAG_PREFIX)
+            and tag[len(REVIEW_SUBJECT_TYPE_TAG_PREFIX):].strip()
+        )
+    return out
+
+
 def review_material_tags(kind: Any, tier: Any, extra: Iterable[str] | None = None) -> list[str]:
     tags = [
         f"{REVIEW_KIND_TAG_PREFIX}{_value(kind)}",
@@ -312,6 +338,7 @@ def review_material_tags(kind: Any, tier: Any, extra: Iterable[str] | None = Non
 
 
 __all__ = [
+    "ATTACHMENT_ONLY_REVIEW_KINDS",
     "DEFAULT_REVIEW_KINDS",
     "DEFAULT_REVIEW_TIERS",
     "REVIEW_KIND_TAG_PREFIX",
@@ -325,6 +352,7 @@ __all__ = [
     "normalize_review_tier",
     "project_domains",
     "project_registered_tracks",
+    "project_subject_types",
     "registered_domains",
     "registered_review_kinds",
     "registered_review_tiers",

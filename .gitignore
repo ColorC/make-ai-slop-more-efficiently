@@ -57,7 +57,6 @@ src/omnicompany/dashboard/frontend/playwright-report/
 src/omnicompany/dashboard/static/
 
 # Plan-local 二进制缓存 (figma renders 等), 单 plan 100MB+ 量级, 不入版本库
-docs/plans/**/cache/figma_renders/
 docs/plans/**/cache/
 
 # Agent-generated temp files (from BigCodeBench runtime)
@@ -155,3 +154,8 @@ data/domains/voxelcraft/*
 !data/domains/voxelcraft/MANIFEST.yaml
 !data/domains/voxelcraft/references/
 data/domains/voxelcraft/references/twilightforest/source/
+# north-stars 权威源 (2026-07-26 从 docs/north-stars/ 迁入, OMNI-035h):
+# 人工策展不可再生, 比照 voxelcraft 白名单进 git
+!data/domains/personal_site/
+data/domains/personal_site/*
+!data/domains/personal_site/north-stars.json

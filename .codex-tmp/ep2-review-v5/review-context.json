@@ -1,0 +1,9 @@
+{
+  "profile_id": "generic-video",
+  "schema_id": "bilibili-video-production/v1",
+  "references": [
+    "episodes/ep02-publishing-pipelines/video/production-manifest.json",
+    "episodes/ep02-publishing-pipelines/video/assets/v2-pilot/review/render-report-v5.json",
+    "episodes/ep02-publishing-pipelines/video/exports/v2-pilot/ep02_blueprint_pilot_v5.qa.json"
+  ]
+}

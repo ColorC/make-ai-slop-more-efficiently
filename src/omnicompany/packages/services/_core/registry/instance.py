@@ -7,9 +7,9 @@ InstanceRegistry — 实例注册表
 文件路径可被 git 追踪，diff 清晰可读。
 
 entity_id 格式：{type}:{package}.{name}
-  示例：router:demogame.team_table.SchemaAssembler
-        format:demogame.table_schema
-        team:demogame.team_table
+  示例：router:example_domain.example_team.SchemaAssembler
+        format:example_domain.example_schema
+        team:example_domain.example_team
 
 自由原则：
   - entity_id 不强制 package 深度
@@ -52,7 +52,7 @@ class InstanceEntry:
     """实体名称（Router 类名 / Format id / Pipeline 名称 等）。"""
 
     package: str
-    """所属 package 点分路径（如 demogame.team_table），可为空字符串。"""
+    """所属 package 点分路径（如 example_domain.example_team），可为空字符串。"""
 
     source_file: str
     """定义文件的相对路径（相对于 source_root.parent，即 omnicompany 根目录）。"""

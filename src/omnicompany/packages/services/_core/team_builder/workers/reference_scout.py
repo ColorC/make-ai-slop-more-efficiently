@@ -31,21 +31,37 @@ from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 # 默认扫描范围 (启发式 · 不走 LLM)
 # ───────────────────────────────────────
-# V0 版本: 不真扫文件, 硬编码核心 standards 参考路径.
-# 观测后若发现命中率低, 升级为真扫 + LLM 判相关性.
+# 只登记当前存在的 canonical 路径；ReferenceScout 不能把已归档或已迁移路径
+# 当作新 Team 的设计依据。
 _CORE_STANDARDS = (
-    ("docs/standards/workspace.md", "workspace 权威 · 每 Team 必遵 (write 紧 read 宽)", "standard"),
-    ("docs/standards/agent_first.md", "agent-first 方法论权威 · 决定是否走 agent 探针", "standard"),
-    ("docs/standards/pipeline.md", "P-13 充分性 · Team 设计必遵", "standard"),
-    ("docs/standards/format.md", "F-15 诚实 · Material 声明必遵", "standard"),
-    ("docs/standards/distributed-docs.md", "OMNI-034 DESIGN.md 七节 · 产出包必遵", "standard"),
-    ("docs/standards/terminology.md", "Material/Worker/Team 命名 · B 层铁律", "standard"),
-    ("docs/standards/llm_first.md", "铁律 A 无预防截断 + 铁律 B 预算宽松", "standard"),
+    ("docs/standards/concepts/team.md", "canonical TeamSpec 与 Team 术语权威", "standard"),
+    ("docs/standards/concepts/worker.md", "Worker 职责与复用边界", "standard"),
+    ("docs/standards/concepts/material.md", "Material 契约与来源边界", "standard"),
+    ("docs/standards/concepts/workspace.md", "workspace 权威 · write 紧 read 宽", "standard"),
+    ("docs/standards/concepts/agent_first.md", "是否需要 Agent 循环的判断依据", "standard"),
+    ("docs/standards/_global/single_source_thin_wrap.md", "单一真源与薄适配器规则", "standard"),
+    ("docs/standards/_global/distributed-docs.md", "OMNI-034 DESIGN.md 七节", "standard"),
+    ("docs/standards/_global/terminology.md", "Material、Worker、Team 命名权威", "standard"),
+    ("docs/standards/_global/llm_first.md", "LLM 使用边界", "standard"),
+    ("docs/standards/cli/llm_infrastructure.md", "统一模型设施入口", "standard"),
 )
 
 _SIMILAR_TEAMS = (
-    ("src/omnicompany/packages/services/doctor/", "Stage 3 完整标杆 · 未来产出 Team 模板", "similar_team"),
-    ("src/omnicompany/packages/services/team_builder/_archive/routers_legacy.py", "旧 workflow_factory 业务链参考 · Diamond 归档", "similar_team"),
+    (
+        "src/omnicompany/packages/services/_core/agent/external_workers/routers/workflow_node.py",
+        "现有 TeamRunner Agent Worker 节点；可直接引用，不重复生成 Agent 启动器",
+        "similar_team",
+    ),
+    (
+        "src/omnicompany/packages/services/_focus/meegle_dispatch.py",
+        "现有 Meegle 到 Project、Skill、Agent 的薄路由桥",
+        "similar_team",
+    ),
+    (
+        "src/omnicompany/packages/services/_core/lifecycle/claim_route.py",
+        "Task 到 Team 岗位的唯一原子认领入口",
+        "similar_team",
+    ),
 )
 
 _BUS_INFRA = (
@@ -72,7 +88,7 @@ class ReferenceScoutWorker(Worker):
                 diagnosis=f"input_data must be dict, got {type(input_data).__name__}",
             )
 
-        # ─── 扫描参考 (V0 · 启发式固定清单) ─────────────────
+        # ─── 扫描参考 (V0 · 当前 canonical 固定清单) ────────
         # TODO(A3 后续): 升级为 AGENT worker
         #   - grep 工具: 按 intent_analysis.domain 关键词找 similar teams
         #   - read 工具: 读 DESIGN.md / manifest.yaml
@@ -98,9 +114,9 @@ class ReferenceScoutWorker(Worker):
                 "body_path": body_path_hint,
                 "_meta": {
                     "worker": "ReferenceScoutWorker",
-                    "stage": "v0_heuristic",
+                    "stage": "v0_canonical_inventory",
                     "count": len(references),
-                    "note": "stub · 升级为 AGENT 后走 grep+read+LLM 判相关性",
+                    "note": "固定读取当前 canonical Team、Worker、路由与认领入口",
                 },
             },
         )

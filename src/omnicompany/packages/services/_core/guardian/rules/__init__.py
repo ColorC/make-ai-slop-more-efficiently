@@ -40,6 +40,7 @@ from .progress_snapshot import RULES as _R097  # plan.md 正文进度快照(进�
 from .prose_health import RULES as _R098  # 语言治理确定性半(禁用代称/术语变体/已知缩写)· 2026-06-27 commit-time
 from .plan_bindings_guardian import RULES as _R099  # 绑定注册表巡检(缺锚/登记不完整/悬空)· 2026-07-03 overnight-run 第六节
 from .testmap_sync import RULES as _R100  # OMNI-100 (testmap 同步提醒 · 功能点-测试台账完成标准 · 2026-07-03)
+from .ontology_ruins import RULES as _R101  # OMNI-101 (决策本体清场废墟检测 · 2026-07-10)
 
 # 按 OMNI 编号顺序组装（便于阅读 patrol 日志）
 RULES: list[GuardianRule] = [
@@ -70,6 +71,7 @@ RULES: list[GuardianRule] = [
     *_R098,        # OMNI-098 (语言治理确定性半 · 禁用代称/术语变体/已知缩写 · commit-time · 2026-06-27)
     *_R099,        # OMNI-099 (绑定注册表巡检 · 缺锚/登记不完整/悬空 · 2026-07-03 overnight-run 第六节)
     *_R100,        # OMNI-100 (testmap 同步提醒 · 功能点-测试台账完成标准 · 2026-07-03)
+    *_R101,        # OMNI-101a/b (决策本体清场废墟检测 · 墓碑复活+死模块引用 · 2026-07-10 清场纪律)
 ]
 
 __all__ = [

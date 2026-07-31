@@ -11,7 +11,7 @@ attacks: []
 
 source:
   source_type: report
-  artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v19_h034_batch_finding_2026-05-07.md"
+  artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/h034_batch_finding_2026-05-07.md"
   producer: "HypothesisDiagnosticAgent"
   method: "LLM diagnosis + batch report"
 

@@ -39,6 +39,7 @@ interface UseChatComposerStateArgs {
   codexModel: string;
   geminiModel: string;
   opencodeModel: string;
+  kimiModel: string;
   omniAgentModel: string;
   controllerModel: string;
   isLoading: boolean;
@@ -175,6 +176,7 @@ export function useChatComposerState({
   codexModel,
   geminiModel,
   opencodeModel,
+  kimiModel,
   omniAgentModel,
   controllerModel,
   isLoading,
@@ -338,11 +340,13 @@ export function useChatComposerState({
                 ? geminiModel
                 : provider === 'opencode'
                   ? opencodeModel
-                  : provider === 'omni_agent'
-                    ? omniAgentModel
-                    : provider === 'controller'
-                      ? controllerModel
-                      : claudeModel,
+                  : provider === 'kimi'
+                    ? kimiModel
+                    : provider === 'omni_agent'
+                      ? omniAgentModel
+                      : provider === 'controller'
+                        ? controllerModel
+                        : claudeModel,
           tokenUsage: tokenBudget,
         };
 
@@ -397,6 +401,7 @@ export function useChatComposerState({
       cursorModel,
       geminiModel,
       opencodeModel,
+      kimiModel,
       omniAgentModel,
       controllerModel,
       handleBuiltInCommand,
@@ -695,7 +700,9 @@ export function useChatComposerState({
                   ? 'gemini-settings'
                   : provider === 'opencode'
                     ? 'opencode-settings'
-                    : provider === 'omni_agent'
+                    : provider === 'kimi'
+                      ? 'kimi-settings'
+                      : provider === 'omni_agent'
                       ? 'omni_agent-settings'
                       : provider === 'controller'
                         ? 'claude-settings'
@@ -725,7 +732,9 @@ export function useChatComposerState({
               ? geminiModel
               : provider === 'opencode'
                 ? opencodeModel
-                : provider === 'omni_agent'
+                : provider === 'kimi'
+                  ? kimiModel
+                  : provider === 'omni_agent'
                   ? omniAgentModel
                   : provider === 'controller'
                     ? controllerModel
@@ -774,6 +783,7 @@ export function useChatComposerState({
       executeCommand,
       geminiModel,
       opencodeModel,
+      kimiModel,
       omniAgentModel,
       controllerModel,
       isLoading,

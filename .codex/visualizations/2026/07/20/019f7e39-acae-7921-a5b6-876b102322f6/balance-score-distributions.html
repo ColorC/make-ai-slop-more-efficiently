@@ -1,0 +1,312 @@
+<div id="anniv-balance-distribution">
+  <section aria-labelledby="faction-distribution-heading">
+    <h3 id="faction-distribution-heading">各流派终局分数分布（对数横轴）</h3>
+    <p class="text-small text-muted">全解锁，24 回合，每种策略 1,000 局；柱高为该流派落在对应分数区间的占比。</p>
+    <div id="faction-histogram"></div>
+  </section>
+
+  <section aria-labelledby="overall-distribution-heading">
+    <h3 id="overall-distribution-heading">整体游玩分数分布</h3>
+    <p class="text-small text-muted">五种策略合并 5,000 局。横轴使用对数尺度，右侧仍保留低频奇迹局。</p>
+    <div id="overall-histogram"></div>
+  </section>
+
+  <section aria-labelledby="median-curve-heading">
+    <h3 id="median-curve-heading">各流派典型进度（逐回合中位数）</h3>
+    <div id="median-legend" class="anniv-legend text-small" aria-label="流派图例"></div>
+    <div id="median-curves"></div>
+  </section>
+
+  <section aria-labelledby="representative-curve-heading">
+    <h3 id="representative-curve-heading">真实代表局曲线</h3>
+    <p class="text-small text-muted">从 5,000 局中选取最接近整体 P25、P50、P90 的真实对局，不是平均曲线。</p>
+    <div id="representative-legend" class="anniv-legend text-small" aria-label="代表局图例"></div>
+    <div id="representative-curves"></div>
+  </section>
+
+  <p class="text-small text-muted">当前 headless 基线尚未消费检查点 BonusReward 的额外选建筑次数，因此实际正式局的后段曲线可能略高。</p>
+  <script id="anniv-balance-data" type="application/json">{"generatedAt":"2026-07-20T09:58:10.033Z","gamesPerStrategy":1000,"totalGames":5000,"rounds":24,"edges":[0,5000,6495,8438,10962,14240,18499,24032,31219,40556,52685,68442,88912,115504,150048,194925,253223,328956,427340,555148,721182,936872,1217070,1581070,2053935,2668223,3466232,4502909,5849633,7599135,9871876],"strategies":[{"key":"greedy","label":"贪心","mean":68318,"p25":26508,"p50":43272,"p75":75240,"p90":142584,"p95":203079,"max":1616697,"histogram":[0,0.2,0.6,2.2,3.5,4.3,9.8,13.4,13.4,13.8,11,8.9,5.8,3.7,4.1,1.6,1.7,1.2,0.3,0.2,0.2,0,0,0.1,0,0,0,0,0,0],"medianCurve":[51,105,174,330,561,909,1278,1770,2349,3075,3894,4935,6153,7530,9330,11418,14184,16890,20460,24420,29004,33654,37509,43272]},{"key":"farm","label":"烹饪","mean":68322,"p25":25041,"p50":41781,"p75":70518,"p90":132210,"p95":203775,"max":1376121,"histogram":[0.5,0.6,0.6,2.4,3.8,5.6,9.8,10.4,15,12.5,12.7,8.9,4.9,3.6,3.2,2.4,1.1,0.9,0.3,0.2,0.2,0.2,0.2,0,0,0,0,0,0,0],"medianCurve":[51,105,180,324,558,888,1278,1737,2349,3051,3909,4836,6135,7551,9330,11433,14031,17136,20598,24831,28809,33504,37368,41781]},{"key":"wood","label":"伐木","mean":76262,"p25":24345,"p50":37692,"p75":68820,"p90":140076,"p95":222042,"max":9871875,"histogram":[0.3,0.2,1.3,2.2,2.6,6.9,10.9,14.3,14.9,12.1,9.2,7.1,4.8,4.2,2.5,2.5,2.3,0.9,0.4,0.1,0.1,0,0,0,0,0.1,0,0,0,0.1],"medianCurve":[51,105,186,354,582,921,1299,1758,2346,3057,3894,4836,6015,7359,8907,10953,13101,15855,19803,23340,26514,30255,33909,37692]},{"key":"ore","label":"锻造","mean":76412,"p25":24501,"p50":40551,"p75":75456,"p90":148458,"p95":247659,"max":1668951,"histogram":[0.4,0.1,0.5,1.2,4.1,6.4,11.4,13.7,12.3,11,10.4,7.7,6,5,2.5,2.3,1.6,1.3,0.5,0.8,0.5,0.2,0,0.1,0,0,0,0,0,0],"medianCurve":[51,105,189,339,552,894,1275,1752,2364,3009,3888,4839,6069,7428,9153,11247,13701,16659,19806,23385,26967,31866,36165,40551]},{"key":"alchemy","label":"炼药","mean":76454,"p25":27906,"p50":45039,"p75":78750,"p90":158922,"p95":230628,"max":1616697,"histogram":[0.2,0.3,0.8,0.7,2.9,4.8,8.1,12.6,14.7,12.8,11,8.8,6.8,4.5,4.3,2.1,2,1.2,0.2,0.7,0.4,0,0,0.1,0,0,0,0,0,0],"medianCurve":[51,105,165,318,552,909,1275,1779,2361,3162,4110,5130,6573,7989,9972,12402,15030,18021,21747,26286,31113,35637,40143,45039]}],"overall":{"mean":73154,"p25":25740,"p50":41466,"p75":73677,"p90":146403,"p95":225708,"max":9871875,"histogram":[0.28,0.28,0.76,1.74,3.38,5.6,10,12.88,14.06,12.44,10.86,8.28,5.66,4.2,3.32,2.18,1.74,1.1,0.34,0.4,0.28,0.08,0.04,0.06,0,0.02,0,0,0,0.02]},"representative":[{"name":"P25 代表局","percentile":0.25,"strategyLabel":"炼药","final":25740,"curve":[54,153,249,1128,1890,1941,2235,2748,2985,5430,6447,9930,11187,13893,15420,17355,17703,18924,21630,22968,24195,24960,25692,25740]},{"name":"P50 代表局","percentile":0.5,"strategyLabel":"伐木","final":41466,"curve":[51,114,183,252,318,492,702,1428,1653,1875,2037,2523,6330,7926,13269,18693,21354,25206,26436,27528,29133,35211,39480,41466]},{"name":"P90 代表局","percentile":0.9,"strategyLabel":"炼药","final":146403,"curve":[54,105,156,207,258,354,432,501,807,2598,4965,6327,7311,8250,12840,14205,21099,40470,142485,145683,146166,146280,146316,146403]}],"note":"当前 headless 模型未消费检查点 BonusReward 的额外选建筑次数。"}</script>
+</div>
+
+<style>
+  #anniv-balance-distribution {
+    --anniv-chart-height: 280px;
+    display: grid;
+    gap: 28px;
+    width: 100%;
+    color: var(--foreground);
+  }
+  #anniv-balance-distribution section {
+    min-width: 0;
+  }
+  #anniv-balance-distribution h3 {
+    margin: 0 0 4px;
+  }
+  #anniv-balance-distribution p {
+    margin: 0 0 8px;
+  }
+  #anniv-balance-distribution .anniv-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin: 0 0 6px;
+  }
+  #anniv-balance-distribution .anniv-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--foreground);
+  }
+  #anniv-balance-distribution .anniv-swatch {
+    width: 18px;
+    height: 3px;
+    background: var(--swatch);
+  }
+  #anniv-balance-distribution .anniv-chart {
+    display: block;
+    width: 100%;
+    overflow: visible;
+  }
+  #anniv-balance-distribution .anniv-axis,
+  #anniv-balance-distribution .anniv-grid {
+    stroke: var(--border);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+  #anniv-balance-distribution .anniv-grid {
+    opacity: 0.65;
+  }
+  #anniv-balance-distribution .anniv-label {
+    fill: var(--foreground);
+    font: 500 var(--font-size-base) sans-serif;
+  }
+  #anniv-balance-distribution .anniv-tick,
+  #anniv-balance-distribution .anniv-note {
+    fill: var(--muted-foreground);
+    font: 400 11px sans-serif;
+  }
+  #anniv-balance-distribution .anniv-bar {
+    fill: var(--series);
+    opacity: 0.56;
+  }
+  #anniv-balance-distribution .anniv-marker {
+    stroke: var(--series);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+  }
+  #anniv-balance-distribution .anniv-line {
+    fill: none;
+    stroke: var(--series);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+  }
+  #anniv-balance-distribution .anniv-point {
+    fill: var(--background);
+    stroke: var(--series);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+  }
+  @media (max-width: 520px) {
+    #anniv-balance-distribution {
+      gap: 22px;
+    }
+    #anniv-balance-distribution .anniv-note {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+(() => {
+  const root = document.getElementById('anniv-balance-distribution');
+  const data = JSON.parse(document.getElementById('anniv-balance-data').textContent);
+  const NS = 'http://www.w3.org/2000/svg';
+  const seriesVars = ['--viz-series-1', '--viz-series-2', '--viz-series-3', '--viz-series-4', '--viz-series-5'];
+  const compact = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 });
+  const integer = new Intl.NumberFormat('zh-CN');
+  const scoreTicks = [0, 10000, 30000, 100000, 300000, 1000000, 3000000, 10000000];
+
+  function el(name, attrs = {}, text = '') {
+    const node = document.createElementNS(NS, name);
+    for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+    if (text) node.textContent = text;
+    return node;
+  }
+
+  function makeSvg(container, height, label, description) {
+    container.replaceChildren();
+    const width = Math.max(320, Math.round(container.getBoundingClientRect().width || root.getBoundingClientRect().width || 736));
+    const svg = el('svg', { class: 'anniv-chart', viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': label });
+    svg.append(el('title', {}, label), el('desc', {}, description));
+    container.append(svg);
+    return { svg, width, height };
+  }
+
+  function scoreScale(value, left, right, maxScore) {
+    const offset = 10000;
+    return left + (Math.log(value + offset) - Math.log(offset)) / (Math.log(maxScore + offset) - Math.log(offset)) * (right - left);
+  }
+
+  function addScoreAxis(svg, y, left, right, maxScore) {
+    svg.append(el('line', { x1: left, y1: y, x2: right, y2: y, class: 'anniv-axis' }));
+    for (const tick of scoreTicks.filter((x) => x <= maxScore * 1.02)) {
+      const x = scoreScale(tick, left, right, maxScore);
+      svg.append(el('line', { x1: x, y1: y, x2: x, y2: y + 5, class: 'anniv-axis' }));
+      const anchor = tick === 0 ? 'start' : (tick >= maxScore * 0.9 ? 'end' : 'middle');
+      svg.append(el('text', { x, y: y + 18, 'text-anchor': anchor, class: 'anniv-tick' }, tick === 0 ? '0' : compact.format(tick)));
+    }
+  }
+
+  function renderFactionHistogram() {
+    const container = document.getElementById('faction-histogram');
+    const facetHeight = 86;
+    const top = 8;
+    const bottom = 28;
+    const { svg, width } = makeSvg(container, top + data.strategies.length * facetHeight + bottom, '各流派终局分数分布', '五种策略各一千局的同尺度对数直方图，并标注中位数与九十分位。');
+    const left = width < 520 ? 62 : 82;
+    const right = width - 10;
+    const maxScore = data.overall.max;
+    const maxPct = Math.max(...data.strategies.flatMap((s) => s.histogram));
+
+    data.strategies.forEach((strategy, index) => {
+      const yTop = top + index * facetHeight;
+      const baseline = yTop + 62;
+      const color = `var(${seriesVars[index]})`;
+      svg.append(el('text', { x: 0, y: yTop + 18, class: 'anniv-label' }, strategy.label));
+      svg.append(el('text', { x: left, y: yTop + 18, class: 'anniv-note' }, `P50 ${compact.format(strategy.p50)} · P90 ${compact.format(strategy.p90)} · 均值 ${compact.format(strategy.mean)}`));
+      svg.append(el('line', { x1: left, y1: baseline, x2: right, y2: baseline, class: 'anniv-grid' }));
+
+      strategy.histogram.forEach((pct, bin) => {
+        const x0 = scoreScale(data.edges[bin], left, right, maxScore);
+        const x1 = scoreScale(data.edges[bin + 1], left, right, maxScore);
+        const height = pct / maxPct * 36;
+        const rect = el('rect', { x: x0, y: baseline - height, width: Math.max(1, x1 - x0 - 1), height, class: 'anniv-bar', style: `--series:${color}` });
+        rect.append(el('title', {}, `${strategy.label} · ${compact.format(data.edges[bin])}–${compact.format(data.edges[bin + 1])}：${pct}%`));
+        svg.append(rect);
+      });
+
+      const medianX = scoreScale(strategy.p50, left, right, maxScore);
+      const p90X = scoreScale(strategy.p90, left, right, maxScore);
+      svg.append(el('line', { x1: medianX, y1: yTop + 23, x2: medianX, y2: baseline, class: 'anniv-marker', style: `--series:${color}` }));
+      svg.append(el('line', { x1: p90X, y1: yTop + 29, x2: p90X, y2: baseline, class: 'anniv-marker', 'stroke-dasharray': '3 3', style: `--series:${color}` }));
+    });
+    addScoreAxis(svg, top + data.strategies.length * facetHeight, left, right, maxScore);
+  }
+
+  function renderOverallHistogram() {
+    const container = document.getElementById('overall-histogram');
+    const { svg, width, height } = makeSvg(container, 240, '整体游玩分数分布', '五千局合并分布，中位数四万一千，九十分位十四万六千，保留一个接近九百八十七万的低频长尾。');
+    const left = width < 520 ? 46 : 58;
+    const right = width - 12;
+    const top = 30;
+    const baseline = height - 34;
+    const maxPct = Math.max(...data.overall.histogram);
+    const maxScore = data.overall.max;
+
+    data.overall.histogram.forEach((pct, bin) => {
+      const x0 = scoreScale(data.edges[bin], left, right, maxScore);
+      const x1 = scoreScale(data.edges[bin + 1], left, right, maxScore);
+      const barHeight = pct / maxPct * (baseline - top);
+      const rect = el('rect', { x: x0, y: baseline - barHeight, width: Math.max(1, x1 - x0 - 1), height: barHeight, class: 'anniv-bar', style: '--series:var(--viz-series-1)' });
+      rect.append(el('title', {}, `${compact.format(data.edges[bin])}–${compact.format(data.edges[bin + 1])}：${pct}%`));
+      svg.append(rect);
+    });
+
+    const markers = [
+      ['P50', data.overall.p50, ''],
+      ['P90', data.overall.p90, '4 3'],
+    ];
+    for (const [label, value, dash] of markers) {
+      const x = scoreScale(value, left, right, maxScore);
+      svg.append(el('line', { x1: x, y1: top, x2: x, y2: baseline, class: 'anniv-marker', 'stroke-dasharray': dash, style: '--series:var(--viz-series-2)' }));
+      svg.append(el('text', { x: x + 4, y: top + (label === 'P50' ? 12 : 27), class: 'anniv-label' }, `${label} ${compact.format(value)}`));
+    }
+    const maxStrategy = data.strategies.reduce((a, b) => a.max > b.max ? a : b);
+    svg.append(el('text', { x: right, y: top + 12, 'text-anchor': 'end', class: 'anniv-note' }, `最高 ${compact.format(data.overall.max)}（${maxStrategy.label}）`));
+    addScoreAxis(svg, baseline, left, right, maxScore);
+  }
+
+  function renderLegend(containerId, entries) {
+    const container = document.getElementById(containerId);
+    container.replaceChildren();
+    entries.forEach((entry, index) => {
+      const item = document.createElement('span');
+      item.className = 'anniv-legend-item';
+      const swatch = document.createElement('span');
+      swatch.className = 'anniv-swatch';
+      swatch.style.setProperty('--swatch', `var(${seriesVars[index]})`);
+      const label = document.createElement('span');
+      label.textContent = entry;
+      item.append(swatch, label);
+      container.append(item);
+    });
+  }
+
+  function renderCurves(containerId, series, label, description, logY = false) {
+    const container = document.getElementById(containerId);
+    const { svg, width, height } = makeSvg(container, 300, label, description);
+    const left = width < 520 ? 50 : 62;
+    const right = width - 16;
+    const top = 14;
+    const bottom = height - 34;
+    const yMax = Math.max(...series.flatMap((s) => s.values));
+    const x = (round) => left + (round - 1) / (data.rounds - 1) * (right - left);
+    const y = logY
+      ? (value) => bottom - Math.log1p(value) / Math.log1p(yMax) * (bottom - top)
+      : (value) => bottom - value / yMax * (bottom - top);
+
+    const yTicks = logY
+      ? [0, 1000, 3000, 10000, 30000, 100000, 300000].filter((v) => v <= yMax)
+      : Array.from({ length: 5 }, (_, i) => Math.round(yMax * i / 4));
+    for (const tick of yTicks) {
+      const yy = y(tick);
+      svg.append(el('line', { x1: left, y1: yy, x2: right, y2: yy, class: 'anniv-grid' }));
+      svg.append(el('text', { x: left - 6, y: yy + 4, 'text-anchor': 'end', class: 'anniv-tick' }, compact.format(tick)));
+    }
+    for (const round of [1, 6, 12, 18, 24]) {
+      const xx = x(round);
+      svg.append(el('line', { x1: xx, y1: bottom, x2: xx, y2: bottom + 5, class: 'anniv-axis' }));
+      svg.append(el('text', { x: xx, y: bottom + 19, 'text-anchor': 'middle', class: 'anniv-tick' }, `R${round}`));
+    }
+    svg.append(el('line', { x1: left, y1: bottom, x2: right, y2: bottom, class: 'anniv-axis' }));
+
+    series.forEach((entry, index) => {
+      const color = `var(${seriesVars[index]})`;
+      const d = entry.values.map((value, i) => `${i ? 'L' : 'M'}${x(i + 1).toFixed(2)},${y(value).toFixed(2)}`).join(' ');
+      svg.append(el('path', { d, class: 'anniv-line', style: `--series:${color}`, 'stroke-dasharray': entry.dash || '' }));
+      entry.values.forEach((value, i) => {
+        const point = el('circle', { cx: x(i + 1), cy: y(value), r: i === entry.values.length - 1 ? 3 : 1.5, class: 'anniv-point', style: `--series:${color}` });
+        point.append(el('title', {}, `${entry.name} · 第 ${i + 1} 回合：${integer.format(value)}`));
+        svg.append(point);
+      });
+    });
+  }
+
+  function draw() {
+    renderFactionHistogram();
+    renderOverallHistogram();
+    renderLegend('median-legend', data.strategies.map((s) => `${s.label} · R24 ${compact.format(s.p50)}`));
+    renderCurves(
+      'median-curves',
+      data.strategies.map((s) => ({ name: s.label, values: s.medianCurve })),
+      '各流派逐回合中位数曲线',
+      '五种策略分别对每个回合取一千局的累计分中位数，显示典型成型节奏。'
+    );
+    renderLegend('representative-legend', data.representative.map((r) => `${r.name} · ${r.strategyLabel} · ${compact.format(r.final)}`));
+    renderCurves(
+      'representative-curves',
+      data.representative.map((r, i) => ({ name: `${r.name}（${r.strategyLabel}）`, values: r.curve, dash: i === 1 ? '' : (i === 0 ? '3 3' : '7 3') })),
+      '真实 P25、P50、P90 代表局逐回合累计分',
+      '三条曲线是实际对局。P90 代表局在第十九回合完成关键链并出现主要跃升。'
+    );
+  }
+
+  let pending = 0;
+  const observer = new ResizeObserver(() => {
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(draw);
+  });
+  observer.observe(root);
+  draw();
+})();
+</script>

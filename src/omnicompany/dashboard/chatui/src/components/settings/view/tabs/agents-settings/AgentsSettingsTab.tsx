@@ -24,7 +24,7 @@ export default function AgentsSettingsTab({
   const [selectedCategory, setSelectedCategory] = useState<AgentCategory>('account');
 
   const visibleAgents = useMemo<AgentProvider[]>(() => {
-    return ['claude', 'cursor', 'codex', 'gemini', 'opencode', 'omni_agent', 'controller'];
+    return ['claude', 'cursor', 'codex', 'gemini', 'opencode', 'kimi', 'omni_agent', 'controller'];
   }, []);
 
   const agentContextById = useMemo<Record<AgentProvider, AgentContext>>(() => ({
@@ -48,6 +48,10 @@ export default function AgentsSettingsTab({
       authStatus: providerAuthStatus.opencode,
       onLogin: () => onProviderLogin('opencode'),
     },
+    kimi: {
+      authStatus: providerAuthStatus.kimi,
+      onLogin: () => onProviderLogin('kimi'),
+    },
     omni_agent: {
       authStatus: providerAuthStatus.omni_agent,
       onLogin: () => onProviderLogin('omni_agent'),
@@ -63,6 +67,7 @@ export default function AgentsSettingsTab({
     providerAuthStatus.cursor,
     providerAuthStatus.gemini,
     providerAuthStatus.opencode,
+    providerAuthStatus.kimi,
     providerAuthStatus.omni_agent,
     providerAuthStatus.controller,
   ]);

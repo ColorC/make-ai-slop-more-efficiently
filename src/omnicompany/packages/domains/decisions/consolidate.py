@@ -243,8 +243,13 @@ def _render_report(*, project: str, tag: str | None, candidates: list[RuleCandid
     return "\n".join(lines)
 
 
-def run(*, project: str, tag: str | None = None, model: str | None = None) -> dict[str, Any]:
-    """反向固化器 v0 主入口:筛裁决 → 聚类 → 落报告。返回结果摘要(供 CLI 打印)。"""
+def run(*, project: str, tag: str | None = None, model: str | None = None,
+        submit: bool = False) -> dict[str, Any]:
+    """反向固化器 v0 主入口:筛裁决 → 聚类 → 落报告。返回结果摘要(供 CLI 打印)。
+
+    submit=True 时同时把每条规则候选排进候选流水线(审阅台 decision-candidate 队列,
+    信号入口②固化聚类——决策本体 §六;仍禁自动写规则文档,人裁后 candidate-apply 写回)。
+    """
     decisions = eligible_decisions(project=project, tag=tag)
 
     if len(decisions) < _MIN_CANDIDATES:
@@ -266,6 +271,42 @@ def run(*, project: str, tag: str | None = None, model: str | None = None) -> di
     path = _report_path(project)
     path.write_text(report_md, encoding="utf-8")
 
+    submitted: list[dict[str, Any]] = []
+    if submit and candidates:
+        from . import candidates as cand_mod
+
+        for c in candidates:
+            body = (
+                f"## 固化聚类规则候选\n\n**规则(祈使句)**: {c.rule}\n\n"
+                f"**为什么**: {c.why}\n\n"
+                f"**支撑裁决**: {', '.join(f'`{sid}`' for sid in c.supporting_ids)}\n\n"
+                f"**建议落点**: {c.suggested_location or '(未给出)'}\n\n"
+                f"accept 后 candidate-apply 会把 proposed 写为新陈述(rests_on 支撑裁决)。\n"
+            )
+            res = cand_mod.submit_candidate(
+                title=f"[固化聚类] {c.rule[:60]}",
+                body_md=body,
+                source="consolidate",
+                action="new",
+                proposed={
+                    "kind": "decision",
+                    "statement": c.rule,
+                    "rationale": c.why,
+                    "status": "adopted",
+                    "project": project,
+                    "authority": "high",
+                    "links": {"rests_on": c.supporting_ids},
+                    "decision_space": [
+                        {"option": c.rule, "chosen": True, "why": c.why},
+                        {"option": "维持无规则(逐案裁决)", "chosen": False,
+                         "why": "同类裁决已反复出现,逐案成本高于固化"},
+                    ],
+                },
+                project=project,
+                by="decisions.consolidate",
+            )
+            submitted.append(res)
+
     return {
         "ok": True,
         "skipped": False,
@@ -273,4 +314,5 @@ def run(*, project: str, tag: str | None = None, model: str | None = None) -> di
         "eligible_count": len(decisions),
         "report_path": str(path),
         "candidate_count": len(candidates),
+        "submitted": submitted,
     }

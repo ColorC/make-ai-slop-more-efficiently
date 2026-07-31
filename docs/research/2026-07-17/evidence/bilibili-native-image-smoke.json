@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "tested_at": "2026-07-17T12:28:29+08:00",
+  "surface": "user_chrome_native_bilibili_article_editor",
+  "draft_title": "AI写中文，改了六版还是不像人写的",
+  "source_image": "docs/plans/publish/[2026-07-13]XIAOHONGSHU-AI-PUBLISH/launch/simple-v1/evidence/raw/quant-lab-fabricated-demo-bb32bf8-full.png",
+  "source_image_sha256": "c383fe6c8cde77c6179232eb77816cd8294c9f721953c3da99bb05b6c6337d23",
+  "before": {
+    "visible_text_characters": 1570,
+    "image_nodes": 0,
+    "heading_level_2_nodes": 4,
+    "ai_disclosure_checked": true,
+    "save_success_visible": true
+  },
+  "after_native_clipboard_paste": {
+    "image_nodes": 1,
+    "figure_node_visible": true,
+    "image_caption_input_visible": true,
+    "observed_keyboard_document_end_failure": true
+  },
+  "after_single_undo": {
+    "visible_text_characters": 1570,
+    "visible_text_restored_exactly": true,
+    "image_nodes": 0,
+    "heading_level_2_nodes": 4,
+    "ai_disclosure_checked": true,
+    "save_success_visible": true
+  },
+  "publish_clicked": false,
+  "conclusion": "native clipboard image insertion works; insertion must use explicit segment anchors"
+}

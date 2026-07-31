@@ -1,0 +1,6 @@
+interface:
+  display_name: "AI 玩家总调度"
+  short_description: "恢复会话、选任务并驱动一次可验证的自主游玩循环"
+  default_prompt: "Use $ai-player-orchestrator to resume the canonical AI-player session and run one evidence-backed cycle."
+policy:
+  allow_implicit_invocation: true

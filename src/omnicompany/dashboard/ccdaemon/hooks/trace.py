@@ -1,6 +1,6 @@
 # [OMNI] origin=claude-code ts=2026-05-02 type=infra
 # [OMNI] material_id="material:dashboard.cc_wrapper.hooks.tool_call_trace_emitter.implementation.py"
-"""Convert every Claude Code tool call into an event-bus trace event.
+"""Convert native Claude Code/Codex tool calls into event-bus trace events.
 
 Wired as PreToolUse + PostToolUse + Stop hooks (one script, dispatch on
 `hook_event_name`). Output is silent (no additionalContext) — pure observation.
@@ -29,6 +29,10 @@ _FALLBACK_PAIRING: dict[str, str] = {}
 
 def _trace_id_of(stdin: dict) -> str:
     return sh.trace_id_for(stdin)
+
+
+def _tags(stdin: dict, *extra: str) -> list[str]:
+    return ["cc_session", f"provider:{sh.binding_provider(stdin)}", *extra]
 
 
 def _summarize_args(args: dict) -> dict:
@@ -80,7 +84,7 @@ def handle_pre_tool_use(stdin: dict) -> int:
             "args": _summarize_args(tool_input),
             "tool_use_id": tool_use_id,
         },
-        tags=["cc_session", f"tool:{tool_name}"],
+        tags=_tags(stdin, f"tool:{tool_name}"),
     )
     return 0
 
@@ -101,7 +105,7 @@ def handle_post_tool_use(stdin: dict) -> int:
             "verdict": "ok" if result else "empty",
         },
         parent_id=parent,
-        tags=["cc_session", f"tool:{tool_name}"],
+        tags=_tags(stdin, f"tool:{tool_name}"),
     )
     return 0
 
@@ -112,10 +116,16 @@ def handle_stop(stdin: dict) -> int:
         event_type="task.finish",
         payload={
             "session_id": stdin.get("session_id") or stdin.get("sessionId"),
+            "provider": sh.binding_provider(stdin),
             "result": "turn ended",
         },
-        tags=["cc_session"],
+        tags=_tags(stdin),
     )
+    # Codex Stop requires JSON (plain text is invalid); an empty object means
+    # success/continue and remains harmless for Claude Code.
+    if sh.hook_provider(stdin) == "codex":
+        json.dump({}, sys.stdout)
+        sys.stdout.write("\n")
     return 0
 
 
@@ -130,7 +140,7 @@ def main() -> int:
         if event == "Stop":
             return handle_stop(stdin)
     except Exception as e:
-        # never block claude on observability failure
+        # never block the native agent on observability failure
         print(f"[cc_wrapper trace hook] {event} failed: {e}", file=sys.stderr)
     return 0
 

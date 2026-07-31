@@ -1,6 +1,6 @@
 # [OMNI] origin=claude-code domain=project_atlas ts=2026-06-21 type=team status=active
 # [OMNI] summary="project_atlas 的 Team:项目及业务收集,4 节点(入题→勘察→带工具 worker 收集→落名录)。"
-# [OMNI] why="语义起草交给带工具的 claude-code worker(实地核实真入口,不裸 LLM 编造);做成 Team 才进驾驶舱项目-管线看板。"
+# [OMNI] why="语义起草交给带工具的受审计 worker(实地核实真入口,不裸 LLM 编造);provider 可选,做成 Team 才进驾驶舱项目-管线看板。"
 # [OMNI] tags=project_atlas,team,pipeline,collect
 """project_atlas domain Team —— 项目及业务收集(4 节点)。"""
 
@@ -36,7 +36,7 @@ def build_project_atlas_pipeline() -> TeamSpec:
         _node("survey", "Survey", "project_atlas.intake", "project_atlas.surveyed",
               TransformMethod.RULE, "确定性收线索地图(顶层目录 + 清单摘要), 给 worker 当起点。"),
         _node("collect", "Collect", "project_atlas.surveyed", "project_atlas.collected",
-              TransformMethod.LLM, "omni worker run claude-code(带工具): 实地核实真入口 + 写 grounded object-SKILL 到 staging。"),
+              TransformMethod.LLM, "omni worker run <provider>(带工具): 实地核实真入口 + 写 grounded object-SKILL 到 staging。"),
         _node("finalize", "Finalize", "project_atlas.collected", "project_atlas.record",
               TransformMethod.RULE, "读 staging 实际产物 → 写名录草稿 + 报告(待人审)。"),
     ]

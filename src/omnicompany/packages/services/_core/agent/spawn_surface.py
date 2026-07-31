@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-AGENT_SPAWN_SURFACE_VERSION = "2026-06-13:T8"
+AGENT_SPAWN_SURFACE_VERSION = "2026-07-24:T9"
 
 ENTRY_AGENT_TOOL = "agent_tool"
 ENTRY_EXTERNAL_WORKER_RUN = "external_worker_run"
@@ -16,6 +16,7 @@ ENTRY_CONTROLLER_SPAWN = "controller_spawn"
 ENTRY_TEAMRUNNER_NODE = "teamrunner_external_node"
 ENTRY_WORKFLOW_RUN = "workflow_run"
 ENTRY_INTERNAL_LOOP = "internal_agent_loop"
+ENTRY_CONTEXT_FORK = "context_fork_adapter"
 
 
 @dataclass(frozen=True)
@@ -57,8 +58,8 @@ AGENT_SPAWN_ENTRIES: tuple[AgentSpawnEntry, ...] = (
             ".run_external_agent_request"
         ),
         use_when=(
-            "A CLI, API, or workflow needs an audited one-shot Codex or Claude Code run "
-            "with explicit cwd, permission mode, timeout, and context."
+            "A CLI, API, or workflow needs an audited native, Pi, Codex, Claude Code, "
+            "OpenCode, or Kimi run with explicit cwd, permission mode, timeout, and context."
         ),
         new_usage_rule=(
             "New synchronous local-agent callers construct ExternalAgentRunRequest; they "
@@ -105,12 +106,28 @@ AGENT_SPAWN_ENTRIES: tuple[AgentSpawnEntry, ...] = (
         label="External worker exposed as Agent tool subagent",
         implementation="omnicompany.packages.services._core.agent.external_workers.subagent",
         use_when=(
-            "An AgentRouter registry intentionally exposes Codex or Claude Code as a "
-            "subagent_type."
+            "An AgentRouter registry intentionally exposes a registered external harness "
+            "as a subagent_type."
         ),
         new_usage_rule=(
             "This remains an adapter under AgentRouter and ExternalAgentRunRequest, not "
             "a fifth launch surface."
+        ),
+    ),
+    AgentSpawnEntry(
+        entry_id=ENTRY_CONTEXT_FORK,
+        kind="adapter",
+        surface="AgentRouter execution_mode=context_fork",
+        label="Checkpoint-inheriting Agent tool adapter",
+        implementation="omnicompany.packages.services._core.agent.context_fork",
+        use_when=(
+            "The Agent allocation gate selected context_fork and a parent checkpoint "
+            "must be inherited without summary injection."
+        ),
+        new_usage_rule=(
+            "This is an adapter under the existing Agent tool, not a primitive launch "
+            "surface. It requires an allocation decision ref and returns only a "
+            "structured receipt with trace/artifact references."
         ),
     ),
     AgentSpawnEntry(
@@ -224,6 +241,7 @@ __all__ = [
     "AGENT_SPAWN_SURFACE_VERSION",
     "ENTRY_AGENT_TOOL",
     "ENTRY_CONTROLLER_SPAWN",
+    "ENTRY_CONTEXT_FORK",
     "ENTRY_EXTERNAL_WORKER_AS_AGENT",
     "ENTRY_EXTERNAL_WORKER_RUN",
     "ENTRY_INTERNAL_LOOP",

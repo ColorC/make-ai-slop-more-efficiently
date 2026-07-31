@@ -23,7 +23,7 @@ M_TARGET_SPEC = Material(
     description=(
         "absorption_runtime_test 入口配置. 由外部触发. 描述要测哪个目标团队 / 给它什么 sample input / "
         "跑几次取样 / 抽几条提案做落地验证.\n\n"
-        "字段含义: target_team_id (str): 注册 id (例 'repo-absorption'). sample_input (dict): 给目标团队真跑用的 input_data. "
+        "字段含义: target_team_id (str): absorption 类目标的注册 id；当前无默认样例。sample_input (dict): 给目标团队真跑用的 input_data. "
         "run_count (int, ≥2): 跨次稳定性需要至少 2 次取样, 一般 2-3. spot_impl_count (int, ≥1): 抽样落地的提案数, 一般 1-2 节省 token.\n\n"
         "外部承诺: target_team_id 在 PipelineRegistry 已注册. sample_input 可被目标团队消费 (类型与目标 FORMAT_IN 兼容).\n\n"
         "TargetIngressWorker 消费: 校 target_team_id 存在性, 透传 sample_input/run_count 给下游."

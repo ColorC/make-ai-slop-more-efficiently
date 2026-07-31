@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:core.team_builder.decomposition_planner.large_split.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """DecompositionPlannerWorker — Phase 2 · AgentNodeLoop · conditional (2026-04-23).
 
 Worker 协议 (composite fan-in and):
@@ -21,7 +22,7 @@ Worker 协议 (composite fan-in and):
 - 推敲契约 material schema
 这些都是**信息不确定 + 高复杂度**的典型.
 
-**不做** (用户明示): 不自动拆超过 3 层; 过复杂 → 走 HumanBus 请 L1 裁定.
+**不做** (用户明示): 不自动拆超过 3 层; 过复杂 → 返回当前 agent 对话请 L1 裁定.
 """
 from __future__ import annotations
 
@@ -54,7 +55,7 @@ _SYSTEM_PROMPT = """你是 team_builder 第 2 阶段 · DecompositionPlanner age
 
 ## 拆分原则 (scale_assessment.decompose_axis 指定)
 - **by_capability**: 按能力边界 (例: 分析/生成/验证 三子 team)
-- **by_domain**: 按业务子域 (例: demogame/voxelcraft 三子 team)
+- **by_domain**: 按业务子域 (例: research/decisions 三子 team)
 - **by_phase**: 按阶段 (例: ingest/process/output 三子 team)
 
 ## 契约 material 设计要点
@@ -236,9 +237,12 @@ class DecompositionPlannerWorker(AgentNodeLoop):
     TOOL_ROUTERS: ClassVar[list] = [ReadFileRouter, GlobRouter, GrepRouter, ListDirRouter, FinishRouter]
     NODE_PROMPT: ClassVar[str] = _SYSTEM_PROMPT
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any) -> _DecompositionPlannerPromptBuilder:
         return _DecompositionPlannerPromptBuilder(template=self.NODE_PROMPT, bus=bus)

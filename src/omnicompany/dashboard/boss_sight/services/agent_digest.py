@@ -84,6 +84,15 @@ def _save_digests(store: dict[str, dict[str, Any]]) -> None:
     tmp = p.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(store, ensure_ascii=False, indent=1), encoding="utf-8")
     tmp.replace(p)
+    # ccdaemon owns the live PTY projection. Push newly generated summary
+    # titles into memory immediately so the 2s tab-state stream can replace the
+    # first-message fallback without waiting for another full session-list read.
+    try:
+        from omnicompany.dashboard.ccdaemon.pty import get_manager
+
+        get_manager().apply_digest_titles(store)
+    except Exception:  # noqa: BLE001
+        _log.debug("live PTY digest-title projection skipped", exc_info=True)
 
 
 def _key(item: dict[str, Any]) -> str:

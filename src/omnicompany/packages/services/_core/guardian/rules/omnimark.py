@@ -9,8 +9,12 @@ from ._base import FileContext, GuardianRule, _is_python, _has_content, _is_exte
 def _check_missing_omnimark(ctx: FileContext) -> bool:
     if not _is_python(ctx) or not _has_content(ctx):
         return False
-    # 只检查 packages/ 下的业务文件
-    if "packages/" not in ctx.path:
+    # 只检查 src/omnicompany/packages/ 下的业务文件 (2026-07-26 锚定:
+    # 原 "packages/" 子串匹配会把 data/ 下的仓库快照树
+    # (data/_workspaces/team_builder/*, data/services/repo_exporter/jobs/*)
+    # 误扫进来 — 那些是数据产物不是活的业务代码, 7282 条存量误报)
+    p = ctx.path.replace("\\", "/")
+    if not p.startswith("src/omnicompany/packages/"):
         return False
     # 豁免：vendored / graveyard / 自动生成的 __init__
     if _is_external(ctx):

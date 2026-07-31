@@ -41,7 +41,7 @@ ItemStartedEvent / ItemUpdatedEvent 当前 MVP 不映射 — 等 ItemCompletedEv
 - 本地装: codex CLI (`npm i -g @openai/codex` 或 SDK 自带 install)
 - 认证: codex 走 OpenAI 账号登录 (codex login), 跟 claude binary 走订阅认证类似
 - ProviderOptions 扩展 (TypedDict extras):
-  - `codex_path`: codex CLI 绝对路径, 默认 'C:/Users/user/AppData/Roaming/npm/codex.cmd'
+  - `codex_path`: codex CLI 绝对路径, 默认 shutil.which("codex")
 """
 
 from __future__ import annotations
@@ -50,6 +50,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import subprocess
 from types import SimpleNamespace
 from typing import Any, AsyncIterator
@@ -61,7 +62,7 @@ from .base import BaseProvider, ProviderOptions
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_CODEX_PATH = "C:/Users/user/AppData/Roaming/npm/codex.cmd"
+DEFAULT_CODEX_PATH = shutil.which("codex") or shutil.which("codex.cmd") or "codex"
 
 
 def _env_float(name: str, default: float) -> float:
@@ -347,6 +348,10 @@ class CodexProvider(BaseProvider):
             thread_opts["working_directory"] = opts["cwd"]
         if opts.get("model"):
             thread_opts["model"] = opts["model"]
+        if opts.get("effort"):
+            # openai-codex-sdk ThreadOptions.model_reasoning_effort is the
+            # actual Codex CLI config path; storing metadata alone is not enough.
+            thread_opts["model_reasoning_effort"] = opts["effort"]
         thread_opts["skip_git_repo_check"] = True
         scope = planned_write_scope(
             cwd=str(opts.get("cwd") or os.getcwd()),

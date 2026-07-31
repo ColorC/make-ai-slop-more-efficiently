@@ -1,0 +1,1336 @@
+{
+  "agent_layers": [
+    {
+      "candidates": [
+        "DeviceExecutor",
+        "ADB",
+        "MAA-compatible skills"
+      ],
+      "escalate_when": [
+        "状态守卫不匹配",
+        "目标不可定位",
+        "预期变化未发生"
+      ],
+      "name": "固定动作执行层",
+      "responsibility": "ADB、模拟器、已验证技能和固定自动化负责快速原子动作。",
+      "tier": "A0"
+    },
+    {
+      "candidates": [
+        "GPT-5.6 Luna medium",
+        "AFKJ benchmark winner"
+      ],
+      "escalate_when": [
+        "出现新界面",
+        "需要跨系统判断",
+        "连续两次无效动作"
+      ],
+      "name": "快速语义操作层",
+      "responsibility": "用低时延语义模型选择已知目标和调用 A0。",
+      "tier": "A1"
+    },
+    {
+      "candidates": [
+        "Claude Sonnet 5 medium",
+        "GPT-5.6 Terra medium"
+      ],
+      "escalate_when": [
+        "需要复杂设施编程",
+        "阶段目标需要重构",
+        "高风险不可逆决策"
+      ],
+      "name": "持续游戏层",
+      "responsibility": "在连续 Session 中规划、探索、理解玩法并提升账号。",
+      "tier": "A2"
+    },
+    {
+      "candidates": [
+        "Claude Opus",
+        "GPT-5.6 Sol high"
+      ],
+      "escalate_when": [
+        "跨设施决策",
+        "权限边界变化",
+        "验收口径冲突"
+      ],
+      "name": "设施工程层",
+      "responsibility": "处理阶段规划和较复杂的自动化设施编程。",
+      "tier": "A3"
+    },
+    {
+      "candidates": [
+        "goal owner main agent"
+      ],
+      "escalate_when": [],
+      "name": "主 Agent 监督层",
+      "responsibility": "维护目标、质量门、分层路由和最终审阅；必要时直接承担 A3。",
+      "tier": "A4"
+    }
+  ],
+  "behavior_rules_sha256": "6cb9ecf7dff10448df13d46da0819c6eaaf7e511c974b5862c438de34298dc4b",
+  "canonical_sources": [
+    "docs/plans/game-observatory/[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/plan.md",
+    "docs/plans/game-observatory/[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/acceptance.md",
+    "docs/plans/game-observatory/[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/continuous-player-iteration-v1.zh-CN.md",
+    "docs/plans/game-observatory/[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/external-agent-continuous-exploration-v1.zh-CN.md"
+  ],
+  "cli_help_sha256": "4e06251aaf9882b08dc9af84d71c86b20a9577ac71da4fbfb4d4087cf3dadc51",
+  "commands": [
+    {
+      "category": "诊断",
+      "examples": [
+        "omni game player doctor --help"
+      ],
+      "guard_profile": "none",
+      "id": "doctor",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player doctor",
+      "summary": "检查 CLI、数据库、设备桥、外部 Agent 与证据目录。"
+    },
+    {
+      "category": "诊断",
+      "examples": [
+        "omni game player acceptance run --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "acceptance.run",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player acceptance run",
+      "summary": "以显式回执执行 fail-closed AI 玩家验收并保存结果。"
+    },
+    {
+      "category": "上下文",
+      "examples": [
+        "omni game player context export --help"
+      ],
+      "guard_profile": "none",
+      "id": "context.export",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player context export",
+      "summary": "导出一次加载的精简设施合同和阶段上下文。"
+    },
+    {
+      "category": "环境",
+      "examples": [
+        "omni game player environment list --help"
+      ],
+      "guard_profile": "none",
+      "id": "environment.list",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player environment list",
+      "summary": "列出游戏、构建、账号、设备和区服环境。"
+    },
+    {
+      "category": "环境",
+      "examples": [
+        "omni game player environment show --help"
+      ],
+      "guard_profile": "none",
+      "id": "environment.show",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player environment show",
+      "summary": "查看环境身份、别名、当前叶和来源。"
+    },
+    {
+      "category": "环境",
+      "examples": [
+        "omni game player environment use --help"
+      ],
+      "guard_profile": "none",
+      "id": "environment.use",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player environment use",
+      "summary": "解析并返回唯一已验证环境叶。"
+    },
+    {
+      "category": "环境",
+      "examples": [
+        "omni game player environment register --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "environment.register",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player environment register",
+      "summary": "从在线模拟器当前画面登记不可变根环境。"
+    },
+    {
+      "category": "环境",
+      "examples": [
+        "omni game player environment promote --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "environment.promote",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player environment promote",
+      "summary": "用终态证据提升到更具体的账号或区服环境叶。"
+    },
+    {
+      "category": "设备",
+      "examples": [
+        "omni game player device list --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "device.list",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player device list",
+      "summary": "列出或刷新统一 CLI 可用的 ADB 与模拟器目标。"
+    },
+    {
+      "category": "设备",
+      "examples": [
+        "omni game player device inspect --help"
+      ],
+      "guard_profile": "none",
+      "id": "device.inspect",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player device inspect",
+      "summary": "只读检查前台界面与游戏包构建身份。"
+    },
+    {
+      "category": "会话",
+      "examples": [
+        "omni game player session start --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "session.start",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player session start",
+      "summary": "启动可续接的外部 Agent Session。"
+    },
+    {
+      "category": "会话",
+      "examples": [
+        "omni game player session rollover --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "session.rollover",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player session rollover",
+      "summary": "阶段结束后建立新 canonical 代，并复用同一原生 provider Session。"
+    },
+    {
+      "category": "会话",
+      "examples": [
+        "omni game player session resume --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "session.resume",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player session resume",
+      "summary": "续接原外部 Session 并先重新观察。"
+    },
+    {
+      "category": "会话",
+      "examples": [
+        "omni game player session status --help"
+      ],
+      "guard_profile": "none",
+      "id": "session.status",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player session status",
+      "summary": "查看模型、effort、心跳、检查点和动作计数。"
+    },
+    {
+      "category": "会话",
+      "examples": [
+        "omni game player session heartbeat --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "session.heartbeat",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player session heartbeat",
+      "summary": "写入轻量心跳和当前阶段摘要。"
+    },
+    {
+      "category": "会话",
+      "examples": [
+        "omni game player session checkpoint --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "session.checkpoint",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player session checkpoint",
+      "summary": "保存任务、状态、记忆和副作用检查点。"
+    },
+    {
+      "category": "会话",
+      "examples": [
+        "omni game player session stop --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "session.stop",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player session stop",
+      "summary": "安全停止设备计划并保留可恢复 Session。"
+    },
+    {
+      "category": "观察",
+      "examples": [
+        "omni game player observe capture --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "observe.capture",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player observe capture",
+      "summary": "采集当前画面、UI 树与第一次动作可引用的只读证据锚点。"
+    },
+    {
+      "category": "观察",
+      "examples": [
+        "omni game player observe inspect --help"
+      ],
+      "guard_profile": "none",
+      "id": "observe.inspect",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player observe inspect",
+      "summary": "解析画面、交互候选、遮罩和信息增量。"
+    },
+    {
+      "category": "观察",
+      "examples": [
+        "omni game player observe locate --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "observe.locate",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player observe locate",
+      "summary": "对 canonical 原图运行可缓存的 OmniParser 元素定位。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act tap --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.tap",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act tap",
+      "summary": "按可追溯目标或坐标点击并核对前后状态。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act tap-anchor --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.tap-anchor",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act tap-anchor",
+      "summary": "按已审阅状态锚点生成或执行受守卫点击；动态对象必须先视觉重定位。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act tap-preview --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.tap-preview",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act tap-preview",
+      "summary": "按 agent preview 像素点击，由 CLI 换算原图坐标并复用动作守卫。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act tap-element --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.tap-element",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act tap-element",
+      "summary": "按持久化定位结果和 element ID 点击原图检测框中心。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act swipe --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.swipe",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act swipe",
+      "summary": "执行滑动并核对预期变化。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act back --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.back",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act back",
+      "summary": "执行返回并核对关闭层级或状态迁移。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act launch --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.launch",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act launch",
+      "summary": "启动当前环境的游戏包并核对前台画面。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act text --help"
+      ],
+      "guard_profile": "account_policy",
+      "id": "act.text",
+      "json_output": true,
+      "mutation_scope": "account",
+      "path": "omni game player act text",
+      "summary": "输入文本；账号发言仍经过作者口径策略。"
+    },
+    {
+      "category": "操作",
+      "examples": [
+        "omni game player act wait --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "act.wait",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player act wait",
+      "summary": "等待有限异步变化并持续心跳。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore plan --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "explore.plan",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player explore plan",
+      "summary": "基于前沿、任务和攻略生成阶段动作预算。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore run --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "explore.run",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player explore run",
+      "summary": "在一个连续 Session 内执行语义动作段。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore drive --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "explore.drive",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player explore drive",
+      "summary": "复用同一外部 Session 连续运行到阶段停止条件。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore dispatch --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "explore.dispatch",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player explore dispatch",
+      "summary": "将完整 drive 托管给独立后台 worker，保留原 Session 与全量日志。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore dispatch-status --help"
+      ],
+      "guard_profile": "none",
+      "id": "explore.dispatch-status",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player explore dispatch-status",
+      "summary": "只读查看后台阶段、心跳和退出状态，不调用模型或游戏。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore status --help"
+      ],
+      "guard_profile": "none",
+      "id": "explore.status",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player explore status",
+      "summary": "查看进度、空转、信息增量和降级状态。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore interrupt --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "explore.interrupt",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player explore interrupt",
+      "summary": "安全中断设备动作段并保留 Session。"
+    },
+    {
+      "category": "探索",
+      "examples": [
+        "omni game player explore resume --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "explore.resume",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player explore resume",
+      "summary": "从检查点继续同一探索阶段。"
+    },
+    {
+      "category": "任务",
+      "examples": [
+        "omni game player task list --help"
+      ],
+      "guard_profile": "none",
+      "id": "task.list",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player task list",
+      "summary": "列出持续任务、前沿候选和优先级。"
+    },
+    {
+      "category": "任务",
+      "examples": [
+        "omni game player task add --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "task.add",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player task add",
+      "summary": "建立可验证退出条件的任务。"
+    },
+    {
+      "category": "任务",
+      "examples": [
+        "omni game player task claim --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "task.claim",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player task claim",
+      "summary": "认领任务，并可绑定到运行中的 Session。"
+    },
+    {
+      "category": "任务",
+      "examples": [
+        "omni game player task complete --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "task.complete",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player task complete",
+      "summary": "以终态证据关闭任务。"
+    },
+    {
+      "category": "任务",
+      "examples": [
+        "omni game player task block --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "task.block",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player task block",
+      "summary": "记录已复现的真实阻断与恢复条件。"
+    },
+    {
+      "category": "玩法",
+      "examples": [
+        "omni game player gameplay list --help"
+      ],
+      "guard_profile": "none",
+      "id": "gameplay.list",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player gameplay list",
+      "summary": "列出玩法候选、边界、规则线索、相邻关系和来源证据。"
+    },
+    {
+      "category": "玩法",
+      "examples": [
+        "omni game player gameplay show --help"
+      ],
+      "guard_profile": "none",
+      "id": "gameplay.show",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player gameplay show",
+      "summary": "查看一个玩法候选的完整边界与证据。"
+    },
+    {
+      "category": "玩法",
+      "examples": [
+        "omni game player gameplay invalidate --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "gameplay.invalidate",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player gameplay invalidate",
+      "summary": "保留历史与证据，追加一个自动发现不会覆盖的失效版本。"
+    },
+    {
+      "category": "玩法",
+      "examples": [
+        "omni game player gameplay discover --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "gameplay.discover",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player gameplay discover",
+      "summary": "有界扫描实机轨迹并幂等写入待审玩法候选；不调用模型或设备。"
+    },
+    {
+      "category": "状态",
+      "examples": [
+        "omni game player state current --help"
+      ],
+      "guard_profile": "none",
+      "id": "state.current",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player state current",
+      "summary": "查看当前语义状态及识别依据。"
+    },
+    {
+      "category": "状态",
+      "examples": [
+        "omni game player state map --help"
+      ],
+      "guard_profile": "none",
+      "id": "state.map",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player state map",
+      "summary": "查看已知界面、状态、转移和玩法归属。"
+    },
+    {
+      "category": "状态",
+      "examples": [
+        "omni game player state route --help"
+      ],
+      "guard_profile": "none",
+      "id": "state.route",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player state route",
+      "summary": "规划或核对到目标状态的最短可靠路线。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player navigate 编队换将 --environment <ENVIRONMENT_ID> --session <SESSION_ID> --source-step <SOURCE_STEP_ID>"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "navigate",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player navigate",
+      "summary": "按目标自动选择并执行已学习路径；动态画面用首控件局部守卫匹配入口，紧凑回执直接返回实际技能版本，未命中时在设备动作前交回语义探索。"
+    },
+    {
+      "category": "状态",
+      "examples": [
+        "omni game player state review-export --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "state.review-export",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player state review-export",
+      "summary": "导出带来源哈希的独立语义状态审阅包，不改变 canonical 状态。"
+    },
+    {
+      "category": "状态",
+      "examples": [
+        "omni game player state review-sign --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "state.review-sign",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player state review-sign",
+      "summary": "使用受信本地密钥签署独立审阅种子，不保存私钥材料。"
+    },
+    {
+      "category": "状态",
+      "examples": [
+        "omni game player state review-apply --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "state.review-apply",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player state review-apply",
+      "summary": "原子应用签名状态裁决，并以原 EvidenceRun 重新推导转移结果。"
+    },
+    {
+      "category": "记忆",
+      "examples": [
+        "omni game player memory recall --help"
+      ],
+      "guard_profile": "none",
+      "id": "memory.recall",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player memory recall",
+      "summary": "按环境和任务召回焦点记忆。"
+    },
+    {
+      "category": "记忆",
+      "examples": [
+        "omni game player memory record --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "memory.record",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player memory record",
+      "summary": "追加有来源的情节、语义、程序或禁忌记忆。"
+    },
+    {
+      "category": "记忆",
+      "examples": [
+        "omni game player memory consolidate --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "memory.consolidate",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player memory consolidate",
+      "summary": "去重并固化阶段记忆，不丢失来源。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill list --help"
+      ],
+      "guard_profile": "none",
+      "id": "skill.list",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player skill list",
+      "summary": "列出分层操作技能及适用环境。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill show --help"
+      ],
+      "guard_profile": "none",
+      "id": "skill.show",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player skill show",
+      "summary": "查看技能步骤、守卫、回退和验证记录。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill replay --help"
+      ],
+      "guard_profile": "device_preflight",
+      "id": "skill.replay",
+      "json_output": true,
+      "mutation_scope": "device",
+      "path": "omni game player skill replay",
+      "summary": "执行已验证技能并保留动作证据。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill health --help"
+      ],
+      "guard_profile": "none",
+      "id": "skill.health",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player skill health",
+      "summary": "读取操作级复用健康、当前任务与可直接复用候选，不访问设备。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill reconcile-operation-memory --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "skill.reconcile-operation-memory",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player skill reconcile-operation-memory",
+      "summary": "幂等补记有真实状态护栏与动作证据的 SkillRun；不访问设备。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill confirm-terminal-alias --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "skill.confirm-terminal-alias",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player skill confirm-terminal-alias",
+      "summary": "确认安全中断后的实际终态是调用上下文造成的合法落点，并保留证据来源。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill invalidate --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "skill.invalidate",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player skill invalidate",
+      "summary": "用终态截图反例停用语义目标错误的精确技能版本，并保留历史与来源。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill crystallize --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "skill.crystallize",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player skill crystallize",
+      "summary": "从成功轨迹归纳候选技能。"
+    },
+    {
+      "category": "技能",
+      "examples": [
+        "omni game player skill validate --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "skill.validate",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player skill validate",
+      "summary": "从独立 SkillRun 推导速度、精度和副作用验证门。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide search --help"
+      ],
+      "guard_profile": "none",
+      "id": "guide.search",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player guide search",
+      "summary": "检索已导入且保留时效和来源的攻略。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide import --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "guide.import",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player guide import",
+      "summary": "导入攻略结论、版本、时间和原始来源。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide freshness --help"
+      ],
+      "guard_profile": "none",
+      "id": "guide.freshness",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player guide freshness",
+      "summary": "判断攻略是否仍适用于当前环境。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide refresh submit --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "guide.refresh.submit",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player guide refresh submit",
+      "summary": "在四类明确触发点提交异步时效攻略请求，立即返回且不等待研究。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide refresh pending --help"
+      ],
+      "guard_profile": "none",
+      "id": "guide.refresh.pending",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player guide refresh pending",
+      "summary": "列出尚无终态回执的攻略刷新请求。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide refresh work-item --help"
+      ],
+      "guard_profile": "none",
+      "id": "guide.refresh.work-item",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player guide refresh work-item",
+      "summary": "输出供既有 research.run 消费的严格工作合同。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide refresh complete --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "guide.refresh.complete",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player guide refresh complete",
+      "summary": "校验并保存独立研究 worker 产出的来源快照与攻略知识。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide refresh finish --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "guide.refresh.finish",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player guide refresh finish",
+      "summary": "为离线、来源不可用或研究失败写入明确终态。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide refresh retry --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "guide.refresh.retry",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player guide refresh retry",
+      "summary": "从离线、来源不可用或失败终态建立新尝试并保留旧回执。"
+    },
+    {
+      "category": "攻略",
+      "examples": [
+        "omni game player guide refresh contradict --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "guide.refresh.contradict",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player guide refresh contradict",
+      "summary": "用实机反例追加 contradicted 版本并保留原来源。"
+    },
+    {
+      "category": "日账",
+      "examples": [
+        "omni game player daily schema --help"
+      ],
+      "guard_profile": "none",
+      "id": "daily.schema",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player daily schema",
+      "summary": "查看三谋连续日职责候选与封账合同。"
+    },
+    {
+      "category": "日账",
+      "examples": [
+        "omni game player daily status --help"
+      ],
+      "guard_profile": "none",
+      "id": "daily.status",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player daily status",
+      "summary": "只读查看当前自然日、下一职责与封账条件。"
+    },
+    {
+      "category": "日账",
+      "examples": [
+        "omni game player daily advance --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "daily.advance",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player daily advance",
+      "summary": "用已保存的 canonical 证据推进当天下一项职责。"
+    },
+    {
+      "category": "日账",
+      "examples": [
+        "omni game player daily seal --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "daily.seal",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player daily seal",
+      "summary": "在六项职责与真实动作质量通过后封账。"
+    },
+    {
+      "category": "证据",
+      "examples": [
+        "omni game player evidence run --help"
+      ],
+      "guard_profile": "none",
+      "id": "evidence.run",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player evidence run",
+      "summary": "查看动作段 EvidenceRun。"
+    },
+    {
+      "category": "证据",
+      "examples": [
+        "omni game player evidence step --help"
+      ],
+      "guard_profile": "none",
+      "id": "evidence.step",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player evidence step",
+      "summary": "查看 Before、Action、After 和点击标记。"
+    },
+    {
+      "category": "证据",
+      "examples": [
+        "omni game player evidence show --help"
+      ],
+      "guard_profile": "none",
+      "id": "evidence.show",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player evidence show",
+      "summary": "按稳定 ID 打开图像、视频帧和来源。"
+    },
+    {
+      "category": "证据",
+      "examples": [
+        "omni game player evidence export --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "evidence.export",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player evidence export",
+      "summary": "导出玩法拆解需要的证据索引。"
+    },
+    {
+      "category": "证据",
+      "examples": [
+        "omni game player evidence prune --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "evidence.prune",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player evidence prune",
+      "summary": "报告 canonical 重复 hash，并清理未登记孤儿文件。"
+    },
+    {
+      "category": "基准",
+      "examples": [
+        "omni game player benchmark list --help"
+      ],
+      "guard_profile": "none",
+      "id": "benchmark.list",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player benchmark list",
+      "summary": "列出 AFKJ 与持续 Session 基准。"
+    },
+    {
+      "category": "基准",
+      "examples": [
+        "omni game player benchmark run --candidate gpt-5.6-luna-medium --task B3 --case B3-01 --run-id afkj-b3-run-001；B1/B3 续跑追加 --resume-existing"
+      ],
+      "guard_profile": "local_write",
+      "id": "benchmark.run",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player benchmark run",
+      "summary": "运行 B0/B1 与 A2 新界面 B3 基准；B1/B3 中断后可按不可变 request 续跑。"
+    },
+    {
+      "category": "基准",
+      "examples": [
+        "omni game player benchmark compare --help"
+      ],
+      "guard_profile": "none",
+      "id": "benchmark.compare",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player benchmark compare",
+      "summary": "比较质量门、时延、token 和信息增量。"
+    },
+    {
+      "category": "账号",
+      "examples": [
+        "omni game player account status --help"
+      ],
+      "guard_profile": "none",
+      "id": "account.status",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player account status",
+      "summary": "查看账号身份、区服和纯 AI 账号状态。"
+    },
+    {
+      "category": "账号",
+      "examples": [
+        "omni game player account metric --help"
+      ],
+      "guard_profile": "none",
+      "id": "account.metric",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player account metric",
+      "summary": "查看有来源的账号指标及变化。"
+    },
+    {
+      "category": "账号",
+      "examples": [
+        "omni game player account metric-derive --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "account.metric-derive",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player account metric-derive",
+      "summary": "从同一终态证据的局部数值区域推导并保存任务相关账号指标。"
+    },
+    {
+      "category": "账号",
+      "examples": [
+        "omni game player account policy --help"
+      ],
+      "guard_profile": "none",
+      "id": "account.policy",
+      "json_output": true,
+      "mutation_scope": "read_only",
+      "path": "omni game player account policy",
+      "summary": "查看支付、身份资料和发言策略。"
+    },
+    {
+      "category": "账号",
+      "examples": [
+        "omni game player account initialize --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "account.initialize",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player account initialize",
+      "summary": "初始化游戏内自主、支付和外部身份资料的固定权限边界。"
+    },
+    {
+      "category": "控制台",
+      "examples": [
+        "omni game player console serve --help"
+      ],
+      "guard_profile": "local_write",
+      "id": "console.serve",
+      "json_output": true,
+      "mutation_scope": "local_state",
+      "path": "omni game player console serve",
+      "summary": "启动独立 AI 玩家控制台。"
+    }
+  ],
+  "continuous_session_policy": {
+    "allowed_restart_reasons": [
+      "phase_complete",
+      "provider_failover",
+      "hard_reset",
+      "environment_identity_change",
+      "facility_contract_change",
+      "unrecoverable_context_pollution",
+      "benchmark_isolation"
+    ],
+    "checkpoint_every_semantic_actions": 10,
+    "forbidden_behaviors": [
+      "每个游戏动作创建一个新 Agent 或新 Session",
+      "把单步证据边界误作 Agent 生命周期边界",
+      "无心跳地长时间占用设备",
+      "重复读取完整设施说明代替恢复焦点上下文"
+    ],
+    "full_help_load_events": [
+      "session_start",
+      "facility_contract_change"
+    ],
+    "heartbeat_after_device_action": true,
+    "heartbeat_interval_seconds_max": 30,
+    "safe_stop_after_silence_seconds": 60,
+    "semantic_actions_per_session_min": 10,
+    "semantic_actions_per_session_target": 30,
+    "warn_after_silence_seconds": 30
+  },
+  "external_agent_providers": [
+    {
+      "effort_argument": "-c model_reasoning_effort=\"{effort}\"",
+      "event_format": "jsonl",
+      "executable": "codex",
+      "provider": "codex-cli",
+      "resume_template": [
+        "codex",
+        "exec",
+        "resume",
+        "-m",
+        "{model}",
+        "-c",
+        "model_reasoning_effort=\"{effort}\"",
+        "--json",
+        "{session_id}",
+        "{prompt}"
+      ],
+      "session_id_source": "thread.started.thread_id",
+      "start_template": [
+        "codex",
+        "exec",
+        "-C",
+        "{workspace}",
+        "-m",
+        "{model}",
+        "-c",
+        "model_reasoning_effort=\"{effort}\"",
+        "--json",
+        "{prompt}"
+      ]
+    },
+    {
+      "effort_argument": "--effort {effort}",
+      "event_format": "stream-json",
+      "executable": "claude",
+      "provider": "claude-code-cli",
+      "resume_template": [
+        "claude",
+        "-p",
+        "--model",
+        "{model}",
+        "--effort",
+        "{effort}",
+        "--output-format",
+        "stream-json",
+        "--resume",
+        "{session_id}",
+        "{prompt}"
+      ],
+      "session_id_source": "caller-assigned --session-id / result.session_id",
+      "start_template": [
+        "claude",
+        "-p",
+        "--model",
+        "{model}",
+        "--effort",
+        "{effort}",
+        "--output-format",
+        "stream-json",
+        "--session-id",
+        "{session_id}",
+        "{prompt}"
+      ]
+    }
+  ],
+  "facility_contract_sha256": "4de938323a6bed43b38982c0dc4f8069e89e9071e9e5a1826dbd19a9b66f391d",
+  "help_language": "zh-CN",
+  "invariants": [
+    "每个实体动作都先检查目标、遮罩、来源和账号策略，再记录前后证据。",
+    "A2 每轮第一张图由外层在调用前即时采集并作为权威当前帧，附加图片只作历史参考。",
+    "观察、语义决策、固定自动化和设施编程按 A0 至 A4 分层路由。",
+    "同一阶段优先续接原外部 Session；只有白名单原因允许新建。",
+    "游戏运行本身是主要 E2E；日常定向测试总时长不得超过 120 秒。",
+    "持续 Agent 每次确定下一界面或操作目标后先调用 navigate；命中已知路径时整段交给零模型输入的低级固定自动化并直接返回终态预览，未命中且设备未动作后才步进探索缺失片段；进入与退出目标不得互相模糊匹配。",
+    "每条成功且已理解的交互路径当轮写入带来源的程序记忆；后续按目标直接选路，守卫失配时只把失败片段交回持续 Agent。",
+    "已理解界面的程序守卫固定外框与控件结构，并允许同一界面内的数值、进度、倒计时、动画和地图动态内容变化；从这类界面首次探索新边时自动采用局部结构稳定终态，不能因待机动画漏记已经成功且理解的路径；弹窗和异页仍须拒绝。",
+    "固定技能到达的实际界面与目标语义明确不符时，用终态截图证据停用精确版本；后续绕开错误版本并只重探该片段。",
+    "资源不足、并发占用、冷却、解锁与次数限制等运行时前置失败只保留失败运行和终态证据，不停用技能；已停用版本不得由原始旧证据自动复活。",
+    "技能声明终态只有在实机截图匹配时才可作为权威状态；不匹配的完整终态证据继续进入普通状态归纳，预期只保留为反例。",
+    "外部 Session 成功返回后由包装器自动把终态动作 EvidenceRun 幂等沉淀进状态图。",
+    "只保留变化帧、关键状态和必要上下文，避免重复静帧浪费磁盘与 token。",
+    "攻略必须保留来源、时间、版本和适用环境；过期结论不能覆盖实机证据。",
+    "除真实货币支付和外部个人身份资料外，纯 AI 账号可按任务自主行动。",
+    "账号发言仅在必要时发生，并遵循作者口径。"
+  ],
+  "public_root": "omni game player",
+  "public_schema_bundle_sha256": "32a48ce763d3cafc2e941fdd314e7d08779bee2883ed2a6b686475515805878f",
+  "schema": "game-observatory.ai-player.facility-contract.v1",
+  "test_policy": {
+    "daily_test_limit_seconds": 120,
+    "required_post_run_fields": [
+      "实际变化",
+      "证据索引",
+      "信息增量",
+      "副作用",
+      "下一任务"
+    ],
+    "required_pre_run_fields": [
+      "目标",
+      "当前状态",
+      "预期变化",
+      "动作预算",
+      "停止条件"
+    ],
+    "run_is_primary_e2e": true,
+    "stop_and_diagnose_when": [
+      "连续 30 秒没有心跳",
+      "同一动作重复两次无信息增量",
+      "来源守卫失败"
+    ]
+  }
+}

@@ -245,7 +245,7 @@ def cmd_notes_promote(note_id: str, category: str, model: str | None,
     """把一条 poof note 调研澄清成可执行 plan 草稿 (走统一 agent)。
 
     产出 docs/plans/<category>/[date]NAME/plan.md(+brief.md); 歧义标 NEEDS CLARIFICATION
-    并入 omni human inbox; 草稿要过 omni plan gate 才能 split/dispatch。
+    并直接在当前命令/agent 对话中返回; 草稿要过 omni plan gate 才能 split/dispatch。
     """
     from omnicompany.packages.services._core.lifecycle.note_to_plan import promote_note_to_plan
     res = promote_note_to_plan(note_id, category=category, model=model, dry=dry)
@@ -263,7 +263,7 @@ def cmd_notes_promote(note_id: str, category: str, model: str | None,
     click.echo(f"✓ 生成 plan 草稿: {res['plan_id']}")
     click.echo(f"  路径: {res['path']}")
     if res.get("clarifications"):
-        click.echo(f"  ⚠ {len(res['clarifications'])} 条待澄清 (已入 inbox {res.get('clarifications_pushed_to_inbox',0)} 条):")
+        click.echo(f"  ⚠ {len(res['clarifications'])} 条待澄清 (请在当前 agent 对话直接补充):")
         for c in res["clarifications"]:
             click.echo(f"    - {c}")
     click.echo(f"  下一步: {res.get('next')}")
@@ -279,18 +279,18 @@ def _notes_materialize_state_path():
 @cmd_notes.command("materialize")
 @external_or_controller
 @click.option("--model", default=None, help="覆盖默认性价比模型")
-@click.option("--inbox", is_flag=True, help="置信不足/越界标签推 human-inbox")
-def cmd_notes_materialize(model: str | None, inbox: bool) -> None:
+@click.option("--review", "submit_review", is_flag=True, help="置信不足/越界标签合并提交审阅材料")
+def cmd_notes_materialize(model: str | None, submit_review: bool) -> None:
     """消费任务: poof-notes 逐条水位线增量入册(标题分叉修正+双时间+受控标签), 真源零改动。
 
-    手动 = 直接跑此 verb; 定期 = cron 任务 gov-notes-materialize 每 15 分钟调同函数
+    手动 = 直接跑此 verb; 定期 = cron 任务 gov-notes-materialize 每小时调同函数
     (index.json 无变更时零 LLM 调用)。
     """
     from omnicompany.packages.services._core.lifecycle.note_source import overlay_note_store_dir
     from omnicompany.packages.services._core.lifecycle.notes_materialize import run_notes_materialize
     report = run_notes_materialize(
         overlay_note_store_dir(), state_path=_notes_materialize_state_path(),
-        model=model, push_inbox=inbox,
+        model=model, submit_review=submit_review,
     )
     _emit(report)
 

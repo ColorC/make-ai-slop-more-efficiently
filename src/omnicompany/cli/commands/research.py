@@ -29,13 +29,15 @@ def cmd_research_status() -> None:
     recs = library.active_records()
     runs = _paths.RUNS_ROOT
     n_runs = len(list(runs.iterdir())) if runs.is_dir() else 0
-    click.echo("== 公开调研管线 (Team) ==")
+    click.echo("== 公开调研管线 ==")
     click.echo(f"  管线/Worker : {_paths._OMNI_ROOT / 'src/omnicompany/packages/domains/research'}")
     click.echo(f"  统一研究库  : {_paths.RECORDS_PATH}  ({len(recs)} 条 active)")
     click.echo(f"  runs        : {n_runs}")
     click.echo(f"  reports     : {_paths.REPORTS_ROOT}")
-    click.echo("  无人值守跑  : omni run research.run -i topic=\"<题目>\"  (codex 原生搜索)")
-    click.echo("  交互式跑    : 按 research SKILL 协议自己搜 → omni research save")
+    click.echo("  交互式主路  : 当前 agent 原生搜索 → omni research check/save")
+    click.echo("  无人值守可选: omni run research.run -i topic=\"<题目>\"")
+    click.echo("                 默认总时限 600s / 无可观测输出 60s 自动终止")
+    click.echo("                 进度见 run_dir/native_events.jsonl，状态见 native_status.json")
 
 
 @cmd_research.command("list")
@@ -175,6 +177,25 @@ def cmd_research_save(file_path: str, json_str: str) -> None:
     click.echo(f"  report: {report}")
 
 
+@cmd_research.command("merge")
+@click.option("--primary", required=True, help="保留的主 record_id")
+@click.option("--duplicate", required=True, help="并入后墓碑删除的重复 record_id")
+@any_caller
+def cmd_research_merge(primary: str, duplicate: str) -> None:
+    """人工确认两条语义同题后合并；旧题目保留为 alias，后续 check/save 不再分叉。"""
+    from omnicompany.packages.domains.research import library
+
+    try:
+        merged, _, report = library.merge_records(primary, duplicate)
+    except library.LibraryWriteError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        f"✓ 已合并 {duplicate} → {primary} · 来源 {len(merged.get('sources') or [])} · "
+        f"发现 {len(merged.get('findings') or [])} · 丰富度 {merged.get('richness', 0)}"
+    )
+    click.echo(f"  report: {report}")
+
+
 @cmd_research.command("find-local")
 @click.argument("query")
 @any_caller
@@ -194,17 +215,78 @@ def cmd_research_find_local(query: str) -> None:
 @cmd_research.command("doctor")
 @any_caller
 def cmd_research_doctor() -> None:
-    """列带病研究记录:落库校验不过(缺字段/源无 url/快照缺失)。"""
-    from omnicompany.packages.domains.research import library
+    """检查受支持路径、worker 可用性、运行时限和带病研究记录。"""
+    import json
+    import shutil
+
+    from omnicompany.packages.domains.research import library, process_health
+    from omnicompany.packages.domains.research._paths import RUNS_ROOT
+    from omnicompany.packages.domains.research.routers.pipeline import (
+        DEFAULT_IDLE_TIMEOUT_S,
+        DEFAULT_TOTAL_TIMEOUT_S,
+    )
 
     recs = library.active_records()
     bad = [(r, (r.get("validation") or {}).get("issues") or [])
            for r in recs if (r.get("validation") or {}).get("ok") is False]
-    if not bad:
-        click.echo(f"✓ {len(recs)} 条研究记录全部合法(或未校验)。")
-        return
-    click.echo(f"⚠ {len(bad)}/{len(recs)} 条记录带病:")
+    problems: list[str] = []
+    if shutil.which("codex") is None:
+        problems.append("可选无人值守 worker 不可用: PATH 中找不到 codex")
+    if DEFAULT_TOTAL_TIMEOUT_S <= DEFAULT_IDLE_TIMEOUT_S:
+        problems.append("research.run 总时限必须大于空闲时限")
+
+    running: list[str] = []
+    finished_statuses: list[tuple[float, str]] = []
+    if RUNS_ROOT.is_dir():
+        for status_path in RUNS_ROOT.glob("*/native_status.json"):
+            try:
+                status = json.loads(status_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                problems.append(f"状态文件不可读: {status_path}")
+                continue
+            if status.get("state") == "running":
+                running.append(status_path.parent.name)
+            elif status.get("state") == "finished":
+                try:
+                    mtime = status_path.stat().st_mtime
+                except OSError:
+                    mtime = 0.0
+                finished_statuses.append((mtime, str(status.get("result_status") or "unknown")))
+    if running:
+        problems.append("仍标记运行中的无人值守任务: " + ", ".join(running))
+
+    process_audit = process_health.inspect_research_processes(RUNS_ROOT)
+    if process_audit.error:
+        problems.append("research worker 进程审计不可用: " + process_audit.error)
+    for proc in process_audit.processes:
+        problems.append(
+            "孤儿/残留 worker 进程: "
+            f"pid={proc.pid} parent={proc.parent_pid} name={proc.name} "
+            f"run={proc.run_name} created={proc.created_at or 'unknown'}"
+        )
+
+    if bad:
+        click.echo(f"⚠ {len(bad)}/{len(recs)} 条记录带病:")
     for r, issues in bad:
         click.echo(f"  {r.get('record_id','')}  {r.get('topic','')[:34]}")
         for i in issues[:5]:
             click.echo(f"      - {i}")
+        problems.append(f"带病记录 {r.get('record_id', '')}")
+
+    if problems:
+        for problem in problems:
+            click.echo(f"✗ {problem}")
+        raise click.ClickException(f"research 管线不健康: {len(problems)} 个问题")
+
+    click.echo(f"✓ 交互式主路健康: check/save/merge · {len(recs)} 条 active 记录全部合法。")
+    recent = [status for _, status in sorted(finished_statuses, reverse=True)[:3]]
+    if recent and "succeeded" not in recent:
+        click.echo(
+            "⚠ 可选无人值守路已隔离: 最近 3 次内无成功记录 "
+            f"({', '.join(recent)})；失败会拒绝落库。交互式调研不得调用它。"
+        )
+    else:
+        click.echo(
+            f"✓ 可选无人值守路安全门正常: codex 可用 · 总时限 {DEFAULT_TOTAL_TIMEOUT_S:g}s · "
+            f"空闲时限 {DEFAULT_IDLE_TIMEOUT_S:g}s · 实时事件日志已启用 · 无悬挂状态。"
+        )

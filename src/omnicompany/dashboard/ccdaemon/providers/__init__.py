@@ -10,7 +10,7 @@
 ----
 - 阶段 1 (本): base.py BaseProvider ABC + ProviderOptions
 - 阶段 2: claude.py ClaudeProvider (现 chat.py SDK 路径迁入)
-- 阶段 6: codex.py / opencode.py / cursor.py (留 stub, 真接入各立独立 plan)
+- 阶段 6: codex.py / kimi.py / opencode.py (已实现); cursor.py (留 stub, 真接入另立 plan)
 
 不允许从这里 re-export 旧的 chat.py 实现 (强制走 providers.X 路径).
 """

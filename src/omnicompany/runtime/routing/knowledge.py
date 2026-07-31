@@ -11,15 +11,15 @@
 
 示例::
 
-    class P4WorkflowKnowledge(KnowledgeRouter):
-        FORMAT_IN  = "p4-changelist"
-        FORMAT_OUT = "p4-changelist"
+    class GitWorkflowKnowledge(KnowledgeRouter):
+        FORMAT_IN  = "git-changeset"
+        FORMAT_OUT = "git-changeset"
         DESCRIPTION = '''
-        P4 提交流程：
-        1. p4 edit 打开文件编辑
-        2. 修改文件
-        3. p4 submit -d "描述" 提交
-        注意：必须先 p4 login
+        Git 提交流程：
+        1. 修改文件
+        2. git add 暂存修改
+        3. git commit -m "描述" 提交
+        注意：提交前先 git status 检查改动范围
         '''
 """
 

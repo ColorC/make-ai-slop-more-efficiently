@@ -4,7 +4,7 @@
 LAP StateAnchor — 执行时的物理世界状态锚点
 
 问题背景（来自实验 Explorer V4）：
-  Agent 在执行时错误地将 LLM 声称的"产出类型"（如 feishu_message_output）
+  Agent 在执行时错误地将 LLM 声称的"产出类型"（如 api_message_output）
   当作文件系统中可寻址的实体，导致后续任务在 max_steps 内找不到数据而失败。
 
   根本原因：LAP V0.1/V0.2 只定义了"数据的语义类型"，没有定义
@@ -53,7 +53,7 @@ class StateKind(str, Enum):
     """SVN 版本号。同 P4_CHANGELIST 的注意事项。"""
 
     API_SNAPSHOT = "api_snapshot"
-    """外部服务的时刻状态快照（如 Feishu 消息列表、REST API 响应）。
+    """外部服务的时刻状态快照（如外部消息列表、REST API 响应）。
     带时间戳；实时变化，时效性有限。"""
 
     AGENT_OUTPUT = "agent_output"
@@ -82,14 +82,14 @@ class StateAnchor:
     Examples:
         # Git 提交（最可靠）
         StateAnchor(kind=StateKind.GIT_COMMIT, ref="abc123ef",
-                    path="e:/WindowsWorkspace")
+                    path="/path/to/workspace")
 
         # 文件摘要（适合验证文件内容未被意外修改）
         StateAnchor(kind=StateKind.FILE_HASH, ref="sha256:abcdef...",
-                    path="data/feishu_v1_state.json")
+                    path="data/api_v1_state.json")
 
         # Agent 产出（低可靠，后续任务不应以此为起点）
-        StateAnchor(kind=StateKind.AGENT_OUTPUT, ref="feishu_message_output",
+        StateAnchor(kind=StateKind.AGENT_OUTPUT, ref="api_message_output",
                     trace_id="01KM4Z2A...", is_mutable=True)
     """
 

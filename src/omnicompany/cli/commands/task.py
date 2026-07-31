@@ -48,11 +48,26 @@ def cmd_task() -> None:
 @cmd_task.command("list")
 @click.option("--plan", "plan_id", default=None, help="只看某 plan 的 task")
 @click.option("--status", default=None, help="按状态过滤")
+@click.option("--team", "team_id", default=None, help="按目标团队过滤")
+@click.option("--position", "position_id", default=None, help="按目标岗位过滤")
+@click.option("--assignee", default=None, help="按当前负责人过滤")
 @click.option("--json", "as_json", is_flag=True)
 @any_caller
-def cmd_task_list(plan_id: str | None, status: str | None, as_json: bool) -> None:
-    """列 task (可按 plan / 状态过滤)。"""
-    tasks = _store().list_tasks(plan_id)
+def cmd_task_list(
+    plan_id: str | None,
+    status: str | None,
+    team_id: str | None,
+    position_id: str | None,
+    assignee: str | None,
+    as_json: bool,
+) -> None:
+    """列 task；团队/岗位“收件箱”是 canonical Task 的只读筛选视图。"""
+    tasks = _store().list_tasks(
+        plan_id,
+        team_id=team_id,
+        position_id=position_id,
+        assignee=assignee,
+    )
     if status:
         tasks = [t for t in tasks if t.status == status]
     rows = [t.to_dict() for t in tasks]
@@ -65,7 +80,8 @@ def cmd_task_list(plan_id: str | None, status: str | None, as_json: bool) -> Non
     for t in rows:
         deps = f" deps={t['dependencies']}" if t["dependencies"] else ""
         asg = f" @{t['assignee']}" if t.get("assignee") else ""
-        click.echo(f"  [{t['id']}] {t['status']:11s} {t['title']}{asg}{deps}")
+        pos = f" →岗位:{t['position_id']}" if t.get("position_id") else ""
+        click.echo(f"  [{t['id']}] {t['status']:11s} {t['title']}{asg}{pos}{deps}")
 
 
 @cmd_task.command("show")
@@ -84,7 +100,8 @@ def cmd_task_show(task_id: str, plan_id: str | None, as_json: bool) -> None:
         return
     d = t.to_dict()
     for k in ("id", "plan_id", "title", "status", "priority", "complexity", "parallel",
-              "dependencies", "assignee", "test_strategy", "description", "details"):
+              "dependencies", "assignee", "team_id", "position_id",
+              "test_strategy", "description", "details"):
         click.echo(f"{k:14s}: {d.get(k)}")
 
 
@@ -166,6 +183,114 @@ def cmd_task_assign(task_id: str, assignee: str, plan_id: str | None, as_json: b
     click.echo(f"✓ [{t.id}] 指派给 {assignee}")
 
 
+@cmd_task.command("claim-route")
+@click.argument("task_id")
+@click.option("--plan", "plan_id", required=True, help="任务所属计划")
+@click.option("--project", "project_id", required=True, help="任务所属项目")
+@click.option("--team", "team_id", required=True, help="项目已引用的目标团队")
+@click.option("--position", "position_id", required=True, help="团队岗位")
+@click.option("--assignee", required=True, help="当前认领人或 Agent 身份")
+@click.option(
+    "--evidence-ref",
+    "evidence_refs",
+    multiple=True,
+    required=True,
+    help="认领与岗位判断依据；可重复传入",
+)
+@click.option("--trace-id", default=None, help="可选审计追踪号")
+@click.option("--json", "as_json", is_flag=True)
+@any_caller
+def cmd_task_claim_route(
+    task_id: str,
+    plan_id: str,
+    project_id: str,
+    team_id: str,
+    position_id: str,
+    assignee: str,
+    evidence_refs: tuple[str, ...],
+    trace_id: str | None,
+    as_json: bool,
+) -> None:
+    """原子认领任务并放入团队岗位；只落位，不执行。"""
+    import asyncio
+
+    from omnicompany.bus.sqlite import SQLiteBus
+    from omnicompany.core import registry as runtime_registry
+    from omnicompany.core.projects_registry import (
+        list_projects,
+        plan_governance,
+    )
+    from omnicompany.packages.services._core.lifecycle.claim_route import (
+        TaskPositionClaimRequest,
+        claim_task_to_position,
+    )
+
+    project = next(
+        (item for item in list_projects() if item.get("id") == project_id),
+        None,
+    )
+    if project is None:
+        message = f"项目不存在: {project_id}"
+        if as_json:
+            _emit({"ok": False, "status": "rejected", "reason": message})
+        else:
+            click.echo(f"未认领：{message}", err=True)
+        raise click.exceptions.Exit(2)
+
+    try:
+        runtime_registry.discover()
+        entry = runtime_registry.get_or_raise(team_id)
+        team = entry.build_team()
+    except Exception as exc:  # noqa: BLE001
+        message = f"团队无法从现有运行目录构建: {exc}"
+        if as_json:
+            _emit({"ok": False, "status": "rejected", "reason": message})
+        else:
+            click.echo(f"未认领：{message}", err=True)
+        raise click.exceptions.Exit(2) from exc
+
+    request = TaskPositionClaimRequest(
+        project_id=project_id,
+        plan_id=plan_id,
+        task_id=task_id,
+        team_id=team_id,
+        position_id=position_id,
+        assignee=assignee,
+        evidence_refs=tuple(evidence_refs),
+    )
+
+    async def run_claim():
+        bus = SQLiteBus()
+        await bus.connect()
+        try:
+            return await claim_task_to_position(
+                request,
+                project=project,
+                team=team,
+                store=_store(),
+                governance=plan_governance(),
+                bus=bus,
+                trace_id=trace_id,
+                source="cli.task.claim_route",
+            )
+        finally:
+            await bus.close()
+
+    try:
+        receipt = asyncio.run(run_claim())
+    except (RuntimeError, ValueError) as exc:
+        if as_json:
+            _emit({"ok": False, "status": "rejected", "reason": str(exc)})
+        else:
+            click.echo(f"未认领：{exc}", err=True)
+        raise click.exceptions.Exit(2) from exc
+    if as_json:
+        _emit(receipt.to_dict())
+    else:
+        click.echo(receipt.summary_zh)
+    raise click.exceptions.Exit(0 if receipt.ok else 2)
+
+
 @cmd_task.command("update")
 @click.argument("task_id")
 @click.option("--note", required=True, help="一条进度记录(平实人话: 做了什么/改了哪些文件/跑了什么/结果)")
@@ -178,6 +303,12 @@ def cmd_task_update(task_id: str, note: str, plan_id: str | None) -> None:
     except KeyError as e:
         click.echo(f"ERROR: {e}", err=True)
         sys.exit(2)
+    try:  # 会话侧反向挂一条引用(这个会话给这个 task 记了进度)
+        from omnicompany.packages.services._core.identity import link_record_to_session
+        link_record_to_session(None, kind="task_note", record_id=t.id,
+                               ref_id=(f"plan:{t.plan_id}" if getattr(t, "plan_id", None) else None))
+    except Exception:
+        pass
     click.echo(f"✓ [{t.id}] 记下进度(共 {len(t.notes)} 条): {note[:50]}")
 
 

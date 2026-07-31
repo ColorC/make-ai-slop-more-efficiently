@@ -12,7 +12,7 @@ Worker 协议:
 from __future__ import annotations
 
 from omnicompany.packages.services._core.omnicompany import Worker
-from .._archive.routers_legacy import FrameworkContextLoaderRouter as _Legacy
+from ..routers_legacy import FrameworkContextLoaderRouter as _Legacy
 
 
 class FrameworkContextLoaderWorker(Worker, _Legacy):

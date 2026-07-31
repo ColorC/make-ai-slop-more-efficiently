@@ -23,7 +23,8 @@ CONTROL_DEFINITIONS: dict[str, dict[str, Any]] = {
     "controller.auto_wake": {
         "label": "Controller auto wake",
         "description": "Allow controller wakeups from review/subagent events.",
-        "default": True,
+        # 2026-07 总控止血「非确认不主动」: 自动唤起默认关, 用户显式打开才唤起。
+        "default": False,
     },
     "reviewstage.push_to_user": {
         "label": "Review push to user",
@@ -284,6 +285,13 @@ class ControlObservabilityStore:
                             for k in ("value", "updated_by", "updated_at", "reason", "history")
                             if k in controls[key]
                         })
+                        # 2026-07 总控止血: 用户从未显式设置过(updated_by=="system")的存量
+                        # control, value 跟随 CONTROL_DEFINITIONS 的最新 default, 不被旧的
+                        # 持久化值锁死; human/controller 显式设置过的保持不变。
+                        if state["controls"][key].get("updated_by") == "system":
+                            state["controls"][key]["value"] = bool(
+                                CONTROL_DEFINITIONS[key]["default"]
+                            )
                         state["controls"][key]["value"] = bool(state["controls"][key]["value"])
                         if not isinstance(state["controls"][key].get("history"), list):
                             state["controls"][key]["history"] = []

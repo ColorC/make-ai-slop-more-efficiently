@@ -27,6 +27,9 @@ from omnicompany.packages.services._core.agent._bus import (
     emit_router_input,
     emit_router_output,
 )
+from omnicompany.packages.services._core.agent.context_fork import (
+    inherit_context_fork_messages,
+)
 
 
 class _PermissiveDict(dict):
@@ -112,7 +115,10 @@ class PromptBuilderRouter(Router):
         else:
             system_prompt = self.render_system_prompt(biz_input)
 
-        initial_messages = self.build_initial_messages(biz_input)
+        initial_messages = inherit_context_fork_messages(
+            biz_input,
+            self.build_initial_messages(biz_input),
+        )
 
         output = {
             "system_prompt": system_prompt,

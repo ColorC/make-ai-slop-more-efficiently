@@ -1,0 +1,43 @@
+{
+  "schema": "game-observatory.ai-player.physical-readiness-config.v2",
+  "repository_root": "../..",
+  "expected_afk_build_id": "afk-cn-1.7.21-versionCode-10750-20260714",
+  "evidence": {
+    "acceptance_manifest": {
+      "path": "data/domains/game_observatory/benchmarks/ai_player/acceptance_manifest.v1.json",
+      "sha256": "f7157a20e59c7ad968860f1a25d351efbe352a5b6c0f0c273d1337ab12a2a1de"
+    },
+    "candidate_manifest": {
+      "path": "data/domains/game_observatory/benchmarks/ai_player/fixtures/afk_hero_growth_v1_candidate_v4/candidate_manifest.v1.json",
+      "sha256": "1ecb9e3541cf1340b2db66194c2ace105620079c71d2e53e9e3b83a3b7c04be3"
+    },
+    "candidate_validation": {
+      "path": "data/domains/game_observatory/benchmarks/ai_player/fixtures/afk_hero_growth_v1_candidate_v4/validation.v1.json",
+      "sha256": "b1aa01121178d3e03fd818723addc994e6e85b703da68b630ff14ebb7402ea38"
+    },
+    "adjudication_evidence": {
+      "path": "data/domains/game_observatory/benchmarks/ai_player/fixtures/afk_hero_growth_v1_candidate_v4_adjudication.v1.json",
+      "sha256": "aaf6d4887f945f833ec660153da02f35dbe101c0483b5b3122eadcabf8c84e3c"
+    },
+    "truth_audit_result": {
+      "path": "data/domains/game_observatory/benchmarks/ai_player/results/afk_stage1_truth_audit.v1.result.json",
+      "sha256": "d2da6105c165fe6b7ae68ee8a84799af61faa4c5cd3522c0ee9a445c6295b23f"
+    },
+    "interaction_preflight_result": {
+      "path": "data/domains/game_observatory/benchmarks/ai_player/results/afk_interaction_preflight_known_controls_v1.result.json",
+      "sha256": "836a5d2be7a2ef71db13e91c66edd8629fed0f118de2969e445b97c1eaf06f6e"
+    }
+  },
+  "validator_receipt": {
+    "path": "config/game_observatory/receipts/afk_physical_readiness_candidate_v4.20260716.receipt.json",
+    "sha256": "ef55ce27152975ba7e5fade1d1c3516ce5a4d2fccdbb96f41f2244f9f13fafe0"
+  },
+  "trusted_validators": [
+    {
+      "kind": "independent_machine_validator",
+      "id": "validator.afk-physical-readiness.file-replay.20260716",
+      "public_key_base64": "+T2ho4HeTFl478i6die+c+Cln3EXWhf+LHtSBb8PmVE=",
+      "status": "trusted_for_eligibility_diagnostics"
+    }
+  ]
+}

@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
 import json
 import time
 from datetime import datetime, timedelta, timezone
@@ -33,43 +35,11 @@ from .cockpit_workflow import build_workflow_summary
 from .entity_registry import parse_entity_uri, resolve_entity_uri, search_entities
 from .llm_runtime_usage import build_llm_runtime_usage
 from .material_registry import build_material_registry
-from .token_ledger_view import build_token_ledger_view
+from .ccusage_stats import build_ccusage_stats
 from .services.control_observability_store import get_control_observability_store
 
 boss_sight_router = APIRouter(prefix="/api/boss-sight", tags=["boss-sight"])
 
-# ── InsightsTab 聚合常量 ──────────────────────────────────────────────
-# 价格 USD per 1M tokens, [input, output]
-_PRICING = {
-    "opus": (5.0, 25.0),
-    "sonnet": (3.0, 15.0),
-    "haiku": (1.0, 5.0),
-    "gpt-5.4": (2.5, 15.0),
-    "gpt-5.3-codex": (1.75, 14.0),
-}
-_DEFAULT_PRICING = _PRICING["opus"]
-_SCAN_FILE_CAP = 50  # 每次扫描 jsonl 上限, 控延迟
-_MAX_FILE_BYTES = 4 * 1024 * 1024  # 单文件最多读 4MB
-_MAX_AGE_DAYS = 35  # 老于此跳过 (省 mtime 排序之外的 IO)
-# 简易内存缓存: { key: (expire_ts, payload) }
-_CACHE: dict[str, tuple[float, dict]] = {}
-_CACHE_TTL = 60.0  # 秒
-
-
-def _cached(key: str, ttl: float = _CACHE_TTL):
-    hit = _CACHE.get(key)
-    if hit and hit[0] > time.time():
-        return hit[1]
-    return None
-
-
-def _set_cache(key: str, payload: dict, ttl: float = _CACHE_TTL) -> dict:
-    _CACHE[key] = (time.time() + ttl, payload)
-    return payload
-
-
-# 单独缓存 session 活动 (active-time 与 projects 共用, 避免双倍扫描)
-_SESSION_ACTIVITY_CACHE: dict[str, Any] = {}
 
 
 class ControlUpdateBody(BaseModel):
@@ -113,325 +83,6 @@ class CockpitActionBody(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
-def _get_session_activity() -> tuple[list[dict], dict, bool]:
-    now = time.time()
-    if _SESSION_ACTIVITY_CACHE.get("expire", 0) > now:
-        return (
-            _SESSION_ACTIVITY_CACHE["sessions"],
-            _SESSION_ACTIVITY_CACHE["totals"],
-            _SESSION_ACTIVITY_CACHE["partial"],
-        )
-    sessions, totals, partial = _scan_session_activity()
-    _SESSION_ACTIVITY_CACHE.update(
-        {"sessions": sessions, "totals": totals, "partial": partial, "expire": now + _CACHE_TTL}
-    )
-    return sessions, totals, partial
-
-
-def _classify_model(model_str: str | None) -> str:
-    """把任意 model 字符串归到 _PRICING key, 兜底 opus."""
-    if not model_str:
-        return "opus"
-    m = model_str.lower()
-    if "haiku" in m:
-        return "haiku"
-    if "sonnet" in m:
-        return "sonnet"
-    if "opus" in m:
-        return "opus"
-    if "codex" in m:
-        return "gpt-5.3-codex"
-    if "gpt-5" in m or m.startswith("gpt5") or "gpt-5.4" in m:
-        return "gpt-5.4"
-    return "opus"
-
-
-def _bucket_for(ts: datetime, now: datetime) -> tuple[bool, bool, bool]:
-    """(today, week, month) 三个布尔."""
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = today_start - timedelta(days=now.weekday())
-    month_start = today_start.replace(day=1)
-    return (ts >= today_start, ts >= week_start, ts >= month_start)
-
-
-def _empty_bucket() -> dict[str, Any]:
-    """Per-provider bucket with per-window token & USD + per-model breakdown.
-
-    Old fields kept for backward compat:
-      - today_tokens / week_tokens / month_tokens
-      - estimated_usd = month_usd (累计本月)
-    New fields:
-      - today_usd / week_usd / month_usd: 按时间窗口分别累计 USD
-      - by_model: { model_str → { tokens, usd } } 真正的模型粒度细分
-    """
-    return {
-        "today_tokens": 0,
-        "week_tokens": 0,
-        "month_tokens": 0,
-        "today_usd": 0.0,
-        "week_usd": 0.0,
-        "month_usd": 0.0,
-        "estimated_usd": 0.0,  # alias of month_usd, 保留前端旧字段不破坏
-        "by_model": {},
-    }
-
-
-def _accum_tokens(
-    bucket: dict[str, Any],
-    input_toks: int,
-    output_toks: int,
-    pricing_key: str,
-    when_today: bool,
-    when_week: bool,
-    when_month: bool,
-    *,
-    raw_model: str | None = None,
-) -> None:
-    total = input_toks + output_toks
-    in_p, out_p = _PRICING.get(pricing_key, _DEFAULT_PRICING)
-    cost = (input_toks * in_p + output_toks * out_p) / 1_000_000
-
-    if when_month:
-        bucket["month_tokens"] += total
-        bucket["month_usd"] += cost
-        bucket["estimated_usd"] = bucket["month_usd"]  # alias
-    if when_week:
-        bucket["week_tokens"] += total
-        bucket["week_usd"] += cost
-    if when_today:
-        bucket["today_tokens"] += total
-        bucket["today_usd"] += cost
-
-    # Per-model breakdown (累计全期, 不分窗口 — 模型分布看长期占比意图)
-    key = raw_model or pricing_key or "unknown"
-    by_model = bucket["by_model"]
-    if key not in by_model:
-        by_model[key] = {"tokens": 0, "usd": 0.0, "pricing_key": pricing_key}
-    by_model[key]["tokens"] += total
-    by_model[key]["usd"] += cost
-
-
-def _recent_jsonls(root: Path, cap: int) -> tuple[list[Path], bool]:
-    """递归取最近修改的 cap 个 .jsonl, 跳过太老的; 返回 (files, partial)."""
-    if not root.is_dir():
-        return [], True
-    cutoff = time.time() - _MAX_AGE_DAYS * 86400
-    files: list[tuple[float, Path]] = []
-    skipped = 0
-    try:
-        for p in root.rglob("*.jsonl"):
-            try:
-                mt = p.stat().st_mtime
-            except OSError:
-                continue
-            if mt < cutoff:
-                skipped += 1
-                continue
-            files.append((mt, p))
-    except OSError:
-        pass
-    files.sort(key=lambda x: x[0], reverse=True)
-    partial = len(files) > cap or skipped > 0
-    return [p for _, p in files[:cap]], partial
-
-
-def _scan_claude_jsonls() -> tuple[dict[str, dict], bool]:
-    """扫 ~/.claude/projects/*.jsonl. 返回 (by_provider, partial).
-
-    分类: 文件路径包含 controller/boss_sight → controller; 含 omni_agent → omni_agent;
-    其它 → claude.
-    """
-    out = {
-        "claude": _empty_bucket(),
-        "controller": _empty_bucket(),
-        "omni_agent": _empty_bucket(),
-    }
-    root = Path.home() / ".claude" / "projects"
-    now = datetime.now(timezone.utc)
-    files, partial = _recent_jsonls(root, _SCAN_FILE_CAP)
-    if not files and not root.is_dir():
-        return out, True
-    for f in files:
-        path_lower = str(f).lower()
-        if "controller" in path_lower or "boss_sight" in path_lower or "boss-sight" in path_lower:
-            provider = "controller"
-        elif "omni_agent" in path_lower or "omni-agent" in path_lower:
-            provider = "omni_agent"
-        else:
-            provider = "claude"
-        try:
-            size = f.stat().st_size
-            with f.open("r", encoding="utf-8", errors="replace") as fh:
-                if size > _MAX_FILE_BYTES:
-                    fh.seek(size - _MAX_FILE_BYTES)
-                    fh.readline()  # 丢半行
-                    partial = True
-                for line in fh:
-                    if "input_tokens" not in line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                    except Exception:  # noqa: BLE001
-                        continue
-                    msg = obj.get("message") or {}
-                    usage = msg.get("usage") or {}
-                    if not usage:
-                        continue
-                    ts_raw = obj.get("timestamp")
-                    try:
-                        ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00")) if ts_raw else now
-                    except Exception:  # noqa: BLE001
-                        ts = now
-                    in_t = int(usage.get("input_tokens", 0) or 0) + int(usage.get("cache_creation_input_tokens", 0) or 0) + int(usage.get("cache_read_input_tokens", 0) or 0)
-                    out_t = int(usage.get("output_tokens", 0) or 0)
-                    raw_model = msg.get("model")
-                    pk = _classify_model(raw_model)
-                    a, b, c = _bucket_for(ts, now)
-                    _accum_tokens(out[provider], in_t, out_t, pk, a, b, c, raw_model=raw_model)
-        except OSError:
-            partial = True
-            continue
-    return out, partial
-
-
-def _scan_codex_jsonls() -> tuple[dict, dict | None, bool]:
-    """扫 ~/.codex/sessions/*.jsonl.
-
-    返回 (codex_bucket, rate_limits_or_none, partial).
-
-    rate_limits 来自 codex 自身 token_count 事件里的 payload.info.rate_limits — 这是真实
-    OpenAI 余额数据 (primary/secondary used_percent + resets_at + plan_type)。我们取所有
-    session 中 timestamp 最新的那个 token_count 的 rate_limits 作为 "当前余额"。
-    """
-    out = _empty_bucket()
-    rate_limits: dict | None = None
-    rate_limits_ts: float = 0.0
-    root = Path.home() / ".codex" / "sessions"
-    now = datetime.now(timezone.utc)
-    files, partial = _recent_jsonls(root, _SCAN_FILE_CAP)
-    if not files and not root.is_dir():
-        return out, None, True
-    for f in files:
-        try:
-            with f.open("r", encoding="utf-8", errors="replace") as fh:
-                file_last_in = 0
-                file_last_out = 0
-                file_last_ts = now
-                model_str = None
-                for line in fh:
-                    if "token_count" not in line and "model" not in line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                    except Exception:  # noqa: BLE001
-                        continue
-                    if obj.get("type") == "session_meta":
-                        model_str = (obj.get("payload") or {}).get("model")
-                    payload = obj.get("payload") or {}
-                    if payload.get("type") == "token_count":
-                        info = payload.get("info") or {}
-                        usage = info.get("total_token_usage") or {}
-                        file_last_in = int(usage.get("input_tokens", 0) or 0)
-                        file_last_out = int(usage.get("output_tokens", 0) or 0)
-                        ts_raw = obj.get("timestamp")
-                        try:
-                            file_last_ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00")) if ts_raw else now
-                        except Exception:  # noqa: BLE001
-                            file_last_ts = now
-                        # 真余额: codex 自报 rate_limits — 取所有 session 中最新的那条
-                        rl = payload.get("rate_limits") or info.get("rate_limits")
-                        if rl and isinstance(rl, dict):
-                            ts_epoch = file_last_ts.timestamp()
-                            if ts_epoch > rate_limits_ts:
-                                rate_limits_ts = ts_epoch
-                                rate_limits = {
-                                    **rl,
-                                    "_observed_at": file_last_ts.isoformat(),
-                                    "_observed_model_context_window": info.get("model_context_window"),
-                                }
-                pk = _classify_model(model_str)
-                a, b, c = _bucket_for(file_last_ts, now)
-                _accum_tokens(out, file_last_in, file_last_out, pk, a, b, c, raw_model=model_str)
-        except OSError:
-            partial = True
-            continue
-    return out, rate_limits, partial
-
-
-def _scan_session_activity() -> tuple[list[dict], dict, bool]:
-    """读 claude jsonl 推算每个 session 的 (cwd, started, ended, msg_count).
-
-    返回 (sessions, totals, partial). totals = {today_minutes, week_minutes, month_minutes, last_active_at}.
-    """
-    sessions: list[dict] = []
-    totals = {"today_minutes": 0.0, "week_minutes": 0.0, "month_minutes": 0.0, "last_active_at": None}
-    root = Path.home() / ".claude" / "projects"
-    now = datetime.now(timezone.utc)
-    files, partial = _recent_jsonls(root, _SCAN_FILE_CAP)
-    if not files and not root.is_dir():
-        return sessions, totals, True
-    last_overall: datetime | None = None
-    for f in files:
-        # cwd 推断: 父目录名形如 "E--WindowsWorkspace-omnicompany" → "E:/WindowsWorkspace/omnicompany"
-        parent_name = f.parent.name
-        cwd_guess = parent_name.replace("--", ":/", 1).replace("-", "/") if "--" in parent_name else parent_name
-        first_ts: datetime | None = None
-        last_ts: datetime | None = None
-        try:
-            # 仅取首行时间戳作为 started_at; last_ts 用文件 mtime
-            with f.open("r", encoding="utf-8", errors="replace") as fh:
-                head = fh.readline()
-            try:
-                obj = json.loads(head)
-                ts_raw = obj.get("timestamp")
-                if ts_raw:
-                    first_ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
-            except Exception:  # noqa: BLE001
-                pass
-            try:
-                last_ts = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
-            except OSError:
-                last_ts = None
-        except OSError:
-            partial = True
-            continue
-        if not first_ts or not last_ts:
-            continue
-        duration_s = (last_ts - first_ts).total_seconds()
-        if duration_s < 60:
-            continue
-        minutes = duration_s / 60.0
-        sessions.append({
-            "cwd": cwd_guess,
-            "session_id": f.stem,
-            "started_at": first_ts.isoformat(),
-            "last_active_at": last_ts.isoformat(),
-            "minutes": minutes,
-        })
-        # 正确的窗口分钟算法: 计算 session 区间 [first_ts, last_ts] 与 [bucket_start, now]
-        # 的 OVERLAP, 而不是把整个 duration 塞进 last_ts 所在的桶。
-        # 之前的 bug: 一个 30 天前开始、今天 mtime 的 jsonl, today_minutes 会被加 +30 天 ×
-        # 1440 分钟 → 三窗口全相同。
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        week_start = today_start - timedelta(days=now.weekday())
-        month_start = today_start.replace(day=1)
-
-        def _overlap_min(bucket_start: datetime) -> float:
-            a = max(first_ts, bucket_start)
-            b = min(last_ts, now)
-            return max(0.0, (b - a).total_seconds() / 60.0)
-
-        totals["today_minutes"] += _overlap_min(today_start)
-        totals["week_minutes"] += _overlap_min(week_start)
-        totals["month_minutes"] += _overlap_min(month_start)
-
-        if last_overall is None or last_ts > last_overall:
-            last_overall = last_ts
-    if last_overall:
-        totals["last_active_at"] = last_overall.isoformat()
-    return sessions, totals, partial
-
-
 def _workspace_root() -> Path:
     # 委托到唯一权威 core.config.omni_workspace_root(), 不再硬编码 parents[N]
     return omni_workspace_root()
@@ -469,7 +120,7 @@ def _reviewstage_briefing() -> dict[str, Any]:
         tier = _value(m.tier)
         by_status[status] = by_status.get(status, 0) + 1
         by_tier[tier] = by_tier.get(tier, 0) + 1
-        if tier == "mandatory" and status in {"pending", "rejected", "blocked"}:
+        if tier == "mandatory" and status == "pending":  # 与 reviewstage/_stats 口径一致: 只数待审, 已驳回/卡住不再挂"必验收"
             mandatory_unaccepted += 1
         if m.pushed_to_user and status == "pending":
             pushed_unread += 1
@@ -843,19 +494,49 @@ async def get_recent_observability(limit: int = 20) -> dict[str, Any]:
     return {"items": items, "count": len(items)}
 
 
-@boss_sight_router.get("/plans")
-async def list_plans() -> dict[str, Any]:
-    """plan 索引平铺 — 供 claudecodeui sidebar 做"按内部 plan 分组对话"用.
+# ── 慢扫描端点的快照缓存(通用小件, 与 _RESIDENTS_CACHE 同思路) ────────────────
+# briefing / workflow-summary / plans / ctx 的数据源都是全仓文件扫描(暖机后单次约 0.2-1.4s),
+# 消费端是驾驶舱开页/轮询, 容忍十几秒陈旧。策略: 有快照永远秒回旧快照, 过期(>TTL)时起后台
+# 线程刷新(stale-while-revalidate); 只有进程冷启第一问才真等一次构建(调用方已在线程池里)。
+_SNAPSHOT_CACHE: dict[str, dict[str, Any]] = {}
+_SNAPSHOT_LOCK = threading.Lock()
 
-    NOT folder-derived: 数据源是 docs/plans/{category}/[ts]ID/plan.md 的
-    frontmatter (PlanIndexScanner), 跟仓库目录扫描无关.
 
-    返回值字段贴 PlanIndexEntry.to_dict(), 关键字段:
-    - plan_id        (category/[ts]ID)
-    - category       (顶层分组, 如 dashboard / voxelcraft / cli)
-    - project_path   (关联的 docs/plans/<category>/project.md 相对路径; 给前端做 cwd→plan 推断时, 用 category 段)
-    - title / status / todo_done / todo_total / last_modified_ts
-    """
+def _snapshot_refresh(key: str, builder) -> None:
+    try:
+        payload = builder()
+    except Exception:  # noqa: BLE001 — 刷新失败保留旧快照, 下个过期请求再试
+        with _SNAPSHOT_LOCK:
+            ent = _SNAPSHOT_CACHE.get(key)
+            if ent is not None:
+                ent["refreshing"] = False
+        return
+    with _SNAPSHOT_LOCK:
+        _SNAPSHOT_CACHE[key] = {"payload": payload, "ts": time.time(), "refreshing": False}
+
+
+def _snapshot_cached(key: str, ttl: float, builder) -> dict[str, Any]:
+    """同步调用(端点经 asyncio.to_thread 进来): 秒回快照, 过期时后台刷新。"""
+    now = time.time()
+    with _SNAPSHOT_LOCK:
+        ent = _SNAPSHOT_CACHE.get(key)
+        if ent is not None:
+            if now - float(ent["ts"]) > ttl and not ent["refreshing"]:
+                ent["refreshing"] = True
+                threading.Thread(
+                    target=_snapshot_refresh, args=(key, builder),
+                    daemon=True, name=f"snapshot-{key}",
+                ).start()
+            return ent["payload"]
+    payload = builder()  # 冷启首问: 本线程(线程池)同步构建, 不堵事件循环
+    with _SNAPSHOT_LOCK:
+        _SNAPSHOT_CACHE[key] = {"payload": payload, "ts": time.time(), "refreshing": False}
+    return payload
+
+
+def _list_plans_sync() -> dict[str, Any]:
+    """list_plans 的同步实现体: PlanIndexScanner.scan() 全是阻塞文件扫描 I/O, 抽出来给
+    asyncio.to_thread 用, 不堵事件循环。"""
     ws = _workspace_root()
     scanner = PlanIndexScanner(ws)
     entries = scanner.scan()
@@ -865,11 +546,25 @@ async def list_plans() -> dict[str, Any]:
     }
 
 
-@boss_sight_router.get("/ctx")
-async def get_ctx() -> dict[str, Any]:
-    """当前 ctx 快照: plan 索引 + subagent 活跃情况.
+@boss_sight_router.get("/plans")
+async def list_plans() -> dict[str, Any]:
+    """plan 索引平铺 — 供 claudecodeui sidebar 做"按内部 plan 分组对话"用.
 
-    外部维护会话用这个看总控每次唤起会看到什么."""
+    NOT folder-derived: 数据源是 docs/plans/{category}/[ts]ID/plan.md 的
+    frontmatter (PlanIndexScanner), 跟仓库目录扫描无关.
+
+    返回值字段贴 PlanIndexEntry.to_dict(), 关键字段:
+    - plan_id        (category/[ts]ID)
+    - category       (顶层分组, 如 dashboard / cli / research)
+    - project_path   (关联的 docs/plans/<category>/project.md 相对路径; 给前端做 cwd→plan 推断时, 用 category 段)
+    - title / status / todo_done / todo_total / last_modified_ts
+    """
+    return await asyncio.to_thread(_snapshot_cached, "plans", 15.0, _list_plans_sync)
+
+
+def _get_ctx_sync() -> dict[str, Any]:
+    """get_ctx 的同步实现体: plan 索引扫描 + subagent 状态刷新 + material registry + cockpit
+    + workflow_summary 全是阻塞文件 I/O, 抽出来给 asyncio.to_thread 用, 不堵事件循环。"""
     ws = _workspace_root()
     plan_scanner = PlanIndexScanner(ws)
     plan_entries = plan_scanner.scan()
@@ -901,9 +596,17 @@ async def get_ctx() -> dict[str, Any]:
     }
 
 
-@boss_sight_router.get("/briefing")
-async def get_briefing() -> dict[str, Any]:
-    """First-screen deterministic briefing for the BOSS SIGHT shell."""
+@boss_sight_router.get("/ctx")
+async def get_ctx() -> dict[str, Any]:
+    """当前 ctx 快照: plan 索引 + subagent 活跃情况.
+
+    外部维护会话用这个看总控每次唤起会看到什么."""
+    return await asyncio.to_thread(_snapshot_cached, "ctx", 30.0, _get_ctx_sync)
+
+
+def _get_briefing_sync() -> dict[str, Any]:
+    """get_briefing 的同步实现体: plan/subagent/reviewstage/workflow 全量扫描聚合, 全是阻塞
+    文件 I/O, 抽出来给 asyncio.to_thread 用, 不堵事件循环。"""
     ws = _workspace_root()
     plan_scanner = PlanIndexScanner(ws)
     plan_entries = plan_scanner.scan()
@@ -923,11 +626,23 @@ async def get_briefing() -> dict[str, Any]:
     return briefing
 
 
+@boss_sight_router.get("/briefing")
+async def get_briefing() -> dict[str, Any]:
+    """First-screen deterministic briefing for the BOSS SIGHT shell."""
+    return await asyncio.to_thread(_snapshot_cached, "briefing", 15.0, _get_briefing_sync)
+
+
 # residents 取数:常态走 Rust scanner(127.0.0.1:8765,~ms,带真 5 态),仅 scanner 断了才回落
 # Python 全扫(~6.8s)。薄合并层 + 后台刷新:永不阻塞 UI,且 Rust 在跑时近实时(TTL 3s)。
 # (不是"快照"—— 源是活的 scanner;此层只为合并突发轮询 + 兜底 Python 慢路径。)
 _RESIDENTS_CACHE: dict[str, Any] = {"payload": None, "ts": 0.0, "refreshing": False}
 _RESIDENTS_TTL = 3.0
+_RESIDENT_TAIL_TTL = 5.0
+_RESIDENT_TAIL_CACHE_MAX = 256
+_RESIDENT_TAIL_CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]] | None]] = {}
+_RESIDENT_TAIL_INFLIGHT: dict[
+    tuple[str, int], asyncio.Task[list[dict[str, Any]] | None]
+] = {}
 
 
 def _refresh_residents() -> None:
@@ -968,6 +683,20 @@ def _residents_now() -> dict[str, Any]:
     return build_residents()
 
 
+@boss_sight_router.get("/active-bindings")
+async def get_active_bindings() -> dict[str, Any]:
+    """活跃对话按 plan / project / task 聚合(计数 + 清单)。
+
+    给计划/项目/任务/对话四页显示"有多少活跃对话在推进它"。**复用 /residents 的
+    stale-while-revalidate 缓存**(build_residents 冷路径是秒级全盘扫描,不能每请求重扫),
+    上面只做确定性分组计数。见 docs/plans/dashboard/[2026-07-09]SESSION-SELF-BINDING/plan.md (4.5)。
+    """
+    from .services.binding_aggregate import aggregate
+
+    payload = await get_residents()  # 走 residents 缓存(冷启在 executor 里跑, 暖后即时)
+    return aggregate(build=lambda: payload)
+
+
 @boss_sight_router.get("/residents/{session_id}/tail")
 async def get_resident_tail(session_id: str, n: int = 14) -> dict[str, Any]:
     """某 agent 会话最近活动行 [{role,text}] —— multiagent 详情面板的"它在干嘛"feed。
@@ -975,7 +704,32 @@ async def get_resident_tail(session_id: str, n: int = 14) -> dict[str, Any]:
     from .services import rust_scanner_client
 
     n = max(1, min(int(n), 40))
-    lines = rust_scanner_client.tail(session_id, n=n)
+    key = (session_id, n)
+    cached = _RESIDENT_TAIL_CACHE.get(key)
+    now = time.monotonic()
+    if cached is not None and now - cached[0] <= _RESIDENT_TAIL_TTL:
+        lines = cached[1]
+        return {"lines": (lines or [])[-n:], "available": lines is not None}
+
+    async def load() -> list[dict[str, Any]] | None:
+        try:
+            # urllib is synchronous and may wait for the Rust scanner timeout.
+            # Never run it on the same event loop that forwards terminal bytes.
+            lines = await asyncio.to_thread(rust_scanner_client.tail, session_id, n=n)
+            _RESIDENT_TAIL_CACHE[key] = (time.monotonic(), lines)
+            if len(_RESIDENT_TAIL_CACHE) > _RESIDENT_TAIL_CACHE_MAX:
+                oldest = min(_RESIDENT_TAIL_CACHE, key=lambda item: _RESIDENT_TAIL_CACHE[item][0])
+                _RESIDENT_TAIL_CACHE.pop(oldest, None)
+            return lines
+        finally:
+            if _RESIDENT_TAIL_INFLIGHT.get(key) is asyncio.current_task():
+                _RESIDENT_TAIL_INFLIGHT.pop(key, None)
+
+    task = _RESIDENT_TAIL_INFLIGHT.get(key)
+    if task is None:
+        task = asyncio.create_task(load())
+        _RESIDENT_TAIL_INFLIGHT[key] = task
+    lines = await asyncio.shield(task)
     return {"lines": (lines or [])[-n:], "available": lines is not None}
 
 
@@ -1225,12 +979,21 @@ async def get_cockpit_action_events(limit: int = 50) -> dict[str, Any]:
     return {"items": items, "count": len(items)}
 
 
-@boss_sight_router.get("/workflow-summary")
-async def get_workflow_summary(action_limit: int = 40) -> dict[str, Any]:
-    """Workflow-level summary for controller and cockpit surfaces."""
+def _get_workflow_summary_sync(action_limit: int) -> dict[str, Any]:
+    """get_workflow_summary 的同步实现体: build_workflow_summary 内部走文件扫描, 阻塞 I/O,
+    抽出来给 asyncio.to_thread 用, 不堵事件循环。"""
     return build_workflow_summary(
         ws=_workspace_root(),
         action_limit=max(1, min(int(action_limit), 100)),
+    )
+
+
+@boss_sight_router.get("/workflow-summary")
+async def get_workflow_summary(action_limit: int = 40) -> dict[str, Any]:
+    """Workflow-level summary for controller and cockpit surfaces."""
+    return await asyncio.to_thread(
+        _snapshot_cached, f"workflow-summary:{action_limit}", 15.0,
+        lambda: _get_workflow_summary_sync(action_limit),
     )
 
 
@@ -1318,123 +1081,6 @@ async def get_session_context_alias(sid: str) -> dict[str, Any]:
     return await get_session_context(sid)
 
 
-# ── InsightsTab 4 endpoints ─────────────────────────────────────────
-
-
-@boss_sight_router.get("/insights/tokens")
-async def insights_tokens() -> dict[str, Any]:
-    """Token 用量 + 估算花费 (按 provider 拆 + 按 today/week/month 三窗口拆 + 按真实 model 拆).
-
-    新增 (相对前一版):
-      - {today,week,month}_usd 分别累计 (旧 estimated_usd = month_usd 保留兼容)
-      - by_provider.*.by_model: 按 message.model 真实粒度拆 (claude-opus-4-6 等)
-      - pricing: 暴露定价常量表, 让前端展示倍率
-    """
-    cached = _cached("tokens")
-    if cached is not None:
-        return cached
-    by_provider, partial_c = _scan_claude_jsonls()
-    codex_bucket, codex_rate_limits, partial_x = _scan_codex_jsonls()
-    by_provider["codex"] = codex_bucket
-    total = _empty_bucket()
-    for b in by_provider.values():
-        for k in ("today_tokens", "week_tokens", "month_tokens", "today_usd", "week_usd", "month_usd"):
-            total[k] = total.get(k, 0) + b.get(k, 0)
-        # 合并 by_model
-        for model_key, m in (b.get("by_model") or {}).items():
-            tm = total.setdefault("by_model", {}).setdefault(model_key, {"tokens": 0, "usd": 0.0, "pricing_key": m.get("pricing_key")})
-            tm["tokens"] += m["tokens"]
-            tm["usd"] += m["usd"]
-    total["estimated_usd"] = total["month_usd"]  # alias
-    payload: dict[str, Any] = {
-        "by_provider": by_provider,
-        "total": total,
-        "pricing": {
-            # USD per 1M tokens, [input, output]
-            "opus":        {"input": _PRICING["opus"][0],        "output": _PRICING["opus"][1],        "note": "claude opus 任意子版本"},
-            "sonnet":      {"input": _PRICING["sonnet"][0],      "output": _PRICING["sonnet"][1],      "note": "claude sonnet 任意子版本"},
-            "haiku":       {"input": _PRICING["haiku"][0],       "output": _PRICING["haiku"][1],       "note": "claude haiku 任意子版本"},
-            "gpt-5.4":     {"input": _PRICING["gpt-5.4"][0],     "output": _PRICING["gpt-5.4"][1],     "note": "codex gpt-5.4 系列"},
-            "gpt-5.3-codex": {"input": _PRICING["gpt-5.3-codex"][0], "output": _PRICING["gpt-5.3-codex"][1], "note": "codex gpt-5.3 系列"},
-        },
-        "pricing_unit": "USD per 1M tokens",
-        "pricing_default_fallback": "opus (5/25)",
-    }
-    if codex_rate_limits:
-        payload["codex_rate_limits"] = codex_rate_limits
-    if partial_c or partial_x:
-        payload["partial"] = True
-    return _set_cache("tokens", payload)
-
-
-@boss_sight_router.get("/insights/active-time")
-async def insights_active_time() -> dict[str, Any]:
-    """活跃时长聚合."""
-    cached = _cached("active_time")
-    if cached is not None:
-        return cached
-    _sessions, totals, partial = _get_session_activity()
-    payload: dict[str, Any] = {
-        "today_minutes": round(totals["today_minutes"], 1),
-        "week_minutes": round(totals["week_minutes"], 1),
-        "month_minutes": round(totals["month_minutes"], 1),
-        "last_active_at": totals["last_active_at"],
-    }
-    if partial:
-        payload["partial"] = True
-    return _set_cache("active_time", payload)
-
-
-@boss_sight_router.get("/insights/projects")
-async def insights_projects() -> dict[str, Any]:
-    """按 cwd 聚合 top 20."""
-    cached = _cached("projects")
-    if cached is not None:
-        return cached
-    sessions, _totals, partial = _get_session_activity()
-    agg: dict[str, dict] = {}
-    for s in sessions:
-        cwd = s["cwd"]
-        slot = agg.setdefault(cwd, {"cwd": cwd, "total_minutes": 0.0, "session_count": 0, "last_active_at": None})
-        slot["total_minutes"] += s["minutes"]
-        slot["session_count"] += 1
-        if slot["last_active_at"] is None or s["last_active_at"] > slot["last_active_at"]:
-            slot["last_active_at"] = s["last_active_at"]
-    items = sorted(agg.values(), key=lambda x: x["total_minutes"], reverse=True)[:20]
-    for it in items:
-        it["total_minutes"] = round(it["total_minutes"], 1)
-    payload: dict[str, Any] = {"items": items}
-    if partial:
-        payload["partial"] = True
-    return _set_cache("projects", payload)
-
-
-@boss_sight_router.get("/insights/plans")
-async def insights_plans() -> dict[str, Any]:
-    """PlanIndexScanner 输出 + 每个 plan 关联的 session 计数 (按 category↔cwd 名匹配, 启发式)."""
-    cached = _cached("insights_plans")
-    if cached is not None:
-        return cached
-    ws = _workspace_root()
-    scanner = PlanIndexScanner(ws)
-    entries = scanner.scan()
-    sessions, _t, partial = _get_session_activity()
-    cat_counts: dict[str, int] = {}
-    for s in sessions:
-        cwd_l = s["cwd"].lower()
-        for e in entries:
-            if e.category.lower() in cwd_l:
-                cat_counts[e.category] = cat_counts.get(e.category, 0) + 1
-                break
-    items = []
-    for e in entries:
-        d = e.to_dict()
-        d["session_count"] = cat_counts.get(e.category, 0)
-        items.append(d)
-    payload: dict[str, Any] = {"plans": items, "total": len(items)}
-    if partial:
-        payload["partial"] = True
-    return _set_cache("insights_plans", payload)
 
 
 # (workboard 三态 lane 看板已于 2026-06-12 退役 — 项目模型唯一权威在 core/projects_registry,
@@ -1467,14 +1113,29 @@ async def get_llm_runtime_usage() -> dict[str, Any]:
     return build_llm_runtime_usage()
 
 
-# token 记账(#6 监督设施追加件): claude/codex 会话用量 + 内部调用账三路归并, 只读不落盘。
-# 落盘版由 `omni token-ledger run` CLI / gov-token-ledger-daily 定时任务负责写 data/llm/token_ledger/。
-# 权威: docs/plans/[2026-07-02]SEMANTIC-OS-MAP/overnight-run.md 第六节。
-@boss_sight_router.get("/token-ledger")
-async def get_token_ledger() -> dict[str, Any]:
-    """按会话/按天/按项目三种聚合 + 未关联桶 + 内部调用账 + cron 字符串匹配(读文件, 丢线程池跑)。"""
+
+
+# ccusage 统计(设置>Token统计 页签): 首次真正接入 ccusage 取「按天×软件×模型」token+成本 + 5h 计费块。
+# ccusage 子进程扫 GB 级本地日志(阻塞且慢), 丢线程池跑 + 模块内 TTL 缓存; since/until = YYYYMMDD。
+# 会话归属统一设施状态(唯一入口=session_attribution; 各渠道禁止自建会话分类)
+@boss_sight_router.get("/session-attribution")
+async def get_session_attribution() -> dict[str, Any]:
+    """归属链状态 + LLM标注/词表规模(巡检与消费方自检用)。"""
+    from .session_attribution import attribution_summary
+    return attribution_summary()
+
+
+@boss_sight_router.get("/ccusage")
+async def get_ccusage_stats(
+    since: str | None = None,
+    until: str | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """各软件(agent) token 用量 + 成本(ccusage daily) + 当前 5h 计费块燃烧率(ccusage blocks)。"""
     import asyncio
-    return await asyncio.get_running_loop().run_in_executor(None, build_token_ledger_view)
+    return await asyncio.get_running_loop().run_in_executor(
+        None, lambda: build_ccusage_stats(since, until, force)
+    )
 
 
 __all__ = ["boss_sight_router"]

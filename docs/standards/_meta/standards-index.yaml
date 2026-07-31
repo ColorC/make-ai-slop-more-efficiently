@@ -307,7 +307,22 @@ standards:
       - "src/omnicompany/**/formats.py"
       - "src/omnicompany/dashboard/boss_sight/reviewstage/**/*.py"
       - "src/omnicompany/cli/commands/boss_sight.py"
+      - "src/omnicompany/dashboard/frontend/src/entities/review/**/*.tsx"
+      - "src/omnicompany/dashboard/frontend/src/entities/note/wikilinks.ts"
+      - "src/omnicompany/dashboard/frontend/src/shell/MarkdownRenderer.tsx"
       - "docs/standards/review/**/*.md"
+    excerpt_strategy: full
+
+  - id: REVIEW-FACILITY-HANDBOOK
+    file: docs/standards/review/审阅设施手册.md
+    applies_to: [material, standard_md]
+    path_match:
+      - "docs/standards/review/审阅设施手册.md"
+      - "src/omnicompany/dashboard/boss_sight/reviewstage/capabilities.py"
+      - "src/omnicompany/dashboard/frontend/src/entities/review/rendererRegistry.ts"
+      - "src/omnicompany/dashboard/frontend/src/entities/review/materialEmbedViews.tsx"
+      - "src/omnicompany/dashboard/frontend/src/entities/review/MaterialViews.tsx"
+      - "src/omnicompany/dashboard/frontend/src/entities/review/businesses/index.ts"
     excerpt_strategy: full
 
   - id: REVIEW-GUIDED-DEMO

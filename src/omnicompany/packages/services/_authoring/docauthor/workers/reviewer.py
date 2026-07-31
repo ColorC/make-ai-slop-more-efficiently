@@ -629,7 +629,7 @@ _REVIEWER_SYSTEM_PROMPT = """\
 - 编造 (evidence 里没有的文件 / subdir / 类名) 标 critical
 
 ### 业务语义合理
-- 若 plan_excerpts 里提到特定 subdir 命名 (如 voxelcraft 的 samples/scratch), 作者用了自己发明的名字 → major
+- 若 plan_excerpts 里提到特定 subdir 命名 (如业务域的 samples/scratch), 作者用了自己发明的名字 → major
 - plan 语义优先于 DESIGN 倒推
 
 ### 引用真实

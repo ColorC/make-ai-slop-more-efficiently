@@ -31,6 +31,13 @@ class Intake(Router):
     def run(self, input_data: Any) -> Verdict:
         req = input_data if isinstance(input_data, dict) else {}
         space = str(req.get("space", "")).strip()
+        worker_provider = str(req.get("worker_provider") or "codex").strip()
+        if worker_provider not in ("codex", "claude-code"):
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output=req,
+                diagnosis="worker_provider 必须是 codex 或 claude-code",
+            )
         sp = spaces.resolve(space)
         if not sp:
             return Verdict(kind=VerdictKind.FAIL, output=req,
@@ -47,7 +54,7 @@ class Intake(Router):
             output={
                 "space": space, "root": str(root), "run_dir": str(run_dir),
                 "group": sp.get("group", "other"), "tier": sp.get("tier", "auto"),
-                "dry_run": _truthy(req.get("dry_run")),
+                "dry_run": _truthy(req.get("dry_run")), "worker_provider": worker_provider,
             },
             diagnosis=f"收集 space '{space}' ({root})",
             granted_tags=["domain.project_atlas", "stage.intake"],

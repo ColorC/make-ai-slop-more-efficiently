@@ -176,7 +176,8 @@ function getWebviewHtml(url: string, status: BackendStatus): string {
   // url 为 loopback(http://127.0.0.1:8210/…)。远程(code serve-web 经 Caddy 反代)时 iframe 在
   // 客户端浏览器渲染, 127.0.0.1 指向客户端 → 拒绝访问 + https 页加 http iframe 触发混合内容拦截。
   // 故 iframe 不在服务端写死 src, 改由下方脚本按 location.ancestorOrigins 客户端解析:
-  // 顶层是 https 源(被反代/远程)→ 换成该源根路径(本套 codeweb 里 Caddy 把 / 反代到 dashboard);
+  // 顶层是非 loopback 的 http(s) 源(被反代/远程)→ 换成该源根路径
+  // (本套 codeweb 里 Caddy 把 / 反代到 dashboard);
   // 否则(桌面 vscode-file:// / 本机 http 直连)保持 loopback 不变。
   const iframe = status.phase === 'ready'
     ? `<iframe id="chat" src="${escapeHtml(url)}" data-loopback="${escapeHtml(url)}" allow="clipboard-read; clipboard-write"></iframe>`
@@ -184,13 +185,13 @@ function getWebviewHtml(url: string, status: BackendStatus): string {
   // 注意: webview.html 赋"相同字符串"是 no-op(不会重载)。这里埋一个构建戳, 每次 impl 版本变了
   // 外壳字符串必然不同 → 热换时外壳/页面真正重载重接, 而不是静默跳过。
   return `<!DOCTYPE html>
-<!-- impl-build: 2026-07-04-deeplink-v3 -->
+<!-- impl-build: 2026-07-20-remote-http-surface-v4 -->
 <html>
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none';
-               frame-src http://127.0.0.1:* http://localhost:* https:;
+               frame-src http: https:;
                script-src 'unsafe-inline';
                style-src 'unsafe-inline';">
 <style>
@@ -245,15 +246,18 @@ ${iframe || `<div class="boot">
     vscode.postMessage({ __omnichat: true, type: 'shell-selftest', iframeSrc: fEl ? String(fEl.getAttribute('src')).slice(0, 120) : '(no-iframe)' });
   } catch (e) { /* 自检失败不影响正常功能 */ }
   // 远程适配(仅远程才动): iframe 服务端已写死 loopback src(本地/桌面照常用它)。
-  // 只有当顶层源是 https(经 Caddy 反代的远程访问)时, 才把 src 覆盖成同源根路径(Caddy / → dashboard),
-  // 因为远程客户端浏览器解析不了 127.0.0.1。本地什么都不做 → 行为与改动前完全一致。
+  // 顶层只要是非 loopback 的 http(s) 源, 就把 src 覆盖成同源根路径(Caddy / → dashboard)。
+  // 旧逻辑只认 https, LAN 上常见的 http code serve-web 会继续请求客户端 127.0.0.1,
+  // 再被 CSP 拦成空白。替换 protocol/host 时保留 surface/multiagent 等完整 query。
   try {
     const f = document.getElementById('chat');
     const ao = location.ancestorOrigins;
     const top = ao && ao.length ? ao[ao.length - 1] : '';
-    if (f && /^https:\/\//.test(top)) {
+    const t = top ? new URL(top) : null;
+    const topIsRemoteHttp = t && (t.protocol === 'http:' || t.protocol === 'https:')
+      && !/^(localhost|127(?:\.\d+){3}|\[?::1\]?)$/i.test(t.hostname);
+    if (f && topIsRemoteHttp) {
       const u = new URL(f.getAttribute('data-loopback') || '');
-      const t = new URL(top);
       u.protocol = t.protocol;
       u.host = t.host;
       f.src = u.toString();
@@ -600,6 +604,59 @@ async function saveSnapshot(context: vscode.ExtensionContext, html: string, file
   await vscode.window.showTextDocument(doc, { preview: false });
 }
 
+// ─── 桥接看门狗决策核(纯函数, 可单测; 见 activateImpl.attachWebview 调用点)──────────
+// 只把"确在屏幕上、且过了宽限期仍收不到外壳自检"判为渲染层卡死。误报根因(用户: 正常
+// 情况下也弹): 窗口重载后 VSCode 用 serializer 还原所有 omniChat 编辑页签, 后台(非活动)
+// 页签根本不加载其 html/脚本 → 永不发 shell-selftest; 而 adoptPanel 对每个还原页签都
+// attach+arm 看门狗。侧栏各 section 折叠时又都没自检过、后端也已 ready, 旧三道防线全穿 →
+// 弹"桥接失联", 其实一切正常, 只是没人在看。侧栏视图不会误报(resolveWebviewView 仅在
+// 视图可见时才被调用→才 arm, 一可见其外壳即同步发一条自检)。故对 editor-panel 增设一道闸。
+export type WatchdogSnapshot = {
+  selfSeen: boolean;            // 本 slot 已收到 shell-selftest(桥通了)
+  alreadyWarned: boolean;      // 本 impl 实例已弹过一次(全局只提醒一次)
+  elapsedMs: number;           // 自附着起观察时长
+  graceMs: number;             // 宽限期(默认 60s), 期内只观察不判
+  anySiblingSeen: boolean;     // 任一 slot 收到过自检 —— 渲染层活着的铁证
+  backendReady: boolean;       // 后端 phase==ready(排除冷启动竞争期)
+  isEditorPanel: boolean;      // 本 slot 活在编辑页签里(会被 serializer 还原/后台 arm 的那类)
+  anyEditorTabVisible: boolean; // 当前确有 omniChat 编辑页签处于可见/活动
+};
+export type WatchdogReason =
+  | 'bridged' | 'warned' | 'grace' | 'siblings-ok' | 'backend-warming' | 'editor-hidden' | 'wedged';
+export type WatchdogVerdict = { action: 'stop' | 'wait' | 'warn'; reason: WatchdogReason };
+
+export function watchdogDecide(s: WatchdogSnapshot): WatchdogVerdict {
+  if (s.selfSeen) return { action: 'stop', reason: 'bridged' };            // 桥已通
+  if (s.alreadyWarned) return { action: 'stop', reason: 'warned' };        // 已提醒过一次
+  if (s.elapsedMs < s.graceMs) return { action: 'wait', reason: 'grace' }; // 启动期慢加载, 先观察
+  if (s.anySiblingSeen) return { action: 'stop', reason: 'siblings-ok' };  // 有区通着 → 本区只是没真加载
+  if (!s.backendReady) return { action: 'wait', reason: 'backend-warming' }; // 冷启动竞争 → 顺延
+  // 误报根因闸: 此刻并无任何 omniChat 编辑页签可见, 该 slot 必是后台/还原页签(VSCode 不加载
+  // 隐藏页签脚本, 收不到自检本就正常)→ 不是卡死, 不弹。侧栏 slot(isEditorPanel=false)不受此闸。
+  if (s.isEditorPanel && !s.anyEditorTabVisible) return { action: 'stop', reason: 'editor-hidden' };
+  return { action: 'warn', reason: 'wedged' };
+}
+
+/** 本 slot 是否活在编辑页签里(会被 serializer 还原/后台 arm)。侧栏视图恒有非 material 的 surface;
+ *  material 虽有 surface 却也开在编辑页签, 故单列。 */
+function isEditorPanelSlot(slot: WebviewSlot): boolean {
+  return !slot.surface || slot.surface.kind === 'material';
+}
+
+/** 当前是否有 omniChat 编辑页签处于可见/活动(每个编辑组只有 activeTab 可见)。
+ *  用于把"后台/还原的 editor-panel 收不到自检"与"真渲染层卡死"区分开 —— 后者用户正盯着某个
+ *  可见的 omniChat 页签而按钮全废。tabGroups 自 VSCode 1.67 稳定, engines^1.85 恒可用。 */
+export function anyOmniEditorTabVisible(): boolean {
+  try {
+    for (const group of vscode.window.tabGroups.all) {
+      const input = group.activeTab?.input as { viewType?: unknown } | undefined;
+      const vt = input && typeof input.viewType === 'string' ? input.viewType.toLowerCase() : '';
+      if (vt.includes('omnichat')) return true; // 'omniChat' 或内部前缀 'mainThreadWebview-omniChat' 皆匹配
+    }
+  } catch { /* tabGroups 不可用: 视为不可见, 宁可漏弹也不误报 */ }
+  return false;
+}
+
 export function activateImpl(host: ImplHost): ImplApi {
   const messageBindings = new Map<WebviewSlot, vscode.Disposable>();
   const renderedPhase = new Map<WebviewSlot, BackendPhase>();
@@ -809,45 +866,54 @@ export function activateImpl(host: ImplHost): ImplApi {
       bindMessages(slot);
       renderSlot(slot, supervisor.current);
       void supervisor.ensureStarted();
-      // 看门狗: 收不到该 slot 的外壳自检 → 桥接失联, 弹一键重载窗口(每个 impl 实例只提醒一次)。
-      // VSCode 冷启动恢复页签时, 渲染进程忙 + 后端在拉起, 自检晚于 10s 到达是常态且会自愈
-      // (2026-07-04 用户实锤: 开机必弹这条警告, 过一会儿自己就好了)。所以分两段:
-      // 20s 未到只记日志继续等; 60s 仍未到才判真失联弹警告。真渲染层卡死不会自愈, 晚 50s 提醒无损。
-      // 2026-07-06 再修(用户: 后台明明活着还弹"断连"): 该看门狗要抓的故障(07-02 那种渲染层
-      // 按 viewType origin 整体卡死)必然是"本扩展全部 webview 一起失联", 单个区静默只说明该区
-      // 没真正加载(折叠 section 不跑脚本是 VSCode 正常行为), 不是全局故障。因此:
-      // ① 任一兄弟 slot 的自检到过 → 渲染层活着, 本区只记日志不弹窗;
-      // ② 后端还没 ready(冷启动最坏 ~60s, 与本阈值重叠, 整机都在忙)→ 顺延 40s 再判;
-      // ③ 真要弹时文案带上具体区名, 便于事后对日志。
-      const watchdogCheck = (delayMs: number, isFinal: boolean): void => {
-        setTimeout(() => {
-          if (selftestSeen.has(slot) || bridgeWarned) return;
-          const kind = slot.surface ? slot.surface.kind : 'editor-panel';
-          if (!isFinal) {
-            host.log(`[watchdog] ${kind} 附着 20s 未收到 shell-selftest, 启动期慢加载常见, 继续观察到 60s`);
-            watchdogCheck(40_000, true);
-            return;
+      // 桥接看门狗(2026-07-12 重写, 决策核 watchdogDecide 与两个 helper 的注释在上方):
+      // 每 20s 一 tick, 用纯决策核判 stop/wait/warn。相较旧逻辑新增一道"editor-panel 闸":
+      // 窗口重载还原的后台编辑页签 VSCode 不加载其脚本 → 永不自检, 但此刻并无 omniChat 编辑页签
+      // 可见时, 判它是后台/还原页签而非渲染层卡死, 不弹(用户"正常也弹"的根因)。
+      const kind = slot.surface ? slot.surface.kind : 'editor-panel';
+      const GRACE_MS = 60_000;
+      const STEP_MS = 20_000;
+      let elapsed = 0;
+      const waitLogged: Partial<Record<WatchdogReason, boolean>> = {};
+      const tick = (): void => {
+        elapsed += STEP_MS;
+        const { action, reason } = watchdogDecide({
+          selfSeen: selftestSeen.has(slot),
+          alreadyWarned: bridgeWarned,
+          elapsedMs: elapsed,
+          graceMs: GRACE_MS,
+          anySiblingSeen: host.listSlots().some((s) => selftestSeen.has(s)),
+          backendReady: supervisor.current.phase === 'ready',
+          isEditorPanel: isEditorPanelSlot(slot),
+          anyEditorTabVisible: anyOmniEditorTabVisible(),
+        });
+        const secs = Math.round(elapsed / 1000);
+        if (action === 'stop') {
+          if (reason === 'siblings-ok') host.log(`[watchdog] ${kind} ${secs}s 未自检, 但其他区桥接正常 → 判为本区未真正加载(折叠/后台), 不弹警告`);
+          else if (reason === 'editor-hidden') host.log(`[watchdog] ${kind} ${secs}s 未自检, 但当前无 omniChat 编辑页签处于可见/活动 → 判为后台或未打开的还原页签, 不弹警告`);
+          return;
+        }
+        if (action === 'wait') {
+          if (!waitLogged[reason]) {
+            waitLogged[reason] = true;
+            const why = reason === 'grace'
+              ? '启动期慢加载常见, 继续观察到宽限期满'
+              : `后端仍在 ${supervisor.current.phase}, 冷启动竞争期, 顺延再判`;
+            host.log(`[watchdog] ${kind} ${secs}s 未收到 shell-selftest: ${why}`);
           }
-          if (host.listSlots().some((s) => selftestSeen.has(s))) {
-            host.log(`[watchdog] ${kind} 60s 未收到 shell-selftest, 但其他区桥接正常 → 判为该区未真正加载(折叠/惰性), 不弹警告`);
-            return;
-          }
-          if (supervisor.current.phase !== 'ready') {
-            host.log(`[watchdog] ${kind} 60s 未收到 shell-selftest, 但后端仍在 ${supervisor.current.phase} → 冷启动竞争期, 顺延 40s 再判`);
-            watchdogCheck(40_000, true);
-            return;
-          }
-          bridgeWarned = true;
-          host.log(`[watchdog] ${kind} 60s 仍未收到 shell-selftest 且无任何区桥通 — webview→扩展桥接失联, 需重载窗口`);
-          void vscode.window.showWarningMessage(
-            `OmniChat: webview 桥接失联(${kind} 区, 且所有区均未通)。页面显示正常但"在 VSCode 打开"等按钮全部无效时, 是 VSCode 渲染层卡死, 重开页签无用, 需重载窗口。`,
-            '重载窗口',
-          ).then((pick) => {
-            if (pick === '重载窗口') void vscode.commands.executeCommand('workbench.action.reloadWindow');
-          });
-        }, delayMs);
+          setTimeout(tick, STEP_MS);
+          return;
+        }
+        bridgeWarned = true;
+        host.log(`[watchdog] ${kind} ${secs}s 仍未收到 shell-selftest 且无任何区桥通 — webview→扩展桥接失联, 需重载窗口`);
+        void vscode.window.showWarningMessage(
+          `OmniChat: webview 桥接失联(${kind} 区, 且所有区均未通)。页面显示正常但"在 VSCode 打开"等按钮全部无效时, 是 VSCode 渲染层卡死, 重开页签无用, 需重载窗口。`,
+          '重载窗口',
+        ).then((pick) => {
+          if (pick === '重载窗口') void vscode.commands.executeCommand('workbench.action.reloadWindow');
+        });
       };
-      watchdogCheck(20_000, false);
+      setTimeout(tick, STEP_MS);
     },
 
     handleCommand(command: string): void {

@@ -192,6 +192,19 @@ def _load_cc_sessions() -> dict[str, dict[str, Any]]:
     return out
 
 
+def _load_bindings_idx() -> dict[str, dict[str, Any]]:
+    """会话权威绑定台账(identity 模块 cc_session_bindings.json),按 provider:session_id 索引。
+
+    这是"会话自己声明"的绑定(plan/project/task),权威优先于 digest/cwd 推测。失败静默。
+    见 docs/plans/dashboard/[2026-07-09]SESSION-SELF-BINDING/plan.md (4.1/4.5)。
+    """
+    try:
+        from omnicompany.packages.services._core.identity import bindings_by_session_key
+        return bindings_by_session_key() or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _clean(text: str, n: int) -> str:
     return " ".join(str(text or "").split())[:n]
 
@@ -207,6 +220,7 @@ def rebuild(*, now: float | None = None) -> list[dict[str, Any]]:
     store = load_registry()
     items = _scan_convos()
     cc = _load_cc_sessions()
+    binds = _load_bindings_idx()  # 会话自己声明的权威绑定 (plan/project/task)
     taken = {r.get("name") for r in store.values() if r.get("name")}
 
     seen: set[str] = set()
@@ -217,6 +231,7 @@ def rebuild(*, now: float | None = None) -> list[dict[str, Any]]:
         seen.add(key)
         prev = store.get(key, {})
         managed = cc.get(key)
+        bd = binds.get(key) or {}  # 会话权威绑定; 优先于推测
         dg = get_digest(item.get("provider", ""), item.get("session_id", "")) or {}
         pins: set[str] = set(prev.get("_pinned", []))
 
@@ -224,8 +239,10 @@ def rebuild(*, now: float | None = None) -> list[dict[str, Any]]:
         name = prev.get("name") or _stable_name(key, taken)
         taken.add(name)
 
-        project = prev["project"] if "project" in pins else _derive_project(
-            str(dg.get("project") or ""), str(item.get("cwd") or ""))
+        # project 优先级: 用户 pin > 会话权威绑定 > digest/cwd 推测
+        project = (prev["project"] if "project" in pins
+                   else (bd.get("project")
+                         or _derive_project(str(dg.get("project") or ""), str(item.get("cwd") or ""))))
         blob = f"{project} {dg.get('title','')} {dg.get('last_step','')} {item.get('cwd','')} {item.get('preview','')}"
         role = prev["role"] if "role" in pins else _derive_role(blob)
         location = prev["location"] if "location" in pins else _classify_location(item, managed)
@@ -253,7 +270,10 @@ def rebuild(*, now: float | None = None) -> list[dict[str, Any]]:
             "initial_task": initial or "(无)",
             "running": _running(item, managed, now),
             "pty_id": (managed or {}).get("pty_id") or (managed or {}).get("id"),
-            "active_plan": (managed or {}).get("active_plan"),
+            # active_plan / task_id: 会话权威绑定优先, 回落托管态
+            "active_plan": bd.get("active_plan") or (managed or {}).get("active_plan"),
+            "task_id": bd.get("task_id"),
+            "authoritative": bool(bd),  # 是否有会话自己声明的绑定(vs 纯推测)
             "mtime": item.get("mtime"),
             "_updated_ts": now,
             "updated_at": datetime.fromtimestamp(now, timezone.utc).isoformat(),

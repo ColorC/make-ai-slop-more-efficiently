@@ -187,7 +187,7 @@ def cron_run(name: str) -> None:
     cmd = (task.get("command") or "").strip()
     if cmd:
         click.echo(f"跑 command: {cmd}")
-        proc = scheduler.run_command_capped(cmd)
+        proc = scheduler.run_command_capped(cmd, timeout_s=scheduler.task_timeout_s(task))
         _full = (proc.stdout or "") + (proc.stderr or "")
         click.echo(_full[-1000:])
         click.echo(f"returncode={proc.returncode}")

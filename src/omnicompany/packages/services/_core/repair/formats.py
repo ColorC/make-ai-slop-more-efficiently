@@ -26,7 +26,7 @@ FORMAT_REPAIR_REQUEST = Material(
         {"format_id": "bw.combat_balance_matrix"},
         {
             "format_id": "bw.code_spec",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "source_root": "src/omnicompany",
             "max_iterations": 3,
         },
     ],
@@ -46,8 +46,8 @@ FORMAT_REPAIR_REPORT = Material(
     tags=["repair", "report", "output", "kind.sink"],
     examples=[
         {
-            "format_id": "bw.combat_balance_matrix",
-            "source_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany",
+            "format_id": "example_domain.balance_matrix",
+            "source_root": "src/omnicompany",
             "initial_grade": "C",
             "final_grade": "A",
             "success": True,
@@ -55,7 +55,7 @@ FORMAT_REPAIR_REPORT = Material(
                 {
                     "iter": 1,
                     "grade_before": "C",
-                    "delta": {"description": "修改后描述文本", "tags": ["bw", "domain.voxelcraft"]},
+                    "delta": {"description": "修改后描述文本", "tags": ["example", "domain.example_domain"]},
                     "patch_ok": True,
                     "grade_after": "A",
                 }

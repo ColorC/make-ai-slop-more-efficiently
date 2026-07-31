@@ -55,11 +55,18 @@ def _build_user_prompt(input_data: dict) -> str:
     triggered_at = input_data.get("triggered_at", "")
     tags = input_data.get("tags", [])
     tags_str = ", ".join(tags) if tags else "(无)"
+    target_package_path = input_data.get("target_package_path")
+    target_line = (
+        f"**已指定目标包路径**: {target_package_path}\n"
+        if target_package_path
+        else "**已指定目标包路径**: (未指定；必须列入 ambiguities)\n"
+    )
     return (
         f"# 原始请求\n\n{request}\n\n"
         f"---\n\n"
         f"**触发时间**: {triggered_at}\n"
-        f"**Tags**: {tags_str}\n\n"
+        f"**Tags**: {tags_str}\n"
+        f"{target_line}\n"
         f"请输出 JSON 格式的 intent_analysis."
     )
 
@@ -104,6 +111,7 @@ class IntentAnalyzerWorker(Worker):
                 user=user_prompt,
                 web_bus=self._web_bus,
                 caller="team_builder.intent_analyzer",
+                model=self._model,
             )
         except Exception as e:
             return Verdict(
@@ -128,11 +136,21 @@ class IntentAnalyzerWorker(Worker):
                 diagnosis=f"intent_analysis missing required fields: {missing}",
             )
 
+        # Exact package location is request metadata, not an LLM decision.  Copy
+        # it after parsing so the model cannot rewrite the caller's choice.
+        explicit_target = input_data.get("target_package_path")
+        if explicit_target:
+            parsed["target_package_path"] = explicit_target
+
         parsed.setdefault("_meta", {}).update(
             {
                 "worker": "IntentAnalyzerWorker",
                 "stage": "v1_llm",
                 "prompt_chars": len(user_prompt),
+                # Keep the original request as a reference.  Team Builder
+                # downstreams consume the reference; they do not copy the
+                # request into TeamSpec.
+                "origin_request_ref": str(input_data.get("body_path") or "").strip(),
             }
         )
         return Verdict(

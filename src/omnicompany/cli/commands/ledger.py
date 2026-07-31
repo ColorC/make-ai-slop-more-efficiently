@@ -83,3 +83,39 @@ def cmd_ledger_verify(event_id: str, by: str, reason: str) -> None:
 
     new_id = set_verdict(event_id, "verified", by=by, reason=reason)
     click.echo(new_id)
+
+
+@cmd_ledger.command("deviate")
+@click.option("--kind", type=click.Choice(["unmanaged", "missing", "modified", "undecidable"]),
+              required=True,
+              help="偏离类型:unmanaged=做了陈述库没覆盖的判断 / missing=该消费的陈述没消费 / "
+                   "modified=实际做法与陈述相悖 / undecidable=无法判定")
+@click.option("--note", required=True, help="一句话说明(偏离了什么、为什么)")
+@click.option("--ref", "refs", multiple=True, help="被偏离的陈述 id(可多次)")
+@click.option("--handling", type=click.Choice(["auto_correct", "alert_only", "report_only"]),
+              default="alert_only", show_default=True, help="处置档:自动纠正/只告警等人/只报告")
+@click.option("--mode", "change_mode", type=click.Choice(["active_change", "passive_correction"]),
+              default="passive_correction", show_default=True,
+              help="主动变更声明(做法应该变) vs 被动纠偏(回到陈述)")
+@click.option("--agent", default="", help="报告者")
+@click.option("--event", "related_event_id", default="", help="关联的运行事件 id")
+@any_caller
+def cmd_ledger_deviate(kind, note, refs, handling, change_mode, agent, related_event_id) -> None:
+    """报告一笔偏离(显式动作;提议修订本体请另走 omni decisions candidate)。"""
+    from omnicompany.packages.services._core.ledger import report_deviation
+
+    eid = report_deviation(kind=kind, note=note, refs=list(refs), handling=handling,
+                           change_mode=change_mode, agent=agent,
+                           related_event_id=related_event_id)
+    click.echo(eid)
+
+
+@cmd_ledger.command("deviations")
+@click.option("-n", "count", default=50, show_default=True, help="取最近 n 条")
+@any_caller
+def cmd_ledger_deviations(count: int) -> None:
+    """列最近的偏离记录(候选流水线信号源之一:偏离聚集处=规则该修处)。"""
+    from omnicompany.packages.services._core.ledger import list_deviations
+
+    for rec in list_deviations(count):
+        click.echo(json.dumps(rec, ensure_ascii=False))

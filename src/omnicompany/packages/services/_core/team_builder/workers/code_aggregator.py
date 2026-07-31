@@ -21,6 +21,9 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from omnicompany.packages.services._core.omnicompany import Worker
+from omnicompany.packages.services._core.team_builder.package_location import (
+    canonical_team_package_path,
+)
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 
@@ -90,22 +93,58 @@ class CodeAggregator(Worker):
                 if rel and isinstance(content, str):
                     files[rel] = content
 
-        # team_name + target_package_path 抽取 · 从任一 upstream payload 拿 (V3.2: HARD generator 都带)
-        team_name = None
-        target = None
-        # 先扫所有 _from_* upstream 里的 team_name/target_package_path · 再 fallback team_architect / workspace_designer
-        for key, val in input_data.items():
+        # All producers repeat the canonical location only for transport.  The
+        # aggregator requires agreement; it never picks a "first" value or
+        # reconstructs a flat services path.
+        team_names: set[str] = set()
+        targets: set[str] = set()
+        for val in input_data.values():
             if not isinstance(val, dict):
                 continue
-            if key.startswith("_from_") or key in ("_from_team_architect", "_from_workspace_designer"):
-                team_name = team_name or val.get("team_name") or val.get("name")
-                target = target or val.get("target_package_path") or val.get("generated_package_path")
-        # 再兜底 input_data 本身
-        if isinstance(input_data, dict):
-            team_name = team_name or input_data.get("team_name") or input_data.get("name")
-            target = target or input_data.get("target_package_path") or input_data.get("generated_package_path")
-        team_name = team_name or "unnamed_team"
-        target = target or f"src/omnicompany/packages/services/{team_name}/"
+            name = val.get("team_name") or val.get("name")
+            if isinstance(name, str) and name.strip():
+                team_names.add(name.strip())
+            target = val.get("target_package_path")
+            if isinstance(target, str) and target.strip():
+                targets.add(target.strip())
+        direct_name = input_data.get("team_name") or input_data.get("name")
+        if isinstance(direct_name, str) and direct_name.strip():
+            team_names.add(direct_name.strip())
+        direct_target = input_data.get("target_package_path")
+        if isinstance(direct_target, str) and direct_target.strip():
+            targets.add(direct_target.strip())
+
+        if len(team_names) != 1:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=(
+                    "code generator outputs require exactly one team_name; "
+                    f"got {sorted(team_names)}"
+                ),
+            )
+        team_name = next(iter(team_names))
+        try:
+            normalized_targets = {
+                canonical_team_package_path(target, team_name=team_name)
+                for target in targets
+            }
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
+        if len(normalized_targets) != 1:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=(
+                    "code generator outputs require one agreed "
+                    f"target_package_path; got {sorted(normalized_targets)}"
+                ),
+            )
+        target = next(iter(normalized_targets))
 
         if not files:
             return Verdict(

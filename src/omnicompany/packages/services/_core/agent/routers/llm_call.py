@@ -19,7 +19,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import queue
 import random
+import sys
 from typing import Any, ClassVar
 
 from omnicompany.protocol.anchor import Verdict, VerdictKind
@@ -27,6 +29,7 @@ from omnicompany.runtime.routing.router import Router
 from omnicompany.runtime.llm.llm import LLMClient
 from omnicompany.runtime.agent.agent_loop_config import RetryConfig
 from omnicompany.packages.services._core.agent._bus import (
+    emit_agent_signal,
     emit_router_input,
     emit_router_output,
 )
@@ -288,6 +291,10 @@ class LLMCallRouter(Router):
         tools_spec: list[dict] | None = None,
         retry: RetryConfig | None = None,
         max_tokens: int = 16384,
+        timeout_seconds: float | None = None,
+        extra_body: dict[str, Any] | None = None,
+        max_continuation_retries: int | None = None,
+        prefix_tool_errors: bool = True,
         bus: Any | None = None,
         caller_prefix: str = "AgentNodeLoop",
     ):
@@ -306,14 +313,29 @@ class LLMCallRouter(Router):
         self._retry = retry or RetryConfig()
         self._caller_prefix = caller_prefix
         self._tools_spec = tools_spec or []
+        self._timeout_seconds = timeout_seconds
+        self._extra_body = dict(extra_body or {})
+        self._max_continuation_retries = max_continuation_retries
+        self._prefix_tool_errors = bool(prefix_tool_errors)
+        deadline_kwargs = {
+            "request_timeout_sec": timeout_seconds,
+            "stream_wall_clock_deadline_sec": timeout_seconds,
+            "stream_idle_chunk_deadline_sec": timeout_seconds,
+            # Retry ownership lives in this Router. A second hidden retry loop
+            # inside LLMClient multiplies one timeout into minutes.
+            "max_retry_attempts": 0,
+            "max_continuation_retries": max_continuation_retries,
+            "prefix_tool_errors": self._prefix_tool_errors,
+        }
 
         # 带工具 / 不带工具两个 client
+        client_kwargs = {**deadline_kwargs, "extra_body": self._extra_body or None}
         if role:
-            self._llm = LLMClient(role=role, tools=self._tools_spec, max_tokens=max_tokens)
-            self._llm_no_tools = LLMClient(role=role, tools=[], max_tokens=max_tokens)
+            self._llm = LLMClient(role=role, tools=self._tools_spec, max_tokens=max_tokens, **client_kwargs)
+            self._llm_no_tools = LLMClient(role=role, tools=[], max_tokens=max_tokens, **client_kwargs)
         else:
-            self._llm = LLMClient(model=model, tools=self._tools_spec, max_tokens=max_tokens)
-            self._llm_no_tools = LLMClient(model=model, tools=[], max_tokens=max_tokens)
+            self._llm = LLMClient(model=model, tools=self._tools_spec, max_tokens=max_tokens, **client_kwargs)
+            self._llm_no_tools = LLMClient(model=model, tools=[], max_tokens=max_tokens, **client_kwargs)
 
     # ── 纯文本调用辅助（供 ContextCompact L4 复用） ────────────────
 
@@ -333,6 +355,7 @@ class LLMCallRouter(Router):
         turn = input_data.get("turn", 0)
         messages = input_data.get("messages", [])
         system = input_data.get("system_prompt", "")
+        observer = input_data.get("agent_run_observer")
 
         # tool_use/tool_result 配对兜底 (CC normalizeMessagesForAPI 对齐, 2026-05-04)
         # L4 compact 切分 / extract_result fallback / partial compact 等路径都
@@ -362,18 +385,33 @@ class LLMCallRouter(Router):
             )
 
         caller = f"{self._caller_prefix}.turn_{turn}"
-        response = await self._call_with_retry(messages, system, use_tools=True, caller=caller)
+        try:
+            response = await self._call_with_stream_progress(
+                messages,
+                system,
+                use_tools=True,
+                caller=caller,
+                trace_id=trace_id,
+                turn=turn,
+                observer=observer,
+            )
+        except BaseException as exc:
+            if observer is not None:
+                observer.announce(
+                    "failed",
+                    turn=turn,
+                    error_type=type(exc).__name__,
+                    error=str(exc)[:1000],
+                )
+            raise
 
         stop_reason = getattr(response, "stop_reason", "end_turn")
         text_parts, tool_use_blocks = self._parse_response(response)
 
         # max_tokens 截断时工具调用可能畸形 — 丢弃
-        if stop_reason == "max_tokens" and tool_use_blocks:
-            logger.warning(
-                "[LLMCallRouter] turn %d: stop_reason=max_tokens, discarding %d tool_use blocks",
-                turn, len(tool_use_blocks),
-            )
-            tool_use_blocks = []
+        # Keep truncated tool-call identities. AgentNodeLoop turns each one
+        # into an explicit failed result and asks the model to re-issue it,
+        # matching Pi's length-stop contract without executing partial args.
 
         text = "\n".join(text_parts)
         tool_uses = self._extract_tool_calls(tool_use_blocks)
@@ -383,6 +421,14 @@ class LLMCallRouter(Router):
         usage_dict = {
             "input_tokens": getattr(usage, "input_tokens", 0) if usage else 0,
             "output_tokens": getattr(usage, "output_tokens", 0) if usage else 0,
+            "cache_read_tokens": (
+                getattr(usage, "cache_read_input_tokens", 0) if usage else 0
+            ),
+            "cache_write_tokens": (
+                getattr(usage, "cache_creation_input_tokens", 0)
+                if usage
+                else 0
+            ),
             "model": getattr(response, "model", getattr(self._llm, "model", None)),
         }
 
@@ -414,6 +460,82 @@ class LLMCallRouter(Router):
 
     # ── 内部实现 ──────────────────────────────────────────────────
 
+    async def _call_with_stream_progress(
+        self,
+        messages: list[dict],
+        system: str,
+        *,
+        use_tools: bool,
+        caller: str,
+        trace_id: str,
+        turn: int,
+        observer: Any | None = None,
+    ) -> Any:
+        """Bridge worker-thread stream telemetry into EventBus and the CLI."""
+        updates: queue.SimpleQueue[dict[str, Any]] = queue.SimpleQueue()
+
+        def on_progress(update: dict[str, Any]) -> None:
+            updates.put(dict(update))
+
+        task = asyncio.create_task(
+            self._call_with_retry(
+                messages,
+                system,
+                use_tools=use_tools,
+                caller=caller,
+                progress_callback=on_progress,
+            )
+        )
+
+        async def drain() -> None:
+            while True:
+                try:
+                    update = updates.get_nowait()
+                except queue.Empty:
+                    break
+                payload = {"turn": turn, "caller": caller, **update}
+                await emit_agent_signal(
+                    self._bus,
+                    trace_id=trace_id,
+                    event_type="agent.llm.progress",
+                    source="agent.llm_call",
+                    payload=payload,
+                )
+                self._print_stream_progress(payload)
+                if observer is not None:
+                    observer.update("llm_streaming", **payload)
+
+        heartbeat_at = 0.0
+        while not task.done():
+            await drain()
+            now = asyncio.get_running_loop().time()
+            if observer is not None and now - heartbeat_at >= 1.0:
+                observer.update("llm_waiting", turn=turn, caller=caller)
+                heartbeat_at = now
+            await asyncio.wait({task}, timeout=0.25)
+        await drain()
+        return await task
+
+    @staticmethod
+    def _print_stream_progress(payload: dict[str, Any]) -> None:
+        """Keep foreground Agent runs visibly alive without printing content."""
+        event = str(payload.get("event") or "progress")
+        model = str(payload.get("model") or "?")
+        turn = payload.get("turn", "?")
+        details: list[str] = []
+        if "elapsed_ms" in payload:
+            details.append(f"{float(payload['elapsed_ms']) / 1000:.1f}s")
+        if "chunk_count" in payload:
+            details.append(f"chunks={payload['chunk_count']}")
+        if "reasoning_chars" in payload:
+            details.append(f"reasoning={payload['reasoning_chars']}")
+        if "text_chars" in payload:
+            details.append(f"text={payload['text_chars']}")
+        if "tool_arg_chars" in payload:
+            details.append(f"tool_args={payload['tool_arg_chars']}")
+        suffix = " " + " ".join(details) if details else ""
+        print(f"[llm {model} turn={turn}] {event}{suffix}", file=sys.stderr, flush=True)
+
     async def _call_with_retry(
         self,
         messages: list[dict],
@@ -421,6 +543,7 @@ class LLMCallRouter(Router):
         *,
         use_tools: bool,
         caller: str,
+        progress_callback: Any | None = None,
     ) -> Any:
         cfg = self._retry
         # env CLAUDE_CODE_MAX_RETRIES 覆盖（对齐 CC getMaxRetries）
@@ -442,6 +565,13 @@ class LLMCallRouter(Router):
                     model=model_name,
                     tools=self._tools_spec if use_tools else [],
                     max_tokens=self._llm.max_tokens,
+                    request_timeout_sec=self._timeout_seconds,
+                    stream_wall_clock_deadline_sec=self._timeout_seconds,
+                    stream_idle_chunk_deadline_sec=self._timeout_seconds,
+                    max_retry_attempts=0,
+                    max_continuation_retries=self._max_continuation_retries,
+                    prefix_tool_errors=self._prefix_tool_errors,
+                    extra_body=self._extra_body or None,
                 )
             try:
                 return await asyncio.to_thread(
@@ -449,6 +579,7 @@ class LLMCallRouter(Router):
                     messages=messages,
                     system=system,
                     caller=caller,
+                    progress_callback=progress_callback,
                 )
             except Exception as e:
                 last_error = e
@@ -508,6 +639,13 @@ class LLMCallRouter(Router):
                         model=cfg.fallback_model,
                         tools=self._tools_spec if use_tools else [],
                         max_tokens=self._llm.max_tokens,
+                        request_timeout_sec=self._timeout_seconds,
+                        stream_wall_clock_deadline_sec=self._timeout_seconds,
+                        stream_idle_chunk_deadline_sec=self._timeout_seconds,
+                        max_retry_attempts=0,
+                        max_continuation_retries=self._max_continuation_retries,
+                        prefix_tool_errors=self._prefix_tool_errors,
+                        extra_body=self._extra_body or None,
                     )
                     model_name = cfg.fallback_model
         # 理论不可达（max_retries+1 次后前面会 raise CannotRetryError）

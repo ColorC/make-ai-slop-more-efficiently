@@ -19,6 +19,7 @@ FORMATS = [
         name="ImplTask",
         description="实施任务: 需求文本 + 项目目录 + 范围 + 相关文件",
         parent="sw.task-input",
+        tags=["kind.source"],
     ),
 
     # ── 项目快照（继承 sw.project-snapshot）──
@@ -27,7 +28,7 @@ FORMATS = [
         name="ImplProjectSnapshot",
         description="项目快照: 目录结构 + 主语言 + 关键文件列表",
         parent="sw.project-snapshot",
-        tags=["scanned"],
+        tags=["scanned", "kind.internal"],
     ),
 
     # ── 上下文累积状态 ──
@@ -40,7 +41,7 @@ FORMATS = [
             "回路载体，每轮累积更多文件。"
         ),
         parent="agent-state",
-        tags=["stateful", "accumulating"],
+        tags=["stateful", "accumulating", "kind.internal"],
     ),
 
     # ── 实施变更集（继承 sw.change-set）──
@@ -49,7 +50,7 @@ FORMATS = [
         name="ImplChangeSet",
         description="LLM 生成的变更集: code-change 列表 + 测试状态",
         parent="sw.change-set",
-        tags=["generated"],
+        tags=["generated", "kind.internal"],
     ),
 
     # ── 报告（继承 sw.report）──
@@ -58,7 +59,7 @@ FORMATS = [
         name="ImplReport",
         description="实施报告: report_text + conclusion + metrics",
         parent="sw.report",
-        tags=["finalized"],
+        tags=["finalized", "kind.sink"],
     ),
 ]
 

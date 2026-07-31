@@ -1,0 +1,56 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe\" -m omnicompany.dashboard.ccdaemon.hooks.lock_pretooluse --provider codex",
+            "commandWindows": "& 'C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe' -m omnicompany.dashboard.ccdaemon.hooks.lock_pretooluse --provider codex",
+            "timeout": 30,
+            "statusMessage": "Checking Omnicompany write policy"
+          }
+        ],
+        "matcher": "Bash|apply_patch|Edit|Write"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe\" -m omnicompany.dashboard.ccdaemon.hooks.session_start --provider codex",
+            "commandWindows": "& 'C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe' -m omnicompany.dashboard.ccdaemon.hooks.session_start --provider codex",
+            "timeout": 30,
+            "statusMessage": "Loading Omnicompany session context"
+          }
+        ],
+        "matcher": "startup|resume|clear|compact"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe\" -m omnicompany.dashboard.ccdaemon.hooks.trace --provider codex",
+            "commandWindows": "& 'C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe' -m omnicompany.dashboard.ccdaemon.hooks.trace --provider codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe\" -m omnicompany.dashboard.ccdaemon.hooks.user_prompt_submit --provider codex",
+            "commandWindows": "& 'C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe' -m omnicompany.dashboard.ccdaemon.hooks.user_prompt_submit --provider codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,12 +1,12 @@
 # [OMNI] origin=claude-code domain=project_atlas ts=2026-07-04 type=health status=active
 # [OMNI] summary="技能库健康巡检:解析级体检(BOM/frontmatter/name+description)+ canonical→两生效目录导出漂移检测与自动修复(仅 atlas 管理的技能)+ 正文死绝对路径只报不修。"
-# [OMNI] why="canonical 真源之外还有两个生效目录(~/.claude/skills、~/.codex/skills),此前只在 approve/export 手动触发时才可能对齐,坏半库事故(手改生效目录/漏导)无持续巡检;本模块补上无人值守闭环,且明确不动非 atlas 管理的技能(如 lark-*)。"
+# [OMNI] why="canonical 真源之外还有两个生效目录(~/.claude/skills、~/.agents/skills),此前只在 approve/export 手动触发时才可能对齐,坏半库事故(手改生效目录/漏导)无持续巡检;本模块补上无人值守闭环,且明确不动非 atlas 管理的技能(如 lark-*)。"
 # [OMNI] tags=project_atlas,health,skills,atlas,cron
 """project_atlas 技能库健康巡检(`omni atlas health`)。
 
 三类 finding:
   parse    —— BOM / frontmatter 开闭 / name·description 缺失(解析级体检,全部技能都查)
-  drift    —— canonical 已批准集合 vs 两个生效目录(~/.claude/skills、~/.codex/skills)缺失或内容不一致
+  drift    —— canonical 已批准集合 vs 两个生效目录(~/.claude/skills、~/.agents/skills)缺失或内容不一致
               (仅对 canonical 里存在的名字做漂移检查; 生效目录独有的名字视为非 atlas 管理, 跳过)
   dead_ref —— canonical 正文里的绝对路径(盘符打头)在磁盘上不存在(只报不修, 语义内容不动)
 
@@ -29,17 +29,18 @@ from ._paths import DATA_ROOT, SKILLS_ROOT
 HEALTH_DIR = DATA_ROOT / "health"
 
 _CLAUDE_SKILLS = Path.home() / ".claude" / "skills"
-_CODEX_SKILLS = Path.home() / ".codex" / "skills"
+_CODEX_SKILLS = Path.home() / ".agents" / "skills"
 
 # 生效目录布局是扁平的 <name>/SKILL.md(无 space 子层, 见 atlas.py export)
 _EXPORT_TARGETS: tuple[tuple[str, Path], ...] = (("claude", _CLAUDE_SKILLS), ("codex", _CODEX_SKILLS))
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
-# Windows 绝对路径: 盘符打头, 如 E:\WindowsWorkspace\... 或 E:/WindowsWorkspace/...
-# 以空白/引号/反引号/尖括号/管道/问号/星号/右括右方括号收尾(排除误吞随后中文提示语);
-# 代价: 真实含空格的路径(如 `C:/Program Files/...`)会在空格处被截断成假阳性(已知残留,
-# 见 _path_exists_tolerant 文档字符串), 权衡后选择"不误吞叙述文字"优先于"零空格路径假阳性"。
-_ABS_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])([A-Za-z]:[\\/][^\s`\"'<>|*?)\]]+)")
+# Windows 绝对路径: 盘符打头, 如 C:\Users\you\workspace\... 或 C:/Users/you/workspace/...
+# 反引号包裹的路径允许空格；裸路径仍在空白和常见标点处结束，避免吞入后续叙述。
+_ABS_PATH_RE = re.compile(
+    r"`([A-Za-z]:[\\/][^`\r\n]+)`|"
+    r"(?<![A-Za-z0-9_])([A-Za-z]:[\\/][^\s`\"'<>|*?)\]]+)"
+)
 # 行锚后缀: `:123` 或 `:123-456`(单文件行号/行区间), 不是路径的一部分, 判存在性前先剥掉。
 _LINE_ANCHOR_SUFFIX_RE = re.compile(r":\d+(?:-\d+)?$")
 
@@ -186,16 +187,19 @@ def _check_drift(canonical: list[tuple[str, str, Path]]) -> list[Finding]:
 
 
 def _path_exists_tolerant(raw_path: str) -> bool:
-    """判存在性前先剥掉行锚后缀(`:123` / `:123-456`, 常见"文件:行号"引用写法, 不是路径本身)。
-
-    捕获正则本身在空白处截断(见 _ABS_PATH_RE 注释), 故真实含空格的路径(如
-    `C:/Program Files/...`)在这里已收不到完整段, 属已知残留假阳性, 不在此兜底。
-    """
+    """判存在性前先剥掉行锚后缀(`:123` / `:123-456`, 不是路径本身)。"""
     candidate = _LINE_ANCHOR_SUFFIX_RE.sub("", raw_path)
     try:
         return Path(candidate).exists()
     except OSError:
         return False
+
+
+def _is_path_template(raw_path: str) -> bool:
+    """通配符、占位符和省略路径是文档模板，不是应当存在的单个文件。"""
+    if any(token in raw_path for token in ("<", ">", "{", "}", "*", "…")):
+        return True
+    return bool(re.search(r"(?:^|[\\/_.-])(?:YYYY|MM|DD|NNN)(?:$|[\\/_.-])", raw_path))
 
 
 def _check_dead_ref(canonical: list[tuple[str, str, Path]]) -> list[Finding]:
@@ -208,7 +212,11 @@ def _check_dead_ref(canonical: list[tuple[str, str, Path]]) -> list[Finding]:
             continue
         seen: set[str] = set()
         for m in _ABS_PATH_RE.finditer(text):
-            raw_path = m.group(1).rstrip(".,;:")
+            raw_path = (m.group(1) or m.group(2)).rstrip(".,;:")
+            # 裸路径的正则会在模板起始符前结束；这种前缀同样不是实体路径。
+            following = text[m.end():m.end() + 1]
+            if following in {"<", "{", "*"} or _is_path_template(raw_path):
+                continue
             if raw_path in seen:
                 continue
             seen.add(raw_path)

@@ -21,6 +21,7 @@ canonical_form 描述完全一致。
 from __future__ import annotations
 
 import ast
+import hashlib
 import logging
 import shutil
 from datetime import datetime, timezone
@@ -47,8 +48,8 @@ def _infer_package(py_file: Path, source_root: Path) -> str:
 
     示例：
       source_root = src/omnicompany
-      py_file = src/omnicompany/packages/domains/demogame/team_table/workers/schema_assembler.py
-      → "demogame.team_table"
+      py_file = src/omnicompany/packages/domains/example_domain/example_team/workers/schema_assembler.py
+      → "example_domain.example_team"
 
     过滤规则：
       - 去掉架构基础目录（packages/domains/services/protocol/runtime）
@@ -153,8 +154,122 @@ def scan_formats(source_root: Path) -> Iterator[InstanceEntry]:
 
 # ── Router / AgentLoop 扫描 ─────────────────────────────────────────────────
 
-_ROUTER_BASES = {"Router", "LLMRouter", "AgentNodeLoop"}
-_AGENT_BASES = {"AgentNodeLoop"}
+_ROUTER_BASES = {"Router", "LLMRouter", "AgentNodeLoop", "ConfigurableAgent"}
+_AGENT_BASES = {"AgentNodeLoop", "ConfigurableAgent"}
+
+_AGENT_SPEC_INDEX_FIELDS = frozenset(
+    {
+        "id",
+        "name",
+        "domain",
+        "registry_namespace",
+        "llm_model",
+        "prompt_path",
+        "tools",
+        "output_materials",
+        "primary_output",
+        "trigger_materials",
+    }
+)
+
+
+def _assignment_value(statements: list[ast.stmt], name: str) -> ast.expr | None:
+    for stmt in statements:
+        if isinstance(stmt, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == name for target in stmt.targets):
+                return stmt.value
+        if (
+            isinstance(stmt, ast.AnnAssign)
+            and isinstance(stmt.target, ast.Name)
+            and stmt.target.id == name
+        ):
+            return stmt.value
+    return None
+
+
+def _call_name(value: ast.expr) -> str:
+    if isinstance(value, ast.Name):
+        return value.id
+    if isinstance(value, ast.Attribute):
+        return value.attr
+    return ""
+
+
+def _agent_spec_projection(value: ast.expr) -> dict[str, object] | None:
+    """Build a read-only registry projection from ``AgentSpec(...)`` source.
+
+    The registry intentionally does not copy the full AgentSpec.  Code remains
+    authoritative; this projection is only for discovery and source-change
+    fingerprinting.
+    """
+
+    if not isinstance(value, ast.Call) or _call_name(value.func) != "AgentSpec":
+        return None
+    projected: dict[str, object] = {}
+    declared_fields: list[str] = []
+    dynamic_fields: list[str] = []
+    for keyword in value.keywords:
+        if keyword.arg is None:
+            dynamic_fields.append("**kwargs")
+            continue
+        declared_fields.append(keyword.arg)
+        if keyword.arg not in _AGENT_SPEC_INDEX_FIELDS:
+            continue
+        try:
+            projected[keyword.arg] = ast.literal_eval(keyword.value)
+        except Exception:
+            projected[keyword.arg] = None
+            dynamic_fields.append(keyword.arg)
+    source_ast = ast.dump(value, annotate_fields=True, include_attributes=False)
+    return {
+        "agent_spec_projection": projected,
+        "agent_spec_declared_fields": sorted(declared_fields),
+        "agent_spec_dynamic_fields": sorted(set(dynamic_fields)),
+        "agent_spec_source_digest": (
+            "sha256:"
+            + hashlib.sha256(source_ast.encode("utf-8")).hexdigest()
+        ),
+    }
+
+
+def _module_agent_specs(tree: ast.Module) -> dict[str, dict[str, object]]:
+    result: dict[str, dict[str, object]] = {}
+    for stmt in tree.body:
+        if not isinstance(stmt, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = (
+            stmt.targets
+            if isinstance(stmt, ast.Assign)
+            else [stmt.target]
+        )
+        projection = _agent_spec_projection(stmt.value)
+        if projection is None:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name):
+                result[target.id] = {
+                    **projection,
+                    "agent_spec_declaration_ref": target.id,
+                }
+    return result
+
+
+def _class_agent_spec_projection(
+    node: ast.ClassDef,
+    module_specs: dict[str, dict[str, object]],
+) -> dict[str, object] | None:
+    value = _assignment_value(node.body, "SPEC")
+    if value is None:
+        return None
+    direct = _agent_spec_projection(value)
+    if direct is not None:
+        return {
+            **direct,
+            "agent_spec_declaration_ref": f"{node.name}.SPEC",
+        }
+    if isinstance(value, ast.Name):
+        return module_specs.get(value.id)
+    return None
 
 
 def scan_routers(source_root: Path) -> Iterator[InstanceEntry]:
@@ -177,6 +292,7 @@ def scan_routers(source_root: Path) -> Iterator[InstanceEntry]:
 
         package = _infer_package(py_file, source_root)
         rel = _rel_to_root(py_file, source_root)
+        module_specs = _module_agent_specs(tree)
 
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
@@ -261,6 +377,9 @@ def scan_routers(source_root: Path) -> Iterator[InstanceEntry]:
             if is_agent:
                 # AgentLoop 额外属性（max_turns 等需从 __init__ 提取，此处先记录占位）
                 attrs["base_class"] = list(base_names & _AGENT_BASES)[0]
+                spec_projection = _class_agent_spec_projection(node, module_specs)
+                if spec_projection is not None:
+                    attrs.update(spec_projection)
 
             yield InstanceEntry(
                 entity_id=entity_id,
@@ -513,6 +632,7 @@ def _scan_routers_file(py_file: Path, source_root: Path) -> Iterator[InstanceEnt
         return
     package = _infer_package(py_file, source_root)
     rel = _rel_to_root(py_file, source_root)
+    module_specs = _module_agent_specs(tree)
 
     if _should_skip(py_file) or "test" in py_file.name.lower():
         return
@@ -596,6 +716,9 @@ def _scan_routers_file(py_file: Path, source_root: Path) -> Iterator[InstanceEnt
         }
         if is_agent:
             attrs["base_class"] = list(base_names & _AGENT_BASES)[0]
+            spec_projection = _class_agent_spec_projection(node, module_specs)
+            if spec_projection is not None:
+                attrs.update(spec_projection)
 
         yield InstanceEntry(
             entity_id=entity_id,

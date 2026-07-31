@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from typing import Callable
 
 from . import catalog
 from ._paths import RUNS_ROOT, ensure_dirs
 from .sources import conversation as cv
 
 CHECKPOINT = RUNS_ROOT / "extracted_sessions.json"
+PROGRESS = RUNS_ROOT / "extraction_progress.json"
 
 # 显式钉一个确认可用的便宜-中端模型;别用 "default" 角色(它会路由到失效的 deepseek-v4-pro 401)。
 # 用户点名 gpt-5.5 / codex;--model 可覆盖(如 qwen3.6-plus 更省)。
@@ -29,10 +31,12 @@ DEFAULT_MODEL = "gpt-5.5"
 # 领域范围(严格归位;对不上填 needs-review)。与 v2 工作流一致。
 _TAXONOMY = (
     "vilo=个人叙事卡牌游戏(薇洛想知道):世界观/卡牌/recipe/文风/密教式开局/又一天/核心欲望卡。"
-    "demogame=公司日间游戏:GvE/公会对决/沙盘演兵/GRaid/StdLv/战斗公平化/配表/期数/公会等级/figma工作台。"
+    "example_domain=示例业务域(占位):新增业务域时按此格式补范围描述。"
     "omnicompany=个人实验室/AI编排基建:决策记录系统/dashboard/governance/研究吸收/决策设施/aiworkspace系统组/网页转figma。"
     "tabletop=通用桌游底座/13原型(五件套/golden-layout)。anniv-fest=周年庆Demo3增量游戏(仓鼠/订单/轻工厂)。"
-    "aigc=图像生成设施(aigc-lab/gen矩阵/审阅台)。resume=简历与求职管线。web-company=作品集公开发布(colorc.cc)。walker=自走棋/回合战棋。"
+    "aigc=图像生成设施(aigc-lab/gen矩阵/审阅台)。resume=简历与求职管线。web-company=作品集公开发布(colorc.cc)。"
+    "xiaohongshu-publish=小红书账号、内容生产、长文/图文与手机草稿发布。publish=跨渠道发布通则和内部文章管线。"
+    "internal-publishing=内部文章与经验发布。walker=自走棋/回合战棋。"
 )
 
 _EXTRACT_SYS = (
@@ -40,6 +44,8 @@ _EXTRACT_SYS = (
     "(1) 每条 evidence 必填:该决策对应的真实对话原文摘录(用户/助手原话+前后文,够判领域+决策真做过),不许只写一句结论、不许改写。"
     "(2) project 只由该条 evidence 严格判,对不上任何已知领域填 needs-review,绝不按'切片里提到过某项目'去猜。"
     "只记真实表达过的,别臆造;一次性闲聊/状态汇报/纯执行细节不记。"
+    "用户明确指出产物或流程错在哪里、并据此改变后续做法的纠正要记:已有明确选型时记 decision,"
+    "只确认问题与影响时记 comment;必须保留被纠正对象和发生情境,不要压成脱离上下文的口号。"
 )
 
 _OBS_SCHEMA = {
@@ -89,11 +95,22 @@ def _save_ckpt(d: dict) -> None:
     CHECKPOINT.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def mark(session_id: str, n_added: int, *, source: str = "claude", status: str = "done", error: str = "") -> None:
+def _save_progress(**fields) -> None:
+    ensure_dirs()
+    payload = {"updated_at": _now(), **fields}
+    PROGRESS.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def mark(session_id: str, n_added: int, *, source: str = "claude", status: str = "done", error: str = "",
+         source_offset: int | None = None, path: str = "") -> None:
     d = load_ckpt()
     d[session_id] = {"extracted_at": _now(), "n_added": n_added, "source": source, "status": status}
     if error:
         d[session_id]["error"] = error[:300]
+    if source_offset is not None:
+        d[session_id]["source_offset"] = source_offset
+    if path:
+        d[session_id]["path"] = path
     _save_ckpt(d)
 
 
@@ -111,11 +128,23 @@ def seed_done(session_ids: list[str], *, source: str = "claude") -> int:
 
 # ── pending ──────────────────────────────────────────────────────────────────
 
-def pending_sessions(*, include_codex: bool = False, min_bytes: int = 3000) -> list[dict]:
+def pending_sessions(*, source: str = "claude", min_bytes: int = 3000,
+                     session_ids: set[str] | None = None) -> list[dict]:
     """未炼会话(不在 checkpoint 里),按大小升序(先炼小的、便宜先出活)。"""
-    done = set(load_ckpt().keys())
-    out = [s for s in cv.scan_claude_sessions()
-           if s["session_id"] not in done and s.get("size", 0) >= min_bytes]
+    ckpt = load_ckpt()
+    out = []
+    for s in cv.scan_sessions(source=source):
+        if session_ids and s["session_id"] not in session_ids:
+            continue
+        if s.get("size", 0) < min_bytes:
+            continue
+        old = ckpt.get(s["session_id"])
+        if old:
+            offset = old.get("source_offset")
+            if offset is None or int(offset) >= int(s.get("size", 0)):
+                continue
+            s["start_offset"] = int(offset)
+        out.append(s)
     out.sort(key=lambda s: s.get("size", 0))
     return out
 
@@ -143,7 +172,7 @@ def _is_dup(statement: str) -> bool:
     return False
 
 
-def _upsert_obs(o: dict, session_id: str) -> bool:
+def _upsert_obs(o: dict, session_id: str, *, source: str = "claude") -> bool:
     from . import record as record_one
 
     stmt = (o.get("statement") or "").strip()
@@ -157,7 +186,7 @@ def _upsert_obs(o: dict, session_id: str) -> bool:
         "track": {"kind": "plan", "id": o.get("track_id") or "misc"},
         "rationale": o.get("rationale") or "",
         "authority": "derived",
-        "origin": {"channel": "claude", "session_ref": session_id},
+        "origin": {"channel": source, "session_ref": session_id},
         "anchor": {"kind": "note", "ref": f"session:{session_id}", "excerpt": ev[:600]},
         "evidence": [{"ref": f"session:{session_id}", "note": ev}] if ev else None,
     }
@@ -170,39 +199,63 @@ def _upsert_obs(o: dict, session_id: str) -> bool:
 
 
 def extract_session(path: str, session_id: str, *, model: str | None = None,
-                    chunk_chars: int = 12000, overlap: int = 800) -> int:
-    text = cv.condense_text(path)
+                    chunk_chars: int = 24000, overlap: int = 1200,
+                    source: str = "claude", start_offset: int = 0,
+                    progress: Callable[[dict], None] | None = None) -> tuple[int, int]:
+    text, end_offset = cv.condense_text_from_offset(path, start_offset)
     if not text.strip():
-        return 0
+        return 0, end_offset
     step = max(1, chunk_chars - overlap)
     added = 0
-    for i in range(0, len(text), step):
+    starts = list(range(0, len(text), step))
+    for index, i in enumerate(starts, start=1):
+        state = {"status": "running", "session": session_id, "source": source,
+                 "chunk": index, "chunks": len(starts), "added": added,
+                 "chars": len(text), "model": model or DEFAULT_MODEL}
+        _save_progress(**state)
+        if progress:
+            progress(state)
         for o in _extract_chunk(text[i:i + chunk_chars], model):
-            if _upsert_obs(o, session_id):
+            if _upsert_obs(o, session_id, source=source):
                 added += 1
-    return added
+        _save_progress(**{**state, "added": added, "stage": "chunk_complete"})
+    return added, end_offset
 
 
-def run_batch(*, limit: int = 3, model: str | None = None, include_codex: bool = False) -> dict:
+def run_batch(*, limit: int = 3, model: str | None = None, source: str = "claude",
+              session_ids: set[str] | None = None, chunk_chars: int = 24000) -> dict:
     """炼一批未炼会话(top-limit,小的先)。每个标 checkpoint;挂的标 error 不卡整批。"""
-    pend = pending_sessions(include_codex=include_codex)
+    pend = pending_sessions(source=source, session_ids=session_ids)
     processed = []
     for s in pend[:limit]:
         try:
-            n = extract_session(s["path"], s["session_id"], model=model)
-            mark(s["session_id"], n)
+            _save_progress(status="running", session=s["session_id"], source=s.get("source", "claude"),
+                           stage="condensing", chunk=0, chunks=0, added=0,
+                           model=model or DEFAULT_MODEL)
+            n, end_offset = extract_session(s["path"], s["session_id"], model=model,
+                                            source=s.get("source", "claude"),
+                                            start_offset=s.get("start_offset", 0),
+                                            chunk_chars=chunk_chars)
+            mark(s["session_id"], n, source=s.get("source", "claude"),
+                 source_offset=end_offset, path=s["path"])
+            _save_progress(status="done", session=s["session_id"], source=s.get("source", "claude"),
+                           stage="complete", added=n, source_offset=end_offset,
+                           model=model or DEFAULT_MODEL)
             processed.append({"session": s["session_id"], "added": n, "mb": round(s.get("size", 0) / 1e6, 1)})
         except Exception as e:  # noqa: BLE001 — 单会话失败不该卡整批
-            mark(s["session_id"], 0, status="error", error=str(e))
+            mark(s["session_id"], 0, source=s.get("source", "claude"), status="error",
+                 error=str(e), source_offset=s.get("start_offset", 0), path=s["path"])
+            _save_progress(status="error", session=s["session_id"], source=s.get("source", "claude"),
+                           stage="failed", added=0, error=str(e)[:300], model=model or DEFAULT_MODEL)
             processed.append({"session": s["session_id"], "added": 0, "error": str(e)[:120]})
     if processed:
         catalog.rebuild_index()
     return {"processed": processed, "remaining": max(0, len(pend) - len(processed))}
 
 
-def status() -> dict:
+def status(*, source: str = "claude") -> dict:
     ck = load_ckpt()
-    pend = pending_sessions()
+    pend = pending_sessions(source=source)
     errs = [k for k, v in ck.items() if v.get("status") == "error"]
     return {"done": len(ck), "remaining": len(pend), "errors": len(errs),
             "remaining_mb": round(sum(s.get("size", 0) for s in pend) / 1e6, 1)}

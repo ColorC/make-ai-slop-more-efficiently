@@ -11,7 +11,7 @@ V2 核心机制：
 
 输出格式:
   ## Known Route Hints (from memory)
-  [7x confidence] user_request → feishu_chat_list_json → feishu_state_json_file → recall_result
+  [7x confidence] user_request → api_chat_list_json → api_state_json_file → recall_result
   [4x confidence] user_request → git_log → commit_hash → git_stat_data
   If any path matches your task, follow it directly without re-exploration.
 """
@@ -32,7 +32,7 @@ from omnicompany.runtime.storage.db_access import open_db_rw
 @dataclass
 class RouteCandidate:
     """一条候选路径（线性展开的类型链）"""
-    steps: list[str]        # 类型链: ["user_request", "feishu_chat_list_json", ...]
+    steps: list[str]        # 类型链: ["user_request", "api_chat_list_json", ...]
     node_ids: list[str]     # 对应的节点 ID
     total_weight: int       # 路径上所有节点 hit_count 之和（置信度）
     similarity: float       # 起始节点与任务文本的 embedding 相似度

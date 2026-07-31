@@ -1,19 +1,28 @@
-<!-- [OMNI] origin=ai-ide domain=dashboard/ccdaemon ts=2026-05-09T00:00:00Z type=doc status=active -->
+<!-- [OMNI] origin=codex domain=dashboard/ccdaemon ts=2026-07-10T00:00:00Z type=doc status=active -->
 <!-- [OMNI] material_id="material:dashboard.ccdaemon.design_doc.architecture.markdown" -->
 
 # ccdaemon · 设计文档
 
 ## 状态
-- **版本**: V1 (2026-05-09 立, 跟道路 [2026-05-09]DASHBOARD-DOGFOOD-RESILIENCE 阶段二同步落档)
-- **成熟度**: skeleton (骨架已立, chat / pty 全套迁入待阶段三完成)
-- **下一步**: 阶段三把 `cc_wrapper/` 全套搬入 + 重命名 + 重写 chat 路线
+- **版本**: V2（2026-07-10，Claude Code / Codex 原生能力对齐）
+- **成熟度**: production（chat / PTY / hooks / installer 已迁入并被 dashboard 反代）
+- **当前边界**: daemon 持有有状态会话；原生 CLI 的项目 hooks 由各 runtime 直接从 `.claude` / `.codex` 加载
 
 ## 核心目的
-ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单独跑一个 uvicorn 进程 (8201), 装载所有 claude-agent-sdk client / winpty PtySession / claude binary 子进程, 跟 dashboard 控制面进程**进程级隔离**.
+ccdaemon 是 dashboard 体系内**有状态 agent 会话的独立持有方**。它单独运行 uvicorn（8201），持有 Claude SDK/PTY 与 ChatUI provider 会话，并把 Claude Code/Codex 生命周期 hooks 接到统一 identity/event/Guardian 设施；与 dashboard 控制面进程做进程级隔离。
 
 **解决**: dashboard 控制面文件 (`controlplane/*.py`) 改动后开 `--reload` 自动生效, 不影响 ccdaemon 持有的 chat 会话; 反过来 ccdaemon 自身代码改动通过 `omni cc daemon restart` 显式触发, 浏览器走自动重连协议感知重启 + 历史续展, 不会出现"AI IDE 改 chat 后端把当前对话杀掉" 的自杀事故.
 
 **不解决**: HTTP/WebSocket 反向代理 (属 `controlplane/cc_proxy.py`); CLI 入口 (属 `cli/commands/cc.py` 跟 `cli/commands/cc_daemon.py`); 业务逻辑 (chat / pty 内的真业务), 仅做生命周期 + 路由装载.
+
+## 与 chatui 的分工（两栈边界）
+
+仓里有两套"创建会话"栈，**功能不重复、都在服役**——不要再争论删哪套，也不允许发明第三套：
+
+- **ccdaemon（本包，Python FastAPI :8201）** — lofa 手机端的会话 API，链路：lofa app → Caddy 12443 → dashboard 8210 → `controlplane/cc_proxy.py` 透传 `/api/cc/*` → ccdaemon `/cc/*`。同时是 BOSS SIGHT 的 Python 进程内 spawn 通道（`boss_sight/captures/routes.py`、`boss_sight/services/workflow_orchestrator.py` 直接 `import ccdaemon.chat`）。**lofa + BOSS SIGHT 双依赖，不能删。**
+- **chatui（`../chatui/`，Node vendored CCUI :7348）** — web 驾驶舱的会话后端，驾驶舱"新建会话"UI 全部走这里，边界说明见 `../chatui/VENDOR.md`。
+
+约定：新增 AI CLI 时两边都评估——lofa 手机端用得上，就在 ccdaemon 加 Python provider（`chat.py` 的 provider 分支）；web 驾驶舱用得上，就在 chatui 按 `../chatui/server/modules/providers/README.md` 加 Node provider。
 
 ## 核心接口
 
@@ -22,12 +31,12 @@ ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单
 - **`lifecycle.py`** — pid/port 文件管理 + 启动健康自检 + reload 模式探测 — [lifecycle.py](lifecycle.py)
 
 ### 业务模块
-- **`sessions.py`** — `CcSession` 共同基类, 封装 `data/cc_sessions.json` 元数据协议 (id/kind/cwd/started_at/ended_at/claude_session_id/active_plan/exit_reason). 阶段三填写 — sessions.py
-- **`chat.py`** — claude-agent-sdk 路线 chat session manager + 路由 + WebSocket. 阶段三从 `cc_wrapper/cc_chat_bridge.py` 重写迁入 — [chat.py](chat.py)
-- **`pty.py`** — winpty 路线 PTY session manager + 路由 + WebSocket. 阶段三从 `cc_wrapper/pty_service.py` 跟 `cc_wrapper/api.py` 合并迁入 — [pty.py](pty.py)
-- **`installer.py`** — claude code settings 安装/卸载工具. 阶段三从 `cc_wrapper/settings_installer.py` 迁入 — [installer.py](installer.py)
-- **`hooks/`** — claude code SessionStart / PreToolUse / UserPromptSubmit 等钩子. 阶段三整目录从 `cc_wrapper/hooks/` 搬入 — [hooks/](hooks/)
-- **`mcp_server.py`** — claude code MCP server 集成. 阶段三搬入 — [mcp_server.py](mcp_server.py)
+- **`chat.py`** — Claude Code / Codex / omni_agent / controller chat session manager + WebSocket — [chat.py](chat.py)
+- **`pty.py`** — winpty Claude CLI session manager + WebSocket — [pty.py](pty.py)
+- **`installer.py`** — Claude Code settings + MCP 安装/卸载 — [installer.py](installer.py)
+- **`codex_installer.py`** — Codex `.codex/hooks.json` 安装/卸载/状态；保留用户 hooks — [codex_installer.py](codex_installer.py)
+- **`hooks/`** — Claude Code / Codex 共用最小会话指针、计划切换、写入保护和结束记录；完整工具记录仅按需诊断 — [hooks/](hooks/)
+- **`mcp_server.py`** — Claude Code MCP server 集成；Codex 侧使用本机 config/MCP provider 设施 — [mcp_server.py](mcp_server.py)
 
 ## 架构决策
 
@@ -39,9 +48,13 @@ ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单
 **决策**: ccdaemon 自身代码改动 (`chat.py` / `pty.py` 等) **不**自动 reload, 必须用户显式 `omni cc daemon restart` 触发.
 **理由**: AI IDE 在网页 chat 框里改 ccdaemon 自身代码时, 如果 daemon 自动 reload, 会出现"改到一半 reload 触发, 当前对话连同改动者一起死"的自杀事故. 显式重启给改动者一个明确的"我准备好接受重启"信号, 浏览器同时进入 reconnecting 状态, 重启完后自动续展.
 
-### D3 · `data/cc_sessions.json` 协议保持兼容
-**决策**: ccdaemon 接管后 `cc_sessions.json` 的 schema 不变 (id/kind=chat|pty/cwd/started_at/ended_at/claude_session_id/active_plan/...). [2026-05-03]CC-PLAN-SESSION-CONTEXT 的 active_plan 绑定协议跟 SessionStart hook 写入路径不动.
-**理由**: 持有方换了, 但落盘协议是其他模块 (cli plan / hooks) 共同消费的契约. 协议改动 = 跨模块连锁, 跟"无旧兼容"决策的边界 (无兼容只针对内部代码风格, 不针对持久化协议) 切开.
+### D3 · provider-neutral 身份台账 + legacy PTY 协议
+**决策**: `data/cc_sessions.json` 继续兼容旧 PTY/chat 元数据；跨 provider 聚合与权威绑定统一读 `data/cc_session_bindings.json`，字段为 `provider + session_id`，`claude_session_id` 只作兼容别名。
+**理由**: 不能把 Codex 冒充 Claude 塞进旧字段；同时不破坏已有 PTY 恢复数据。
+
+### D4 · 共用 hook 实现，不共用 runtime 配置
+**决策**: Claude 安装到 `.claude/settings.json`，Codex 安装到 `.codex/hooks.json`；命令通过 `--provider` 进入同一组 Python hook。
+**理由**: 两端事件/输出/信任模型不同，复制 Claude settings 不能形成正确的 Codex 支持。
 
 ## 数据流 / 拓扑
 ```
@@ -56,11 +69,11 @@ ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单
 [ccdaemon 进程 :8201] ← 本包
    ├─ chat.py (ChatSessionManager 单例)
    ├─ pty.py (PtyManager 单例)
-   ├─ installer.py (settings install/uninstall)
-   ├─ hooks/ (子进程钩子, 由 claude binary 启动时加载)
-   └─ sessions.py (落盘 data/cc_sessions.json)
+   ├─ installer.py / codex_installer.py
+   ├─ hooks/ (由 native runtime 触发)
+   └─ identity ledger + data/cc_sessions.json legacy metadata
         │
-        └─ subprocess: claude binary (SDK 走 spawn / winpty 走 PTY.spawn)
+        └─ provider subprocess: Claude / Codex（按会话路径选择）
 ```
 
 ## 已知局限

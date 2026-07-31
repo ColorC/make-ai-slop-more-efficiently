@@ -33,6 +33,12 @@ class EventType(str, Enum):
     TASK_ERROR = "task.error"
     """不可恢复错误导致任务终止"""
 
+    TASK_POSITION_CLAIMED = "task.position.claimed"
+    """任务已原子认领并路由到 canonical Team 岗位；不表示已经开始执行。"""
+
+    TASK_POSITION_CLAIM_REJECTED = "task.position.claim_rejected"
+    """任务认领或岗位路由因归属、冲突或合同问题被拒绝。"""
+
     # Agent 决策循环 (Agent Step Loop)
     # 每一轮 step() 调用产生的细粒度事件
     LLM_REQUEST = "agent.llm.request"

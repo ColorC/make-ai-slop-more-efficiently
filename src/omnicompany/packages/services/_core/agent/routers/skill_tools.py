@@ -4,8 +4,8 @@
 参考: claude-code SkillTool / DiscoverSkillsTool / ToolSearchTool
 
 omnicompany 实现思路:
-  - skills 在 .claude/skills/<name>/SKILL.md (与 claude code 一致约定)
-  - DiscoverSkills: 扫工作区 + 用户 ~/.claude/skills/ 列出可用 skills
+  - skills 同时支持 Codex 的 .agents/skills 与 Claude Code 的 .claude/skills
+  - DiscoverSkills: 扫工作区 + 用户目录, ~/.codex/skills 仅作旧版只读回退
   - Skill: 调一个 skill 的入口 — 这里是"加载 SKILL.md 内容供 LLM 跟随"
     (omnicompany 没 claude.ai 那种 skill 运行时, 但可以加载 instructions)
   - ToolSearch: 列已注册工具 (从 Worker 的 ctx.tool_registry 取)
@@ -14,8 +14,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import ClassVar
+
+import yaml
 
 from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
@@ -27,20 +30,100 @@ logger = logging.getLogger(__name__)
 
 
 def _skills_search_paths(ctx: ToolContext) -> list[Path]:
-    """合法 skills 搜索路径: 项目 .claude/skills/ + 用户 ~/.claude/skills/"""
+    """按优先级返回现存的 Codex/Claude skill 目录, legacy 仅作只读回退。"""
+    start = Path(ctx.cwd or ctx.project_root or Path.cwd()).resolve()
+    limit = Path(ctx.project_root).resolve() if ctx.project_root else None
+    ancestors: list[Path] = []
+    current = start
+    while True:
+        ancestors.append(current)
+        if (limit is not None and current == limit) or (limit is None and (current / ".git").exists()):
+            break
+        if current.parent == current:
+            break
+        current = current.parent
+    if limit is not None and limit not in ancestors:
+        ancestors.append(limit)
+
+    home = Path.home()
+    codex_home = Path(os.environ.get("CODEX_HOME") or (home / ".codex"))
+    candidates = [
+        *(ancestor / ".agents" / "skills" for ancestor in ancestors),
+        *(ancestor / ".claude" / "skills" for ancestor in ancestors),
+        home / ".agents" / "skills",
+        home / ".claude" / "skills",
+        codex_home / "skills",
+        Path("/etc/codex/skills"),
+    ]
     paths: list[Path] = []
-    base = Path(ctx.project_root or ctx.cwd or Path.cwd())
-    paths.append(base / ".claude" / "skills")
-    home = Path.home() / ".claude" / "skills"
-    paths.append(home)
-    return [p for p in paths if p.exists() and p.is_dir()]
+    seen: set[Path] = set()
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
+        if path.is_dir():
+            paths.append(path)
+    return paths
+
+
+def _skill_description(skill_md: Path) -> str:
+    """读取 Skill 的声明说明；frontmatter 优先，正文首句只作兼容回退。"""
+    try:
+        content = skill_md.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    lines = content.splitlines()
+    body_start = 0
+    if lines and lines[0].strip() == "---":
+        for index, line in enumerate(lines[1:], start=1):
+            if line.strip() != "---":
+                continue
+            body_start = index + 1
+            try:
+                metadata = yaml.safe_load("\n".join(lines[1:index])) or {}
+            except yaml.YAMLError:
+                metadata = {}
+            description = metadata.get("description") if isinstance(metadata, dict) else ""
+            if description:
+                return " ".join(str(description).split())[:500]
+            break
+    for line in lines[body_start:]:
+        value = line.strip()
+        if value and not value.startswith("#") and not value.startswith("<!--"):
+            return value[:500]
+    return ""
+
+
+def discover_skills(ctx: ToolContext) -> list[dict[str, str]]:
+    """返回与 SkillRouter 同源、按优先级去重后的结构化 Skill 目录。"""
+    skills: list[dict[str, str]] = []
+    seen_names: set[str] = set()
+    for search_path in _skills_search_paths(ctx):
+        for child in sorted(search_path.iterdir()):
+            if not child.is_dir():
+                continue
+            dedupe_key = child.name.casefold()
+            if dedupe_key in seen_names:
+                continue
+            skill_md = child / "SKILL.md"
+            if not skill_md.is_file():
+                continue
+            seen_names.add(dedupe_key)
+            skills.append(
+                {
+                    "name": child.name,
+                    "path": str(skill_md),
+                    "description": _skill_description(skill_md),
+                }
+            )
+    return skills
 
 
 # ─── DiscoverSkillsRouter ─────────────────────────────────────────
 
 
 class DiscoverSkillsRouter(SingleToolRouter):
-    """List available skills (from .claude/skills/ project + user dirs)."""
+    """List available skills from Codex and Claude project/user directories."""
 
     CONSUMED_META_IO: ClassVar[tuple[str, ...]] = ("meta_io.fs.read_file",)
     PRODUCED_META_IO: ClassVar[tuple[str, ...]] = ()
@@ -49,7 +132,7 @@ class DiscoverSkillsRouter(SingleToolRouter):
     DESCRIPTION: ClassVar[str] = (
         "List skills available in this project + user's global skills.\n"
         "\n"
-        "Skills are .claude/skills/<name>/SKILL.md files. Returns:\n"
+        "Skills are .agents/skills/<name>/SKILL.md or .claude/skills/<name>/SKILL.md files. Returns:\n"
         "- name + first-line description per skill\n"
         "- path (so caller can pass to Skill tool)"
     )
@@ -62,30 +145,7 @@ class DiscoverSkillsRouter(SingleToolRouter):
     IS_READONLY: ClassVar[bool] = True
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
-        skills: list[dict] = []
-        for sp in _skills_search_paths(ctx):
-            for child in sorted(sp.iterdir()):
-                if not child.is_dir():
-                    continue
-                skill_md = child / "SKILL.md"
-                if not skill_md.exists():
-                    continue
-                try:
-                    head = skill_md.read_text(encoding="utf-8", errors="replace").splitlines()
-                except Exception:
-                    continue
-                # 提取首行非空非注释作 description
-                desc = ""
-                for line in head[:30]:
-                    s = line.strip()
-                    if s and not s.startswith("#") and not s.startswith("---"):
-                        desc = s[:120]
-                        break
-                skills.append({
-                    "name": child.name,
-                    "path": str(skill_md),
-                    "description": desc,
-                })
+        skills = discover_skills(ctx)
 
         if not skills:
             return "No skills found."
@@ -134,7 +194,7 @@ class SkillRouter(SingleToolRouter):
     INPUT_SCHEMA: ClassVar[dict] = {
         "type": "object",
         "properties": {
-            "name": {"type": "string", "description": "Skill name (dir under .claude/skills/)"},
+            "name": {"type": "string", "description": "Skill name (dir under .agents/skills/ or .claude/skills/)"},
             "args": {"type": "string", "description": "Optional argument string"},
         },
         "required": ["name"],

@@ -803,11 +803,6 @@ class ToolExecutor:
         candidates = [
             _shutil.which("rg"),
             _shutil.which("rg.exe"),
-            # @vscode/ripgrep (bundled with Antigravity / Cursor / VS Code)
-            r"c:/Users/user/AppData/Local/Programs/Antigravity/resources/app/node_modules/@vscode/ripgrep/bin/rg.exe",
-            r"c:/Users/user/AppData/Local/Programs/cursor/resources/app/node_modules/@vscode/ripgrep/bin/rg.exe",
-            r"c:/Users/user/.gemini/tmp/bin/rg.exe",
-            r"c:/Users/user/AppData/Local/Programs/Microsoft VS Code/560a9dba96/resources/app/extensions/copilot/node_modules/@github/copilot/sdk/ripgrep/bin/win32-x64/rg.exe",
         ]
         for c in candidates:
             if c and Path(c).is_file():

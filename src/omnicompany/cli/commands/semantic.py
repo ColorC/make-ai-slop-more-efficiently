@@ -33,11 +33,11 @@ def cmd_classify(path: str, model: str | None) -> None:
 @click.argument("path")
 @click.option("--model", default=None)
 @click.option("--force", is_flag=True, help="已注册也重跑(覆盖)")
-@click.option("--no-inbox", is_flag=True, help="置信不足也不推 human-inbox")
-def cmd_materialize(path: str, model: str | None, force: bool, no_inbox: bool) -> None:
+@click.option("--no-review", is_flag=True, help="置信不足也不提交当前会话可读回的审阅材料")
+def cmd_materialize(path: str, model: str | None, force: bool, no_review: bool) -> None:
     """落盘钩子: 把一个产出文件分类→入册→写回语义字段(产出即 material)。"""
     from omnicompany.packages.services._core.semantic_fs.classify import materialize
-    click.echo(json.dumps(materialize(path, model=model, force=force, push_inbox=not no_inbox),
+    click.echo(json.dumps(materialize(path, model=model, force=force, submit_review=not no_review),
                           ensure_ascii=False, indent=2))
 
 
@@ -46,11 +46,11 @@ def cmd_materialize(path: str, model: str | None, force: bool, no_inbox: bool) -
 @click.argument("directory")
 @click.option("--model", default=None)
 @click.option("--limit", type=int, default=None)
-@click.option("--inbox", is_flag=True, help="置信不足推 human-inbox")
-def cmd_materialize_dir(directory: str, model: str | None, limit: int | None, inbox: bool) -> None:
+@click.option("--review", "submit_review", is_flag=True, help="置信不足时提交合并审阅材料")
+def cmd_materialize_dir(directory: str, model: str | None, limit: int | None, submit_review: bool) -> None:
     """扫一个产出目录, 把还没入册的文件批量 materialize。"""
     from omnicompany.packages.services._core.semantic_fs.classify import materialize_dir
-    payload = materialize_dir(directory, model=model, limit=limit, push_inbox=inbox, echo=click.echo)
+    payload = materialize_dir(directory, model=model, limit=limit, submit_review=submit_review, echo=click.echo)
     click.echo(json.dumps({k: payload[k] for k in ("scanned", "materialized", "needs_review")
                            if k in payload}, ensure_ascii=False, indent=2))
 
@@ -80,15 +80,15 @@ def cmd_search(query: str, top_k: int, tags: tuple[str, ...], model: str | None)
     click.echo(json.dumps(rows, ensure_ascii=False, indent=2))
 
 
-@cmd_semantic.command("demogame-gap")
+@cmd_semantic.command("gap-map")
 @external_or_controller
 @click.option("--from", "from_json", default=None,
               help="一手源公式 JSON 文件: [{field, formula}]。不给则用内置样例(plan 里的代表性公式)。")
 @click.option("--model", default="qwen3.6-plus")
-def cmd_demogame_gap(from_json: str | None, model: str) -> None:
-    """里程碑四: 从 demogame 一手源公式产出 cross-table-lookup/formula-semantic material 并入册可检索(MATERIAL-GAP-MAP 意图)。"""
+def cmd_gap_map(from_json: str | None, model: str) -> None:
+    """里程碑四: 从一手源公式产出 cross-table-lookup/formula-semantic material 并入册可检索(MATERIAL-GAP-MAP 意图)。"""
     import json as _j
-    from omnicompany.packages.services._core.semantic_fs.demogame_gap import produce
+    from omnicompany.packages.services._core.semantic_fs.gap_map import produce
     if from_json:
         formulas = _j.loads(open(from_json, encoding="utf-8").read())
     else:  # 内置代表性样例(MATERIAL-GAP-MAP plan 的公式形态)
@@ -107,11 +107,11 @@ def cmd_demogame_gap(from_json: str | None, model: str) -> None:
 @external_or_controller
 @click.option("--limit", type=int, default=40, help="单轮最多 materialize 多少新文件")
 @click.option("--model", default=None)
-@click.option("--inbox", is_flag=True, help="置信不足推 human-inbox")
-def cmd_sweep(limit: int, model: str | None, inbox: bool) -> None:
+@click.option("--review", "submit_review", is_flag=True, help="置信不足时提交合并审阅材料")
+def cmd_sweep(limit: int, model: str | None, submit_review: bool) -> None:
     """每日自动纳管: 扫产出目录(docs/reports·data/reports·data/domains)把还没入册的产出文件自动变 material。"""
     from omnicompany.packages.services._core.semantic_fs.classify import sweep
-    payload = sweep(limit=limit, model=model, push_inbox=inbox, echo=click.echo)
+    payload = sweep(limit=limit, model=model, submit_review=submit_review, echo=click.echo)
     click.echo(json.dumps({k: payload[k] for k in ("dirs", "new_files", "materialized", "capped")},
                           ensure_ascii=False, indent=2))
 

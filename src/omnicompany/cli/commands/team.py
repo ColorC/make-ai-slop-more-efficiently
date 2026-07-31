@@ -173,13 +173,13 @@ def cmd_team_run(
 
     # 创建 EventBus + TeamRunner
     try:
-        from omnicompany.runtime.bus.event_bus import EventBus
+        from omnicompany.bus.memory import MemoryBus
         from omnicompany.runtime.exec.runner import TeamRunner
     except ImportError as e:
         click.echo(f"runtime 模块导入失败: {e}", err=True)
         raise SystemExit(1)
 
-    bus = EventBus()
+    bus = MemoryBus()
     runner = TeamRunner(
         pipeline=team, bindings=bindings, bus=bus,
         max_steps=max_steps, source=f"yaml:{Path(from_yaml).name}",

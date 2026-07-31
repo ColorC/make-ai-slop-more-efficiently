@@ -2,15 +2,15 @@
 # [OMNI] material_id="material:core.team_builder.router_compatibility.shim.py"
 """workflow_factory/routers.py — 向后兼容 shim (Clean Migration 2026-04-20).
 
-真实 Worker 实现在 `workers/` 目录 (14 Worker, Diamond shortcut · 业务代码暂存
-`_archive/routers_legacy.py`, Stage 3 清洁工作可搬到 workers/*.py).
+真实 Worker 实现在 `workers/` 目录 (14 Worker, Diamond 继承 · 业务代码在
+`routers_legacy.py`, 2026-07-26 OMNI-040 Stage 3 已迁回正式位置).
 
 兼容入口:
   - 新名 `*Worker`: from workers 重导出
   - 旧名 `*Router` (别名): 指向对应 `*Worker` 类
   - 模块级辅助函数 (`_wf_no_trunc` / `_extract_json_obj` / `check_format_in_consumption`
     / `_GLOBAL_FIX_LIMIT` / `_check_global_fix_iter` / `_wf_extract_python_code`):
-    从 `_archive/routers_legacy.py` re-export
+    从 `routers_legacy.py` re-export
 
 不要往本文件加新逻辑; 新增 Worker 请直接写 `workers/<name>.py`.
 旧代码 `from ...workflow_factory.routers import ErrorRouteAuditorRouter` 继续可用.
@@ -38,8 +38,8 @@ from .workers import (
     ALL_WORKERS,
 )
 
-# ─── 模块级辅助 (re-export 自 _archive) ─────────────────────────────────
-from ._archive.routers_legacy import (
+# ─── 模块级辅助 (re-export 自 routers_legacy) ───────────────────────────
+from .routers_legacy import (
     _wf_no_trunc,
     _extract_json_obj,
     check_format_in_consumption,

@@ -17,6 +17,17 @@ from .material_types import (
     registered_review_tiers,
     review_material_tags,
 )
+from .capabilities import (
+    ReviewContext,
+    ReviewReference,
+    ReviewSubmissionIntent,
+    capability_catalog,
+    resolve_review_submission,
+)
+from .context_spine import (
+    build_material_context_spine,
+    canonical_review_ref,
+)
 
 __all__ = [
     "AnnotationKind",
@@ -30,4 +41,11 @@ __all__ = [
     "registered_review_kinds",
     "registered_review_tiers",
     "review_material_tags",
+    "ReviewContext",
+    "ReviewReference",
+    "ReviewSubmissionIntent",
+    "capability_catalog",
+    "resolve_review_submission",
+    "build_material_context_spine",
+    "canonical_review_ref",
 ]

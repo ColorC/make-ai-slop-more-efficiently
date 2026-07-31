@@ -33,7 +33,7 @@ agent-first 哲学 (`docs/standards/concepts/agent_first.md`): **先搭完整 wo
 **最终目标** (当下能认知的):
 - V2 完成 Phase 2/4/5/6/7 (7 新 worker)
 - V3 对接 Phase 8 CodeGenerator + Phase 10 Registrar
-- 接 HumanBus: intent.ambiguities → human_blocking
+- 歧义回当前 agent 对话: intent.ambiguities → needs_user_input
 - 接 self_repair (A4): design_validation_report FAIL → core_diagnose
 - 多轮探针观测后, 把稳定流程固化成 HARD worker (按 agent-first Step 4)
 
@@ -57,7 +57,7 @@ agent-first 哲学 (`docs/standards/concepts/agent_first.md`): **先搭完整 wo
 - Materials (V1 9 类 → V2 16 类) → [formats.py](formats.py)
 - workflow 详述 → .omni/build_workflow.md
 - workspace → .omni/workspace.yaml
-- 旧 workflow_factory 实现归档 → [_archive/](_archive/) (Stage 2 · 3076 行 Diamond 实现, 用户明示**不拆 Stage 3**, 作回退路径 + 观测对照组)
+- 旧 workflow_factory 实现 → [routers_legacy.py](routers_legacy.py) (3076 行 Diamond 实现, 2026-07-26 迁出 _archive; 用户明示**不拆**, 作回退路径 + 观测对照组)
 - compat shim → [../workflow_factory/](../workflow_factory/) (deprecated, import 路径兼容)
 
 ## 想了解更多

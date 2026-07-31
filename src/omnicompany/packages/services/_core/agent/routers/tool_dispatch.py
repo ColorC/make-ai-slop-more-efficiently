@@ -32,6 +32,19 @@ from omnicompany.packages.services._core.agent.routers.single_tool import Single
 logger = logging.getLogger(__name__)
 
 
+_NATIVE_TOOL_ALIASES = {
+    "read": "read_file",
+    "write": "write_file",
+    "edit": "edit",
+    "bash": "bash",
+    "glob": "glob",
+    "grep": "grep",
+    "list": "list_dir",
+    "list_dir": "list_dir",
+    "finish": "finish",
+}
+
+
 class ToolDispatchRouter(Router):
     """工具分发 Router。
 
@@ -76,13 +89,41 @@ class ToolDispatchRouter(Router):
         """汇总所有注册工具的 Anthropic API schema。"""
         return [type(r).to_api_spec() for r in self._routers.values()]
 
+    def produces_filesystem_mutation(self, tool_name: str) -> bool:
+        """Whether a controlled tool declares a concrete filesystem write.
+
+        Wildcard producers such as shell and sub-agent tools are deliberately
+        excluded: their successful return does not prove that workspace state
+        changed. File tools declare explicit ``meta_io.fs.*`` outputs and can
+        safely advance the Agent loop's workspace-mutation generation.
+        """
+
+        canonical_name = tool_name
+        if canonical_name not in self._routers:
+            canonical_name = _NATIVE_TOOL_ALIASES.get(
+                canonical_name.casefold(),
+                canonical_name,
+            )
+        target = self._routers.get(canonical_name)
+        if target is None:
+            return False
+        produced = tuple(getattr(type(target), "PRODUCED_META_IO", ()) or ())
+        return any(
+            item != "*" and str(item).startswith("meta_io.fs.")
+            for item in produced
+        )
+
     async def run(self, input_data: Any) -> Verdict:
         pre = self.validate_input(input_data)
         if pre is not None:
             return pre
 
         trace_id = input_data.get("trace_id", "")
-        tool_name = input_data.get("tool_name", "")
+        requested_tool_name = str(input_data.get("tool_name", ""))
+        tool_name = requested_tool_name
+        if tool_name not in self._routers:
+            tool_name = _NATIVE_TOOL_ALIASES.get(tool_name.casefold(), tool_name)
+        routed_input = input_data if tool_name == requested_tool_name else {**input_data, "tool_name": tool_name}
         tool_use_id = input_data.get("tool_use_id", "")
         turn = input_data.get("turn", 0)
 
@@ -93,6 +134,7 @@ class ToolDispatchRouter(Router):
             format_id=self.FORMAT_IN,
             data={
                 "tool_name": tool_name,
+                "requested_tool_name": requested_tool_name,
                 "tool_use_id": tool_use_id,
                 "turn": turn,
                 "available_tools": list(self._routers.keys()),
@@ -116,7 +158,7 @@ class ToolDispatchRouter(Router):
             verdict = Verdict(kind=VerdictKind.PASS, output=output, diagnosis=diagnosis)
         else:
             # 委派给具体工具 Router
-            inner = await target.run(input_data)
+            inner = await target.run(routed_input)
             verdict = inner
 
         await emit_router_output(

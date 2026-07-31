@@ -22,7 +22,7 @@ FORMATS = [
             "包含 work_dir、compile_command、test_cases 列表（由简到繁）"
         ),
         parent="code",
-        tags=["smoke", "test-plan"],
+        tags=["smoke", "test-plan", "kind.internal"],
     ),
     Format(
         id=f"{DOMAIN}.result",
@@ -32,7 +32,7 @@ FORMATS = [
             "含 passed_cases 列表和 smoke_passed=True"
         ),
         parent=f"{DOMAIN}.test-suite",
-        tags=["smoke", "verified"],
+        tags=["smoke", "verified", "kind.sink"],
         required_tags=["smoke"],
     ),
 ]

@@ -1,0 +1,9 @@
+{
+  "name": "gov-history-weekly",
+  "schedule": "@weekly",
+  "command": "omni governance history-run",
+  "description": "每周: 对话重复需求/指正挖掘",
+  "prompt": "",
+  "created_at": "2026-06-13T07:10:33.578041+00:00",
+  "last_run_at": "2026-07-17T09:49:02.831356+00:00"
+}

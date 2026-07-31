@@ -144,6 +144,9 @@ class GuardianReportWorker(Worker):
                         pass
         skeleton_designs, missing_manifests = _scan_docauthor_deficits(repo)
 
+        # 4.5 Format/Router metadata 质量周报 (guard-metadata-weekly 落盘的 latest.md)
+        metadata_weekly = _load_metadata_weekly(repo)
+
         # 5. 规则字典 (从 RULES 实时取定义喂 LLM)
         rule_dict = _build_rule_dictionary(rule_scan, audit_records)
 
@@ -155,6 +158,7 @@ class GuardianReportWorker(Worker):
             "docauthor_quarantine": len(quarantine_queue),
             "docauthor_skeleton_design": len(skeleton_designs),
             "docauthor_missing_manifest": len(missing_manifests),
+            "metadata_weekly_report": 1 if metadata_weekly else 0,
         }
 
         # 6. LLM 翻译写中文 markdown
@@ -169,6 +173,7 @@ class GuardianReportWorker(Worker):
                 quarantine_queue=quarantine_queue,
                 skeleton_designs=skeleton_designs,
                 missing_manifests=missing_manifests,
+                metadata_weekly=metadata_weekly,
                 rule_dict=rule_dict,
                 source_counts=source_counts,
                 web_bus=self._web_bus,
@@ -254,6 +259,26 @@ def _scan_docauthor_deficits(repo: Path) -> tuple[list[dict], list[dict]]:
         return [], []
 
 
+def _load_metadata_weekly(repo: Path) -> dict | None:
+    """读 guard-metadata-weekly 落盘的 data/services/guardian/metadata/latest.md。
+
+    文件不存在/读失败返回 None (周报还没跑过时报告里该节记 0, 不阻塞主流程)。
+    """
+    p = repo / "data/services/guardian/metadata/latest.md"
+    if not p.exists():
+        return None
+    try:
+        text = p.read_text(encoding="utf-8", errors="replace")
+        mtime = p.stat().st_mtime
+    except OSError:
+        return None
+    return {
+        "rel_path": p.relative_to(repo).as_posix(),
+        "ts": datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat(),
+        "content": text,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════
 # LLM 渲染 markdown (qwen-3.6-plus · call_llm_json)
 # ═══════════════════════════════════════════════════════════════════
@@ -288,7 +313,7 @@ markdown 必须含:
 - 标题 `# omnicompany 守护一手观察 · <ts_iso>`
 - 一段 1-3 句的导语 (这报告是什么 / 怎么读 / 数据来源)
 - 顶层概览 (中文表格)
-- 各节: 规则扫描 → LLM 巡查 → audit 判定 → docauthor 队列, 每节"翻译说明 + 具体清单 + 原始证据"
+- 各节: 规则扫描 → LLM 巡查 → audit 判定 → docauthor 队列 → metadata 周报, 每节"翻译说明 + 具体清单 + 原始证据"
 - 末尾 "下一步建议" (具体动作, 含命令)
 
 ## 各节具体要求
@@ -322,6 +347,13 @@ audit 是 LLM 复核结果:
 - 列出哪些文档 + 卡在什么 critical 问题
 - skeleton DESIGN: "设计文档还是骨架状态待填实"
 - 缺 manifest: "service 包还没声明 data 目录布局"
+
+### metadata 周报节
+这是每周一次的全量 Format/Router 描述质量扫描 (cron guard-metadata-weekly 落盘):
+- full = 描述信息完整 (description 够长 + tags + schema/parent 或 FORMAT_IN/OUT 齐)
+- poor = 描述过短或缺要素 — 影响 LLM 路由理解"这个 Format/Router 是干什么的"
+- 列出 poor 最多的 package + 一句话建议 (补 description / 补 tags)
+- 文件不存在就说明周报还没跑过, 提示跑 `omni guardian metadata-report`
 
 ### 下一步建议
 对每个建议给具体命令:
@@ -364,6 +396,9 @@ skeleton DESIGN backlog ({skeleton_count} 条):
 缺 manifest 的包 ({missing_manifest_count} 条):
 {missing_manifest_json}
 
+## 5. Format/Router metadata 质量周报 (guard-metadata-weekly 落盘)
+{metadata_weekly_section}
+
 ## 任务
 
 按 system_prompt 把以上数据翻译成中文 markdown 报告. 严格不打分, 不保留代号给用户读 (代号放末尾原始证据段供溯源), 每条问题给"规则是什么 + 哪里违规 + 怎么改".
@@ -382,6 +417,7 @@ def _llm_render_markdown(
     quarantine_queue: list[dict],
     skeleton_designs: list[dict],
     missing_manifests: list[dict],
+    metadata_weekly: dict | None,
     rule_dict: dict,
     source_counts: dict,
     web_bus: Any = None,
@@ -400,6 +436,18 @@ def _llm_render_markdown(
     else:
         patrol_section = "(无 patrol 报告)"
 
+    # metadata 周报节: latest.md 全文 (同样截 4000 字)
+    if metadata_weekly:
+        content = metadata_weekly["content"]
+        if len(content) > 4000:
+            content = content[:4000] + "\n\n...(下略)"
+        metadata_section = (
+            f"### {metadata_weekly['rel_path']} (ts={metadata_weekly['ts']})\n\n"
+            f"```\n{content}\n```"
+        )
+    else:
+        metadata_section = "(周报还没跑过 · data/services/guardian/metadata/latest.md 不存在)"
+
     user_prompt = _USER_PROMPT_TEMPLATE.format(
         ts_iso=ts_iso,
         source_counts_json=json.dumps(source_counts, ensure_ascii=False, indent=2),
@@ -416,6 +464,7 @@ def _llm_render_markdown(
         skeleton_json=json.dumps(skeleton_designs, ensure_ascii=False, indent=2, default=str),
         missing_manifest_count=len(missing_manifests),
         missing_manifest_json=json.dumps(missing_manifests, ensure_ascii=False, indent=2, default=str),
+        metadata_weekly_section=metadata_section,
     )
 
     result = call_llm_json(

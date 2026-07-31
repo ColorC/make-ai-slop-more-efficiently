@@ -21,21 +21,31 @@ import asyncio
 import json
 import logging
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from ..entity_registry import normalize_comment_target
+from .capabilities import (
+    ReviewSubmissionIntent,
+    capability_catalog,
+    resolve_review_submission,
+)
+from .context_spine import build_material_context_spine
+from .links import review_material_open_path
 from .store import (
     COMMENT_FEEDBACK_STATUSES,
     MaterialKind,
     MaterialStatus,
     MaterialStore,
     MaterialTier,
+    is_internal_review_material,
 )
 
 _log = logging.getLogger(__name__)
@@ -90,6 +100,8 @@ class ReviewstageHub:
     def on_store_event(self, event_type: str, material) -> None:
         """store 同步 callback. 转 async broadcast."""
         if self._loop is None:
+            return
+        if is_internal_review_material(material):
             return
         mdict = material.to_dict()
         _attach_notes_to_materials([mdict])  # 评论真源在中心 store, wire 出去前水合
@@ -189,7 +201,39 @@ class CreateMaterialBody(BaseModel):
     track: str | None = None
     version: int | None = None
     version_family: str | None = None
+    subject_id: str | None = None
+    subject_type: str | None = None
+    revision: int | None = None
     links: dict[str, Any] | None = None
+    review_context: dict[str, Any] | None = None
+
+
+class ResolveReviewSubmissionBody(BaseModel):
+    """Read-only, event-scoped guidance for UI and Agent submission clients."""
+
+    event: str = Field(
+        default="submission_preflight",
+        pattern="^(submission_preflight|embed_preflight|material_open)$",
+    )
+    kind: str = ""
+    tier: str = ""
+    title: str = ""
+    source_plan_id: str = ""
+    source_subagent_id: str = ""
+    file_path: str = ""
+    file_relpath: str = ""
+    inline_content: str = ""
+    data_schema_id: str = ""
+    extra: dict[str, Any] | None = None
+    project: str = ""
+    track: str = ""
+    version: int | None = None
+    version_family: str = ""
+    subject_id: str = ""
+    subject_type: str = ""
+    revision: int | None = None
+    links: dict[str, Any] | None = None
+    review_context: dict[str, Any] | None = None
 
 
 class ReviewCaptureBody(BaseModel):
@@ -285,6 +329,32 @@ class BatchTierBody(BaseModel):
 reviewstage_router = APIRouter(prefix="/api/boss-sight/reviewstage", tags=["reviewstage"])
 
 
+@reviewstage_router.get("/capabilities")
+async def get_review_capabilities() -> dict[str, Any]:
+    """Return the authoritative, Format-validated review scenario projection."""
+
+    return capability_catalog(get_store().format_registry)
+
+
+@reviewstage_router.post("/resolve-submission")
+async def resolve_review_submission_route(
+    body: ResolveReviewSubmissionBody,
+) -> dict[str, Any]:
+    """Resolve guidance only when a caller reaches an explicit review event."""
+
+    payload = body.model_dump() if hasattr(body, "model_dump") else body.dict()
+    event = payload.pop("event")
+    try:
+        result = resolve_review_submission(
+            ReviewSubmissionIntent.from_mapping(payload),
+            event=event,
+            registry=get_store().format_registry,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return result.to_dict()
+
+
 def _clip_text(value: Any, limit: int = 60000) -> str:
     text = "" if value is None else str(value)
     if len(text) <= limit:
@@ -340,6 +410,63 @@ def _capture_markdown(body: ReviewCaptureBody) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+# 列表视图的 inline_content 裁剪上限: 前端卡片摘要只取 300 字, 全文走 /{material_id} 详情。
+# 不裁的话大 HTML 报告全文都在列表里(实测 109 条 22MB, 审阅台开页要 5s+)。
+_LIST_INLINE_CLIP = 2000
+
+
+def _clip_for_list(d: dict[str, Any]) -> dict[str, Any]:
+    ic = d.get("inline_content")
+    if isinstance(ic, str) and len(ic) > _LIST_INLINE_CLIP:
+        d["inline_content"] = ic[:_LIST_INLINE_CLIP]
+        d["inline_content_clipped"] = True
+    return d
+
+
+def _list_materials_sync(
+    status: str | None,
+    tier: str | None,
+    plan_id: str | None,
+    pushed_only: bool,
+    include_archived: bool,
+    archived_only: bool,
+    include_internal: bool,
+    limit: int,
+    project: str | None,
+    track: str | None,
+    subject_id: str | None,
+    revision: int | None,
+    full: bool,
+) -> dict[str, Any]:
+    """list_materials 的同步实现体: store.reload() 强制重读磁盘 + store.list() 过滤, 全是
+    阻塞文件 I/O, 抽出来给 asyncio.to_thread 用, 不堵事件循环。"""
+    store = get_store()
+    # 强制 invalidate cache — omni cli (subagent) 直写 fs, ccdaemon 进程
+    # 内存 cache 不会自动 reload. 每次 list 都重读磁盘 (<1000 条 OK).
+    store.reload()
+    items = store.list(
+        status=status, tier=tier, plan_id=plan_id, pushed_only=pushed_only,
+        include_archived=include_archived or archived_only,
+        include_internal=include_internal,
+        project=project, track=track, subject_id=subject_id, revision=revision,
+    )
+    if archived_only:
+        items = [m for m in items if getattr(m, "archived", False)]
+    limit = max(1, min(int(limit), 500))
+    dicts = [m.to_dict() for m in items[:limit]]
+    if not full:
+        dicts = [_clip_for_list(d) for d in dicts]
+    return {
+        "count": len(items),
+        "items": dicts,
+        "filter": {
+            "status": status, "tier": tier, "plan_id": plan_id, "pushed_only": pushed_only,
+            "include_internal": include_internal,
+            "project": project, "track": track, "subject_id": subject_id, "revision": revision,
+        },
+    }
+
+
 @reviewstage_router.get("")
 async def list_materials(
     status: str | None = None,
@@ -348,35 +475,50 @@ async def list_materials(
     pushed_only: bool = False,
     include_archived: bool = False,
     archived_only: bool = False,
+    include_internal: bool = False,
     limit: int = 200,
     project: str | None = None,
     track: str | None = None,
+    subject_id: str | None = None,
+    revision: int | None = None,
+    full: bool = False,
 ) -> dict[str, Any]:
-    store = get_store()
-    # 强制 invalidate cache — omni cli (subagent) 直写 fs, ccdaemon 进程
-    # 内存 cache 不会自动 reload. 每次 list 都重读磁盘 (<1000 条 OK).
-    store.reload()
-    items = store.list(
-        status=status, tier=tier, plan_id=plan_id, pushed_only=pushed_only,
-        include_archived=include_archived or archived_only,
-        project=project, track=track,
+    """材料列表。默认排除内部治理件并裁剪正文；include_internal=1 仅供治理审计。"""
+    return await asyncio.to_thread(
+        _list_materials_sync,
+        status, tier, plan_id, pushed_only, include_archived, archived_only,
+        include_internal, limit, project, track, subject_id, revision, full,
     )
-    if archived_only:
-        items = [m for m in items if getattr(m, "archived", False)]
-    limit = max(1, min(int(limit), 500))
-    return {
-        "count": len(items),
-        "items": [m.to_dict() for m in items[:limit]],
-        "filter": {
-            "status": status, "tier": tier, "plan_id": plan_id, "pushed_only": pushed_only,
-            "project": project, "track": track,
-        },
-    }
 
 
-@reviewstage_router.get("/_stats")
-async def material_stats() -> dict[str, Any]:
-    """快速统计 — 给前端顶栏 badge 用."""
+@reviewstage_router.get("/readback")
+async def readback_materials(
+    session_id: str | None = None,
+    conversation_id: str | None = None,
+    provider: str | None = None,
+    include_archived: bool = False,
+    limit: int = 200,
+) -> dict[str, Any]:
+    """快速读取当前对话送审材料; 路由必须位于动态 /{material_id} 之前。"""
+    from .readback import build_review_readback
+
+    # Transcript discovery recursively scans provider session trees and parses
+    # large JSONL files. Keep that work off the ccdaemon event loop that also
+    # forwards interactive PTY bytes.
+    return await asyncio.to_thread(
+        build_review_readback,
+        get_store(),
+        session_id=session_id,
+        conversation_id=conversation_id,
+        provider=provider,
+        include_archived=include_archived,
+        limit=max(1, min(int(limit), 500)),
+    )
+
+
+def _material_stats_sync() -> dict[str, Any]:
+    """material_stats 的同步实现体: store.list() 走磁盘缓存加载, 阻塞文件 I/O,
+    抽出来给 asyncio.to_thread 用 (照搬 _list_materials_sync 模式), 不堵事件循环。"""
     store = get_store()
     all_items = store.list()
     by_status: dict[str, int] = {}
@@ -388,7 +530,9 @@ async def material_stats() -> dict[str, Any]:
         tr = m.tier.value if hasattr(m.tier, "value") else m.tier
         by_status[st] = by_status.get(st, 0) + 1
         by_tier[tr] = by_tier.get(tr, 0) + 1
-        if tr == "mandatory" and st in {"pending", "rejected", "blocked"}:
+        # 只数 pending: rejected/blocked 都是用户已裁过的状态(驳回/卡住), 再计入
+        # "必验收待审"会让徽标被历史积压淹没(2026-07-19: 19 条里 15 条是已驳回旧稿)。
+        if tr == "mandatory" and st == "pending":
             mandatory_unaccepted += 1
         if m.pushed_to_user and st == "pending":
             pushed_unread += 1
@@ -399,6 +543,12 @@ async def material_stats() -> dict[str, Any]:
         "mandatory_unaccepted": mandatory_unaccepted,
         "pushed_unread": pushed_unread,
     }
+
+
+@reviewstage_router.get("/_stats")
+async def material_stats() -> dict[str, Any]:
+    """快速统计 — 给前端顶栏 badge 用."""
+    return await asyncio.to_thread(_material_stats_sync)
 
 
 # 去重(2026-06-14): material 评论真源已迁到中心 authored store(Note)。读材料时把
@@ -464,15 +614,19 @@ def _attach_notes_to_materials(material_dicts: list[dict[str, Any]]) -> None:
         d["comments"] = out
 
 
-@reviewstage_router.get("/review-canvas")
-async def review_canvas(project: str) -> dict[str, Any]:
-    """材料轨迹投影(A3): 给"材料轨迹"画布用。按 track 分泳道, track 内按
-    version_family 分组, 组内按 version 升序排列; 另附 links 边表 + project 缺 track 的
-    材料(unassigned) + 简单统计。material_dict 走既有 to_dict + _attach_notes_to_materials
-    水合(评论要在画布上可见)。"""
+def _review_canvas_sync(project: str, include_archived: bool = False) -> dict[str, Any]:
+    """review_canvas 的同步实现体: store.reload() + 全量 to_dict + 评论水合全是
+    阻塞文件 I/O, 抽出来给 asyncio.to_thread 用 (照搬 _list_materials_sync 模式)。"""
     store = get_store()
     store.reload()
-    items = store.list(project=project)
+    items = store.list(project=project, include_archived=include_archived)
+    from omnicompany.dashboard.boss_sight.reviewstage.material_types import domain_stages, project_domains
+    registered_stage_order: list[str] = []
+    for domain in sorted(project_domains(project, store.format_registry)):
+        for stage in domain_stages(domain, store.format_registry):
+            name = str(stage["name"])
+            if name not in registered_stage_order:
+                registered_stage_order.append(name)
     dicts = [m.to_dict() for m in items]
     _attach_notes_to_materials(dicts)
     by_id = {d["id"]: d for d in dicts}
@@ -509,18 +663,80 @@ async def review_canvas(project: str) -> dict[str, Any]:
             if rel_id in by_id:
                 links_out.append({"source": mid, "target": rel_id, "rel": "related"})
 
+    # project → subject → revision → stage/material 的长期查询索引。这里只放 id 引用，
+    # 材料正文仍以 tracks/families 中的同一份 dict 为真源，避免复制两套材料数据。
+    subject_map: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for d in dicts:
+        subject_id = (d.get("subject_id") or "").strip()
+        if not subject_id:
+            continue
+        subject_type = (d.get("subject_type") or "subject").strip()
+        subject_map.setdefault((subject_type, subject_id), []).append(d)
+
+    subjects_out: list[dict[str, Any]] = []
+    for (subject_type, subject_id), subject_materials in sorted(
+        subject_map.items(), key=lambda item: item[0][1].lower(),
+    ):
+        topic_candidates = [d for d in subject_materials if (d.get("track") or "") == "选题"]
+        topic_candidates.sort(
+            key=lambda d: (d.get("revision") or 0, d.get("version") or 0, d.get("created_at") or ""),
+            reverse=True,
+        )
+        revision_map: dict[int, list[dict[str, Any]]] = {}
+        unversioned: list[str] = []
+        for d in subject_materials:
+            revision_value = d.get("revision")
+            if revision_value is None:
+                unversioned.append(d["id"])
+                continue
+            revision_map.setdefault(int(revision_value), []).append(d)
+        revisions = []
+        for revision_value in sorted(revision_map, reverse=True):
+            revision_materials = revision_map[revision_value]
+            material_stages = list(dict.fromkeys(
+                str(d.get("track") or "") for d in revision_materials if d.get("track")
+            ))
+            present_stages = set(material_stages)
+            stages = [name for name in registered_stage_order if name in present_stages]
+            stages.extend(name for name in material_stages if name not in registered_stage_order)
+            revisions.append({
+                "revision": revision_value,
+                "stages": stages,
+                "material_ids": [d["id"] for d in revision_materials],
+                "archived_count": sum(1 for d in revision_materials if d.get("archived")),
+            })
+        subjects_out.append({
+            "subject_id": subject_id,
+            "subject_type": subject_type,
+            "title": topic_candidates[0]["title"] if topic_candidates else subject_id,
+            "revisions": revisions,
+            "unversioned_material_ids": unversioned,
+        })
+
     stats = {
         "total": len(dicts),
         "tracks": len(tracks_out),
         "unassigned": len(unassigned),
         "links": len(links_out),
+        "subjects": len(subjects_out),
+        "revisions": sum(len(subject["revisions"]) for subject in subjects_out),
     }
     return {
         "tracks": tracks_out,
         "links": links_out,
         "unassigned": unassigned,
+        "subjects": subjects_out,
         "stats": stats,
     }
+
+
+@reviewstage_router.get("/review-canvas")
+async def review_canvas(project: str, include_archived: bool = False) -> dict[str, Any]:
+    """材料轨迹投影(A3): 给"材料轨迹"画布用。按 track 分泳道, track 内按
+    version_family 分组, 组内按 version 升序排列; 另附 links 边表 + project 缺 track 的
+    材料(unassigned) + 简单统计。material_dict 走既有 to_dict + _attach_notes_to_materials
+    水合(评论要在画布上可见)。"""
+    return await asyncio.to_thread(_review_canvas_sync, project, include_archived)
 
 
 def _stage_samples(materials: list[dict[str, Any]], layer_name: str, limit: int = 3) -> list[dict[str, Any]]:
@@ -559,13 +775,9 @@ def _adopted_rulings_for(domain: str, stage_name: str, adopted_by_id: dict[str, 
     return out
 
 
-@reviewstage_router.get("/domain-tree")
-async def domain_tree(project: str) -> dict[str, Any]:
-    """决策树=具象管线投影: 项目所属各注册域的产物层级步骤序列(下一次做的时候怎么做)。
-
-    每步 = 一个产物层级, 带: 人话说明(desc)/形态期望 kind/门禁执法器/本项目该层材料样例
-    (track==层级名, 最新版优先, 上限 3)/适用已拍板裁决(域映射 ∩ 决策库真实 adopted)/下一层名。
-    项目不属任何注册域 → domains 为空(前端据此整条隐藏)。"""
+def _domain_tree_sync(project: str) -> dict[str, Any]:
+    """domain_tree 的同步实现体: store.reload() + 材料全扫 + 决策库 fold 全是阻塞 I/O,
+    抽出来给 asyncio.to_thread 用 (照搬 _list_materials_sync 模式)。"""
     from omnicompany.dashboard.boss_sight.reviewstage.material_types import (
         default_review_format_registry,
         domain_ruling_map,
@@ -582,7 +794,7 @@ async def domain_tree(project: str) -> dict[str, Any]:
     materials = [m.to_dict() for m in store.list(project=project)]
 
     # 决策库真实 adopted 裁决, 供适用裁决交集: project ∈ {X, 域名}, 另加各域裁决映射
-    # 点名的 id(域作者知识已按 id 白名单收束; 裁决可能记在更宽的项目桶如 demogame,
+    # 点名的 id(域作者知识已按 id 白名单收束; 裁决可能记在更宽的项目桶如某业务域,
     # 桶宽窄不该影响可见性, 记录仍须真实存在且 adopted)。
     mapped_ids: set[str] = set()
     for domain in domains:
@@ -621,6 +833,16 @@ async def domain_tree(project: str) -> dict[str, Any]:
         domains_out.append({"domain": domain, "steps": steps_out})
 
     return {"domains": domains_out}
+
+
+@reviewstage_router.get("/domain-tree")
+async def domain_tree(project: str) -> dict[str, Any]:
+    """决策树=具象管线投影: 项目所属各注册域的产物层级步骤序列(下一次做的时候怎么做)。
+
+    每步 = 一个产物层级, 带: 人话说明(desc)/形态期望 kind/门禁执法器/本项目该层材料样例
+    (track==层级名, 最新版优先, 上限 3)/适用已拍板裁决(域映射 ∩ 决策库真实 adopted)/下一层名。
+    项目不属任何注册域 → domains 为空(前端据此整条隐藏)。"""
+    return await asyncio.to_thread(_domain_tree_sync, project)
 
 
 class NextStepDispatchBody(BaseModel):
@@ -663,17 +885,51 @@ async def next_step_dispatch(material_id: str, body: NextStepDispatchBody) -> di
     return {"material_id": material_id, "decision": decision}
 
 
-@reviewstage_router.get("/{material_id}")
-async def get_material(material_id: str) -> dict[str, Any]:
-    store = get_store()
+def _get_or_reload(store, material_id: str):
+    """CLI 直写文件的新材料, 常驻进程内存快照可能还没看到 → 未命中先 reload 再找一次
+    (2026-07-07 视频审阅整改时踩到: 刚 submit 的材料打开是 404)。"""
     m = store.get(material_id)
+    if m is None:
+        try:
+            store.reload()
+        except Exception:  # noqa: BLE001 — reload 失败按原 404 走
+            return None
+        m = store.get(material_id)
+    return m
+
+
+def _get_material_sync(material_id: str) -> dict[str, Any]:
+    """get_material 的同步实现体: _get_or_reload 可能触发 store.reload() 磁盘扫描 +
+    评论水合, 阻塞文件 I/O, 抽出来给 asyncio.to_thread 用 (照搬 _list_materials_sync 模式)。"""
+    store = get_store()
+    m = _get_or_reload(store, material_id)
     if m is None:
         raise HTTPException(404, f"material {material_id} not found")
     d = m.to_dict()
     _attach_notes_to_materials([d])
+    d["context_spine"] = build_material_context_spine(store, m)
     # 评论真源在中心 store; 仍暴露 material 文件绝对路径(历史评论 + 元数据)。
     d["json_path"] = str((store.root / f"{m.id}.json").resolve())
     return d
+
+
+def _get_material_context_sync(material_id: str) -> dict[str, Any]:
+    store = get_store()
+    material = _get_or_reload(store, material_id)
+    if material is None:
+        raise HTTPException(404, f"material {material_id} not found")
+    return build_material_context_spine(store, material)
+
+
+@reviewstage_router.get("/{material_id}/context")
+async def get_material_context(material_id: str) -> dict[str, Any]:
+    """Read the joined Context Spine without duplicating any source authority."""
+    return await asyncio.to_thread(_get_material_context_sync, material_id)
+
+
+@reviewstage_router.get("/{material_id}")
+async def get_material(material_id: str) -> dict[str, Any]:
+    return await asyncio.to_thread(_get_material_sync, material_id)
 
 
 @reviewstage_router.post("")
@@ -692,7 +948,11 @@ async def create_material(body: CreateMaterialBody) -> dict[str, Any]:
             track=body.track,
             version=body.version,
             version_family=body.version_family,
+            subject_id=body.subject_id,
+            subject_type=body.subject_type,
+            revision=body.revision,
             links=body.links,
+            review_context=body.review_context,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -911,7 +1171,7 @@ async def add_comment(material_id: str, body: CommentBody) -> dict[str, Any]:
     # 去重(2026-06-14): 评论统一进中心 authored store(Note), 不再写 Material.comments[]。
     # 读路径(MaterialDetail)同步改查 /notes/by-target/material/{id}。旧 comments[] 冻结为历史。
     store = get_store()
-    m = store.get(material_id)
+    m = _get_or_reload(store, material_id)
     if m is None:
         raise HTTPException(404, f"material {material_id} not found")
     ctarget = normalize_comment_target(body.content, body.target) or {}
@@ -1071,6 +1331,8 @@ async def mark_pushed(material_id: str, body: MarkPushedBody | None = None) -> d
         m = store.mark_pushed(material_id, reason=reason)
     except KeyError:
         raise HTTPException(404, f"material {material_id} not found")
+    except PermissionError as exc:
+        raise HTTPException(409, str(exc))
     return m.to_dict()
 
 
@@ -1181,7 +1443,7 @@ async def get_material_path(material_id: str) -> dict[str, Any]:
     """材料落盘文件的绝对路径 — 供前端「复制材料路径」把材料递给其他 agent。
     inline 材料无落盘文件 → file_abs_path=null(前端退化复制内容 API 地址)。"""
     store = get_store()
-    m = store.get(material_id)
+    m = _get_or_reload(store, material_id)
     if m is None:
         raise HTTPException(404, f"material {material_id} not found")
     fp = store.resolve_file_path(m)
@@ -1192,25 +1454,104 @@ async def get_material_path(material_id: str) -> dict[str, Any]:
     }
 
 
+def build_live_url_shell(live_url: str, *, title: str = "") -> str:
+    # live_url 材料的 /file 响应体: 整页 iframe 壳(手机/远程直开即实时网页)。
+    # 与 controlplane 探针的样本哈希共用同一构造函数——探针 Range 抓到的前 4096 字节
+    # 必须与规范字节一致, 否则物理验证被拒。
+    import html as _html
+
+    safe_url = _html.escape(live_url, quote=True)
+    safe_title = _html.escape(title or live_url)
+    return (
+        "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        f"<title>{safe_title}</title>"
+        "<style>html,body{margin:0;height:100%;background:#faf7f0}"
+        "iframe{display:block;width:100%;height:100%;border:0}</style></head><body>"
+        f"<iframe src=\"{safe_url}\" allow=\"fullscreen\"></iframe>"
+        "</body></html>"
+    )
+
+
+def _material_download_filename(
+    material: Any,
+    *,
+    kind: str,
+    suffix: str = "",
+) -> str:
+    """Build a readable, header-safe filename for explicit material downloads."""
+    title = re.sub(r'[\x00-\x1f<>:"/\\|?*]+', "_", str(material.title or "")).strip(" .")
+    stem = title or str(material.id or "review-material")
+    ext = suffix or {
+        "markdown": ".md",
+        "html": ".html",
+        "static-report": ".html",
+        "demo": ".html",
+        "custom_web_template": ".html",
+        "key_question": ".json",
+    }.get(kind, ".txt")
+    if ext and not stem.lower().endswith(ext.lower()):
+        stem = f"{stem}{ext}"
+    return stem
+
+
+def _download_headers(filename: str, *, enabled: bool) -> dict[str, str] | None:
+    if not enabled:
+        return None
+    return {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+    }
+
+
 @reviewstage_router.get("/{material_id}/file")
-async def get_material_file(material_id: str):
+async def get_material_file(material_id: str, request: Request):
     store = get_store()
-    m = store.get(material_id)
+    m = _get_or_reload(store, material_id)
     if m is None:
         raise HTTPException(404, f"material {material_id} not found")
+    kind = m.kind.value if hasattr(m.kind, "value") else m.kind
+    download = request.query_params.get("download") == "1"
+    direct_navigation = request.headers.get("sec-fetch-dest", "").lower() == "document"
+    if (
+        kind == "markdown"
+        and direct_navigation
+        and request.query_params.get("raw") != "1"
+        and not download
+    ):
+        # Historical user links pointed at this carrier endpoint. Browser navigation
+        # now migrates into the cockpit so Dockview selects the Markdown renderer;
+        # renderer fetches and explicit source access remain available via ?raw=1.
+        return RedirectResponse(review_material_open_path(material_id), status_code=307)
+    live_url = str((m.extra or {}).get("live_url") or "").strip()
+    if live_url:
+        # live_url 材料的真内容是实时网页: /file 必须让远程浏览器直接看到它(整页 iframe),
+        # 而不是 inline_content 回退说明——否则远程打开=白页一行字(2026-07-25 用户远程复现)。
+        return PlainTextResponse(
+            content=build_live_url_shell(live_url, title=m.title or material_id),
+            media_type="text/html; charset=utf-8",
+            headers=_download_headers(
+                _material_download_filename(m, kind="html"),
+                enabled=download,
+            ),
+        )
     if m.inline_content is not None and not m.file_relpath:
         # inline 直接返
-        kind = m.kind.value if hasattr(m.kind, "value") else m.kind
         media_type = {
             "markdown": "text/markdown; charset=utf-8",
             "html": "text/html; charset=utf-8",
             "key_question": "application/json; charset=utf-8",
         }.get(kind, "text/plain; charset=utf-8")
-        return PlainTextResponse(content=m.inline_content, media_type=media_type)
+        return PlainTextResponse(
+            content=m.inline_content,
+            media_type=media_type,
+            headers=_download_headers(
+                _material_download_filename(m, kind=kind),
+                enabled=download,
+            ),
+        )
     fp = store.resolve_file_path(m)
     if fp is None:
         raise HTTPException(404, f"material {material_id} file missing")
-    kind = m.kind.value if hasattr(m.kind, "value") else m.kind
     media_type = None
     if kind == "image":
         ext = fp.suffix.lower()
@@ -1218,11 +1559,25 @@ async def get_material_file(material_id: str):
             ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
             ".svg": "image/svg+xml", ".gif": "image/gif", ".webp": "image/webp",
         }.get(ext)
+    elif kind == "video":
+        # ⚠不能信 mimetypes 猜(Windows 注册表口径 .mp4 猜不出 → FileResponse 落 text/plain,
+        # 播放器拒播)。视频审阅整改(2026-07-07): 显式表 + video/mp4 兜底。
+        ext = fp.suffix.lower()
+        media_type = {
+            ".webm": "video/webm", ".mp4": "video/mp4", ".m4v": "video/mp4",
+            ".mov": "video/quicktime", ".mkv": "video/x-matroska", ".ogv": "video/ogg",
+        }.get(ext, "video/mp4")
     elif kind == "html":
         media_type = "text/html; charset=utf-8"
     elif kind == "markdown":
         media_type = "text/markdown; charset=utf-8"
-    return FileResponse(str(fp), media_type=media_type)
+    return FileResponse(
+        str(fp),
+        media_type=media_type,
+        filename=_material_download_filename(m, kind=kind, suffix=fp.suffix)
+        if download
+        else None,
+    )
 
 
 class CoverRefreshBody(BaseModel):
@@ -1234,7 +1589,7 @@ async def get_material_cover(material_id: str):
     """材料封面预览图(headless 截图,缓存 covers/<id>_<ver>.png)。未生成 → 404,前端退文字封面。"""
     from . import preview
     store = get_store()
-    m = store.get(material_id)
+    m = _get_or_reload(store, material_id)
     if m is None:
         raise HTTPException(404, f"material {material_id} not found")
     path = preview.cover_path(store.root, m.id, preview._ver(m))
@@ -1243,6 +1598,44 @@ async def get_material_cover(material_id: str):
         # 不会卡在旧的小字封面(渲染策略升级时尤其重要)。
         return FileResponse(str(path), media_type="image/png", headers={"Cache-Control": "no-cache"})
     raise HTTPException(404, "cover not generated yet")
+
+
+@reviewstage_router.get("/{material_id}/frames")
+async def list_material_frames(material_id: str) -> dict[str, Any]:
+    """视频帧带清单(2026-07-07 视频审阅整改): 服务端 headless 抽帧,审阅不再依赖播放器。
+    返回 {frames:[{index,url,position}], count}; 未生成 → count=0(前端只显播放器+动作条)。"""
+    from . import preview
+    store = get_store()
+    m = _get_or_reload(store, material_id)
+    if m is None:
+        raise HTTPException(404, f"material {material_id} not found")
+    ver = preview._ver(m)
+    frames = preview.list_frames(store.root, m.id, ver)
+    return {
+        "material_id": material_id,
+        "count": len(frames),
+        "frames": [
+            {
+                "index": idx,
+                "position": pos,
+                "url": f"/api/boss-sight/reviewstage/{material_id}/frames/{idx}",
+            }
+            for idx, pos in frames
+        ],
+    }
+
+
+@reviewstage_router.get("/{material_id}/frames/{index}")
+async def get_material_frame(material_id: str, index: int):
+    from . import preview
+    store = get_store()
+    m = _get_or_reload(store, material_id)
+    if m is None:
+        raise HTTPException(404, f"material {material_id} not found")
+    path = preview.frame_path(store.root, m.id, preview._ver(m), index)
+    if path.exists() and path.stat().st_size > 0:
+        return FileResponse(str(path), media_type="image/jpeg", headers={"Cache-Control": "no-cache"})
+    raise HTTPException(404, "frame not generated")
 
 
 @reviewstage_router.post("/covers/refresh")

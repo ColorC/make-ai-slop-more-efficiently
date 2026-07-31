@@ -154,7 +154,7 @@ CHALLENGE_DIAGNOSTIC_SPEC = AgentSpec(
             "'falsified', resolution 真落档. "
             "绿 fixture: agent 没调工具就退 — 虽过 submit_verdict 协议但红绿对比 PASS (绿原状). "
             "暴露 V3.1.1 prompt 问题 (submit_verdict 跳过), 留 V3.1.1 修. "
-            "完整报告: docs/plans/.../v3_1_real_llm_dogfood_2026-05-07.md"
+            "完整报告: docs/plans/.../real_llm_dogfood_2026-05-07.md"
         ),
     },
 )

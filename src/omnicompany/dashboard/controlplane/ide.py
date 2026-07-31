@@ -209,7 +209,7 @@ async def trace_files(trace_id: str, request: Request):
 
 @ide_router.get("/ide/metrics")
 def get_metrics(
-    caller_prefix: str | None = Query(None, description="Filter by caller prefix (e.g. pipeline.demogame_qa)"),
+    caller_prefix: str | None = Query(None, description="Filter by caller prefix (e.g. pipeline.research_qa)"),
 ):
     """LLM 计量数据：token 用量、成本、按节点分组。"""
     from omnicompany.runtime.llm.llm import LLMMeter

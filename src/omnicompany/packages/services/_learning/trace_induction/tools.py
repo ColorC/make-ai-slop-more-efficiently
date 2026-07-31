@@ -17,14 +17,29 @@ from omnicompany.runtime.exec.tool_executor import ToolExecutor
 logger = logging.getLogger(__name__)
 
 
-async def _dispatch_induction(*, purpose: str, trace_ids: str, domain: str):
+async def _dispatch_induction(
+    *,
+    purpose: str,
+    trace_ids: str,
+    domain: str,
+    source: str = "auto",
+    provider: str = "",
+    sync: bool = True,
+):
     from omnicompany.core.dispatch import dispatch
     from omnicompany.core.registry import discover
 
     discover()
     return await dispatch(
         "trace-induction",
-        {"purpose": purpose, "trace_ids": trace_ids, "domain": domain},
+        {
+            "purpose": purpose,
+            "trace_ids": trace_ids,
+            "domain": domain,
+            "source": source,
+            "provider": provider,
+            "sync": sync,
+        },
         max_steps=50,
     )
 
@@ -42,13 +57,23 @@ def _induce_pipeline_call(args: dict, executor: ToolExecutor | None, ctx: ToolCo
     purpose = args.get("purpose", "")
     trace_ids_str = args.get("trace_ids", "")
     domain = args.get("domain", "")
+    source = str(args.get("source") or "auto")
+    provider = str(args.get("provider") or "")
+    sync = bool(args.get("sync", True))
 
     if not purpose or not trace_ids_str:
         return json.dumps({"status": "error", "message": "purpose and trace_ids are required"})
 
     try:
         result = _run_async_from_sync(
-            _dispatch_induction(purpose=purpose, trace_ids=trace_ids_str, domain=domain)
+            _dispatch_induction(
+                purpose=purpose,
+                trace_ids=trace_ids_str,
+                domain=domain,
+                source=source,
+                provider=provider,
+                sync=sync,
+            )
         )
         if isinstance(result, dict):
             return json.dumps(
@@ -87,6 +112,20 @@ class InducePipelineTool(SingleToolRouter):
             "domain": {
                 "type": "string",
                 "description": "Optional domain identifier.",
+            },
+            "source": {
+                "type": "string",
+                "enum": ["auto", "intent", "external"],
+                "description": "Trace source. auto keeps legacy intent traces and falls back to external Agents.",
+            },
+            "provider": {
+                "type": "string",
+                "enum": ["", "codex", "claude", "kimi"],
+                "description": "Optional external Agent provider filter.",
+            },
+            "sync": {
+                "type": "boolean",
+                "description": "Refresh only the selected external sessions before reading the index.",
             },
         },
         "required": ["purpose", "trace_ids"],

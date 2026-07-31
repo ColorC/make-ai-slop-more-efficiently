@@ -68,6 +68,7 @@ def board_data(plan_id: str) -> dict[str, Any]:
             "id": t.id, "title": t.title, "status": t.status,
             "priority": t.priority, "complexity": t.complexity, "parallel": t.parallel,
             "dependencies": t.dependencies, "assignee": t.assignee,
+            "team_id": t.team_id, "position_id": t.position_id,
             "agent": b.get("agent"), "carrier": b.get("carrier"),
             "binding_status": b.get("status"),
             "has_test_strategy": bool((t.test_strategy or "").strip()),

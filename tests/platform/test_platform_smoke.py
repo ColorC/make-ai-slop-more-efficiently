@@ -64,7 +64,7 @@ def test_research_pipeline_topology_valid():
     spec = build_research_pipeline()
     ids = {n.id for n in spec.nodes}
     assert spec.entry in ids
-    assert len(spec.nodes) >= 5
+    assert {n.id for n in spec.nodes} == {"intake", "native", "library_write"}
     # 所有边的端点都必须是已声明的节点(拓扑自洽)
     for e in spec.edges:
         assert e.source in ids, f"边 source {e.source} 不在节点集"

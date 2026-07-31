@@ -34,6 +34,7 @@ from omnicompany.packages.services._core.agent import (
 # import dashboard 私有工具触发 SingleToolRouter 子类登记 (TodoWriteRouter 等)
 from omnicompany.dashboard import native_agent_tools  # noqa: F401
 from omnicompany.dashboard.native_agent_context import build_context_section
+from omnicompany.dashboard.session_workdir import default_session_cwd, resolve_session_cwd
 from omnicompany.runtime.agent.agent_loop_config import (
     CompactConfig,
     LoopConfig,
@@ -137,7 +138,7 @@ _NATIVE_LOOP_CONFIG = LoopConfig(
 
 _PROMPT_PATH = "src/omnicompany/dashboard/native_agent_prompt.md"
 _DEFAULT_MODEL_ID = "qwen3.6-max-preview"
-_DEFAULT_CWD = os.getcwd()
+_DEFAULT_CWD = default_session_cwd()
 
 
 class NativeIdeAgent(ConfigurableAgent):
@@ -176,7 +177,7 @@ class NativeIdeAgent(ConfigurableAgent):
         config: LoopConfig | None = None,
     ):
         # 实例级覆写 prompt_substitutions cwd + active_plan
-        self._cwd = cwd or os.getcwd()
+        self._cwd = resolve_session_cwd(cwd)
         self._active_plan = active_plan
         # 重跑替换拼出 instance prompt (含 PROGRESS.md / project.md / plan.md 真信息源注入)
         self._instance_prompt = self._reload_with_cwd(self._cwd, active_plan=active_plan)

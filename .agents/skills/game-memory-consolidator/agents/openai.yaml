@@ -1,0 +1,6 @@
+interface:
+  display_name: "游戏记忆整理"
+  short_description: "将终态轨迹整理为语义、路线、失败与任务记忆"
+  default_prompt: "Use $game-memory-consolidator to append durable memories and a resumable capsule from this terminal trace."
+policy:
+  allow_implicit_invocation: true

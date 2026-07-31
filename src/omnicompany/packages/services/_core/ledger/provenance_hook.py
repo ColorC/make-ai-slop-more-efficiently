@@ -85,7 +85,7 @@ def record_tool_run(
     """把一次工具运行记进留痕账本, 返回事件 id; 内部任意异常时返回 None(不抛出)。
 
     Args:
-        tool_id: 工具/执法器标识(落 event.agent), 如 "demogame.design_doc_lint.lint"。
+        tool_id: 工具/执法器标识(落 event.agent), 如 "example_domain.design_doc_lint.lint"。
         event_type: 事件类型, 如 "design.lint_run"。
         activity: 人读活动描述。
         queries: 确定性决策检索词(域词+业务词); 命中记录的 id 落 consumed_decisions。

@@ -114,7 +114,7 @@ _SAFE_OMNI_LIFECYCLE = (
     "task complete", "task status", "task start", "task next", "task show",
     "task list", "task assign", "task board", "task bindings", "task update",
     "plan gate", "plan show", "plan current", "plan list", "plan report",
-    "notes ls", "notes read", "human inbox",
+    "notes ls", "notes read", "review readback",
 )
 
 
@@ -358,12 +358,15 @@ class ClaudeCodeSdkWorker(ExternalAgentWorker):
                     or readonly_rollback["failed"]
                 ):
                     status = ExternalAgentStatus.PERMISSION_VIOLATION
-                    error = "readonly permission violation: external worker changed files"
+                    error = (
+                        "readonly workspace changed during worker window; ownership is unproven "
+                        "and detected changes were preserved"
+                    )
                 if readonly_rollback["failed"]:
                     error += "; rollback failed for " + ", ".join(readonly_rollback["failed"])
                 if allowed_changed_files:
                     diff_summary += (
-                        "\n\nAllowed Claude metadata files detected and rolled back:\n"
+                        "\n\nAllowed Claude metadata files detected and preserved:\n"
                         + "\n".join(f"- {path}" for path in allowed_changed_files)
                     )
             readonly_ignored_session_cleanup = _cleanup_ignored_claude_session_artifacts(

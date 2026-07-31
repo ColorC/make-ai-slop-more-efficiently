@@ -27,13 +27,14 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from omnicompany.core.config import omni_workspace_root
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.runtime.routing.router import Router
 
 logger = logging.getLogger(__name__)
 
-# 默认 source root（omnifactory 项目的 src/omnifactory/）
-_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnifactory/src/omnifactory")
+# 默认 source root（omnicompany 项目的 src/omnicompany/）
+_DEFAULT_SOURCE_ROOT = omni_workspace_root() / "src" / "omnicompany"
 
 # ── HealthArchive 可选集成 ──────────────────────────────────────────────────
 try:
@@ -907,7 +908,7 @@ class FormatContextualAuditRouter(Router):
             seen_files.add(file_rel)
             try:
                 # file_rel 形如 "src/omnifactory/packages/services/doctor/routers.py"
-                # source_root 是 "e:/WindowsWorkspace/omnifactory/src/omnifactory"
+                # source_root 是 <source-root>（如 .../src/omnicompany）
                 # file_rel 由 FormatExtractorRouter 生成：相对于 source_root.parent（即 src/）
                 # 例: "omnifactory/packages/services/.../routers.py"
                 full_path = source_root.resolve().parent / file_rel

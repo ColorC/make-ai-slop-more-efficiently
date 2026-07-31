@@ -107,23 +107,23 @@ Format:
 Rules:
 - `input_types`: ONLY the semantic types whose data this step **actually uses** inside the
   command or code. If the value does not appear in the command/code, do NOT list it.
-  ✅ List "feishu_chat_id" only if that id value appears in the command.
+  ✅ List "slack_channel_id" only if that id value appears in the command.
   ❌ Do NOT list types you "know exist" but don't reference in this specific call.
-  Multiple inputs are normal: ["feishu_chat_id", "date_range"] is fine.
+  Multiple inputs are normal: ["slack_channel_id", "date_range"] is fine.
 - `output_types`: semantic types this step **produces** — available to future steps.
   Use structured names with dot-separated dimensions where possible:
     {{domain}}.{{format}}.{{entity}}[.{{tag}}]
-  Examples: feishu.json.message_list  git.stdout.log_text  fs.path.config_file
+  Examples: slack.json.message_list   git.stdout.log_text  fs.path.config_file
             python.dict.chat_state    bash.int.exit_code   unity.asset.animation_clip
-  Domains: feishu / git / unity / bash / python / fs / web / ...
+  Domains: slack / git / unity / bash / python / fs / web / ...
   Formats: json / file_path / stdout / dict / list / code / url / int / ...
-  Multiple outputs are normal: ["feishu.json.message_list", "feishu.int.message_count"]
+  Multiple outputs are normal: ["slack.json.message_list", "slack.int.message_count"]
 - `action_class`: `acquire` (read/fetch, no side effects), `execute` (changes state),
   `summarize` (transforms/condenses information), `think` (recording reasoning artifact based on real tool outputs).
-- `desc`: short label (e.g. "Read feishu_v1_state.json to get message_id").
+- `desc`: short label (e.g. "Read slack_v1_state.json to get message_id").
 - `rationale`: be specific — name actual file paths, API commands, variable values when known.
-  Bad: "Get the message id."  Good: "I have chat_id from step 2. I will run
-  `python scripts/feishu_im.py list-messages --chat-id <id>` to get the message list
+  Bad: "Get the message id."  Good: "I have channel_id from step 2. I will run
+  `python scripts/slack_im.py list-messages --channel-id <id>` to get the message list
   and extract the latest message_id, which is needed for the recall step."
 - `expected_output`: MUST be specific and verifiable. Predict the concrete output: data shape,
   expected values, file structure, command exit code pattern. This is used for contract verification.

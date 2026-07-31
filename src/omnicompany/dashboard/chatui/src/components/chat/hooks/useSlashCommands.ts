@@ -101,7 +101,7 @@ const mapSkillToSlashCommand = (skill: ProviderSkill): SlashCommand => ({
   },
 });
 
-const filterSlashCommands = (
+export const filterSlashCommands = (
   commands: SlashCommand[],
   query: string,
 ): SlashCommand[] => {
@@ -110,11 +110,11 @@ const filterSlashCommands = (
     return commands;
   }
 
-  const commandPrefix = normalizedQuery.startsWith('/')
-    ? normalizedQuery
-    : `/${normalizedQuery}`;
+  const commandPrefixes = normalizedQuery.startsWith('/') || normalizedQuery.startsWith('$')
+    ? [normalizedQuery]
+    : [`/${normalizedQuery}`, `$${normalizedQuery}`];
   const namePrefixMatches = commands.filter((command) =>
-    command.name.toLowerCase().startsWith(commandPrefix),
+    commandPrefixes.some((prefix) => command.name.toLowerCase().startsWith(prefix)),
   );
 
   // Namespaced commands should behave like path completion. Once a provider
@@ -393,18 +393,20 @@ export function useSlashCommands({
         return;
       }
 
-      // Match / at start of input OR after whitespace, capturing the /word up to cursor.
-      const slashPattern = /(?:^|\s)(\/\S*)$/;
-      const match = textBeforeCursor.match(slashPattern);
+      // Claude commands use `/`; Codex additionally uses `$` for skills.
+      const commandPattern = provider === 'codex'
+        ? /(?:^|\s)([/$]\S*)$/
+        : /(?:^|\s)(\/\S*)$/;
+      const match = textBeforeCursor.match(commandPattern);
 
       if (!match) {
         resetCommandMenuState();
         return;
       }
 
-      // Compute actual position of / in the full input string.
+      // Compute the actual command sigil position in the full input string.
       const slashPos = match.index! + (match[0].length - match[1].length);
-      const query = match[1].slice(1); // strip leading /
+      const query = match[1];
 
       setSlashPosition(slashPos);
       setShowCommandMenu(true);
@@ -415,7 +417,7 @@ export function useSlashCommands({
         setCommandQuery(query);
       }, COMMAND_QUERY_DEBOUNCE_MS);
     },
-    [resetCommandMenuState, clearCommandQueryTimer],
+    [resetCommandMenuState, clearCommandQueryTimer, provider],
   );
 
   const handleCommandMenuKeyDown = useCallback(

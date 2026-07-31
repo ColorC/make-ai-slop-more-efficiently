@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -76,6 +77,43 @@ def _plan_short_title(plan_id: str) -> str:
     return re.sub(r"^\[\d{4}-\d{2}-\d{2}\]", "", seg) or plan_id
 
 
+def canonical_task_id(plan_id: str | None, task_ref: str | None) -> str | None:
+    """把 task 引用规范成 progress-service 线上 id(`p_<plan>.<n>`)。
+
+    前端 QuestBoard 用的就是这个线上 id,会话自绑定 / dispatch 镜像都要对齐到它,
+    by_task 才能分组对齐。见 docs/plans/dashboard/[2026-07-09]SESSION-SELF-BINDING/plan.md (4.6)。
+      - 已是 `p_..._.<n>` 线上子 id → 原样
+      - 纯本地号 `<n>`(+ 已知 plan)→ `p_<sanitized_plan>.<n>`
+      - 无法规范 → 原样
+    """
+    if not task_ref:
+        return task_ref
+    s = str(task_ref).strip()
+    if s.startswith("p_") and "." in s:
+        return s  # 已是线上子 id
+    if plan_id:
+        local = s.rsplit(".", 1)[-1]  # 容忍 "<plan>.n" / "n" 各种写法, 取末段本地号
+        if local:
+            return f"{_plan_task_id(plan_id)}.{local}"
+    return s
+
+
+def local_task_id(plan_id: str, task_ref: str) -> str:
+    """把任务引用解析为本地号，并拒绝“完整任务号属于另一个计划”的情况。"""
+    normalized_plan_id = str(plan_id or "").strip()
+    value = str(task_ref or "").strip()
+    if not normalized_plan_id or not value:
+        raise ValueError("plan_id 和 task_id 不能为空")
+    if value.startswith("p_") and "." in value:
+        expected_prefix = _plan_task_id(normalized_plan_id) + "."
+        if not value.startswith(expected_prefix):
+            raise ValueError("完整任务号不属于指定计划")
+        value = value[len(expected_prefix):]
+    if not value:
+        raise ValueError("task_id 不能为空")
+    return value
+
+
 @dataclass
 class Task:
     id: str
@@ -97,6 +135,8 @@ class Task:
     workload: int | None = None    # 工作量估分 1-10(规模/体量)
     difficulty: int | None = None  # 难度估分 1-10(不确定性/技术难度)
     assignee: str | None = None    # agent key / 身份
+    team_id: str | None = None     # 此任务路由到的 canonical TeamSpec.id
+    position_id: str | None = None # 此任务在 TeamSpec.positions 中的目标岗位
     notes: list[dict[str, Any]] = field(default_factory=list)  # 边做边记的进度(抄 task-master update_subtask)
     created_at: float = 0.0
     updated_at: float = 0.0
@@ -221,6 +261,57 @@ class _HttpBackend:
         for t in tasks:
             self._req("POST", "/api/tasks", self._to_server(t, parent_id))
 
+    def claim_for_position(
+        self,
+        plan_id: str,
+        task_id: str,
+        *,
+        assignee: str,
+        team_id: str,
+        position_id: str,
+    ) -> dict[str, Any]:
+        """通过 progress-service 的原子端点认领并记录目标岗位。"""
+        plan = self._get_plan(plan_id)
+        if not plan:
+            return {"ok": False, "status": "not_found", "error": "plan_not_found"}
+        parent_id = str(plan["parent"]["id"])
+        server_task_id = (
+            task_id
+            if task_id.startswith(parent_id + ".")
+            else f"{parent_id}.{task_id}"
+        )
+        payload = {
+            "id": server_task_id,
+            "assignee": assignee,
+            "team_id": team_id,
+            "position_id": position_id,
+        }
+        url = self.base + "/api/task/claim"
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", "replace")
+            if exc.code in {400, 404, 409}:
+                try:
+                    parsed = json.loads(body)
+                except json.JSONDecodeError:
+                    parsed = {"ok": False, "error": body or f"HTTP {exc.code}"}
+                parsed.setdefault("status", "conflict" if exc.code == 409 else "rejected")
+                return parsed
+            raise RuntimeError(
+                f"progress-service POST /api/task/claim → HTTP {exc.code}: {body[:300]}"
+            ) from exc
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as exc:
+            raise TaskServiceUnavailable(str(exc)) from exc
+
 
 class _FileBackend:
     """测试隔离后备(仅显式传 root 时启用): 一个 plan 一个 json, 与旧盘上格式一致。
@@ -231,6 +322,7 @@ class _FileBackend:
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        self._claim_lock = threading.Lock()
 
     def _path(self, plan_id: str) -> Path:
         return self.root / (re.sub(r"[^A-Za-z0-9._-]", "_", plan_id) + ".json")
@@ -267,6 +359,60 @@ class _FileBackend:
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(p)
 
+    def claim_for_position(
+        self,
+        plan_id: str,
+        task_id: str,
+        *,
+        assignee: str,
+        team_id: str,
+        position_id: str,
+    ) -> dict[str, Any]:
+        """测试后备的进程内原子实现；生产原子性由 progress-service 提供。"""
+        with self._claim_lock:
+            tasks = self.load(plan_id)
+            task = next((item for item in tasks if item.id == task_id), None)
+            if task is None:
+                return {"ok": False, "status": "not_found", "error": "task_not_found"}
+
+            exact_retry = (
+                task.assignee == assignee
+                and task.team_id == team_id
+                and task.position_id == position_id
+            )
+            if exact_retry:
+                return {"ok": True, "status": "already_claimed", "changed": False}
+            if task.status in DONE_STATUS:
+                return {"ok": False, "status": "conflict", "error": "task_closed"}
+            if task.assignee not in {None, assignee}:
+                return {
+                    "ok": False,
+                    "status": "conflict",
+                    "error": "assignee_conflict",
+                    "current_assignee": task.assignee,
+                }
+            if task.team_id not in {None, team_id}:
+                return {
+                    "ok": False,
+                    "status": "conflict",
+                    "error": "team_conflict",
+                    "current_team_id": task.team_id,
+                }
+            if task.position_id not in {None, position_id}:
+                return {
+                    "ok": False,
+                    "status": "conflict",
+                    "error": "position_conflict",
+                    "current_position_id": task.position_id,
+                }
+
+            task.assignee = assignee
+            task.team_id = team_id
+            task.position_id = position_id
+            task.updated_at = time.time()
+            self.replace(plan_id, tasks)
+            return {"ok": True, "status": "claimed", "changed": True}
+
 
 # ───────────────────────── TaskStore ─────────────────────────
 
@@ -284,10 +430,23 @@ class TaskStore:
     def _load(self, plan_id: str) -> list[Task]:
         return self._backend.load(plan_id)
 
-    def list_tasks(self, plan_id: str | None = None) -> list[Task]:
-        if plan_id:
-            return self._load(plan_id)
-        return self._backend.load_all()
+    def list_tasks(
+        self,
+        plan_id: str | None = None,
+        *,
+        team_id: str | None = None,
+        position_id: str | None = None,
+        assignee: str | None = None,
+    ) -> list[Task]:
+        """列出 canonical Task；岗位收件箱只是这里的筛选视图，不另建队列。"""
+        tasks = self._load(plan_id) if plan_id else self._backend.load_all()
+        if team_id is not None:
+            tasks = [task for task in tasks if task.team_id == team_id]
+        if position_id is not None:
+            tasks = [task for task in tasks if task.position_id == position_id]
+        if assignee is not None:
+            tasks = [task for task in tasks if task.assignee == assignee]
+        return tasks
 
     def get(self, task_id: str, plan_id: str | None = None) -> Task | None:
         for t in self.list_tasks(plan_id):
@@ -325,6 +484,49 @@ class TaskStore:
         t.updated_at = time.time()
         self._backend.upsert(t.plan_id, t)
         return t
+
+    def claim_for_position(
+        self,
+        task_id: str,
+        *,
+        plan_id: str,
+        assignee: str,
+        team_id: str,
+        position_id: str,
+    ) -> dict[str, Any]:
+        """首次认领并路由到岗位；同值重试幂等，任何已有异值都拒绝。"""
+        values = {
+            "plan_id": plan_id,
+            "task_id": task_id,
+            "assignee": assignee,
+            "team_id": team_id,
+            "position_id": position_id,
+        }
+        empty = [name for name, value in values.items() if not str(value or "").strip()]
+        if empty:
+            raise ValueError(f"认领字段不能为空: {empty}")
+        normalized_plan_id = str(plan_id).strip()
+        try:
+            normalized_task_id = local_task_id(normalized_plan_id, task_id)
+        except ValueError:
+            return {
+                "ok": False,
+                "status": "rejected",
+                "error": "task_plan_mismatch",
+                "task": None,
+            }
+        result = self._backend.claim_for_position(
+            normalized_plan_id,
+            normalized_task_id,
+            assignee=str(assignee).strip(),
+            team_id=str(team_id).strip(),
+            position_id=str(position_id).strip(),
+        )
+        task = self.get(normalized_task_id, normalized_plan_id)
+        return {
+            **result,
+            "task": task.to_dict() if task is not None else None,
+        }
 
     def add_note(self, task_id: str, text: str, plan_id: str | None = None) -> Task:
         """给任务追加一条带时间戳的进度记录(抄 task-master update_subtask: 边做边记)。"""
@@ -392,5 +594,13 @@ class TaskStore:
         return sorted(bad)
 
 
-__all__ = ["Task", "TaskStore", "TaskServiceUnavailable",
-           "VALID_STATUS", "VALID_PRIORITY", "DONE_STATUS"]
+__all__ = [
+    "Task",
+    "TaskStore",
+    "TaskServiceUnavailable",
+    "VALID_STATUS",
+    "VALID_PRIORITY",
+    "DONE_STATUS",
+    "canonical_task_id",
+    "local_task_id",
+]

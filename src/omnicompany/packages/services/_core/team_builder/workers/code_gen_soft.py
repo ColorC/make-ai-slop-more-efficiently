@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-24T00:00:00Z type=worker
 # [OMNI] material_id="material:core.team_builder.soft_agent_generators.orchestrator_design.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """CodeGenerator 子 team · SOFT 部分 (2026-04-24 · 分形重构).
 
 两个 Worker:
@@ -50,6 +51,10 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
 )
 from omnicompany.packages.services._core.omnicompany import Worker
+from omnicompany.packages.services._core.team_builder.package_location import (
+    canonical_team_package_path,
+    team_omni_domain,
+)
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.runtime.agent.agent_loop_tools import ToolContext
 
@@ -153,6 +158,7 @@ class _WorkerCodePromptBuilder(PromptBuilderRouter):
     def build_initial_messages(self, biz_input: dict) -> list[dict]:
         worker_detail = biz_input.get("worker_detail") or {}
         team_name = biz_input.get("team_name") or "unnamed_team"
+        package_domain = biz_input.get("package_domain") or "invalid-unbound-package"
         similar_teams = biz_input.get("similar_teams") or ["doctor", "guardian"]
         format_out_schema = biz_input.get("format_out_schema") or {}
         format_in_schemas = biz_input.get("format_in_schemas") or {}
@@ -247,7 +253,7 @@ def run(self, input_data):
 2. 按 impl_type 产出完整 .py 源码:
    - HARD: rule_spec 的步骤 → if/else / for 循环实现
    - SOFT: prompt_template 的 system/user → LLMClient.invoke() 调用
-3. 首行 OmniMark 头 (当日日期, domain=services/{team_name}/workers/{expected_module_name}, type=worker)
+3. 首行 OmniMark 头 (当日日期, domain={package_domain}/workers/{expected_module_name}, type=worker)
 4. **class 名必须是 `{expected_class_name}`** · 继承 Worker
 5. **Verdict(output={{...}}) 里的字段名必须 ⊇ 上面列出的 required** (多余字段 OK, 缺一不可)
 6. 调 finish(reason, result), result = 完整源码字符串 (≥ 100 字符)
@@ -334,6 +340,7 @@ def _format_required_input_contract(format_in_schemas: dict[str, dict]) -> tuple
 def _build_external_worker_code_prompt(
     *,
     team_name: str,
+    package_domain: str,
     worker_detail: dict,
     format_out_schema: dict,
     format_in_schemas: dict[str, dict],
@@ -375,7 +382,7 @@ Repository inspection requirement:
 - These read events are audited as material provenance, so keep them relevant.
 
 Required Python shape:
-- First line must be an OmniMark header: # [OMNI] origin=team_builder domain=services/{team_name}/workers/{wid} ts={_TODAY}T00:00:00Z type=worker
+- First line must be an OmniMark header: # [OMNI] origin=team_builder domain={package_domain}/workers/{wid} ts={_TODAY}T00:00:00Z type=worker
 - Import Worker from omnicompany.packages.services._core.omnicompany.
 - Import Verdict and VerdictKind from omnicompany.protocol.anchor.
 - Define class {expected_class_name}(Worker).
@@ -540,11 +547,16 @@ def _external_agent_text_excerpt(text: str, *, limit: int = 1600) -> str:
     return normalized[:head_len].rstrip() + "\n... [truncated]"
 
 
-def _ensure_worker_omni_header(source: str, *, team_name: str, worker_id: str) -> str:
+def _ensure_worker_omni_header(
+    source: str,
+    *,
+    package_domain: str,
+    worker_id: str,
+) -> str:
     if _OMNI_MARK_RE.search(source):
         return source
     header = (
-        f"# [OMNI] origin=team_builder domain=services/{team_name}/workers/{worker_id} "
+        f"# [OMNI] origin=team_builder domain={package_domain}/workers/{worker_id} "
         f"ts={_TODAY}T00:00:00Z type=worker"
     )
     return header + "\n" + source.strip() + "\n"
@@ -1173,12 +1185,26 @@ class _WorkerCodeExtractResult(ExtractResultRouter):
         super().__init__(bus=bus)
         self._run_context: dict = {}
 
-    def set_run_context(self, *, worker_id: str, team_name: str) -> None:
-        self._run_context = {"worker_id": worker_id, "team_name": team_name}
+    def set_run_context(
+        self,
+        *,
+        worker_id: str,
+        team_name: str,
+        package_domain: str,
+    ) -> None:
+        self._run_context = {
+            "worker_id": worker_id,
+            "team_name": team_name,
+            "package_domain": package_domain,
+        }
 
     def extract(self, *, final_text: str, messages: list, turn_count: int, stop_reason: str) -> Verdict:
         worker_id = self._run_context.get("worker_id") or "unknown"
         team_name = self._run_context.get("team_name") or "unnamed_team"
+        package_domain = (
+            self._run_context.get("package_domain")
+            or "invalid-unbound-package"
+        )
 
         # 1. 先找 finish tool_use 的 result
         result_body: str | None = None
@@ -1215,7 +1241,7 @@ class _WorkerCodeExtractResult(ExtractResultRouter):
         # 3. 骨架兜底补 OmniMark 头
         if not _OMNI_MARK_RE.search(body):
             header = (
-                f"# [OMNI] origin=team_builder domain=services/{team_name}/workers/{worker_id} "
+                f"# [OMNI] origin=team_builder domain={package_domain}/workers/{worker_id} "
                 f"ts={_TODAY}T00:00:00Z type=worker"
             )
             body = header + "\n" + body
@@ -1247,9 +1273,12 @@ class _WorkerCodeSingleAgent(AgentNodeLoop):
     DESCRIPTION: ClassVar[str] = "Phase 8 · sub-agent · 单 Worker 代码生成"
     MAX_RETRIES: ClassVar[int] = 1
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any) -> _WorkerCodePromptBuilder:
         return _WorkerCodePromptBuilder(template=self.NODE_PROMPT, bus=bus)
@@ -1261,12 +1290,24 @@ class _WorkerCodeSingleAgent(AgentNodeLoop):
         if isinstance(input_data, dict):
             wid = (input_data.get("worker_detail") or {}).get("worker_id") or "unknown"
             tn = input_data.get("team_name") or "unnamed_team"
+            package_domain = (
+                input_data.get("package_domain")
+                or "invalid-unbound-package"
+            )
             if hasattr(self._extract_result, "set_run_context"):
-                self._extract_result.set_run_context(worker_id=wid, team_name=tn)
+                self._extract_result.set_run_context(
+                    worker_id=wid,
+                    team_name=tn,
+                    package_domain=package_domain,
+                )
         return await super().run(input_data)
 
 
-def _skeleton_minimal_worker_code(worker_detail: dict, team_name: str) -> str:
+def _skeleton_minimal_worker_code(
+    worker_detail: dict,
+    team_name: str,
+    package_domain: str,
+) -> str:
     """最小可编译 Worker 骨架 · 当 sub-agent 全失败时的保底产物."""
     wid = worker_detail.get("worker_id") or "unknown"
     impl_type = (worker_detail.get("impl_type") or "SOFT").upper()
@@ -1278,7 +1319,7 @@ def _skeleton_minimal_worker_code(worker_detail: dict, team_name: str) -> str:
         fmt_in_repr = f'"{fmt_in or "unknown_material"}"'
     class_name = "".join(p[:1].upper() + p[1:] for p in re.split(r"[_\-\s]+", wid) if p) + "Worker"
     return (
-        f"# [OMNI] origin=team_builder domain=services/{team_name}/workers/{wid} "
+        f"# [OMNI] origin=team_builder domain={package_domain}/workers/{wid} "
         f"ts={_TODAY}T00:00:00Z type=worker\n"
         f'"""{wid} · 骨架保底 ({impl_type}, sub-agent 失败 · 需人工补)."""\n'
         f"from __future__ import annotations\n"
@@ -1330,6 +1371,7 @@ class WorkerCodeOrchestrator(Worker):
         external_cwd: Path | str | None = None,
         max_external_prompt_chars: int = 24000,
         fallback_to_legacy_agent: bool = False,
+        internal_model: str | None = None,
     ) -> None:
         self.use_external_agent = use_external_agent
         self.external_provider = external_provider
@@ -1341,12 +1383,14 @@ class WorkerCodeOrchestrator(Worker):
         self.external_cwd = Path(external_cwd).expanduser().resolve() if external_cwd is not None else None
         self.max_external_prompt_chars = max_external_prompt_chars
         self.fallback_to_legacy_agent = fallback_to_legacy_agent
+        self.internal_model = internal_model
 
     async def _run_external_one(
         self,
         *,
         detail: dict,
         team_name: str,
+        package_domain: str,
         out_schema: dict,
         in_schemas: dict[str, dict],
     ) -> tuple[str, str, list[str], bool, dict[str, Any]]:
@@ -1355,6 +1399,7 @@ class WorkerCodeOrchestrator(Worker):
         class_name = _class_name_for(wid)
         prompt = _build_external_worker_code_prompt(
             team_name=team_name,
+            package_domain=package_domain,
             worker_detail=detail,
             format_out_schema=out_schema,
             format_in_schemas=in_schemas,
@@ -1394,7 +1439,11 @@ class WorkerCodeOrchestrator(Worker):
         if prompt_issues:
             return (
                 rel_path,
-                _skeleton_minimal_worker_code(detail, team_name),
+                _skeleton_minimal_worker_code(
+                    detail,
+                    team_name,
+                    package_domain,
+                ),
                 [f"external-agent prompt rejected: {issue}" for issue in prompt_issues],
                 True,
                 {**base_meta, "status": "prompt_rejected", "prompt_quality_issues": prompt_issues},
@@ -1438,7 +1487,11 @@ class WorkerCodeOrchestrator(Worker):
         except Exception as exc:  # noqa: BLE001
             return (
                 rel_path,
-                _skeleton_minimal_worker_code(detail, team_name),
+                _skeleton_minimal_worker_code(
+                    detail,
+                    team_name,
+                    package_domain,
+                ),
                 [f"external-agent exception: {type(exc).__name__}: {exc}"],
                 True,
                 {**base_meta, "status": "exception", "error": str(exc)},
@@ -1460,7 +1513,11 @@ class WorkerCodeOrchestrator(Worker):
         if status != ExternalAgentStatus.SUCCEEDED:
             return (
                 rel_path,
-                _skeleton_minimal_worker_code(detail, team_name),
+                _skeleton_minimal_worker_code(
+                    detail,
+                    team_name,
+                    package_domain,
+                ),
                 [f"external-agent {status.value}: {result.error or result.diff_summary or 'no final source'}"],
                 True,
                 meta,
@@ -1505,18 +1562,30 @@ class WorkerCodeOrchestrator(Worker):
                 parse_meta["structured_output_keys"] = sorted(str(key)[:120] for key in structured.keys())
             return (
                 rel_path,
-                _skeleton_minimal_worker_code(detail, team_name),
+                _skeleton_minimal_worker_code(
+                    detail,
+                    team_name,
+                    package_domain,
+                ),
                 ["external-agent succeeded but returned no parseable worker source"],
                 True,
                 parse_meta,
             )
 
-        body = _ensure_worker_omni_header(body, team_name=team_name, worker_id=wid)
+        body = _ensure_worker_omni_header(
+            body,
+            package_domain=package_domain,
+            worker_id=wid,
+        )
         compile_issue = _python_compile_issue(rel_path=rel_path, source=body)
         if compile_issue:
             return (
                 rel_path,
-                _skeleton_minimal_worker_code(detail, team_name),
+                _skeleton_minimal_worker_code(
+                    detail,
+                    team_name,
+                    package_domain,
+                ),
                 [f"external-agent generated invalid python: {compile_issue}"],
                 True,
                 {
@@ -1530,7 +1599,11 @@ class WorkerCodeOrchestrator(Worker):
         if verdict_kind_issue:
             return (
                 rel_path,
-                _skeleton_minimal_worker_code(detail, team_name),
+                _skeleton_minimal_worker_code(
+                    detail,
+                    team_name,
+                    package_domain,
+                ),
                 [f"external-agent generated invalid VerdictKind use: {verdict_kind_issue}"],
                 True,
                 {
@@ -1568,6 +1641,21 @@ class WorkerCodeOrchestrator(Worker):
 
         td = input_data.get("_from_team_architect") or {}
         team_name = (td.get("team_name") if isinstance(td, dict) else None) or "unnamed_team"
+        try:
+            target_package_path = canonical_team_package_path(
+                td.get("target_package_path") if isinstance(td, dict) else None,
+                team_name=team_name,
+            )
+            package_domain = team_omni_domain(
+                target_package_path,
+                team_name=team_name,
+            )
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
 
         wd = input_data.get("_from_worker_designer") or {}
         details = []
@@ -1582,6 +1670,40 @@ class WorkerCodeOrchestrator(Worker):
                 kind=VerdictKind.FAIL,
                 output={"files": {}, "success_count": 0, "fail_count": 0},
                 diagnosis="worker_design_detailed details is empty",
+            )
+        existing_details = [
+            detail
+            for detail in details
+            if str(detail.get("impl_type") or "").upper() == "EXISTING"
+        ]
+        generated_details = [
+            detail
+            for detail in details
+            if str(detail.get("impl_type") or "").upper() != "EXISTING"
+        ]
+        if not generated_details:
+            return Verdict(
+                kind=VerdictKind.PASS,
+                output={
+                    "team_name": team_name,
+                    "target_package_path": target_package_path,
+                    "files": {},
+                    "success_count": 0,
+                    "fail_count": 0,
+                    "lint_summary": [],
+                    "external_agent_runs": [
+                        {
+                            "worker_id": detail.get("worker_id"),
+                            "provider": "existing-binding",
+                            "status": "reused",
+                            "binding_ref": detail.get("binding_ref"),
+                        }
+                        for detail in existing_details
+                    ],
+                },
+                diagnosis=(
+                    f"0 generated workers · {len(existing_details)} existing bindings reused"
+                ),
             )
 
         # V3.2: 提取 material schema 给每个 sub-agent 看 required 字段 (防 output key 不匹配)
@@ -1610,15 +1732,17 @@ class WorkerCodeOrchestrator(Worker):
                     external_result = await self._run_external_one(
                         detail=detail,
                         team_name=team_name,
+                        package_domain=package_domain,
                         out_schema=out_schema,
                         in_schemas=in_schemas,
                     )
                     if not external_result[3] or not self.fallback_to_legacy_agent:
                         return external_result
 
-                agent = _WorkerCodeSingleAgent()
+                agent = _WorkerCodeSingleAgent(model=self.internal_model)
                 sub_input = {
                     "team_name": team_name,
+                    "package_domain": package_domain,
                     "worker_detail": detail,
                     "format_out_schema": out_schema,  # V3.2: 喂 output required 字段给 LLM
                     "format_in_schemas": in_schemas,  # P6.3: 喂 input required 字段
@@ -1658,20 +1782,28 @@ class WorkerCodeOrchestrator(Worker):
                     # 骨架保底
                     return (
                         f"workers/{_module_name_for(wid)}.py",
-                        _skeleton_minimal_worker_code(detail, team_name),
+                        _skeleton_minimal_worker_code(
+                            detail,
+                            team_name,
+                            package_domain,
+                        ),
                         [f"sub-agent exception: {type(e).__name__}: {e}"],
                         True,
                         {"worker_id": wid, "provider": "legacy-internal-agent", "status": "exception", "error": str(e)},
                     )
                 return (
                     f"workers/{_module_name_for(wid)}.py",
-                    _skeleton_minimal_worker_code(detail, team_name),
+                    _skeleton_minimal_worker_code(
+                        detail,
+                        team_name,
+                        package_domain,
+                    ),
                     [f"sub-agent non-PASS ({kind_val}) · skeleton fallback · diag={diag_preview!r}"],
                     True,
                     {"worker_id": wid, "provider": "legacy-internal-agent", "status": f"non-pass-{kind_val}"},
                 )
 
-        tasks = [_run_one(d) for d in details]
+        tasks = [_run_one(d) for d in generated_details]
         results = await asyncio.gather(*tasks)
 
         files: dict[str, str] = {}
@@ -1694,13 +1826,19 @@ class WorkerCodeOrchestrator(Worker):
         return Verdict(
             kind=VerdictKind.PASS if success > 0 else VerdictKind.PARTIAL,
             output={
+                "team_name": team_name,
+                "target_package_path": target_package_path,
                 "files": files,
                 "success_count": success,
                 "fail_count": fail,
                 "lint_summary": lint_summary,
                 "external_agent_runs": external_agent_runs,
             },
-            diagnosis=f"{success}/{len(details)} workers · {fail} skeleton-fallback · {len(lint_summary)} issues",
+            diagnosis=(
+                f"{success}/{len(generated_details)} generated workers · "
+                f"{len(existing_details)} existing bindings · "
+                f"{fail} skeleton-fallback · {len(lint_summary)} issues"
+            ),
         )
 
 
@@ -1870,9 +2008,12 @@ class DesignMdGenerator(AgentNodeLoop):
     FORMAT_OUT: ClassVar[str] = "team_builder.material.design_md"
     MAX_RETRIES: ClassVar[int] = 1
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any) -> _DesignMdPromptBuilder:
         return _DesignMdPromptBuilder(template=self.NODE_PROMPT, bus=bus)

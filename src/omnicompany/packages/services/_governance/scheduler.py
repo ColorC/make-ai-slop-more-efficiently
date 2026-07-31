@@ -36,6 +36,15 @@ schedulable 的根本不需要人"想起来"。
 判断入口 is_work_due(task, current_value, now) 是纯比较(不做 IO), tick() 内对整个"读计量
 + 判断 + 写水位线"包一层 try/except——任何异常(畸形阈值/计量源出错等)静默降级回原 is_due()
 的自然时间逻辑, 不抛异常, 也不影响同一轮里其他任务的判断与执行。
+
+── 单任务超时字段(2026-07-26, testmap-gates-weekly 超时错配) ──────────────────────
+心跳默认 1800s 杀进程树, 但重任务自己声明的超时可能更长(如 testmap gates-run 单门禁
+2400s)——心跳比门禁先掐, 每次都白跑。任务登记文件可选新增字段:
+
+  "timeout_s": 3600
+
+有此字段的任务, tick()/omni cron run 用它替代默认 1800s; 缺失或畸形(非数字/<=0)静默
+回退 1800s。方向是把心跳上限对齐任务真实耗时, 而不是砍任务自己的超时。
 """
 from __future__ import annotations
 
@@ -94,6 +103,18 @@ _CADENCE_SECONDS = {
     "@yearly": 31536000,
 }
 
+# 心跳杀进程树的默认上限(秒); 任务 json 可用 "timeout_s" 按任务覆盖(重任务如 testmap gates)
+DEFAULT_TASK_TIMEOUT_S = 1800
+
+
+def task_timeout_s(task: dict[str, Any]) -> int:
+    """单任务超时解析: 任务 json 的 timeout_s(正整数) > 默认 1800s; 畸形值静默回退默认。"""
+    try:
+        v = int(task.get("timeout_s") or 0)
+    except (TypeError, ValueError):
+        return DEFAULT_TASK_TIMEOUT_S
+    return v if v > 0 else DEFAULT_TASK_TIMEOUT_S
+
 # 本部门标准治理任务(ensure 时若缺则建)
 _GOVERNANCE_TASKS = [
     {"name": "gov-plans-daily", "schedule": "@daily",
@@ -103,14 +124,11 @@ _GOVERNANCE_TASKS = [
      "command": "omni governance docs-refs",
      "description": "每日: 文档引用完整性(断链/失效行锚, 确定性)"},
     {"name": "gov-commit-daily", "schedule": "@daily",
-     "command": "omni governance commit-run --apply --model qwen3.6-plus",
-     "description": "每日: 性价比模型严格分批提交(防 git 改动堆积; 默认 deepseek 对 commit-run 返空 JSON, 固定 qwen3.6-plus)"},
+     "command": "omni governance commit-run --apply --model qwen3.6-plus --max-files 200",
+     "description": "每日: 性价比模型严格分批提交(防 git 改动堆积; 默认 deepseek 对 commit-run 返空 JSON, 固定 qwen3.6-plus; --max-files 200 分批稳步清积压防心跳超时)"},
     {"name": "gov-decisions-daily", "schedule": "@daily",
      "command": "omni governance decisions-run",
      "description": "每日: 标记 llm_input 的札记 → 结构化决策(进总控 ctx)"},
-    {"name": "gov-history-weekly", "schedule": "@weekly",
-     "command": "omni governance history-run",
-     "description": "每周: 对话重复需求/指正挖掘"},
     {"name": "gov-docs-timeliness-weekly", "schedule": "@weekly",
      "command": "omni governance docs-timeliness",
      "description": "每周: 规范/计划/报告时效性(过期/被取代/冲突)"},
@@ -425,7 +443,7 @@ def tick(*, dry_run: bool = False, now: datetime | None = None,
             ran.append(rec)
             continue
         try:
-            proc = run_command_capped(cmd)
+            proc = run_command_capped(cmd, timeout_s=task_timeout_s(task))
             _full = (proc.stdout or "") + (proc.stderr or "")
             rec["ran"] = True
             rec["returncode"] = proc.returncode
@@ -438,6 +456,16 @@ def tick(*, dry_run: bool = False, now: datetime | None = None,
                     "baseline": current_metric_value,
                     "last_triggered_at": now.isoformat(),
                 }
+            elif has_work_trigger:
+                # 兜底周期触发也必须推进参照时间: 兜底以 work_trigger_state.last_triggered_at
+                # 为参照(见上方注释), 只更新 last_run_at 不更新它的话参照永不动, 每周兜底
+                # 会退化成每个 tick 都触发(2026-07-19 实机踩过: testmap-gates-weekly 从
+                # 23:58 起每 10 分钟一发连跑一夜, 反复踩掉手动 e2e 的客户端)。baseline 不推
+                # (只有真工作量触发才推), last_triggered_at 兼任"最近一次任何触发的时间"
+                # (顺带让 min_interval 对兜底触发同样生效, 重活不该比 min_interval 更密)。
+                state = dict(task.get("work_trigger_state") or {})
+                state["last_triggered_at"] = now.isoformat()
+                task["work_trigger_state"] = state
             f.write_text(json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8")
             record_run(task.get("name"), ok=(proc.returncode == 0), trigger="scheduled",
                        returncode=proc.returncode, output=_full)

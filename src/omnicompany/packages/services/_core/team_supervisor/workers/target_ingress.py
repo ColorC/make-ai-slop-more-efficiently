@@ -29,7 +29,7 @@ _SERVICES_ROOT = _PROJECT_ROOT / "src" / "omnicompany" / "packages" / "services"
 
 
 def _slug_to_pkg(target_team_id: str) -> str:
-    """team_id 'repo-absorption' → package 'repo_absorption'.
+    """team_id 'csv-to-md' → package 'csv_to_md'.
 
     注册 id 用 dash, 包目录用 underscore (omnicompany 惯例).
     """
@@ -96,7 +96,7 @@ class TargetIngressWorker(Worker):
         if err is not None:
             return Verdict(kind=VerdictKind.FAIL, diagnosis=err)
 
-        # 推断 target 包目录 (注册 id 'repo-absorption' → 'repo_absorption')
+        # 推断 target 包目录 (注册 id 'csv-to-md' → 'csv_to_md')
         pkg_name = _slug_to_pkg(target_team_id)
         team_code_dir = _SERVICES_ROOT / pkg_name
 

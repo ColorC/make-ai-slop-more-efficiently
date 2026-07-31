@@ -11,7 +11,7 @@ GROWING(2026-06-22)。收集管线已跑通,产出 83 个 grounded object-SKILL 
 ## 核心接口
 
 - `omni run project_atlas.run -i space=<空间> [-i dry_run=1]` —— 收集一个空间(断点续跑,中断重跑自动接上)。
-- `omni atlas list|approve|reject|export` —— 审/导闭环(staging→canonical→`~/.claude/skills`+`~/.codex/skills`)。
+- `omni atlas list|approve|reject|export` —— 审/导闭环（staging→canonical→`~/.claude/skills`+`~/.agents/skills`）；旧 `~/.codex/skills` 只读兼容、不再写入。
 - 产物:`data/domains/project_atlas/{staging/<space>/<obj>/SKILL.md(待审), skills/(批准), plan/<space>.objects.json(对象清单=断点续跑真源)}`。
 
 ## 架构决策

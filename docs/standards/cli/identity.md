@@ -4,10 +4,10 @@
 <!-- [OMNI] tags=cli,identity,session,standard,G1 -->
 <!-- [OMNI] material_id="material:standards.identity.session_resolver.spec.md" -->
 
-# G1 身份组 (claude code session 统一身份)
+# G1 身份组（Claude Code / Codex 原生会话统一身份）
 
 > **状态**: 实装完成 2026-05-02
-> **关联实装**: `services/_core/identity/` + `cli/commands/identity.py` + `dashboard/cc_wrapper/hooks/session_start.py` + `dashboard/sandbox_api.py`
+> **关联实装**: `services/_core/identity/` + `cli/commands/identity.py` + `dashboard/ccdaemon/hooks/session_start.py` + `dashboard/sandbox_api.py`
 > **关联规范**: `omnicompany_cli.md` (整体 CLI 设计) / `sandbox.md` (沙盒里身份的用法)
 
 ## 一、 这是干嘛的
@@ -15,7 +15,7 @@
 omnicompany 治理的核心前提是**追溯写入身份** — 任何往 watched 目录写东西的人 / 工具 / agent 都要能查到 trace_id, 出问题反查得到来源.
 
 身份链跨三层:
-- **hook 层** — Claude Code 启动时 `SessionStart` hook 写身份到 `data/cc_session_active.json`
+- **hook 层** — Claude Code / Codex 启动时 `SessionStart` hook 写身份到 `data/cc_session_active.json` 与按会话台账
 - **CLI 层** — `omni who` / `omni session` 命令读 / 写同一份身份文件
 - **dashboard 层** — `/api/v2/identity/who` + `/api/v2/identity/writes` web 端只读暴露同一份身份
 
@@ -32,14 +32,16 @@ omnicompany 治理的核心前提是**追溯写入身份** — 任何往 watched
 
 ## 三、 active session 文件格式
 
-文件: `<omnicompany>/data/cc_session_active.json` (项目根 data/ 下, 不进 git)
+文件: `<omnicompany>/data/cc_session_active.json`（当前会话指针）与 `data/cc_session_bindings.json`（按 trace_id 累积的多会话台账）。
 
 字段:
 
 ```json
 {
-  "trace_id": "cc_<claude_session_id>" 或 "cc_<pty_id>",
-  "claude_session_id": "<原始 session_id>",
+  "trace_id": "cc_<session_id>" 或 "codex_<session_id>",
+  "session_id": "<provider 原始 session_id>",
+  "claude_session_id": "<仅 Claude 的兼容别名或 null>",
+  "provider": "claude_code" 或 "codex",
   "pty_id": "<dashboard PTY id 或 null>",
   "active_plan": "<当前 active plan 路径或 null>",
   "cwd": "<当前工作目录>",
@@ -52,13 +54,13 @@ omnicompany 治理的核心前提是**追溯写入身份** — 任何往 watched
 
 ## 四、 双轨制使用
 
-### 自动轨道 (hook 触发, 默认)
+### 自动轨道（hook 触发，默认）
 
-Claude Code 启动时 SessionStart hook 自动写入. 用户不用做任何事:
+Claude Code / Codex 启动时 SessionStart hook 自动写入。项目级 Codex hook 位于 `.codex/hooks.json`，首次或定义变更后需在新会话用 `/hooks` 审阅并信任。
 
 ```
-Claude Code 启动
-  → cc_wrapper hooks/session_start.py 触发
+原生会话启动
+  → ccdaemon hooks/session_start.py 触发
   → 调 sh.trace_id_for(payload) 派生 trace_id
   → 调 record_active_session(trace_id, ..., source='hook')
   → data/cc_session_active.json 写入
@@ -69,13 +71,14 @@ Claude Code 启动
 测试场景 / hook 故障 / 脚本一次跑多 session 时, CLI 显式覆盖:
 
 ```bash
-omni session bind --trace-id=manual_001 --claude-session-id=sid_abc
+omni session bind --trace-id=manual_001 --provider codex --project omnicompany
+omni session bind --provider codex --plan dashboard/[2026-07-09]SESSION-SELF-BINDING --task 3
 # 走同一份 record_active_session(), source='cli_bind'
 ```
 
 ### 跨进程身份继承
 
-Dashboard PTY 启动 claude 时通过 env 传 `OMNI_CC_PTY_ID`. claude 子进程 + 子进程的 CLI 调用都继承到. 这是为什么 dashboard 启动的 session 跟 CLI 看到同一身份.
+Dashboard PTY 启动 Claude 时通过 env 传 `OMNI_CC_PTY_ID`，子进程 CLI 会继承。原生 Codex 会话直接使用 Codex 的 `session_id` 与 `provider=codex`，不伪装成 PTY/Claude 身份。
 
 ## 五、 CLI 命令
 
@@ -83,7 +86,7 @@ Dashboard PTY 启动 claude 时通过 env 传 `OMNI_CC_PTY_ID`. claude 子进程
 |---|---|
 | `omni who` | 显示当前身份 + 写过的文件清单 |
 | `omni session current` | 输出 trace_id 一行字符串 (供 shell `$(omni session current)` 嵌入) |
-| `omni session bind --trace-id=<>` | 显式绑定 (兜底) |
+| `omni session bind --provider <claude_code|codex> [--plan/--project/--task/--topic]` | 显式认领并合并绑定（不清空未给字段） |
 | `omni session meta` | 完整元数据, 不带 writes |
 
 `omni who --json` 跟 `omni who --no-writes` 控制输出格式跟内容.
@@ -101,11 +104,11 @@ dashboard 严格只读, 写仍走 CLI (跟 dashboard 设计原则 D2 一致).
 ## 七、 session writes 派生
 
 "当前 session 写过哪些文件" 不另立数据库, 从 cc_wrapper 已有 SQLite event bus
-(`data/ide_events.db`) 派生:
+（`data/ide_events.db`）派生；Codex 的 `apply_patch` 会先归一化成逐文件 Edit/Write 目标:
 
 ```
 查询条件: trace_id = <current> AND event_type = 'agent.tool.call'
-        AND payload.tool ∈ {Edit, Write, MultiEdit, NotebookEdit, str_replace_editor}
+        AND payload.tool ∈ {apply_patch, Edit, Write, MultiEdit, NotebookEdit, str_replace_editor}
 返回: payload.args.file_path 列表 (按时间倒序)
 ```
 
@@ -127,11 +130,12 @@ dashboard 严格只读, 写仍走 CLI (跟 dashboard 设计原则 D2 一致).
 - `omnicompany/src/omnicompany/packages/services/_core/identity/resolver.py` - 身份解析 + 写入
 - `omnicompany/src/omnicompany/packages/services/_core/identity/writes.py` - session_writes 派生
 - `omnicompany/src/omnicompany/cli/commands/identity.py` - `omni who` / `omni session` CLI
-- `omnicompany/src/omnicompany/dashboard/cc_wrapper/hooks/session_start.py` - hook 集成 (含 record_active_session 调用)
+- `omnicompany/src/omnicompany/dashboard/ccdaemon/hooks/session_start.py` - 双 provider hook 集成（含 record_active_session 调用）
+- `omnicompany/src/omnicompany/dashboard/ccdaemon/codex_installer.py` - Codex `.codex/hooks.json` 安装/卸载/状态
 - `omnicompany/src/omnicompany/dashboard/sandbox_api.py` - dashboard 只读 API
 
 ## 十、 演进点 (留给后续阶段)
 
-- **多 session 并行** — 当前一份 active 文件只支持一份当前 session. 多 claude session 并行 (例如同 workspace 下两个 IDE 窗口) 需要扩多文件 (`<trace_id>.json` 加 `_current.txt` 指针).
-- **trace_id 轮换** — claude session resume 时 hook 可能跑两次, 后一次会覆盖. 需要 hook 端做幂等性保护或者加 session 续接逻辑.
+- **当前指针与台账边界** — `cc_session_active.json` 仍只表达“当前”，多会话聚合必须读 `cc_session_bindings.json`，不得从当前指针推全量。
+- **trace_id 续接** — resume/compact 会复用 provider session id 幂等 upsert；后续若 provider 改变 session id 语义，需要迁移键策略。
 - **跨机身份** — 当前身份只在一台机器. 跨机协作时需要全局 trace_id 命名空间 (例如 `<host>.<pid>.<sid>`).

@@ -43,22 +43,30 @@ def _meta_store_path() -> Path:
 
 
 def _read_meta_store() -> dict[str, dict[str, Any]]:
-    p = _meta_store_path()
-    if not p.is_file():
-        return {}
     try:
-        return json.loads(p.read_text(encoding="utf-8") or "{}") or {}
-    except (json.JSONDecodeError, OSError):
-        return {}
+        # cc_sessions.json is shared by the CLI, dashboard daemon, hooks and
+        # multiple browser-backed PTYs.  Reuse the daemon's cross-process lock
+        # instead of briefly opening the replace target without FILE_SHARE_DELETE
+        # on Windows (that used to make an unrelated writer lose its update).
+        from omnicompany.dashboard.ccdaemon.pty import _read_meta_store as read_store
+
+        return read_store(use_cache=False)
+    except (ImportError, json.JSONDecodeError, OSError, ValueError) as exc:
+        raise click.ClickException(f"cc_sessions.json read failed: {exc}") from exc
 
 
 def _write_meta_store(store: dict[str, dict[str, Any]]) -> None:
-    p = _meta_store_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
     try:
-        p.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError as e:
-        click.echo(f"WARN: cc_sessions.json write failed: {e}", err=True)
+        # ``store`` is an entry patch, not a stale full-file replacement.  The
+        # shared writer re-reads under the same inter-process lock, merges the
+        # patch, writes through a unique temp file and retries Windows replace
+        # contention.  A failed registry update must fail the CLI command rather
+        # than print success while silently dropping the session metadata.
+        from omnicompany.dashboard.ccdaemon.pty import _write_meta_store as write_store
+
+        write_store(store)
+    except (ImportError, OSError, ValueError) as exc:
+        raise click.ClickException(f"cc_sessions.json write failed: {exc}") from exc
 
 
 def _safe_echo(text: str) -> None:
@@ -490,8 +498,7 @@ def cmd_chat_name(session_id: str, new_name: str | None, as_json: bool) -> None:
 
     # set mode
     entry["name"] = new_name
-    store[matched_key] = entry
-    _write_meta_store(store)
+    _write_meta_store({matched_key: {"name": new_name}})
 
     if as_json:
         click.echo(json.dumps({"session_id": entry.get("id") or matched_key, "name": new_name}, ensure_ascii=False))
@@ -545,7 +552,7 @@ def cmd_chat_plan_use(plan_query: str, session_id: str | None, as_json: bool) ->
             click.echo(f"ERROR: no session matched {session_id!r}", err=True)
             sys.exit(2)
         store[matched_key]["active_plan"] = plan_id
-        _write_meta_store(store)
+        _write_meta_store({matched_key: {"active_plan": plan_id}})
         actual_id = store[matched_key].get("id") or matched_key
     else:
         # update current session (same logic as omni plan use)

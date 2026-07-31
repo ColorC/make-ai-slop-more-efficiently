@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:team_builder.workers.worker_deepener_orchestrator.worker.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """WorkerDesignerWorker — Phase 4 · AgentNodeLoop (2026-04-23).
 
 Worker 协议:
@@ -8,7 +9,7 @@ Worker 协议:
   (额外输入 context: `target_worker_name`)
 
 **职责**: AgentNodeLoop · 对 team_design 的**单个** Worker skeleton 深化:
-    - impl_type (HARD/SOFT/AGENT)
+    - impl_type (HARD/SOFT/AGENT/EXISTING)
     - format_in / format_out (精确到某个 material_id)
     - routes (PASS/FAIL/PARTIAL 的 RouteAction)
     - prompt_template (SOFT/AGENT) 或 rule_spec (HARD)
@@ -27,6 +28,7 @@ Worker 协议:
 """
 from __future__ import annotations
 
+import importlib
 import json
 import re
 from typing import Any, ClassVar
@@ -43,6 +45,77 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
 )
 from omnicompany.packages.services._core.omnicompany import Worker
 from omnicompany.protocol.anchor import Verdict, VerdictKind
+
+
+_EXISTING_BINDING_FORBIDDEN_KWARGS = {
+    "model",
+    "prompt",
+    "tools",
+    "permissions",
+    "permission_mode",
+    "budget",
+}
+
+
+def _existing_worker_detail(skeleton: dict[str, Any]) -> dict[str, Any]:
+    """Resolve an existing Worker class; do not ask an LLM to redesign it."""
+    worker_id = str(
+        skeleton.get("worker_name") or skeleton.get("worker_id") or ""
+    ).strip()
+    binding_ref = str(skeleton.get("binding_ref") or "").strip()
+    if not worker_id:
+        raise ValueError("EXISTING worker requires worker_name")
+    if ":" not in binding_ref:
+        raise ValueError(
+            f"EXISTING worker {worker_id!r} requires binding_ref='<module>:<WorkerClass>'"
+        )
+    module_name, class_name = binding_ref.rsplit(":", 1)
+    module = importlib.import_module(module_name)
+    worker_class = getattr(module, class_name)
+    if not isinstance(worker_class, type) or not issubclass(worker_class, Worker):
+        raise ValueError(f"binding_ref does not resolve to Worker: {binding_ref}")
+
+    format_in = getattr(worker_class, "FORMAT_IN", None)
+    format_out = getattr(worker_class, "FORMAT_OUT", None)
+    if not isinstance(format_in, (str, list)) or not format_in:
+        raise ValueError(f"existing Worker has no usable FORMAT_IN: {binding_ref}")
+    if not isinstance(format_out, str) or not format_out:
+        raise ValueError(f"existing Worker has no usable FORMAT_OUT: {binding_ref}")
+
+    binding_kwargs = skeleton.get("binding_kwargs") or {}
+    if not isinstance(binding_kwargs, dict):
+        raise ValueError("EXISTING worker binding_kwargs must be an object")
+    forbidden = sorted(_EXISTING_BINDING_FORBIDDEN_KWARGS & set(binding_kwargs))
+    if forbidden:
+        raise ValueError(
+            "EXISTING worker binding_kwargs cannot own Agent execution settings: "
+            f"{forbidden}"
+        )
+
+    routes = skeleton.get("routes")
+    if not isinstance(routes, dict):
+        routes = {
+            "PASS": {"action": "next"},
+            "FAIL": {"action": "halt"},
+            "PARTIAL": {"action": "halt"},
+        }
+    context_sources = format_in if isinstance(format_in, list) else [format_in]
+    return {
+        "worker_id": worker_id,
+        "impl_type": "EXISTING",
+        "format_in": format_in,
+        "format_in_mode": getattr(worker_class, "FORMAT_IN_MODE", None),
+        "format_out": format_out,
+        "routes": routes,
+        "binding_ref": binding_ref,
+        "binding_kwargs": dict(binding_kwargs),
+        "context_sources": list(context_sources),
+        "hallucination_risks": [],
+        "_meta": {
+            "existing_binding": True,
+            "description": str(getattr(worker_class, "DESCRIPTION", "") or ""),
+        },
+    }
 
 
 _SYSTEM_PROMPT = """你是 team_builder 第 4 阶段 · WorkerDesigner agent.
@@ -367,9 +440,12 @@ class _WorkerDesignSingleAgent(AgentNodeLoop):
     DESCRIPTION: ClassVar[str] = "Phase 4 单 Worker 深化 agent session"
     MAX_RETRIES: ClassVar[int] = 1  # 补产 1 次足以覆盖"忘填字段"常见情况
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any) -> _WorkerDesignerPromptBuilder:
         return _WorkerDesignerPromptBuilder(template=self.NODE_PROMPT, bus=bus)
@@ -493,6 +569,9 @@ class WorkerDesignerWorker(Worker):
     )
     MAX_CONCURRENT: ClassVar[int] = 4  # 并发上限 · 避免 LLM rate limit
 
+    def __init__(self, *, model: str | None = None) -> None:
+        self._model = model
+
     async def run(self, input_data: Any) -> Verdict:
         if not isinstance(input_data, dict):
             return Verdict(
@@ -515,7 +594,14 @@ class WorkerDesignerWorker(Worker):
 
         async def _run_one(skeleton: dict) -> dict | None:
             async with sem:
-                agent = _WorkerDesignSingleAgent()  # 独立实例 · 独立上下文
+                if str(skeleton.get("impl_type") or "").upper() == "EXISTING":
+                    try:
+                        return _existing_worker_detail(skeleton)
+                    except (ImportError, AttributeError, TypeError, ValueError) as exc:
+                        return {"_existing_binding_error": str(exc)}
+                agent = _WorkerDesignSingleAgent(
+                    model=self._model
+                )  # 独立实例 · 独立上下文
                 sub_input = {
                     "_from_team_architect": team_design,
                     "target_worker_name": skeleton.get("worker_name") or skeleton.get("worker_id"),
@@ -535,13 +621,25 @@ class WorkerDesignerWorker(Worker):
 
         tasks = [_run_one(s) for s in skeletons if isinstance(s, dict)]
         results = await asyncio.gather(*tasks, return_exceptions=False)
-        details = [d for d in results if isinstance(d, dict)]
+        binding_errors = [
+            d["_existing_binding_error"]
+            for d in results
+            if isinstance(d, dict) and d.get("_existing_binding_error")
+        ]
+        details = [
+            d
+            for d in results
+            if isinstance(d, dict) and not d.get("_existing_binding_error")
+        ]
 
         if not details:
             return Verdict(
                 kind=VerdictKind.FAIL,
-                output={},
-                diagnosis=f"所有 {len(skeletons)} 份 worker deepen 都失败",
+                output={"binding_errors": binding_errors},
+                diagnosis=(
+                    f"所有 {len(skeletons)} 份 worker deepen 都失败"
+                    + (f": {binding_errors}" if binding_errors else "")
+                ),
             )
 
         return Verdict(
@@ -553,7 +651,11 @@ class WorkerDesignerWorker(Worker):
                     "stage": "v2_orchestrator",
                     "skeletons_count": len(skeletons),
                     "success_count": len(details),
+                    "binding_errors": binding_errors,
                 },
             },
-            diagnosis=f"{len(details)}/{len(skeletons)} workers deepened",
+            diagnosis=(
+                f"{len(details)}/{len(skeletons)} workers deepened"
+                + (f" · binding_errors={len(binding_errors)}" if binding_errors else "")
+            ),
         )

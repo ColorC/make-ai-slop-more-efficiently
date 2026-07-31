@@ -17,6 +17,8 @@
   3. **library_write**(RULE)—— 去重累积 upsert 进统一库,渲 report.md。
   验证:跑「bun vs node/deno」真题,codex 原生搜索产 21 条带源发现 / 12 官方文档源 / richness 39。
 
+  这一路仅用于无人值守/批量，不是交互式默认入口。默认总时限 600 秒、连续 60 秒没有可观测输出即终止；`run_dir/native_status.json` 记录 running/finished/interrupted、时限、worker 状态与事件计数，`run_dir/native_events.jsonl` 在 Codex 输出事件时实时追加，可直接 tail 查看阶段进展。外层调度器的等待时限必须长于内部总时限，不能用短 shell timeout 代替 worker 自己的终止协议。
+
 ### 三件脚手架(原生搜索不白送的)
 
 1. **明确需求** —— 模糊一句话锁成清晰搜索意图 + 候选别名/角度(agent 做;codex 路写进 native 的 prompt 协议)。

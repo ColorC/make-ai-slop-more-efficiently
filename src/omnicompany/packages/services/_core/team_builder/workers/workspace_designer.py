@@ -12,8 +12,8 @@ Worker 协议:
 **不调 LLM** · 规则确定性.
 
 **规则**:
-  - generated_package_path = src/omnicompany/packages/services/<team_name>/
-  - write_prefixes = [generated_package_path, data/services/<team_name>/]
+  - target_package_path 必须来自已完成路径合同的 team_design
+  - write_prefixes = [target_package_path, 由同一路径推导的数据目录]
   - read_prefixes = READ_ANY
   - bash_cwd_prefixes = [<project_root>/]
 
@@ -28,6 +28,10 @@ import re
 from typing import Any
 
 from omnicompany.packages.services._core.omnicompany import Worker
+from omnicompany.packages.services._core.team_builder.package_location import (
+    canonical_team_package_path,
+    team_data_path,
+)
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 
@@ -94,18 +98,31 @@ class WorkspaceDesignerWorker(Worker):
             )
 
         team_name = _extract_team_name(team_design)
-        generated_package_path = f"src/omnicompany/packages/services/{team_name}/"
-        data_path = f"data/services/{team_name}/"
+        try:
+            target_package_path = canonical_team_package_path(
+                team_design.get("target_package_path"),
+                team_name=team_name,
+            )
+            data_path = team_data_path(
+                target_package_path,
+                team_name=team_name,
+            )
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
 
         workspace_spec = {
             "name": team_name,
             "write_prefixes": [
-                generated_package_path,
+                target_package_path,
                 data_path,
             ],
             "read_prefixes": "READ_ANY",
             "bash_cwd_prefixes": [""],  # 项目根 (空串, load_workspace 时展开)
-            "generated_package_path": generated_package_path,
+            "target_package_path": target_package_path,
         }
 
         return Verdict(

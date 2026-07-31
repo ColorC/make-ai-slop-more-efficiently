@@ -118,6 +118,34 @@ def api_trace(trace_id: str):
         conn.close()
 
 
+@traces_router.get("/ledger-recent")
+def api_ledger_recent(limit: int = Query(100, le=500), deviations_only: bool = Query(False)):
+    """留痕账本最近事件(运行原语的消费留痕面:consumed_decisions + deviation)。
+
+    数据源=data/ledger/events.jsonl(append-only);运行历史三态之「同类折叠」由前端做,
+    这里只给原始最近 N 条。决策本体 §八:使用=运行历史+对话卡。
+    """
+    try:
+        from omnicompany.packages.services._core.ledger import list_deviations, tail
+
+        rows = list_deviations(limit) if deviations_only else tail(limit)
+    except Exception:
+        rows = []
+    items = []
+    for r in reversed(rows):  # 最新在前
+        items.append({
+            "id": r.get("id", ""),
+            "time": r.get("time", ""),
+            "type": r.get("type", ""),
+            "agent": r.get("agent", ""),
+            "activity": r.get("activity", ""),
+            "consumed_decisions": r.get("consumed_decisions") or [],
+            "deviation": r.get("deviation"),
+            "verdict": r.get("verdict", ""),
+        })
+    return {"items": items, "total": len(items)}
+
+
 @traces_router.get("/trace-list")
 def api_trace_list(
     limit: int = Query(30, ge=1, le=200),

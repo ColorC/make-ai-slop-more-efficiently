@@ -72,20 +72,20 @@ class Format(BaseModel):
     tags: list[str] = Field(default_factory=list)
     """语义标签。该类型的固有语义维度，点分层级命名。
     标签越多 = 类型越窄 = 语义越精确。
-    例: ["source.p4", "domain.battle", "content.diff"]"""
+    例: ["source.git", "domain.example", "content.diff"]"""
 
     semantic_preconditions: list[str] = Field(default_factory=list)
     """语义前置条件 (人类可读)。
     成为该类型的数据必须满足的语义约束。
     指导 validator 实现者知道该检查什么。
-    例: ["changelist 存在于 P4 中", "changelist 包含至少一个脚本文件"]"""
+    例: ["commit 存在于 git 中", "commit 包含至少一个脚本文件"]"""
 
     required_tags: list[str] = Field(default_factory=list)
     """必需标签 (机器可检查)。
     输入数据必须已具备的标签——即上游 validator 必须已通过
     granted_tags 授予了这些标签。
     TeamChecker 可在编译期验证上游是否覆盖。
-    例: ["source.p4.verified", "domain.battle"]"""
+    例: ["source.git.verified", "domain.example"]"""
 
     components: list[str] = Field(default_factory=list)
     """组合组件（has-a 关系）。该 Format 由哪些子 Format 共同构成。
@@ -102,8 +102,8 @@ class Format(BaseModel):
 
     示例:
       Format(id="oa.automation-context",
-             components=["oa.workflow-info", "feishu.api-spec", "project.codebase"])
-      → Router.run() 中: input_data["feishu.api-spec"] 直接访问collab platform信息
+             components=["oa.workflow-info", "api.spec", "project.codebase"])
+      → Router.run() 中: input_data["api.spec"] 直接访问 API 信息
     """
 
 

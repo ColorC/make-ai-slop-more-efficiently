@@ -9,7 +9,10 @@
   否则 inline_content 是整页 HTML → set_content 截图。
 - 文本类(markdown/plan/agent-workflow-report):正文渲染成暗色 HTML → 截图(真·渲染预览,
   不是裸文字)。
-- 图片自己就是封面(不在此);视频留 ▶。
+- 图片自己就是封面(不在此)。
+- 视频(2026-07-07 视频审阅整改, 用户: "视频从来没有能在审阅台成功播放过"): headless
+  <video> 逐点 seek 抽帧 → 首帧当封面 + 5 帧帧带(covers/<id>_<ver>_f<k>.jpg)。
+  审阅从此不依赖播放器环境(VSCode webview/移动端播放失败时帧带仍可审)。
 
 封面缓存在 store.root/covers/<id>_<ver>.png(ver=updated_at 短哈希,材料变了自动失效)。
 Playwright sync API 不能在 asyncio loop 线程跑 → 路由层用 run_in_executor 丢线程池调本模块。
@@ -30,7 +33,11 @@ TEXT_VIEWPORT = {"width": 600, "height": 460}
 _RENDER_VERSION = "2"  # 渲染策略版本号:改了它 → 所有旧封面失效、重截
 WEB_KINDS = {"html", "demo", "static-report", "custom_web_template", "webgame-spec"}
 TEXT_KINDS = {"markdown", "plan", "agent-workflow-report"}
-COVER_KINDS = WEB_KINDS | TEXT_KINDS
+VIDEO_KINDS = {"video"}
+COVER_KINDS = WEB_KINDS | TEXT_KINDS | VIDEO_KINDS
+
+# 视频帧带取样点(时长占比): 首帧作封面, 全部落帧带
+FRAME_POSITIONS = [0.02, 0.25, 0.5, 0.75, 0.95]
 
 # 一次只跑一个浏览器(刷新串行,省内存,避免并发起多个 chromium)。
 _gen_lock = threading.Lock()
@@ -53,6 +60,20 @@ def _ver(m: Any) -> str:
 
 def cover_path(store_root: Path, material_id: str, ver: str) -> Path:
     return cover_dir(store_root) / f"{material_id}_{ver}.png"
+
+
+def frame_path(store_root: Path, material_id: str, ver: str, index: int) -> Path:
+    return cover_dir(store_root) / f"{material_id}_{ver}_f{index}.jpg"
+
+
+def list_frames(store_root: Path, material_id: str, ver: str) -> list[tuple[int, float]]:
+    """已生成的帧带 [(index, 时长占比)];未生成 → []。"""
+    out: list[tuple[int, float]] = []
+    for idx, pos in enumerate(FRAME_POSITIONS):
+        p = frame_path(store_root, material_id, ver, idx)
+        if p.exists() and p.stat().st_size > 0:
+            out.append((idx, pos))
+    return out
 
 
 def _kind(m: Any) -> str:
@@ -99,20 +120,42 @@ def _doc_html(text: str) -> str:
     )
 
 
-def _render_spec(m: Any) -> tuple[str, str] | None:
-    """('url', full_url) | ('html', inline_html) | ('doc', doc_html) | ('file','') | None。
+def _video_page(src: str) -> str:
+    """抽帧承载页: 纯黑底居中 <video>, muted 自动允许加载, 不自动播放只 seek。"""
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'><style>"
+        "html,body{margin:0;background:#000;height:100%;display:grid;place-items:center}"
+        "video{max-width:100%;max-height:100%}</style></head><body>"
+        f"<video id='v' src='{_html.escape(src, quote=True)}' muted preload='auto'></video>"
+        "</body></html>"
+    )
 
-    mode 决定截图视口:url/html=网页大视口;doc=文本窄幅大字视口。
+
+def _render_spec(m: Any) -> tuple[str, str] | None:
+    """('url', full_url) | ('html', inline_html) | ('doc', doc_html) | ('file','') |
+    ('video', video_src) | None。
+
+    mode 决定截图视口:url/html/video=网页大视口;doc=文本窄幅大字视口。
     """
     kind = _kind(m)
     extra = getattr(m, "extra", None) or {}
     inline = getattr(m, "inline_content", None)
+    if kind in VIDEO_KINDS:
+        # 本地文件走 file 路由(同源可 seek); 外链视频直接用外链(YouTube 页面型外链截不了帧, 跳过)
+        if getattr(m, "file_relpath", None):
+            return ("video", f"{_origin()}/api/boss-sight/reviewstage/{m.id}/file")
+        url = str(extra.get("video_url") or "")
+        if url.startswith("http") and not ("youtube.com" in url or "youtu.be" in url or "vimeo.com" in url):
+            return ("video", url)
+        return None
     if kind in WEB_KINDS:
         url = extra.get("live_url") or extra.get("url") or ""
         if url:
             return ("url", _full_url(str(url)))
         if inline and "<" in inline:
             return ("html", inline)
+        if getattr(m, "file_relpath", None):
+            return ("file_html", "")  # caller reads the staged HTML file
         return None
     if kind in TEXT_KINDS:
         text = inline or ""
@@ -136,7 +179,10 @@ def generate_for(materials: list[Any], store_root: Path, *, read_text=None) -> d
             continue
         ver = _ver(m)
         out = cover_path(store_root, m.id, ver)
-        if out.exists() and out.stat().st_size > 0:
+        cover_ok = out.exists() and out.stat().st_size > 0
+        # 视频: 封面之外还要整套帧带都在才算齐
+        frames_ok = _kind(m) not in VIDEO_KINDS or len(list_frames(store_root, m.id, ver)) == len(FRAME_POSITIONS)
+        if cover_ok and frames_ok:
             skipped.append(m.id)
             continue
         spec = _render_spec(m)
@@ -147,6 +193,12 @@ def generate_for(materials: list[Any], store_root: Path, *, read_text=None) -> d
             try:
                 payload = _doc_html(read_text(m) or "")
                 mode = "doc"
+            except Exception:  # noqa: BLE001
+                continue
+        elif mode == "file_html" and read_text is not None:
+            try:
+                payload = read_text(m) or ""
+                mode = "html"
             except Exception:  # noqa: BLE001
                 continue
         if mode == "file":
@@ -174,6 +226,36 @@ def generate_for(materials: list[Any], store_root: Path, *, read_text=None) -> d
                     vp = TEXT_VIEWPORT if mode == "doc" else WEB_VIEWPORT
                     try:
                         page.set_viewport_size(vp)
+                        if mode == "video":
+                            # 视频抽帧: 载入承载页 → 等元数据 → 逐取样点 seek → 元素截图。
+                            # 首帧同时落封面(png), 全部取样点落帧带(jpg)。
+                            page.set_content(_video_page(payload), wait_until="load", timeout=8000)
+                            page.wait_for_function(
+                                "() => { const v=document.getElementById('v');"
+                                " return !!v && v.readyState >= 2 && v.duration > 0; }",
+                                timeout=20000,
+                            )
+                            video_el = page.locator("#v")
+                            for idx, pos in enumerate(FRAME_POSITIONS):
+                                page.evaluate(
+                                    """async (pos) => {
+                                      const v = document.getElementById('v');
+                                      await new Promise((resolve) => {
+                                        const done = () => { v.removeEventListener('seeked', done); resolve(); };
+                                        v.addEventListener('seeked', done);
+                                        setTimeout(done, 3000);
+                                        v.currentTime = Math.max(0, Math.min(v.duration * pos, Math.max(0, v.duration - 0.05)));
+                                      });
+                                    }""",
+                                    pos,
+                                )
+                                page.wait_for_timeout(120)
+                                fout = frame_path(store_root, m.id, ver, idx)
+                                video_el.screenshot(path=str(fout), type="jpeg", quality=82)
+                                if idx == 0:
+                                    video_el.screenshot(path=str(out))
+                            generated.append(m.id)
+                            continue
                         if mode == "url":
                             try:
                                 page.goto(payload, wait_until="networkidle", timeout=8000)

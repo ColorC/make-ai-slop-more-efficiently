@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any, Literal
 
 from omnicompany.bus.base import EventBus
+from omnicompany.dashboard.session_workdir import resolve_session_cwd
 from omnicompany.protocol.events import EventMetadata, FactoryEvent
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def _create_ide_agent(
     """
     from omnicompany.dashboard.native_agent import NativeIdeAgent
     return NativeIdeAgent(
-        cwd=cwd or os.getcwd(),
+        cwd=resolve_session_cwd(cwd),
         active_plan=active_plan,
         bus=bus_adapter._bus,
     )
@@ -106,7 +106,7 @@ class IDESession:
         self.last_active = self.created_at
         self.task_desc: str | None = None
         self.active_plan = active_plan  # plan id (e.g. "_infra/[2026-05-01]WEB-FOUNDATION")
-        self.cwd = cwd or os.getcwd()
+        self.cwd = resolve_session_cwd(cwd)
         self._bus = bus
         self._task: asyncio.Task | None = None
         self._adapter = BusAdapter(bus, trace_id)

@@ -167,8 +167,8 @@ class PermissionConfig:
 class LoopConfig:
     """AgentNodeLoop 总配置。"""
 
-    max_turns: int = 100
-    """最大 LLM 调用轮数。不保守，实际任务经常需要几十轮"""
+    max_turns: int | None = 100
+    """可选的最大 LLM 调用轮数。None 表示活动驱动的无固定轮数上限循环。"""
 
     context_window: int = 200_000
     """上下文窗口大小（token）。Opus/Sonnet 均 200K"""
@@ -184,7 +184,7 @@ class LoopConfig:
 
     # 预算
     budget_warning_threshold: float = 0.9
-    """到 90% max_turns 时注入预算警告"""
+    """有显式 max_turns 时，到 90% 注入预算警告。"""
 
 
 # ═══════════════════════════════════════════════════════════

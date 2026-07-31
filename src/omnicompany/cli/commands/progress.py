@@ -34,7 +34,18 @@ def cmd_progress_add(ref_type: str, ref_id: str, text: str) -> None:
     from omnicompany.dashboard.boss_sight.progress import add_entry
 
     by = current_caller() or "human"
-    entry = add_entry(ref_type, ref_id, text, by=by)
+    trace_id = None
+    try:  # 会话链接: best-effort, 记录失败绝不能挡住写进度
+        from omnicompany.packages.services._core.identity import resolve_active_trace_id
+        trace_id = resolve_active_trace_id()
+    except Exception:
+        pass
+    entry = add_entry(ref_type, ref_id, text, by=by, trace_id=trace_id)
+    try:
+        from omnicompany.packages.services._core.identity import link_record_to_session
+        link_record_to_session(trace_id, kind="progress", record_id=entry["id"], ref_id=f"{ref_type}:{ref_id}")
+    except Exception:
+        pass
     click.echo(json.dumps({"ok": True, "entry": entry}, ensure_ascii=False, indent=2))
 
 

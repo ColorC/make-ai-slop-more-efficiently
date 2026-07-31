@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "omnicompany": {
+      "type": "stdio",
+      "command": "C:/Users/user/AppData/Local/Programs/Python/Python312/python.exe",
+      "args": [
+        "-m",
+        "omnicompany.dashboard.ccdaemon.mcp_server"
+      ],
+      "env": {},
+      "_omnicompany": "[omnicompany]"
+    }
+  }
+}

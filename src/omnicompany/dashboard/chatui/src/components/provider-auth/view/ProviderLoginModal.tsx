@@ -42,6 +42,11 @@ const getProviderCommand = ({
     return 'opencode auth login';
   }
 
+  if (provider === 'kimi') {
+    // Kimi Code authenticates through its device-code flow (`kimi login`).
+    return 'kimi login';
+  }
+
   if (provider === 'omni_agent') {
     return 'omni auth login';
   }
@@ -54,6 +59,7 @@ const getProviderTitle = (provider: LLMProvider) => {
   if (provider === 'cursor') return 'Cursor CLI Login';
   if (provider === 'codex') return 'Codex CLI Login';
   if (provider === 'opencode') return 'OpenCode CLI Login';
+  if (provider === 'kimi') return 'Kimi CLI Login';
   if (provider === 'omni_agent') return 'Omni Agent Login';
   if (provider === 'controller') return '总控 Login(本地 Claude)';
   return 'Gemini CLI Configuration';

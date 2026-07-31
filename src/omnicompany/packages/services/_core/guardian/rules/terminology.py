@@ -23,7 +23,13 @@ from __future__ import annotations
 
 import re
 
-from ._base import FileContext, GuardianRule, _is_external, _not_graveyard
+from ._base import (
+    FileContext,
+    GuardianRule,
+    _is_external,
+    _is_python,
+    _not_graveyard,
+)
 
 # ══════════════════════════════════════════════════════════════════════
 # 白名单：2026-07-03 批4 起, 空 = 迁移主体已完成, 无活跃迁移前沿需强制轮训
@@ -40,14 +46,24 @@ _NEW_MODULE_WHITELIST: tuple[str, ...] = (
 
 # 在源码正文中出现即视为违反（Phase A 开启后扩展）
 _LEGACY_IDENTIFIERS = (
-    "TeamEdge",
-    "TeamSpec",
+    "PipelineEdge",
+    "PipelineNode",
+    "PipelineSpec",
 )
 
 # import 语句 pattern（命中即违反）
 _LEGACY_IMPORT_PATTERNS = (
-    re.compile(r"\bfrom\s+omnicompany\.protocol\.format\s+import\s+Format\b"),
-    re.compile(r"\bfrom\s+omnicompany\.protocol\b.*\bPipelineEdge\b"),
+    re.compile(
+        r"\bfrom\s+omnicompany\.protocol(?:\.[a-zA-Z0-9_]+)?\s+import\s+"
+        r".*\bPipeline(?:Edge|Node|Spec)\b"
+    ),
+)
+
+# 这些名字不是兼容别名，而是会建立第二套 Team / 岗位 / 运行指派权威的
+# 平行类型。只拦 class 定义，不拦设计文档或错误消息中的文字讨论。
+_FORBIDDEN_PARALLEL_TYPE_PATTERN = re.compile(
+    r"^\s*class\s+(?:ProjectTeam|AgentTeam|RoleSpec|RoleLease)\b",
+    flags=re.MULTILINE,
 )
 
 
@@ -83,6 +99,16 @@ def _check_new_module_legacy_naming(ctx: FileContext) -> bool:
     return False
 
 
+def _check_parallel_team_authority(ctx: FileContext) -> bool:
+    """Active Python code must not define a second Team/position authority."""
+
+    if not ctx.content or not _is_python(ctx):
+        return False
+    if _is_external(ctx) or not _not_graveyard(ctx):
+        return False
+    return bool(_FORBIDDEN_PARALLEL_TYPE_PATTERN.search(ctx.content))
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 规则清单
 # ══════════════════════════════════════════════════════════════════════
@@ -95,15 +121,32 @@ RULES: list[GuardianRule] = [
         severity="MEDIUM",
         description=(
             "命名迁移（terminology.md）反倒退检测：新 module 白名单内禁止"
-            "使用旧命名（Format / TeamEdge / TeamSpec 等）。"
+            "使用旧 Team 协议名（PipelineEdge / PipelineNode / PipelineSpec）。"
             "旧代码 grandfathered 不在此规则范围。"
         ),
         check=_check_new_module_legacy_naming,
         disposition=["warn"],
         message_template=(
             "{path}: 新 module 内检出旧命名（legacy identifier 或 import）。"
-            "请用新命名：Material / Worker / Team / Stock / Department。"
+            "请使用 canonical TeamEdge / TeamNode / TeamSpec。"
             "详见 docs/standards/terminology.md。"
+        ),
+        certainty="absolute",
+    ),
+    GuardianRule(
+        id="OMNI-102",
+        name="parallel-team-authority",
+        severity="HIGH",
+        description=(
+            "禁止定义 ProjectTeam / AgentTeam / RoleSpec / RoleLease 平行类型。"
+            "Project 只引用 TeamSpec；岗位用 TeamPositionSpec；运行指派复用 "
+            "Task.assignee、session binding 与 trace。"
+        ),
+        check=_check_parallel_team_authority,
+        disposition=["warn"],
+        message_template=(
+            "{path}: 检出会制造二重权威的平行类型。"
+            "请扩展 canonical TeamSpec/TeamPositionSpec 或复用既有运行指派设施。"
         ),
         certainty="absolute",
     ),

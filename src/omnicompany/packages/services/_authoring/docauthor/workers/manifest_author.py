@@ -603,7 +603,7 @@ limits:
 1. **严格三 kind**: 每个 document 必须以 `---` 分隔并含 `kind:` 字段之一
 2. **OmniMark 头**: 第一行必须是 `# [OMNI] origin=... domain=... ts=...`
 3. **不得胡编 subdir**: allowed_subdirs 里每个 key **必须**是扫描里实际存在的,
-   或**plan 节选里有明确语义约定的** (如 voxelcraft 的 samples/scratch)
+   或**plan 节选里有明确语义约定的** (如业务域的 samples/scratch)
 4. **不得编造不存在的引用**: notes/description 不能引用不在扫描结果里的文件
 5. **policies / limits 可为 []**: 但三 kind 字段本身不得省略
 6. **severity 词汇**: info / warn / high / medium / low 之一

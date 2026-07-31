@@ -21,6 +21,7 @@ FORMATS = [
         name="VerifyClaim",
         description="待验证的声称: claim + verify_cmd + work_dir + expect_pattern",
         parent="sw.task-input",
+        tags=["kind.source"],
     ),
 
     # ── 环境检查 ──
@@ -29,7 +30,7 @@ FORMATS = [
         name="EnvCheck",
         description="验证环境就绪状态: 工作目录 + 命令可执行",
         parent=f"{DOMAIN}.claim",
-        tags=["env-checked"],
+        tags=["env-checked", "kind.internal"],
     ),
 
     # ── 命令执行结果 ──
@@ -38,7 +39,7 @@ FORMATS = [
         name="CmdExecution",
         description="验证命令执行结果: stdout/stderr/exit_code",
         parent="sw.test-exec-result",
-        tags=["executed"],
+        tags=["executed", "kind.internal"],
     ),
 
     # ── 证据分析 ──
@@ -47,7 +48,7 @@ FORMATS = [
         name="EvidenceAnalysis",
         description="CONFIRMED/REFUTED/UNCERTAIN 判定",
         parent=f"{DOMAIN}.execution",
-        tags=["analyzed"],
+        tags=["analyzed", "kind.internal"],
     ),
 
     # ── 补充验证计划 ──
@@ -56,7 +57,7 @@ FORMATS = [
         name="SupplementalPlan",
         description="不确定时的补充验证命令",
         parent=f"{DOMAIN}.analysis",
-        tags=["analyzed", "supplemental-planned"],
+        tags=["analyzed", "supplemental-planned", "kind.internal"],
         required_tags=["analyzed"],
     ),
 
@@ -66,7 +67,7 @@ FORMATS = [
         name="VerifyReport",
         description="最终验证报告: report_text + conclusion + metrics",
         parent="sw.report",
-        tags=["reported"],
+        tags=["reported", "kind.sink"],
         required_tags=["analyzed"],
     ),
 
@@ -76,7 +77,7 @@ FORMATS = [
         name="VerifyContext",
         description="验证全程状态: 声称 + 执行记录 + 判定",
         parent="agent-state",
-        tags=["stateful", "accumulating"],
+        tags=["stateful", "accumulating", "kind.internal"],
     ),
 ]
 

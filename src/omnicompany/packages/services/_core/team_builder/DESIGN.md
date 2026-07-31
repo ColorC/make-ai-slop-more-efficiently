@@ -42,7 +42,7 @@ agent-first meta team — 输入自然语言需求, 产出合规 L3.5 Team 包 (
 | **5** | Workspace 规范化 | team_design → workspace_spec | WorkspaceDesigner | HARD | ⏳ V2 |
 | **6** | 契约对齐 | workers + materials → contract_audit | ContractAuditor | HARD (P-13 + F-15 静态) | ⏳ V2 |
 | **7** | 草图级完整验证 | 所有前阶段 material → design_validation_report | DesignValidator | HARD + SOFT 补判 | ⏳ V2 |
-| 8 | 代码生成 | worker/material/workspace_detailed → code_package | CodeGeneratorLoop | AgentNodeLoop (参考旧 `_archive/routers_codegen_legacy.py`) | ⏳ V3 |
+| 8 | 代码生成 | worker/material/workspace_detailed → code_package | CodeGeneratorLoop | AgentNodeLoop (参考 `routers_codegen_legacy.py`) | ⏳ V3 |
 | 9 | 最终健康 (后验证) | code_package → doctor 三套自检 | Doctor (既有 L3 组件) | 既有 | ✅ |
 | 10 | 注册上架 | code_package → pipelines registry | Registrar | HARD | ⏳ V3 |
 
@@ -84,20 +84,20 @@ schema 详见 `formats.py::TB_A3_MATERIALS`.
 - 现 V1 产出只到**草图深度** (DESIGN.md 只给七节标题 + worker/material 一行 brief, 无 FORMAT_IN/OUT schema / 无 routes / 无 prompt 模板), 离可运行 package 还差 Phase 4-8
 - LLM 规范合规需后置 HARD 兜底 (V1 实跑暴露 workspace 路径错 · impl_type 自拟 等)
 - ReferenceScout V0 是硬编码启发式清单 11 条, 未按 intent.domain 动态筛选 · 观测后升级 AGENT
-- Diamond 归档作参考: `workers/*.py` 14 旧 Worker 继承 `_archive/routers_legacy.py` (Stage 2 · 3076 行), 用户明示**不拆 Stage 3**, 作回退路径 + 观测对照组
+- Diamond 归档作参考: `workers/*.py` 14 旧 Worker 继承 `routers_legacy.py` (3076 行, 2026-07-26 OMNI-040 迁出 _archive 到正式位置), 用户明示**不拆**成 per-worker 文件, 作回退路径 + 观测对照组
 
 ## 7 · 未来方向
 
 - V2: 完成 Phase 2/4/5/6/7 (7 新 worker, ~7-8h)
 - V3: 对接 Phase 8 CodeGenerator (参考旧 CodeGenLoop 实装) + Phase 10 Registrar
-- 对接 HumanBus: intent.ambiguities → human_blocking (把 LLM 识别的歧义交 L1 裁定后回流)
+- intent.ambiguities → needs_user_input (把歧义直接交回当前 agent 对话裁定)
 - 对接 self_repair (A4): design_validation_report FAIL 时 → core_diagnose 入 self_repair
 - ReferenceScout v1 升级 AGENT worker (grep + read + LLM 判相关性)
 - 多轮探针观测后, 把**稳定流程**固化成 HARD worker (按 agent-first 方法论 Step 4)
 
 ## 附 · ServiceBus 出口强制
 
-所有 agent worker 必须走 DiskBus / WebBus / BashBus / HumanBus, **禁直** subprocess / open('w') / requests. 当前 IntentAnalyzer + TeamArchitect LLM 调用已走 WebBus audit 回流 EventBus (见 `workers/_llm_client.py::call_llm_json`).
+所有 agent worker 的执行动作必须走 DiskBus / WebBus / BashBus, **禁直** subprocess / open('w') / requests; 人类澄清留在当前 agent 对话。当前 IntentAnalyzer + TeamArchitect LLM 调用已走 WebBus audit 回流 EventBus。
 
 ---
 
@@ -173,9 +173,10 @@ schema 详见 `formats.py::TB_A3_MATERIALS`.
 
 ### 归档
 
-- [_archive/routers_legacy.py](_archive/routers_legacy.py) · 原 `routers.py` 3053 行单文件实现
-- [_archive/routers_codegen_legacy.py](_archive/routers_codegen_legacy.py) · 原 `routers_codegen.py` 的 `CodeGenLoop` 实现
-- [_archive/README.md](_archive/README.md) · 归档原因 / Diamond shortcut 说明
+- [routers_legacy.py](routers_legacy.py) · 原 `routers.py` 单文件实现 (2026-07-26 OMNI-040 Stage 3 从 `_archive/` 迁回正式位置)
+- [routers_codegen_legacy.py](routers_codegen_legacy.py) · 原 `routers_codegen.py` 的 `CodeGenLoop` 实现 (同上迁回)
+- [_archive/routers_legacy.py](_archive/routers_legacy.py) · 仅余批4 废止的 LAP 九维检查器实现体 (历史参考)
+- [_archive/README.md](_archive/README.md) · 归档原因 / Diamond shortcut 历史说明
 
 ## 架构决策
 
@@ -209,16 +210,17 @@ workflow_factory routers.py 3053 行, 含紧耦合模块级辅助 (`_REQ_SYSTEM`
 ```python
 # workers/req_analyzer.py
 from omnicompany.packages.services.omnicompany import Worker
-from .._archive.routers_legacy import ReqAnalyzerRouter as _Legacy
+from ..routers_legacy import ReqAnalyzerRouter as _Legacy
 
 class ReqAnalyzerWorker(Worker, _Legacy):
-    pass  # 业务代码仍在 _archive/
+    pass  # 业务代码在 routers_legacy.py (正式位置)
 ```
 
 **合规**: Worker 继承链 + workers/ 结构 + kind.* 三分 + compat shim 全建立.
-**不纯**: 真业务代码仍在 `_archive/routers_legacy.py`, 活代码跟归档物理依赖.
-
-**Stage 3 清洁工作**: 真迁移 (把业务代码搬到 `workers/*.py`), 删除 `_archive/`, 优先级低于 Stage 2 全 Team 覆盖.
+**Stage 3 (2026-07-26 OMNI-040 已落地)**: 业务代码从 `_archive/` 迁回顶层
+`routers_legacy.py` / `routers_codegen_legacy.py` 正式位置, 活代码不再物理依赖归档;
+`_archive/` 仅余批4 废止的 LAP 九维检查器实现体作静态历史参考.
+(更彻底的"每 Worker 一个独立实现文件"拆分仍是可选后续, 非 OMNI-040 要求.)
 
 ### D4 — LLMRouter 子类的 Worker 继承路径
 
@@ -281,8 +283,9 @@ NodePlanAuditorWorker (HARD)          │
 
 ## 已知局限
 
-1. **Diamond shortcut 物理依赖**: `workers/*.py` 的业务代码在 `_archive/routers_legacy.py` 里,
-   `_archive/` 不可真正归档. Stage 3 清洁工作会迁移到纯 workers/ 后才能把 `_archive/` 变成静态文档.
+1. ~~**Diamond shortcut 物理依赖**~~ (2026-07-26 OMNI-040 Stage 3 已解): 业务代码已迁回
+   `routers_legacy.py` / `routers_codegen_legacy.py` 正式位置, `_archive/` 只剩静态历史参考.
+   更彻底的"每 Worker 一个独立实现文件"拆分仍是可选后续.
 
 2. **CodeGenLoop 未迁 Worker**: pipeline.py 用的 `code_gen_loop` 节点是 AgentNodeLoop,
    不是 Worker. 阶段 D 完成前, 本 Team 并非 100% Worker 化.
@@ -304,7 +307,8 @@ NodePlanAuditorWorker (HARD)          │
   - [pipeline.py](pipeline.py) · [run.py](run.py) · [formats.py](formats.py)
   - [routers.py](routers.py) (shim) · [routers_codegen.py](routers_codegen.py) (shim)
   - [workers/](workers/) · 14 Worker 独立文件 + `_shared.py` 共享基类 re-export
-  - [_archive/](_archive/) · legacy routers_legacy.py + routers_codegen_legacy.py (Diamond 业务源)
+  - [routers_legacy.py](routers_legacy.py) · [routers_codegen_legacy.py](routers_codegen_legacy.py) (legacy 业务实现, 正式位置)
+  - [_archive/](_archive/) · 仅余批4 废止 LAP 检查器实现体 (历史参考)
 
 - 规范引用:
   - [terminology.md §6/§7/§8](../../../../../../docs/standards/_global/terminology.md) 两层命名

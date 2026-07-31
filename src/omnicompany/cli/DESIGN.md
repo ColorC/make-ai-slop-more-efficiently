@@ -21,7 +21,7 @@
 - **`commands/guardian.py`** → `cmd_guardian` (patrol / daemon / archmap / shield-status / zombies) [commands/guardian.py](commands/guardian.py)
 - **`commands/llm_audit.py`** → `cmd_llm`, `cmd_pipeline` (LLM 调用审计) [commands/llm_audit.py](commands/llm_audit.py)
 - **`commands/docauthor.py`** → `cmd_docauthor` (scan / run / run-all / observe / issues) [commands/docauthor.py](commands/docauthor.py)
-- **其余命令组** → `cmd_trace`, `cmd_round`, `cmd_node`, `cmd_loops`, `cmd_pain`, `cmd_evo`, `cmd_domain`, `cmd_inquiry`, `cmd_human`, `cmd_registry` 均挂载于主组 [commands/](commands/)
+- **其余命令组** → `cmd_trace`, `cmd_round`, `cmd_node`, `cmd_loops`, `cmd_pain`, `cmd_evo`, `cmd_domain`, `cmd_inquiry`, `cmd_review`, `cmd_registry` 均挂载于主组 [commands/](commands/)
 
 ## 架构决策
 ### D1 · 零业务逻辑原则（CLI 仅作路由与参数解析）

@@ -3,6 +3,7 @@ import { CodexProvider } from '@/modules/providers/list/codex/codex.provider.js'
 import { ControllerProvider } from '@/modules/providers/list/controller/controller.provider.js';
 import { CursorProvider } from '@/modules/providers/list/cursor/cursor.provider.js';
 import { GeminiProvider } from '@/modules/providers/list/gemini/gemini.provider.js';
+import { KimiProvider } from '@/modules/providers/list/kimi/kimi.provider.js';
 import { OmniAgentProvider } from '@/modules/providers/list/omni_agent/omni-agent.provider.js';
 import { OpenCodeProvider } from '@/modules/providers/list/opencode/opencode.provider.js';
 import type { IProvider } from '@/shared/interfaces.js';
@@ -15,6 +16,7 @@ const providers: Record<LLMProvider, IProvider> = {
   cursor: new CursorProvider(),
   gemini: new GeminiProvider(),
   opencode: new OpenCodeProvider(),
+  kimi: new KimiProvider(),
   omni_agent: new OmniAgentProvider(),
   controller: new ControllerProvider(),
 };

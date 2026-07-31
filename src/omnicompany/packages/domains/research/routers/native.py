@@ -12,12 +12,18 @@ intake(research.intake)→ native(research.verified)→ library_write(research.r
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import os
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.runtime.routing.router import Router
+
+from .pipeline import DEFAULT_IDLE_TIMEOUT_S, DEFAULT_MAX_RESULTS, DEFAULT_TOTAL_TIMEOUT_S
 
 # codex --output-schema 走 OpenAI strict 模式: 每个 object 必须 additionalProperties:false
 # 且 required 列全所有 property(没有"可选字段"概念,空就给空串/空数组)。
@@ -52,8 +58,61 @@ RESEARCH_OUTPUT_SCHEMA: dict[str, Any] = {
                     "title": {"type": "string"},
                     "url": {"type": "string"},
                     "snippet": {"type": "string"},
+                    "platform": {
+                        "type": "string",
+                        "description": "页面所属平台；无法从页面确认时留空，禁止猜测",
+                    },
+                    "publisher": {
+                        "type": "string",
+                        "description": "发布主体/账号；无法从页面确认时留空，禁止猜测",
+                    },
+                    "author": {
+                        "type": "string",
+                        "description": "署名作者；页面未署名时留空",
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "description": "页面明确标出的发布时间 ISO-8601；未知留空",
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "description": "页面明确标出的更新时间 ISO-8601；未知留空",
+                    },
+                    "game_version": {
+                        "type": "string",
+                        "description": "原文明确适用的游戏版本；未知留空",
+                    },
+                    "season": {
+                        "type": "string",
+                        "description": "原文明确适用的赛季；未知留空",
+                    },
+                    "server_stage": {
+                        "type": "string",
+                        "description": "原文明确适用的服务器阶段；未知留空",
+                    },
+                    "citation_locator": {
+                        "type": "string",
+                        "description": "精确到标题/段落/时间码的引用位置",
+                    },
+                    "snapshot_text": {
+                        "type": "string",
+                        "description": "从来源页回读的、足以复核结论的原文快照",
+                    },
+                    "source_summary": {
+                        "type": "string",
+                        "description": "只概括本来源明确陈述的内容，不混入其他来源",
+                    },
+                    "fresh_until": {
+                        "type": "string",
+                        "description": "原文明示的有效截止时间 ISO-8601；未知留空",
+                    },
                 },
-                "required": ["title", "url", "snippet"],
+                "required": [
+                    "title", "url", "snippet", "platform", "publisher", "author",
+                    "published_at", "updated_at", "game_version", "season",
+                    "server_stage", "citation_locator", "snapshot_text",
+                    "source_summary", "fresh_until"
+                ],
             },
         },
         "keywords": {"type": "array", "items": {"type": "string"}},
@@ -66,8 +125,65 @@ RESEARCH_OUTPUT_SCHEMA: dict[str, Any] = {
 }
 
 
-def _build_prompt(topic: str, existing: dict | None) -> str:
-    base = f"""你是公开调研员。对题目做联网调研,只用你自己的原生 web 搜索能力(web_search 工具),禁自写爬虫。全程中文。
+def _normalize_source_artifacts(
+    sources: list[dict[str, Any]],
+    *,
+    retrieved_at: str,
+) -> list[dict[str, Any]]:
+    """Add system-observed capture fields without inventing page metadata."""
+
+    normalized: list[dict[str, Any]] = []
+    for item in sources:
+        source = dict(item)
+        for key, value in list(source.items()):
+            if isinstance(value, str):
+                stripped = value.strip()
+                source[key] = stripped or None
+        snapshot_text = source.get("snapshot_text")
+        source["retrieved_at"] = retrieved_at
+        source["snapshot_sha256"] = (
+            hashlib.sha256(snapshot_text.encode("utf-8")).hexdigest()
+            if isinstance(snapshot_text, str) and snapshot_text
+            else None
+        )
+        # Keep the old combined field for existing research/guide consumers.
+        source["author_or_publisher"] = source.get("publisher") or source.get("author")
+        source["summary"] = source.pop("source_summary", None)
+        normalized.append(source)
+    return normalized
+
+
+def _ensure_isolated_audit_repo(run_dir: Path) -> None:
+    """Keep readonly git auditing scoped to this run, not the shared dirty repo.
+
+    The run directory is an untracked child of the main repository. Without a
+    nested git root, Codex's readonly adapter compares the entire shared
+    worktree and can blame unrelated scheduler/user edits on this worker.
+    Existing run artifacts stay untracked on both sides of the baseline; any
+    new child-created path is still observable, while the read-only sandbox is
+    the primary write barrier for existing files.
+    """
+
+    if (run_dir / ".git").exists():
+        return
+    completed = subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=run_dir,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "git init failed").strip()
+        raise RuntimeError(f"failed to isolate research readonly audit: {detail}")
+
+
+def _build_prompt(topic: str, existing: dict | None, max_results: int) -> str:
+    base = f"""你是无人值守公开调研员。对题目做联网调研,只用你自己的原生 web 搜索能力(web_search 工具),禁自写爬虫。全程中文。
+
+运行边界（必须遵守）：intake 已完成本地查重。不要读取任何本地 SKILL/AGENTS/仓库文件，不要运行 shell、PowerShell、omni、refs 或其他本地命令，不要写入任何文件；直接使用 web_search 搜读公开来源并返回 JSON。
 
 题目:{topic}
 
@@ -78,7 +194,17 @@ def _build_prompt(topic: str, existing: dict | None) -> str:
 4. 核源:每条 finding 标 support——回读它声称的来源页,看得到明确支撑才给 supported,沾边不充分给 partial,找不到/矛盾给 unsupported,没核到给 unverified;默认从严。
 5. 只认页面里有的,绝不编造;客观、给证据、不打分。
 
+结果预算：最多保留 {max_results} 条 findings 和 {max_results} 个 sources。达到预算并覆盖题目主问题后立即综合输出，不继续扩展相邻主题。
+
+来源留痕：每个 source 都要回读来源页，并逐项填写平台、发布主体、作者、发布时间/更新时间、适用版本/赛季/服务器阶段、精确引用位置、原文快照和只基于该来源的摘要。页面没有明确写出的字段一律给空串；不得从搜索摘要、网址、常识或其他来源猜测。原文快照必须是来源页中实际可见、可支持摘要的连续内容。fresh_until 只有原文明示截止时间时才填写，否则留空。抓取时间与快照 SHA 由运行器补写，不由你生成。
+
 只输出符合 output schema 的 JSON(summary/findings/sources/keywords/aliases/perspectives_covered/perspectives_open),不要别的话。"""
+    if max_results <= 3:
+        base += (
+            "\n\n【快速受控模式】本次结果预算很小，覆盖主问题优先于扩展广度。"
+            "最多调用 2 次 web_search；无需为每个同义词重复搜索，也无需补冷门视角。"
+            "获得 1—3 个一手来源后立即核源并输出最终 JSON，不继续搜索。"
+        )
     if existing:
         covered = existing.get("perspectives_covered") or []
         open_p = existing.get("perspectives_open") or []
@@ -97,6 +223,12 @@ class NativeResearch(Router):
     FORMAT_OUT = "research.verified"
     REQUIRED_CONTEXT = ["topic", "run_dir"]
 
+    @staticmethod
+    def _write_status(run_dir: Path, **payload: Any) -> None:
+        (run_dir / "native_status.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+        )
+
     def run(self, input_data: Any) -> Verdict:
         from omnicompany.packages.services._core.agent.external_workers import (
             ExternalAgentPermissionMode,
@@ -108,22 +240,87 @@ class NativeResearch(Router):
         topic = ctx["topic"]
         run_dir = Path(ctx["run_dir"])
         existing = ctx.get("existing")
-        timeout_s = float(ctx.get("timeout_s", 900) or 900)
+        timeout_s = float(ctx.get("timeout_s") or DEFAULT_TOTAL_TIMEOUT_S)
+        idle_timeout_s = float(ctx.get("idle_timeout_s") or DEFAULT_IDLE_TIMEOUT_S)
+        max_results = int(ctx.get("max_results") or DEFAULT_MAX_RESULTS)
+        run_id = f"research-{run_dir.name}"
 
         schema_path = run_dir / "output_schema.json"
         schema_path.write_text(json.dumps(RESEARCH_OUTPUT_SCHEMA, ensure_ascii=False), encoding="utf-8")
+        _ensure_isolated_audit_repo(run_dir)
+
+        started_at = datetime.now(timezone.utc).isoformat()
+        self._write_status(
+            run_dir,
+            state="running",
+            started_at=started_at,
+            parent_pid=os.getpid(),
+            run_id=run_id,
+            timeout_s=timeout_s,
+            idle_timeout_s=idle_timeout_s,
+            note="交互式调研不应使用本 worker；这是可选的无人值守批量通道。",
+        )
+        print(
+            f"[research.native] start run={run_id} total_timeout={timeout_s:g}s "
+            f"idle_timeout={idle_timeout_s:g}s status={run_dir / 'native_status.json'}",
+            flush=True,
+        )
 
         request = ExternalAgentRunRequest(
             provider="codex",
-            prompt=_build_prompt(topic, existing),
+            prompt=_build_prompt(topic, existing, max_results),
             cwd=str(run_dir),
+            run_id=run_id,
             permission_mode=ExternalAgentPermissionMode.READONLY,
             model_policy="none",  # 调研要好脑子,别降便宜档
             timeout_s=timeout_s,
             output_schema_path=schema_path,
-            metadata={"codex_config": {"tools.web_search": "true"}},
+            trace_id=run_id,
+            metadata={
+                "codex_config": {"tools.web_search": "true"},
+                "idle_timeout_s": idle_timeout_s,
+                "research_run_dir": str(run_dir),
+                "event_log_path": str(run_dir / "native_events.jsonl"),
+            },
         )
-        result = asyncio.run(run_external_agent_request(request))
+        try:
+            result = asyncio.run(run_external_agent_request(request))
+        except BaseException as exc:
+            self._write_status(
+                run_dir,
+                state="interrupted",
+                started_at=started_at,
+                finished_at=datetime.now(timezone.utc).isoformat(),
+                parent_pid=os.getpid(),
+                run_id=run_id,
+                timeout_s=timeout_s,
+                idle_timeout_s=idle_timeout_s,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            raise
+
+        result_status = getattr(result, "status", "unknown")
+        result_status = getattr(result_status, "value", result_status)
+        finished_at = datetime.now(timezone.utc).isoformat()
+        self._write_status(
+            run_dir,
+            state="finished",
+            started_at=started_at,
+            finished_at=finished_at,
+            parent_pid=os.getpid(),
+            run_id=run_id,
+            timeout_s=timeout_s,
+            idle_timeout_s=idle_timeout_s,
+            result_status=str(result_status),
+            event_count=len(getattr(result, "events", None) or []),
+            exit_code=getattr(result, "exit_code", None),
+            error=getattr(result, "error", ""),
+        )
+        print(
+            f"[research.native] finish run={run_id} status={result_status} "
+            f"events={len(getattr(result, 'events', None) or [])}",
+            flush=True,
+        )
 
         data = getattr(result, "structured_output", None)
         if not isinstance(data, dict):
@@ -147,7 +344,8 @@ class NativeResearch(Router):
                 encoding="utf-8")
             return Verdict(
                 kind=VerdictKind.FAIL,
-                output={**ctx, "synthesis": {"summary": "(codex 调研未产出合法记录)", "findings": []},
+                output={**ctx, "research_ok": False,
+                        "synthesis": {"summary": "(codex 调研未产出合法记录)", "findings": []},
                         "sources": [], "coverage": {}},
                 diagnosis=f"codex 调研失败 status={getattr(result, 'status', '?')}: {err[:160]}"
                           "(原文存 native_raw.txt)",
@@ -160,7 +358,11 @@ class NativeResearch(Router):
             "aliases": data.get("aliases") or [],
             "perspectives_open": data.get("perspectives_open") or [],
         }
-        sources = data.get("sources") or []
+        sources = _normalize_source_artifacts(
+            data.get("sources") or [],
+            retrieved_at=finished_at,
+        )
+        data["sources"] = sources
         coverage = {"covered": data.get("perspectives_covered") or []}
 
         (run_dir / "native.json").write_text(
@@ -171,6 +373,7 @@ class NativeResearch(Router):
             kind=VerdictKind.PASS,
             output={
                 "topic": topic, "topic_norm": ctx.get("topic_norm", ""), "run_dir": str(run_dir),
+                "research_ok": True,
                 "synthesis": synthesis, "sources": sources, "coverage": coverage,
                 "existing": existing,
             },

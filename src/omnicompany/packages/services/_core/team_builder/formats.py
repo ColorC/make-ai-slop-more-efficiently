@@ -503,6 +503,10 @@ TB_REQUEST_TRIGGER = Material(
         "type": "object",
         "properties": {
             "text": {"type": "string", "description": "自然语言请求"},
+            "target_package_path": {
+                "type": "string",
+                "description": "可选的精确 Team package 目录；提供后下游必须原样复用",
+            },
         },
         "required": ["text"],
     },
@@ -544,7 +548,11 @@ TB_INTENT_ANALYSIS = Material(
             "ambiguities": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "明显需要人类澄清的歧义点 (后续走 HumanBus)",
+                "description": "明显需要人类澄清的歧义点 (直接返回当前 agent 对话)",
+            },
+            "target_package_path": {
+                "type": "string",
+                "description": "从入口确定性透传的精确 Team package 目录",
             },
         },
         "required": ["domain", "purpose", "key_capabilities"],
@@ -570,6 +578,10 @@ TB_ORIGIN_REQUEST = Material(
             "triggered_by": {"type": "string", "description": "触发者 (L1/L2 标识)"},
             "tags": {"type": "array", "items": {"type": "string"}},
             "body_path": {"type": "string", "description": ".omni/origin_request.md 本体路径"},
+            "target_package_path": {
+                "type": "string",
+                "description": "入口显式给出的精确 Team package 目录",
+            },
         },
         "required": ["request_text", "triggered_at", "body_path"],
     },
@@ -589,12 +601,118 @@ TB_TEAM_DESIGN = Material(
     json_schema={
         "type": "object",
         "properties": {
+            "team_id": {"type": "string"},
+            "team_name": {"type": "string"},
+            "target_package_path": {
+                "type": "string",
+                "description": (
+                    "唯一部署位置；必须是 packages/services/<bucket>/<team_name>/ "
+                    "或 packages/domains/<domain>/<team_name>/"
+                ),
+            },
             "design_path": {"type": "string"},
             "sections": {"type": "array", "items": {"type": "string"}, "minItems": 7},
             "node_count": {"type": "integer"},
             "material_count": {"type": "integer"},
+            "workers_skeleton": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "worker_name": {"type": "string"},
+                        "impl_type": {
+                            "type": "string",
+                            "enum": ["HARD", "SOFT", "AGENT", "EXISTING"],
+                        },
+                        "brief": {"type": "string"},
+                        "position_id": {"type": "string"},
+                        "binding_ref": {"type": "string"},
+                        "binding_kwargs": {"type": "object"},
+                    },
+                    "required": ["worker_name", "impl_type", "brief", "position_id"],
+                },
+            },
+            "positions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "responsibilities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                        },
+                        "non_responsibilities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                        },
+                        "activation": {
+                            "type": "string",
+                            "enum": ["active", "on_demand"],
+                        },
+                        "activation_evidence_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "context_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "benchmark_refs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "exit_conditions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": [
+                        "id",
+                        "name",
+                        "responsibilities",
+                        "non_responsibilities",
+                        "activation",
+                        "activation_evidence_refs",
+                        "context_refs",
+                        "benchmark_refs",
+                        "exit_conditions",
+                    ],
+                },
+            },
+            "generation": {
+                "type": "object",
+                "properties": {
+                    "method": {"const": "team_builder"},
+                    "builder_id": {"const": "team-builder"},
+                    "request_ref": {"type": "string"},
+                    "source_refs": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "parent_team_id": {"type": "string"},
+                },
+                "required": [
+                    "method",
+                    "builder_id",
+                    "request_ref",
+                    "source_refs",
+                ],
+            },
         },
-        "required": ["design_path", "sections"],
+        "required": [
+            "design_path",
+            "team_id",
+            "team_name",
+            "target_package_path",
+            "sections",
+            "workers_skeleton",
+            "positions",
+            "generation",
+        ],
     },
     tags=["team_builder", "stage.design", "kind.internal", "agent_first"],
 )
@@ -645,7 +763,10 @@ TB_WORKER_DESIGN = Material(
             "worker_id": {"type": "string"},
             "format_in": {"type": "string"},
             "format_out": {"type": "string"},
-            "impl_type": {"type": "string", "enum": ["HARD", "SOFT", "AGENT"]},
+            "impl_type": {
+                "type": "string",
+                "enum": ["HARD", "SOFT", "AGENT", "EXISTING"],
+            },
             "description": {"type": "string"},
             "body_path": {"type": "string"},
         },
@@ -808,7 +929,7 @@ TB_WORKER_DESIGN_DETAILED = Material(
     name="Worker 深化设计 (单条)",
     description=(
         "WorkerDesignerWorker × N 产出 · 每 Worker 独立上下文产一份: FORMAT_IN/OUT schema + "
-        "impl_type (HARD/SOFT/AGENT) + routes + prompt 或 rule 模板 + SKILL §3.1 18 项清单. "
+        "impl_type (HARD/SOFT/AGENT/EXISTING) + routes + prompt、rule 或既有绑定引用. "
         "kind.internal (N 份 fan-out)."
     ),
     parent="doc",
@@ -816,7 +937,10 @@ TB_WORKER_DESIGN_DETAILED = Material(
         "type": "object",
         "properties": {
             "worker_id": {"type": "string"},
-            "impl_type": {"type": "string", "enum": ["HARD", "SOFT", "AGENT"]},
+            "impl_type": {
+                "type": "string",
+                "enum": ["HARD", "SOFT", "AGENT", "EXISTING"],
+            },
             "format_in": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
             "format_in_mode": {"type": ["string", "null"], "enum": ["and", "or", None]},
             "format_out": {"type": "string"},
@@ -830,6 +954,8 @@ TB_WORKER_DESIGN_DETAILED = Material(
             },
             "prompt_template": {"type": ["string", "null"]},
             "rule_spec": {"type": ["string", "null"]},
+            "binding_ref": {"type": ["string", "null"]},
+            "binding_kwargs": {"type": "object"},
             "context_sources": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -881,7 +1007,7 @@ TB_WORKSPACE_SPEC = Material(
     id="team_builder.material.workspace_spec",
     name="Workspace 规范化声明",
     description=(
-        "WorkspaceDesignerWorker 产出 · HARD 规则 · 从 team_name 推 `docs/standards/workspace.md` "
+        "WorkspaceDesignerWorker 产出 · HARD 规则 · 从已验证 target_package_path 推 `docs/standards/workspace.md` "
         "合规 workspace.yaml 内容. 对应生成 package 的 .omni/workspace.yaml 本体. kind.internal."
     ),
     parent="doc",
@@ -892,9 +1018,9 @@ TB_WORKSPACE_SPEC = Material(
             "write_prefixes": {"type": "array", "items": {"type": "string"}, "minItems": 2},
             "read_prefixes": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
             "bash_cwd_prefixes": {"type": "array", "items": {"type": "string"}},
-            "generated_package_path": {"type": "string"},
+            "target_package_path": {"type": "string"},
         },
-        "required": ["name", "write_prefixes", "bash_cwd_prefixes", "generated_package_path"],
+        "required": ["name", "write_prefixes", "bash_cwd_prefixes", "target_package_path"],
     },
     tags=["team_builder", "stage.design", "kind.internal", "workspace"],
 )
@@ -1064,7 +1190,7 @@ TB_WORKSPACE_YAML = Material(
     name="生成的 .omni/workspace.yaml 配置",
     description=(
         "内容语义: 目标 team 的 workspace 声明 yaml 文件内容 (单 str). "
-        "字段含义: content 为 yaml.safe_dump(workspace_spec dict) 的结果, 含 name/write_prefixes/read_prefixes/bash_cwd_prefixes/generated_package_path. "
+        "字段含义: content 为 yaml.safe_dump(workspace_spec dict) 的结果, 含 name/write_prefixes/read_prefixes/bash_cwd_prefixes/target_package_path. "
         "上游承诺: WorkspaceYamlGenerator (HARD · 纯 yaml dump) 依 workspace_spec material 直接序列化. "
         "下游用途: CodeAggregator 合进 code_package.files['.omni/workspace.yaml']. "
         "最小样例: \"name: foo\\nwrite_prefixes:\\n  - data/foo/\\nbash_cwd_prefixes:\\n  - /\". "
@@ -1214,7 +1340,10 @@ TB_CODE_PACKAGE = Material(
         "type": "object",
         "properties": {
             "team_name": {"type": "string"},
-            "target_package_path": {"type": "string", "description": "src/omnicompany/packages/services/<team_name>/"},
+            "target_package_path": {
+                "type": "string",
+                "description": "已验证的 canonical services bucket 或 business domain package 目录",
+            },
             "files": {
                 "type": "object",
                 "description": "rel_path → Python code content (例 'formats.py': '...', 'workers/__init__.py': '...')",
@@ -1233,7 +1362,7 @@ TB_REGISTRATION_PLAN = Material(
     description=(
         "RegistrarWorker (Phase 10 HARD) 产出 · 含 target package 落盘清单 + PipelineEntry 条目代码 + "
         "dry_run 标记. **V3 MVP 不真落盘** (保护 src/ 不被 agent 随意污染), 产物交 L1 人类审阅. "
-        "未来可接 HumanBus 审批机制后自动执行. kind.sink (terminal)."
+        "需要用户授权时在当前 agent 对话确认后执行. kind.sink (terminal)."
     ),
     parent="doc",
     json_schema={

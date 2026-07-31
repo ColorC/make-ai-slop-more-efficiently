@@ -40,9 +40,12 @@ def _git_committed_changes(root: Path, n_commits: int = 1) -> list[tuple[str, st
         )
         results = []
         for line in out.splitlines():
-            parts = line.split("\t", 1)
-            if len(parts) == 2:
-                results.append((parts[0][:1], parts[1].strip()))
+            # rename/copy 行是 "R095\told\tnew" 三段 — 取末段(新路径), 与
+            # _git_staged_changes 一致. 旧 split("\t", 1) 会把 "old\tnew"
+            # 整串当路径, 产出不存在的假路径罚单 (2026-07-15 修).
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                results.append((parts[0][:1], parts[-1].strip()))
         return results
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []

@@ -2,7 +2,7 @@ id: ART-v21-report
 type: artifact
 kind: report
 
-artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v21_h034_falsified_schema_5steps_2026-05-07.md"
+artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/h034_falsified_schema_5steps_2026-05-07.md"
 
 supports_evidence:
   - EV-v21-csv-to-md-fail-retry

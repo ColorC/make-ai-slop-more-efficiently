@@ -1,11 +1,11 @@
 # [OMNI] origin=claude-code domain=dashboard/boss_sight/services ts=2026-06-25T00:00:00Z type=service
 # [OMNI] material_id="material:dashboard.boss_sight.services.session_resolver.py"
-"""把"聚焦的 Claude 对话页签"解析成具体 session_id —— 页签焦点跟随的脑子。
+"""把聚焦的 Claude Code / Codex 对话页签解析成具体 session_id。
 
 权威: omnicompany/docs/plans/dashboard/[2026-06-24]MULTIAGENT-AND-REVIEW-REDESIGN/plan.md (P1)
 
-官方 Claude 插件不暴露 tab↔session 绑定(实测),故只能启发式:
-  1) 缩到 claude_code + cwd 在当前 workspace 下的候选;
+原生插件不暴露稳定的 tab↔session 绑定,故只能启发式:
+  1) 缩到 claude_code/codex + cwd 在当前 workspace 下的候选;
   2) 页签标题(tab.label)精确/包含匹配某会话的 title/current_task/preview → 高置信;
   3) 否则取最近活跃(mtime 最新)→ 单候选 medium、多候选 low。
 OCR/UIA(poof)只在"低置信且多候选"时升级:它们给的不是新逻辑,而是一个**更准的 label/文本**
@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import time
 from typing import Any
+
+
+_NATIVE_PROVIDERS = {"claude", "claude_code", "claude-code", "codex"}
 
 
 def _norm(s: Any) -> str:
@@ -49,13 +52,16 @@ def resolve(
     """
     now = now if now is not None else time.time()  # noqa: F841 — 预留(时间衰减可后加)
 
-    claude = [c for c in candidates if (c.get("provider") or "").startswith("claude") and c.get("session_id")]
-    if not claude:
+    native = [
+        c for c in candidates
+        if str(c.get("provider") or "").lower() in _NATIVE_PROVIDERS and c.get("session_id")
+    ]
+    if not native:
         return None
 
-    pool = [c for c in claude if _cwd_under(c.get("cwd"), workspace_cwd)]
+    pool = [c for c in native if _cwd_under(c.get("cwd"), workspace_cwd)]
     if not pool:
-        pool = claude  # cwd 都不匹配就放开(总比啥都不返回强)
+        pool = native  # cwd 都不匹配就放开(总比啥都不返回强)
 
     label = _norm(tab_label)
     if label:

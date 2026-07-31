@@ -144,7 +144,52 @@ REVIEW_WEBGAME_SPEC = Format(
     ],
 )
 
-FORMATS = [PLAN, PROGRESS_ENTRY, PROJECT, CAPTURE, REVIEW_MATERIAL, REVIEW_WEBGAME_SPEC]
+REVIEW_DECISION_CANDIDATE = Format(
+    id="omni.review.decision-candidate",
+    name="决策候选审阅材料",
+    description=(
+        "决策本体候选流水线的唯一队列材料(plan=[2026-07-10]DECISION-ONTOLOGY §六):"
+        "任何想改陈述库(决策库/语义手册)的提议——不论来自偏离聚集、固化聚类、到期信号、"
+        "AI 记忆还是人——统一成此类材料排队人裁。人机同门,只差发起者字段。"
+        "裁决动作:审阅台 accept/reject(可评论修改意见);accept 后由 "
+        "`omni decisions candidate-apply` 写回陈述库(新版本+取代链;有验证件的先过验证件)。"
+        "正文=markdown 草案(inline_content);机器载荷在 extra.candidate。"
+    ),
+    parent="omni.review-material",
+    tags=["omni.material", "content.review", "review.kind.decision-candidate"],
+    json_schema={
+        "type": "object",
+        "properties": {
+            "candidate": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "enum": ["deviation", "consolidate", "expiry", "memory", "human"],
+                        "description": "信号入口:偏离聚集/固化聚类/到期/AI记忆/人工",
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": ["new", "revise", "retire"],
+                        "description": "提议动作:立新陈述/修订既有(带取代链)/退役",
+                    },
+                    "target_ids": {"type": "array", "items": {"type": "string"},
+                                    "description": "被修订/退役的记录 id(action=new 可空)"},
+                    "proposed": {"type": "object",
+                                  "description": "提议的记录字段(decision.record 子集)"},
+                    "by": {"type": "string", "description": "发起者(人名/agent 标识)"},
+                    "applied_at": {"type": "string", "description": "写回完成时间(apply 后盖)"},
+                    "applied_record_id": {"type": "string"},
+                },
+                "required": ["source", "action"],
+            },
+        },
+        "required": ["candidate"],
+    },
+)
+
+FORMATS = [PLAN, PROGRESS_ENTRY, PROJECT, CAPTURE, REVIEW_MATERIAL, REVIEW_WEBGAME_SPEC,
+           REVIEW_DECISION_CANDIDATE]
 
 
 def register_formats(registry: FormatRegistry) -> None:

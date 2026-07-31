@@ -12,7 +12,7 @@ SPACES: dict[str, dict] = {
     "quant-lab": {"root": r"E:\WindowsWorkspace\quant-lab", "tier": "auto", "group": "omnicompany"},
     "webworks": {"root": r"E:\WindowsWorkspace\webworks", "tier": "auto", "group": "omnicompany"},
     "overlay-shell": {"root": r"E:\WindowsWorkspace\overlay-shell", "tier": "auto", "group": "omnicompany"},
-    "aiworkspace": {"root": r"D:\P4\main\AIWorkSpace", "tier": "snapshot", "group": "demogame"},
+    "aiworkspace": {"root": r"D:\P4\main\AIWorkSpace", "tier": "snapshot", "group": "external"},
     "walker": {"root": r"E:\WindowsWorkspace\webworks\apps\walker-game", "tier": "auto", "group": "omnicompany"},
 }
 

@@ -15,7 +15,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -90,8 +90,31 @@ struct Task {
     /// 统一身份：meego:<id> / multica:<id> / local:<id>，可多条（同一单子两个系统）
     #[serde(default)]
     external_refs: Vec<String>,
+    /// 内部执行 Agent；不可写入外部系统里的经办人。
     #[serde(default)]
     assignee: Option<String>,
+    /// 外部系统里的经办人，不等同于内部执行 Agent。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_owner: Option<String>,
+    /// 来源系统里的项目名，不等同于 Omnicompany Project registry id。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_project: Option<String>,
+    /// 该来源条目是否仍出现在最近一次完整同步中；None 表示非外部任务或尚未迁移。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_active: Option<bool>,
+    /// 已为此任务选定的现有 Skill 名称；只记录路由结果，不复制 Skill 内容。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    routed_skills: Vec<String>,
+    /// 空串=尚未路由；routed / needs_user / needs_controller / started
+    /// 只描述派发阶段，不覆盖来源状态。
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    dispatch_status: String,
+    /// 此任务路由到的 canonical TeamSpec.id；与 assignee 含义不同。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    team_id: Option<String>,
+    /// 此任务在 TeamSpec.positions 中的目标岗位；不表示当前执行者。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    position_id: Option<String>,
     #[serde(default)]
     due_date: Option<String>,
     /// 关联的 omnicompany plan id（R2/R3 用）
@@ -248,8 +271,12 @@ impl App {
         }
         app
     }
-    fn save(&self, s: &Store) {
-        if let Ok(txt) = serde_json::to_string_pretty(s) {
+    fn save(&self, _snapshot: &Store) {
+        // 旧调用方仍传 mutation 后的 snapshot；真正落盘时必须重新读取锁内的最新状态。
+        // 否则 A/B 两次 mutation 都先释放 store 锁后，A 的旧 snapshot 可能比 B 晚写，
+        // 把 B 的任务状态覆盖掉。持锁完成序列化与原子 rename，磁盘始终追随最新内存。
+        let current = self.store.lock().unwrap();
+        if let Ok(txt) = serde_json::to_string_pretty(&*current) {
             let tmp = self.path.with_extension("json.tmp");
             if std::fs::write(&tmp, &txt).is_ok() {
                 let _ = std::fs::rename(&tmp, &self.path);
@@ -276,9 +303,14 @@ struct IncomingTask {
     status: String,
     channel: String,
     external_ref: String,
-    assignee: Option<String>,
+    source_owner: Option<String>,
+    source_project: Option<String>,
     due_date: Option<String>,
     completion: i32,
+}
+
+fn external_source(external_ref: &str) -> &str {
+    external_ref.split(':').next().unwrap_or("")
 }
 
 fn upsert_external(s: &mut Store, inc: IncomingTask) -> String {
@@ -287,7 +319,18 @@ fn upsert_external(s: &mut Store, inc: IncomingTask) -> String {
     if let Some(t) = s.tasks.iter_mut().find(|t| t.external_refs.iter().any(|r| r == &inc.external_ref)) {
         t.title = inc.title;
         t.status = inc.status;
-        if inc.assignee.is_some() { t.assignee = inc.assignee; }
+        // 旧数据曾把来源经办人写进内部 Agent 字段；仅在值完全相同、且任务
+        // 从未进入 Team 岗位时做无损迁移，避免覆盖真实 Agent 认领。
+        if t.source_owner.is_none()
+            && t.team_id.is_none()
+            && t.position_id.is_none()
+            && t.assignee.as_deref() == inc.source_owner.as_deref()
+        {
+            t.source_owner = t.assignee.take();
+        }
+        if inc.source_owner.is_some() { t.source_owner = inc.source_owner; }
+        if inc.source_project.is_some() { t.source_project = inc.source_project; }
+        t.source_active = Some(true);
         if inc.due_date.is_some() { t.due_date = inc.due_date; }
         t.updated_at = now_ms();
         return t.id.clone();
@@ -295,7 +338,11 @@ fn upsert_external(s: &mut Store, inc: IncomingTask) -> String {
     // 2) 同 bug_key 的另一渠道单子 → 合并（统一身份：一张单子两个外部 ref）
     if let Some(k) = key.clone() {
         if let Some(t) = s.tasks.iter_mut().find(|t| {
-            t.external_refs.iter().any(|r| r != &inc.external_ref)
+            // bug_key 只做跨来源合并；同一 Meegle 主单下的不同子任务不能互吞。
+            t.external_refs.iter().any(|r| {
+                r != &inc.external_ref
+                    && external_source(r) != external_source(&inc.external_ref)
+            })
                 && bug_key(&t.title).as_deref() == Some(k.as_str())
         }) {
             if !t.external_refs.contains(&inc.external_ref) {
@@ -305,7 +352,9 @@ fn upsert_external(s: &mut Store, inc: IncomingTask) -> String {
             if t.channel != inc.channel && t.channel != "multi" {
                 t.channel = "multi".into();
             }
-            if inc.assignee.is_some() { t.assignee = inc.assignee; }
+            if inc.source_owner.is_some() { t.source_owner = inc.source_owner; }
+            if inc.source_project.is_some() { t.source_project = inc.source_project; }
+            t.source_active = Some(true);
             if inc.due_date.is_some() { t.due_date = inc.due_date; }
             t.updated_at = now_ms();
             return t.id.clone();
@@ -321,7 +370,9 @@ fn upsert_external(s: &mut Store, inc: IncomingTask) -> String {
         completion: inc.completion,
         channel: inc.channel,
         external_refs: vec![inc.external_ref],
-        assignee: inc.assignee,
+        source_owner: inc.source_owner,
+        source_project: inc.source_project,
+        source_active: Some(true),
         due_date: inc.due_date,
         created_at: now_ms(),
         updated_at: now_ms(),
@@ -353,12 +404,20 @@ async fn board(State(db): State<Db>, Query(q): Query<HashMap<String, String>>) -
             .map(|c| json!({
                 "id":c.id,"title":c.title,"status":c.status,"completion":c.completion,
                 "channel":c.channel,"external_refs":c.external_refs,"assignee":c.assignee,
+                "source_owner":c.source_owner,"source_project":c.source_project,
+                "source_active":c.source_active,"routed_skills":c.routed_skills,
+                "dispatch_status":c.dispatch_status,
+                "team_id":c.team_id,"position_id":c.position_id,
                 "due_date":c.due_date,"plan_id":c.plan_id,"latest_progress":c.latest_progress,
                 "progress": prog_of("task",&c.id),
             })).collect();
         json!({
             "id":t.id,"title":t.title,"status":t.status,"completion":t.completion,"line":t.line,
             "channel":t.channel,"external_refs":t.external_refs,"assignee":t.assignee,
+            "source_owner":t.source_owner,"source_project":t.source_project,
+            "source_active":t.source_active,"routed_skills":t.routed_skills,
+            "dispatch_status":t.dispatch_status,
+            "team_id":t.team_id,"position_id":t.position_id,
             "due_date":t.due_date,"plan_id":t.plan_id,"latest_progress":t.latest_progress,
             "updated_at":t.updated_at,"archived":t.archived,
             "subtasks": subs,
@@ -399,7 +458,13 @@ async fn board(State(db): State<Db>, Query(q): Query<HashMap<String, String>>) -
         .map(|g| goal_json(g)).collect();
     // 外部收件箱（无归属、未归档、未完成的单子）：按紧急度排序（排期 + bug 分级），干掉已完成的。
     let mut loose_refs: Vec<&Task> = s.tasks.iter()
-        .filter(|t| t.goal_id.is_none() && t.parent_task_id.is_none() && !t.archived && !is_done_status(&t.status))
+        .filter(|t| {
+            t.goal_id.is_none()
+                && t.parent_task_id.is_none()
+                && !t.archived
+                && !is_done_status(&t.status)
+                && t.source_active != Some(false)
+        })
         .collect();
     loose_refs.sort_by(|a, b| {
         let due_a = a.due_date.clone().unwrap_or_default();
@@ -503,6 +568,103 @@ async fn upsert_task(State(db): State<Db>, Json(mut b): Json<Task>) -> Json<Valu
     } else { s.tasks.push(b.clone()); }
     let snap = s.clone(); drop(s); db.save(&snap);
     Json(json!({"ok":true,"id":b.id}))
+}
+
+#[derive(Deserialize)]
+struct TaskPositionClaimReq {
+    id: String,
+    assignee: String,
+    team_id: String,
+    position_id: String,
+}
+
+/// 首次认领 + 岗位路由的原子核心。
+///
+/// 同一组值重放是幂等成功；任一已有非空值不同都拒绝，不能用“认领”偷偷改派。
+/// 本接口不承担改派；改派必须另走显式且带审计的迁移语义。
+fn apply_task_position_claim(
+    task: &mut Task,
+    request: &TaskPositionClaimReq,
+) -> Result<bool, &'static str> {
+    let assignee = request.assignee.trim();
+    let team_id = request.team_id.trim();
+    let position_id = request.position_id.trim();
+    if assignee.is_empty() || team_id.is_empty() || position_id.is_empty() {
+        return Err("missing_claim_field");
+    }
+
+    let exact_retry = task.assignee.as_deref() == Some(assignee)
+        && task.team_id.as_deref() == Some(team_id)
+        && task.position_id.as_deref() == Some(position_id);
+    if exact_retry {
+        return Ok(false);
+    }
+    if task.archived || is_done_status(&task.status) {
+        return Err("task_closed");
+    }
+    if task.assignee.as_deref().is_some_and(|value| value != assignee) {
+        return Err("assignee_conflict");
+    }
+    if task.team_id.as_deref().is_some_and(|value| value != team_id) {
+        return Err("team_conflict");
+    }
+    if task.position_id.as_deref().is_some_and(|value| value != position_id) {
+        return Err("position_conflict");
+    }
+
+    task.assignee = Some(assignee.to_string());
+    task.team_id = Some(team_id.to_string());
+    task.position_id = Some(position_id.to_string());
+    task.updated_at = now_ms();
+    Ok(true)
+}
+
+async fn claim_task_for_position(
+    State(db): State<Db>,
+    Json(request): Json<TaskPositionClaimReq>,
+) -> (StatusCode, Json<Value>) {
+    if request.id.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"ok":false,"status":"rejected","error":"missing_task_id"})),
+        );
+    }
+
+    let mut store = db.store.lock().unwrap();
+    let Some(task) = store.tasks.iter_mut().find(|task| task.id == request.id) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"ok":false,"status":"not_found","error":"task_not_found"})),
+        );
+    };
+    match apply_task_position_claim(task, &request) {
+        Ok(changed) => {
+            let status = if changed { "claimed" } else { "already_claimed" };
+            let task_id = task.id.clone();
+            let snapshot = store.clone();
+            drop(store);
+            if changed {
+                db.save(&snapshot);
+            }
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok":true,
+                    "status":status,
+                    "changed":changed,
+                    "task_id":task_id,
+                })),
+            )
+        }
+        Err(error) => (
+            if error == "missing_claim_field" {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::CONFLICT
+            },
+            Json(json!({"ok":false,"status":"conflict","error":error})),
+        ),
+    }
 }
 
 async fn add_progress(State(db): State<Db>, Json(mut b): Json<Progress>) -> Json<Value> {
@@ -702,6 +864,18 @@ async fn patch_task(State(db): State<Db>, Json(b): Json<Value>) -> (StatusCode, 
         if let Some(lp) = b.get("latest_progress").and_then(|v| v.as_str()) { t.latest_progress = Some(lp.to_string()); }
         if let Some(g) = b.get("goal_id").and_then(|v| v.as_str()) { t.goal_id = Some(g.to_string()); }
         if let Some(l) = b.get("line").and_then(|v| v.as_str()) { t.line = l.to_string(); }
+        if let Some(a) = b.get("assignee").and_then(|v| v.as_str()) {
+            t.assignee = Some(a.to_string());
+        }
+        if let Some(skills) = b.get("routed_skills").and_then(|v| v.as_array()) {
+            t.routed_skills = skills.iter()
+                .filter_map(|v| v.as_str())
+                .map(|v| v.to_string())
+                .collect();
+        }
+        if let Some(ds) = b.get("dispatch_status").and_then(|v| v.as_str()) {
+            t.dispatch_status = ds.to_string();
+        }
         t.updated_at = now_ms();
         found = true;
     }
@@ -793,7 +967,13 @@ async fn ingest_external(State(db): State<Db>, Json(b): Json<Value>) -> Json<Val
             status: it.get("status").map(jstr).unwrap_or_default(),
             channel: it.get("channel").map(jstr).filter(|x| !x.is_empty()).unwrap_or_else(|| "meego".into()),
             external_ref: ext,
-            assignee: it.get("assignee").map(jstr).filter(|x| !x.is_empty()),
+            source_owner: it.get("source_owner")
+                .or_else(|| it.get("assignee"))
+                .map(jstr)
+                .filter(|x| !x.is_empty()),
+            source_project: it.get("source_project")
+                .map(jstr)
+                .filter(|x| !x.is_empty()),
             due_date: it.get("due_date").map(jstr).filter(|x| !x.is_empty()),
             completion: it.get("completion").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
         });
@@ -805,37 +985,160 @@ async fn ingest_external(State(db): State<Db>, Json(b): Json<Value>) -> Json<Val
     Json(json!({"ok":true,"ingested":n,"new":new_cnt,"merged_unified":merged}))
 }
 
-/// 同步 meego（经办人/负责人=周灏文 的 mywork todo，翻页拉全）→ 统一身份 upsert。
+fn meego_identity(it: &Value) -> Option<(String, String)> {
+    let wi = it.get("work_item_info");
+    let work_item_id = wi
+        .and_then(|w| w.get("work_item_id"))
+        .or_else(|| it.get("id"))
+        .map(jstr)
+        .unwrap_or_default();
+    if work_item_id.is_empty() {
+        return None;
+    }
+    let work_item_title = wi
+        .and_then(|w| w.get("work_item_name"))
+        .or_else(|| it.get("name"))
+        .map(jstr)
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| format!("meego {}", work_item_id));
+
+    let subtask_id = it
+        .get("sub_task_info")
+        .and_then(|v| v.get("id"))
+        .map(jstr)
+        .unwrap_or_default();
+    let subtask_title = it
+        .get("sub_task_info")
+        .and_then(|v| v.get("name"))
+        .map(jstr)
+        .unwrap_or_default();
+    if !subtask_id.is_empty() {
+        let title = if subtask_title.is_empty() {
+            work_item_title
+        } else {
+            format!("{} / {}", work_item_title, subtask_title)
+        };
+        return Some((format!("meego:subtask:{}", subtask_id), title));
+    }
+
+    let node_title = it
+        .get("node_info")
+        .and_then(|v| v.get("node_name"))
+        .map(jstr)
+        .unwrap_or_default();
+    if !node_title.is_empty() {
+        return Some((
+            format!("meego:node:{}:{}", work_item_id, node_title),
+            format!("{} / {}", work_item_title, node_title),
+        ));
+    }
+    Some((format!("meego:{}", work_item_id), work_item_title))
+}
+
+fn meego_status(it: &Value) -> String {
+    let state_status = it
+        .get("state_info")
+        .and_then(|x| x.get("start_state_key_name"))
+        .map(jstr)
+        .filter(|x| !x.is_empty());
+    let node_status = it
+        .get("node_info")
+        .and_then(|x| x.get("node_state_key"))
+        .map(jstr)
+        .filter(|x| !x.is_empty());
+    state_status
+        .or(node_status)
+        .unwrap_or_else(|| "todo".into())
+}
+
+/// 同步 Meegle 当前待办快照；完整拉取成功后才一次性更新唯一任务真源。
 fn sync_meego_core(app: &App) -> Result<usize, String> {
-    let mut total = 0;
+    let mut all_items: Vec<Value> = Vec::new();
     for page in 1..=10 {
         let p = page.to_string();
-        let raw = run_cli(&["meegle", "mywork", "todo", "--action", "todo", "--page-num", &p, "--format", "json"])
-            .map_err(|e| format!("meegle: {}", e))?;
-        let v: Value = serde_json::from_str(&raw).map_err(|e| format!("parse p{}: {}", page, e))?;
+        let raw = run_cli(&[
+            "meegle", "mywork", "todo", "--action", "todo",
+            "--page-num", &p, "--format", "json",
+        ])
+        .map_err(|e| format!("meegle: {}", e))?;
+        let v: Value =
+            serde_json::from_str(&raw).map_err(|e| format!("parse p{}: {}", page, e))?;
+        let reported_total = v.get("total").and_then(|n| n.as_u64()).map(|n| n as usize);
         let items = extract_array(&v);
-        if items.is_empty() { break; }
-        {
-            let mut s = app.store.lock().unwrap();
-            for it in &items {
-                let wi = it.get("work_item_info");
-                let id = wi.and_then(|w| w.get("work_item_id")).or_else(|| it.get("id")).map(jstr).unwrap_or_default();
-                if id.is_empty() { continue; }
-                let title = wi.and_then(|w| w.get("work_item_name")).or_else(|| it.get("name")).map(jstr).unwrap_or_else(|| format!("meego {}", id));
-                let status = it.get("state_info").and_then(|x| x.get("start_state_key_name")).map(jstr).filter(|x| !x.is_empty()).unwrap_or_else(|| "todo".into());
-                let due = it.get("schedule").and_then(|x| x.get("end_time")).map(jstr).filter(|x| !x.is_empty());
-                upsert_external(&mut s, IncomingTask {
-                    title, status, channel: "meego".into(),
-                    external_ref: format!("meego:{}", id),
-                    assignee: Some("周灏文".into()), due_date: due, completion: 0,
-                });
-                total += 1;
-            }
-            let snap = s.clone(); drop(s); app.save(&snap);
+        if items.is_empty() {
+            break;
         }
-        if items.len() < 30 { break; } // 最后一页
+        all_items.extend(items);
+        if reported_total.is_some_and(|n| all_items.len() >= n) {
+            break;
+        }
     }
-    Ok(total)
+
+    let seen_refs: HashSet<String> = all_items
+        .iter()
+        .filter_map(meego_identity)
+        .map(|(external_ref, _)| external_ref)
+        .collect();
+    let mut store = app.store.lock().unwrap();
+    for it in &all_items {
+        let Some((external_ref, title)) = meego_identity(it) else {
+            continue;
+        };
+        let status = meego_status(it);
+        let due = it
+            .get("schedule")
+            .and_then(|x| x.get("end_time"))
+            .map(jstr)
+            .filter(|x| !x.is_empty());
+        let source_project = it
+            .get("project_name")
+            .map(jstr)
+            .filter(|x| !x.is_empty());
+        upsert_external(
+            &mut store,
+            IncomingTask {
+                title,
+                status,
+                channel: "meego".into(),
+                external_ref,
+                source_owner: Some("周灏文".into()),
+                source_project,
+                due_date: due,
+                completion: 0,
+            },
+        );
+    }
+
+    // 完整快照里未出现的纯 Meegle 任务只标记为来源失活，不删除、不归档。
+    // 同时迁移旧版把来源经办人误写进内部 Agent 字段的数据。
+    for task in &mut store.tasks {
+        let meego_refs: Vec<&String> = task
+            .external_refs
+            .iter()
+            .filter(|r| external_source(r) == "meego")
+            .collect();
+        if meego_refs.is_empty() {
+            continue;
+        }
+        if task.source_owner.is_none()
+            && task.team_id.is_none()
+            && task.position_id.is_none()
+            && task.assignee.as_deref() == Some("周灏文")
+        {
+            task.source_owner = task.assignee.take();
+        }
+        let current = meego_refs.iter().any(|r| seen_refs.contains(r.as_str()));
+        if task.channel == "meego" {
+            task.source_active = Some(current);
+        } else if current {
+            // multi 任务即使 Meegle 一侧失活，也不能替另一来源判断失活。
+            task.source_active = Some(true);
+        }
+    }
+    let snapshot = store.clone();
+    drop(store);
+    app.save(&snapshot);
+    Ok(all_items.len())
 }
 
 fn sync_multica_core(app: &App) -> Result<usize, String> {
@@ -852,7 +1155,10 @@ fn sync_multica_core(app: &App) -> Result<usize, String> {
             status: it.get("status").map(jstr).unwrap_or_default(),
             channel: "multica".into(),
             external_ref: format!("multica:{}", id),
-            assignee: it.get("assignee").map(jstr), due_date: None, completion: 0,
+            source_owner: it.get("assignee").map(jstr),
+            source_project: None,
+            due_date: None,
+            completion: 0,
         });
         n += 1;
     }
@@ -928,6 +1234,7 @@ async fn main() {
         .route("/api/clusters", post(upsert_cluster))
         .route("/api/goals", post(upsert_goal))
         .route("/api/tasks", post(upsert_task))
+        .route("/api/task/claim", post(claim_task_for_position))
         .route("/api/progress", post(add_progress))
         .route("/api/pins", get(get_pins))
         .route("/api/pin", post(set_pin))
@@ -1000,6 +1307,9 @@ mod tests {
             workload: Some(3),
             difficulty: Some(4),
             reasoning: "拆分理由".into(),
+            assignee: Some("agent-a".into()),
+            team_id: Some("team-a".into()),
+            position_id: Some("position-a".into()),
             ..Default::default()
         };
         let s = serde_json::to_string(&t).unwrap();
@@ -1014,6 +1324,9 @@ mod tests {
         assert!(back.parallel);
         assert_eq!(back.workload, Some(3));
         assert_eq!(back.reasoning, "拆分理由");
+        assert_eq!(back.assignee.as_deref(), Some("agent-a"));
+        assert_eq!(back.team_id.as_deref(), Some("team-a"));
+        assert_eq!(back.position_id.as_deref(), Some("position-a"));
     }
 
     #[test]
@@ -1055,5 +1368,162 @@ mod tests {
         let s = app.store.lock().unwrap();
         assert!(!s.tasks.iter().find(|t| t.id == "p_x.1").unwrap().archived);
         assert!(s.tasks.iter().find(|t| t.id == "t1").unwrap().archived);
+    }
+
+    #[test]
+    fn meego_identity_keeps_parent_node_and_subtasks_distinct() {
+        let parent = json!({
+            "work_item_info": {"work_item_id": 100, "work_item_name": "主单"}
+        });
+        let node = json!({
+            "work_item_info": {"work_item_id": 100, "work_item_name": "主单"},
+            "node_info": {"node_name": "确认地图"}
+        });
+        let subtask = json!({
+            "work_item_info": {"work_item_id": 100, "work_item_name": "主单"},
+            "sub_task_info": {"id": 101, "name": "确认奖励"}
+        });
+
+        assert_eq!(
+            meego_identity(&parent),
+            Some(("meego:100".into(), "主单".into()))
+        );
+        assert_eq!(
+            meego_identity(&node),
+            Some(("meego:node:100:确认地图".into(), "主单 / 确认地图".into()))
+        );
+        assert_eq!(
+            meego_identity(&subtask),
+            Some(("meego:subtask:101".into(), "主单 / 确认奖励".into()))
+        );
+        let node_state = json!({
+            "state_info": {"start_state_key_name": ""},
+            "node_info": {"node_state_key": "doing"}
+        });
+        assert_eq!(meego_status(&node_state), "doing");
+    }
+
+    #[test]
+    fn external_owner_does_not_occupy_internal_agent_and_same_source_bugs_do_not_merge() {
+        let mut store = Store::default();
+        for (external_ref, title) in [
+            ("meego:subtask:1", "BUG-123456 / 子任务一"),
+            ("meego:subtask:2", "BUG-123456 / 子任务二"),
+        ] {
+            upsert_external(
+                &mut store,
+                IncomingTask {
+                    title: title.into(),
+                    status: "todo".into(),
+                    channel: "meego".into(),
+                    external_ref: external_ref.into(),
+                    source_owner: Some("来源经办人".into()),
+                    source_project: Some("iGame".into()),
+                    due_date: None,
+                    completion: 0,
+                },
+            );
+        }
+        assert_eq!(store.tasks.len(), 2);
+        assert!(store.tasks.iter().all(|task| task.assignee.is_none()));
+        assert!(store
+            .tasks
+            .iter()
+            .all(|task| task.source_owner.as_deref() == Some("来源经办人")));
+    }
+
+    #[test]
+    fn legacy_external_assignee_moves_to_source_owner_without_overwriting_agent() {
+        let mut store = Store::default();
+        store.tasks.push(Task {
+            id: "t1".into(),
+            title: "旧单".into(),
+            status: "todo".into(),
+            channel: "meego".into(),
+            external_refs: vec!["meego:1".into()],
+            assignee: Some("周灏文".into()),
+            ..Default::default()
+        });
+        upsert_external(
+            &mut store,
+            IncomingTask {
+                title: "旧单".into(),
+                status: "todo".into(),
+                channel: "meego".into(),
+                external_ref: "meego:1".into(),
+                source_owner: Some("周灏文".into()),
+                source_project: Some("iGame".into()),
+                due_date: None,
+                completion: 0,
+            },
+        );
+        let task = &store.tasks[0];
+        assert!(task.assignee.is_none());
+        assert_eq!(task.source_owner.as_deref(), Some("周灏文"));
+        assert_eq!(task.source_project.as_deref(), Some("iGame"));
+        assert_eq!(task.source_active, Some(true));
+    }
+
+    #[test]
+    fn task_position_claim_is_atomic_idempotent_and_conflict_safe() {
+        let mut task = Task {
+            id: "p_x.1".into(),
+            title: "待认领".into(),
+            status: "pending".into(),
+            ..Default::default()
+        };
+        let first = TaskPositionClaimReq {
+            id: task.id.clone(),
+            assignee: "agent-a".into(),
+            team_id: "team-a".into(),
+            position_id: "position-a".into(),
+        };
+        assert_eq!(apply_task_position_claim(&mut task, &first), Ok(true));
+        assert_eq!(apply_task_position_claim(&mut task, &first), Ok(false));
+
+        let other_agent = TaskPositionClaimReq {
+            assignee: "agent-b".into(),
+            ..first
+        };
+        assert_eq!(
+            apply_task_position_claim(&mut task, &other_agent),
+            Err("assignee_conflict")
+        );
+        assert_eq!(task.assignee.as_deref(), Some("agent-a"));
+        assert_eq!(task.position_id.as_deref(), Some("position-a"));
+
+        let other_position = TaskPositionClaimReq {
+            id: task.id.clone(),
+            assignee: "agent-a".into(),
+            team_id: "team-a".into(),
+            position_id: "position-b".into(),
+        };
+        assert_eq!(
+            apply_task_position_claim(&mut task, &other_position),
+            Err("position_conflict")
+        );
+        assert_eq!(task.position_id.as_deref(), Some("position-a"));
+    }
+
+    #[test]
+    fn stale_snapshot_cannot_overwrite_newer_store_state() {
+        let path = tmp_store_path("stale-save");
+        let app = App::load(path.clone());
+        let stale = app.store.lock().unwrap().clone();
+        {
+            let mut store = app.store.lock().unwrap();
+            store.tasks.push(Task {
+                id: "p_x.1".into(),
+                title: "newer task".into(),
+                status: "pending".into(),
+                ..Default::default()
+            });
+        }
+
+        app.save(&stale);
+
+        let persisted: Store =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        assert!(persisted.tasks.iter().any(|task| task.id == "p_x.1"));
     }
 }

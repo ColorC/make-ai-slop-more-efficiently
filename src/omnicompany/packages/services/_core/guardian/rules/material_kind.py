@@ -49,6 +49,11 @@ def _check_material_kind_missing(ctx: FileContext) -> bool:
         return False
     if not _is_formats_py(ctx):
         return False
+    # 2026-07-26 锚定: 只查 src/omnicompany/packages/ 活包树 — data/ 下仓库
+    # 快照树里的 formats.py 副本是数据产物 (162 条存量误报), 不该按 F-19 判
+    p = ctx.path.replace("\\", "/")
+    if not p.startswith("src/omnicompany/packages/"):
+        return False
 
     content = ctx.content or ""
     if not _MATERIAL_CALL_RE.search(content):

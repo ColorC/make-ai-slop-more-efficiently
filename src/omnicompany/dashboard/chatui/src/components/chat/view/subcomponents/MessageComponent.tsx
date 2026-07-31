@@ -182,7 +182,9 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, a
                             ? t('messageTypes.gemini')
                             : provider === 'opencode'
                               ? t('messageTypes.opencode', { defaultValue: 'OpenCode' })
-                              : provider === 'omni_agent'
+                              : provider === 'kimi'
+                                ? t('messageTypes.kimi', { defaultValue: 'Kimi' })
+                                : provider === 'omni_agent'
                                 ? t('messageTypes.omni_agent', { defaultValue: 'Omni Agent' })
                                 : provider === 'controller'
                                   ? t('messageTypes.controller', { defaultValue: '总控' })

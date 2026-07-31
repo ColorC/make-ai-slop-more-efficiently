@@ -8,7 +8,7 @@ worker as a first-class entity. This module exposes:
 - GET /api/workers/{id:path}    one worker (design.md + source excerpt)
 
 Worker `id` is the path under packages/ without `.py`, slash-separated, e.g.
-`domains/voxelcraft/block/workers/block_designer`.
+`domains/research/report/workers/report_writer`.
 """
 
 from __future__ import annotations

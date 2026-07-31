@@ -594,7 +594,7 @@ class TeamRunner:
 
         当目标节点的 format_in 指向已注册的 composite Format 时，改用上游节点的
         format_out 作为 key（即 component Format ID），使 Router.run() 能通过
-        input_data["feishu.api-spec"] 精确访问各路输入，而非猜测 _from_{node_id}。
+        input_data["api.spec"] 精确访问各路输入，而非猜测 _from_{node_id}。
         """
         if len(received) == 1:
             return next(iter(received.values())).output
@@ -728,23 +728,26 @@ class TeamRunner:
             # ── 节点执行 ──
             t0 = time.monotonic()
 
-            # 通用 bus 注入（2026-04-18 扩展）：
-            # Router 子类可选消费这些属性（默认不读不影响）；AgentNodeLoop-based
-            # Router（如 ModuleExplorer / ProposalDisputeLoop）在 _build_loop()
-            # 时把 self._bus 透传到内层 loop，保证 agent 内部 tool.call/tool.result
-            # /llm.request/llm.response 事件全量落盘，替代 ALLOW_NO_BUS opt-out。
-            router._bus = self.bus
-            router._parent_event_id = node_event.id
-            router._trace_id = trace_id
+            # 单一运行时绑定合同。复合 Router 负责把同一上下文递归传给
+            # 内部 Router，避免 AgentNodeLoop 的 LLM/tool 事件滞留在构造期
+            # placeholder MemoryBus。
+            router.bind_runtime_context(
+                bus=self.bus,
+                parent_event_id=node_event.id,
+                trace_id=trace_id,
+            )
 
             from omnicompany.runtime.exec.sub_pipeline import SubTeamWorker
             # SubTeamWorker 之前的专属注入现在由上面的通用路径覆盖，保留 isinstance
             # 检查仅作语义标识（无效果，留作将来 SubPipeline 专属字段扩展钩子）。
             _ = isinstance(router, SubTeamWorker)
 
-            # 注入 caller 标识供 LLM 计量（pipeline.节点名.step_N）
-            if isinstance(input_data, dict):
-                input_data["_llm_caller"] = f"pipeline.{self.pipeline.name}.{node_id}.step_{step}"
+            # 运行元数据属于 Worker 实例，不得写进业务 Material。旧实现把
+            # `_llm_caller` 塞进 input_data，既污染下游 schema，也会被透传进
+            # 最终产物。
+            router._llm_caller = (
+                f"pipeline.{self.pipeline.name}.{node_id}.step_{step}"
+            )
 
             # ── Phase 2.5 关联机制: 设置 audit_context, 节点内所有 LLM 调用自动继承 ──
             audit_ctx = {

@@ -1,9 +1,9 @@
 # [OMNI] origin=claude-code ts=2026-05-02 type=infra
 # [OMNI] material_id="material:cli.claude_code.wrapper.settings_installer.py"
-"""omni cc — Claude Code wrapper management.
+"""omni cc — native Claude Code / Codex lifecycle integration management.
 
 Subcommands (single source of truth — dashboard install button calls these):
-    omni cc install   [--scope project|user]   register MCP + hooks in settings.json
+    omni cc install   [--provider claude_code|codex] [--scope project|user]
     omni cc uninstall [--scope project|user]   remove only the entries we own
     omni cc status    [--scope project|user]   show what's currently wired
 """
@@ -12,44 +12,62 @@ import json
 
 import click
 
+from omnicompany.dashboard.ccdaemon import codex_installer as ci
 from omnicompany.dashboard.ccdaemon import installer as si
+
+
+def _integration_installer(provider: str):
+    return ci if provider == "codex" else si
 
 
 @click.group("cc")
 def cmd_cc():
-    """Claude Code wrapper integration commands."""
+    """Native Claude Code/Codex integration commands (historical `cc` name)."""
 
 
 @cmd_cc.command("install")
 @click.option("--scope", type=click.Choice(["project", "user"]), default="project",
-              help="`project` writes to <repo>/.claude/settings.json (recommended). "
-                   "`user` writes to ~/.claude/settings.json (affects all your claude usage).")
-def cc_install(scope: str) -> None:
-    """Wire omnicompany MCP server + hooks into Claude Code's settings."""
-    rep = si.install(scope=scope)  # type: ignore[arg-type]
-    click.echo(json.dumps({
+              help="Project scope is recommended; user scope affects every native session.")
+@click.option("--provider", type=click.Choice(["claude_code", "codex"]), default="claude_code",
+              show_default=True)
+def cc_install(scope: str, provider: str) -> None:
+    """Wire Omnicompany lifecycle hooks into a native agent."""
+    target = _integration_installer(provider)
+    rep = target.install(scope=scope)  # type: ignore[arg-type]
+    payload = {
+        "provider": provider,
         "settings_path": rep.settings_path,
         "backup": rep.backup,
-        "mcp_added_or_updated": rep.mcp_added,
         "hooks_added_or_updated": rep.hooks_added,
         "hooks_unchanged": rep.hooks_unchanged,
         "note": rep.note,
-    }, indent=2, ensure_ascii=False))
+    }
+    if hasattr(rep, "mcp_added"):
+        payload["mcp_added_or_updated"] = rep.mcp_added
+    if hasattr(rep, "requires_trust"):
+        payload["requires_trust"] = rep.requires_trust
+    click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
 @cmd_cc.command("uninstall")
 @click.option("--scope", type=click.Choice(["project", "user"]), default="project")
-def cc_uninstall(scope: str) -> None:
-    """Remove only the entries omnicompany installed; leave the rest of settings.json alone."""
-    rep = si.uninstall(scope=scope)  # type: ignore[arg-type]
+@click.option("--provider", type=click.Choice(["claude_code", "codex"]), default="claude_code",
+              show_default=True)
+def cc_uninstall(scope: str, provider: str) -> None:
+    """Remove only entries Omnicompany installed; preserve unrelated settings."""
+    rep = _integration_installer(provider).uninstall(scope=scope)  # type: ignore[arg-type]
+    rep["provider"] = provider
     click.echo(json.dumps(rep, indent=2, ensure_ascii=False))
 
 
 @cmd_cc.command("status")
 @click.option("--scope", type=click.Choice(["project", "user"]), default="project")
-def cc_status(scope: str) -> None:
+@click.option("--provider", type=click.Choice(["claude_code", "codex"]), default="claude_code",
+              show_default=True)
+def cc_status(scope: str, provider: str) -> None:
     """Show whether the integration is currently installed at the given scope."""
-    rep = si.status(scope=scope)  # type: ignore[arg-type]
+    rep = _integration_installer(provider).status(scope=scope)  # type: ignore[arg-type]
+    rep["provider"] = provider
     click.echo(json.dumps(rep, indent=2, ensure_ascii=False))
 
 
@@ -358,6 +376,7 @@ def ensure_chatui_running(port: int = 0, wait_ready_s: float = 8.0) -> dict:
     log_path = _chatui_log_file()
     env = os.environ.copy()
     env["SERVER_PORT"] = str(port)
+    env["HOST"] = "127.0.0.1"  # LAN access must traverse the authenticated 12443 gateway.
     env["VITE_IS_PLATFORM"] = "true"  # 免登录(代码已硬编码, 这里冗余兜底)
     log_fd = open(log_path, "ab")
     creationflags = 0x00000008 if sys.platform == "win32" else 0  # DETACHED_PROCESS — 无窗口

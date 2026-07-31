@@ -5,7 +5,7 @@
 # [OMNI] material_id="material:services._core.lifecycle.notes_materialize.py"
 """poof-notes 消费任务(消费侧入册)。
 
-run_notes_materialize(notes_root, *, state_path, model=None, root=None, push_inbox=False):
+run_notes_materialize(notes_root, *, state_path, model=None, root=None, submit_review=False):
     读 notes_root/index.json + docs/<id>.md(只读, 不改真源) → 对每条按 updatedDate 做
     逐条水位线(state_path 记 note_id → 上次处理的 updatedDate) → 有变更的送
     classify_material() 分类(受控词表)→ 进程内注册成 material → 写回 semantic 属性
@@ -115,7 +115,8 @@ def run_notes_materialize(
     state_path: Path,
     model: str | None = None,
     root: Path | None = None,
-    push_inbox: bool = False,
+    submit_review: bool = False,
+    review_store=None,
 ) -> dict[str, Any]:
     """消费一轮: 读 index.json + docs/*.md(只读), 逐条水位线增量分类入册。真源零改动。"""
     from omnicompany.packages.services._core.semantic_fs import classify as classify_mod
@@ -129,6 +130,7 @@ def run_notes_materialize(
     materialized = 0
     llm_calls = 0
     entity_ids: list[str] = []
+    review_items: list[dict[str, Any]] = []
 
     for n in idx.get("notes") or []:
         if not isinstance(n, dict) or not n.get("id"):
@@ -171,25 +173,38 @@ def run_notes_materialize(
             root=root,
         )
 
-        if push_inbox and (c.get("confidence") == "low" or c.get("invalid_tags")):
-            try:
-                from omnicompany.runtime.buses import HumanBus, HumanKind
-                HumanBus().ask(
-                    question=f"笔记已自动入册但置信不足/有越界标签, 请核分类: {note_id} ({title})",
-                    kind=HumanKind.HUMAN_BLOCKING,
-                    context={"facility": "notes_materialize", "entity_id": entity_id, "classify": c},
-                    source="notes_materialize",
-                )
-            except Exception:  # noqa: BLE001
-                pass
+        if submit_review and (c.get("confidence") == "low" or c.get("invalid_tags")):
+            review_items.append({"note_id": note_id, "title": title, "entity_id": entity_id, "classify": c})
 
         note_states[note_id] = {"updatedDate_seen": watermark_key, "entity_id": entity_id}
         entity_ids.append(entity_id)
         materialized += 1
 
     _save_state(Path(state_path), {"notes": note_states})
+    review_material = None
+    if review_items:
+        if review_store is None:
+            from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+            review_store = get_store()
+        from omnicompany.dashboard.boss_sight.reviewstage.report_submission import submit_markdown_report
+        lines = ["# 笔记语义分类待核", ""]
+        for item in review_items:
+            c = item["classify"]
+            lines.append(
+                f"- `{item['note_id']}` · {item['title']} · `{item['entity_id']}` · "
+                f"置信 `{c.get('confidence')}` · 越界 `{c.get('invalid_tags')}`"
+            )
+        review_material = submit_markdown_report(
+            review_store, title="笔记语义分类待核", content="\n".join(lines),
+            source_plan_id="format-material/[2026-06-27]SEMANTIC-FILESYSTEM-ALL-MATERIAL",
+            reason="本轮笔记自动分类存在低置信或越界标签; 请按合并清单核对。",
+            dedupe_key="notes-materialize-classification",
+            stable_payload=json.dumps(review_items, ensure_ascii=False, sort_keys=True),
+            version_family="notes-materialize-classification",
+        )
 
-    return {"ok": True, "materialized": materialized, "llm_calls": llm_calls, "entity_ids": entity_ids}
+    return {"ok": True, "materialized": materialized, "llm_calls": llm_calls,
+            "entity_ids": entity_ids, "review_material": review_material}
 
 
 # ─────────────────────────── 孤儿 ydoc 回收 ───────────────────────────

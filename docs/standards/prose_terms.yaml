@@ -159,7 +159,7 @@ term_consistency:
     note: "whatnow 是进度唯一真源"
   - canonical: "审阅台"
     variants: ["审查台", "review台", "评审台"]
-    note: "reviewstage / human-inbox"
+    note: "统一写 Reviewstage / 审阅台"
   - canonical: "纳管"
     variants: ["纳入管理", "收编进", "归管"]
     note: "把计划纳入 whatnow 跟踪"

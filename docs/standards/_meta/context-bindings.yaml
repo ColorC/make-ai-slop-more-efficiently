@@ -71,9 +71,12 @@ profiles:
         - src/omnicompany/**/formats.py
         - src/omnicompany/dashboard/boss_sight/reviewstage/**/*.py
         - src/omnicompany/cli/commands/boss_sight.py
+        - src/omnicompany/dashboard/frontend/src/entities/review/**/*.tsx
+        - src/omnicompany/dashboard/frontend/src/entities/note/wikilinks.ts
+        - src/omnicompany/dashboard/frontend/src/shell/MarkdownRenderer.tsx
         - docs/standards/review/**/*.md
         - "**/demo-tours.ts"
-      trigger_keywords: [审阅, reviewable, 审阅材料, webgame-spec, 引导演示, 文件树 diff, review material, 推送, curated]
+      trigger_keywords: [审阅, 提交审阅, reviewable, 审阅材料, omni review, review_context, review profile, MaterialEmbed, embedded_review, submission_preflight, embed_preflight, AIGC, 嵌入, webgame-spec, 引导演示, 文件树 diff, review material, 推送, curated]
     include:
       standards:
         - docs/standards/protocol/review_report_form_association.md
@@ -84,6 +87,22 @@ profiles:
         - docs/standards/review/templates/引导演示.tour.md
         - docs/standards/review/templates/spec报告.md
         - docs/standards/review/templates/reviewable.导览.md
+
+  - id: omnicompany.review-facility-discovery
+    priority: 85
+    description: "只有审阅设施无法自动确定或正在维护 renderer 时，按需加载可搜索设施手册。"
+    applies:
+      path_match:
+        - docs/standards/review/审阅设施手册.md
+        - src/omnicompany/dashboard/boss_sight/reviewstage/capabilities.py
+        - src/omnicompany/dashboard/frontend/src/entities/review/rendererRegistry.ts
+        - src/omnicompany/dashboard/frontend/src/entities/review/materialEmbedViews.tsx
+        - src/omnicompany/dashboard/frontend/src/entities/review/MaterialViews.tsx
+        - src/omnicompany/dashboard/frontend/src/entities/review/businesses/index.ts
+      trigger_keywords: [审阅组件, 审阅设施, 组件目录, 设施手册, review facility, review renderer, compact preview, 专门页面, generic-card]
+    include:
+      standards:
+        - docs/standards/review/审阅设施手册.md
 
   - id: omnicompany.worker-authoring
     priority: 80
@@ -152,9 +171,9 @@ profiles:
       trigger_keywords: [mc pipeline, mc company, mc 公司, 产线, dogfood]
     include:
       plans:
-        - docs/plans/voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE/plan.md
-        - docs/plans/voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE/brief.md
-        - docs/plans/voxelcraft/[2026-05-17]MC-COMPANY-PIPELINE/audit.md
+        - docs/plans/voxelcraft/_archive/[2026-05-17]MC-COMPANY-PIPELINE/plan.md
+        - docs/plans/voxelcraft/_archive/[2026-05-17]MC-COMPANY-PIPELINE/brief.md
+        - docs/plans/voxelcraft/_archive/[2026-05-17]MC-COMPANY-PIPELINE/audit.md
 
   - id: voxelcraft.material-standard-authoring
     priority: 90

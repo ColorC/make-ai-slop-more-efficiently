@@ -16,9 +16,10 @@ from .workers.portrait_assembler import PortraitAssemblerWorker
 def build_bindings(input_dict: dict | None = None) -> dict[str, Worker]:
     registry = create_builtin_registry()
     register_formats(registry)
+    model = str((input_dict or {}).get("model") or "").strip() or None
     return {
-        "TargetExplorerWorker": TargetExplorerWorker(),
-        "HypothesisProposerWorker": HypothesisProposerWorker(),
+        "TargetExplorerWorker": TargetExplorerWorker(model=model),
+        "HypothesisProposerWorker": HypothesisProposerWorker(model=model),
         "HypothesisVerifierDispatcherWorker": HypothesisVerifierDispatcherWorker(),
         "PortraitAssemblerWorker": PortraitAssemblerWorker(),
     }

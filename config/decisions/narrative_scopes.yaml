@@ -1,0 +1,22 @@
+version: 1
+
+# 跨项目叙事只保存“如何选记录”的投影定义；事实仍以统一决策库 records.jsonl 为真源。
+scopes:
+  outward-publishing:
+    display_name: 对外与内部发布管线
+    projects:
+      - web-company
+      - personal-site
+      - xiaohongshu-publish
+      - publish
+      - demogame-publishing
+    anchor_contains:
+      - docs/plans/publish/
+      - docs/standards/publishing/
+      - config/publishing/
+      - config/publication_common/
+      - config/xiaohongshu_publish/
+    tags:
+      - publishing
+      - publish
+      - xiaohongshu

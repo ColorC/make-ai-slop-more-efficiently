@@ -1,0 +1,559 @@
+# [OMNI] origin=internal-engine domain=services/knowledge ts=2026-04-17T14:16:52Z
+---
+omnikb_type: khyp
+id: kb.hyp.lark-cli
+name: lark-cli 探索笔记
+tags:
+- domain.lark-cli
+maturity: draft
+summary: '在本机已登录飞书桌面客户端的前提下，找出不需要用户再次浏览器授权就能获取 lark user token 的方法。
+
+
+  背景：用户已在 Feishu 桌面客户端登录，目标绕过浏览器交互。探索方向：注册表、配置目录、桌面客户端缓存。'
+scene:
+  tool: lark-cli
+  os: Windows 10
+  timestamp: '2026-04-17'
+hypotheses:
+  - id: passport-encryption
+    summary: persistent_passport_info_v2 使用 AES-GCM 加密，密钥来自 Local State 中 os_crypt.encrypted_key（经 DPAPI 解密）
+    maturity: living
+    kind: state
+    format_in: {summary: "触发条件：在已登录飞书桌面客户端的 Windows 环境下，LarkShell 配置目录中存在 Local State 文件和 persistent_passport_info_v2 加密数据", trigger_files: ["LarkShell/Local State", "persistent_passport_info_v2"], required_tools: ["python", "win32crypt"]}
+    format_out: {summary: "预测输出：成功解密得到包含 user_auth_list 的 JSON 明文，其中含有 suite_session_key、device_id、install_id 等字段", expected_keys: ["user_auth_list", "suite_session_key", "device_id"], exit_code: 0}
+    evidence:
+      - 描述: Experimenter 用 python 脚本从 Local State 读取 os_crypt.encrypted_key，base64 解码后跳过前 5 字节，用 win32crypt.CryptUnprotectData 解密得到 AES 密钥；再用该密钥对 persistent_passport_info_v2 做 AES-GCM 解密（nonce 为 data[7:19]），成功得到包含 user_auth_list 的 JSON 明文
+        出处: bash session 1a8c0133 steps [4][9]
+        时间: "2026-04-17T14:16:52Z"
+        session: 1a8c0133
+      - 描述: Experimenter 调用 bash 执行 `ls /c/Users/lilithgames/AppData/Roaming/ | grep -i -E "lark|feishu"`，返回 "LarkShell"，再次确认 LarkShell 配置目录存在于 AppData/Roaming 路径下
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-18T16:00:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/`，完整列出 LarkShell Roaming 目录结构（约 60 个条目），确认了多个关键文件的存在：Local State（5229 字节）、persistent_passport_info_v2（5080 字节）、persistent_storage.db（217088 字节，含 -shm/-wal 伴生文件）、persistent_storage.enc.db（4096 字节，含 -wal 文件）、persistent_storage.preload.db（4935680 字节，含 -wal 文件）、persistent_storage_kv（21185 字节）、Remote_State（10136 字节）、Remote_Feature_7469976784941547522（25198 字节，与 cookie-storage-path 假设中的 user ID 一致）、Remote_Feature_Default（25198 字节）、logout_token（28 字节）、lockfile（0 字节）、DeviceInfo.json（197 字节）、exception_config.json（350 字节）、first_party_sets.db（49152 字节），以及多个子目录如 Default/、IronDefault/、aha/、media_center/、net_config/、passport_storage/、sdk_storage/、doctor/、update/ 等。其中 logout_token（28 字节）可能包含登出状态的凭据信息，Remote_State 和 Remote_Feature_* 文件表明 LarkShell 从远端拉取配置和功能标记。
+        出处: bash session fa26096d step [15]
+        时间: "2026-04-19T00:58:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 `cat /c/Users/lilithgames/AppData/Roaming/LarkShell/Local State`，成功读取 Local State 文件的完整 JSON 内容。该文件包含以下关键配置：os_crypt.encrypted_key（DPAPI 加密的 AES 密钥，用于解密 persistent_passport_info_v2）、profile.info_cache（记录了 4 个 profile：global\\profile_global（用户1）、b12adeef...\\profile_main（用户2）、b12adeef...\\profile_explorer（用户3）、b12adeef...\\PartitionsV2\\user-approval-7469976784941547522（用户4））、intl.app_locale 为 zh-CN、cloned_install 首次时间戳 1772242694（约 2026-02-28）、user_experience_metrics（含 stability.exited_cleanly: true、system_crash_count: 1）、variations_limited_entropy_synthetic_trial_seed_v2: "36" 等。该观察完整揭示了 Local State 文件的数据结构，确认 os_crypt.encrypted_key 字段的存在及其在 passport 解密链路中的关键角色。
+        出处: bash session fa26096d step [16]
+        时间: "2026-04-19T01:00:00Z"
+        session: fa26096d
+    counterexamples:
+      - 描述: Experimenter 在本轮中再次尝试从 LarkShell\Local State 读取 os_crypt.encrypted_key 并用 win32crypt.CryptUnprotectData 解密，返回错误码 13（"数据无效"）；随后用 ctypes 直接调用 CryptUnprotectData 同样返回 None，DPAPI blob 前缀确认为 b'DPAPI' 但解密始终失败
+        出处: bash session 1a8c0133 steps [16][17][30][31][32]
+        时间: "2026-04-17T15:30:00Z"
+        session: 1a8c0133
+    state_log:
+      - {从: draft, 到: living, 理由: AES-GCM 解密方案在一次完整链路中成功执行，获得明文 passport JSON, 时间: "2026-04-17T14:16:52Z"}
+    created_at: "2026-04-17T14:16:52Z"
+    created_in_session: 1a8c0133
+
+  - id: session-key-web-access
+    summary: persistent_passport_info_v2 中 user_auth_list[0].suite_session_key 可作为 session cookie 用于访问 feishu.cn 网页端，但无法直接用于开放平台 API 获取 user token
+    maturity: living
+    kind: transition
+    format_in: {summary: "触发条件：已成功解密 persistent_passport_info_v2 并获得 user_auth_list，从中提取 suite_session_key", required_data: ["suite_session_key"], target_domains: ["feishu.cn", "open.feishu.cn", "open.larksuite.com"]}
+    format_out: {summary: "预测输出：若 session key 可作为 web cookie 使用则目标网站返回 HTTP 200；若可兑换为开放平台 token 则 API 返回有效用户信息", possible_outcomes: ["web认证成功(HTTP 200)", "API认证成功", "均失败"], exit_code: "取决于目标端点响应"}
+    evidence:
+      - 描述: Experimenter 将 suite_session_key 作为 Cookie（session=<key>）发送给 www.feishu.cn 根路径，收到 HTTP 200 响应，证明该 key 在 web 端具有认证效力
+        出处: bash session 1a8c0133 step [6]
+        时间: "2026-04-17T14:16:52Z"
+        session: 1a8c0133
+    counterexamples:
+      - 描述: Experimenter 尝试将 suite_session_key 作为 cookie 访问 open.feishu.cn/open-apis/authen/v1/user_info 和 open.feishu.cn/open-apis/contact/v3/users/me 等开放平台端点，均未返回有效用户信息（HTTP 错误或空响应）
+        出处: bash session 1a8c0133 steps [7][8]
+        时间: "2026-04-17T14:16:52Z"
+        session: 1a8c0133
+      - 描述: Experimenter 尝试访问 passport.feishu.cn/suite/login/token 端点，返回 404 Not Found
+        出处: bash session 1a8c0133 step [50]
+        时间: "2026-04-17T14:16:52Z"
+        session: 1a8c0133
+    state_log:
+      - {从: draft, 到: living, 理由: session key 在 feishu.cn 网页端验证有效（HTTP 200），但开放平台 API 和 passport token 端点均失败，尚需进一步探索 token 兑换路径, 时间: "2026-04-17T14:16:52Z"}
+    created_at: "2026-04-17T14:16:52Z"
+    created_in_session: 1a8c0133
+
+  - id: cookie-storage-path
+    summary: LarkShell 的 Cookies 不存储在 Default\Cookies（该文件为 0 字节），而是存储在 aha\users\<user_id>\PartitionsV2\user-approval-<id>\Network\Cookies 等 per-user partition 路径下
+    maturity: living
+    kind: state
+    format_in: {summary: "触发条件：在 LarkShell 配置目录下查找 Cookies 文件，预期位于 Default/Cookies", search_paths: ["LarkShell/Default/Cookies"], tools: ["os.walk", "shutil.copy2"]}
+    format_out: {summary: "预测输出：Default/Cookies 为 0 字节，实际 Cookies 存储在 aha/users/<user_id>/PartitionsV2/*/Network/Cookies 路径下", actual_path_pattern: "aha/users/*/PartitionsV2/*/Network/Cookies", exit_code: 0}
+    evidence:
+      - 描述: Experimenter 用 shutil.copy2 复制 Default\Cookies 到工作目录，确认文件大小为 0 字节；随后用 os.walk 遍历 LarkShell 目录，发现 aha\users\b12adeef...\PartitionsV2\user-approval-7469976784941547522\Network\Cookies（28672 字节）和 aha\users\global\profile_global\Network\Cookies（20480 字节）有实际数据
+        出处: bash session 1a8c0133 steps [55][57]
+        时间: "2026-04-17T14:16:52Z"
+        session: 1a8c0133
+      - 描述: Experimenter 调用 bash 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/`，确认 LarkShell Roaming 目录下存在 aha/、Default/、IronDefault/ 等子目录，与 cookie-storage-path 假设中描述的存储结构一致；同时发现 Remote_Feature_7469976784941547522 文件，其 ID 与之前发现的 user-approval-7469976784941547522 路径一致
+        出处: bash session fa26096d step [15]
+        时间: "2026-04-19T00:58:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/aha/`，返回 `users` 子目录（drwxr-xr-x，创建时间 Feb 27 18:44）。该观察再次确认 aha/ 目录下存在 users/ 子目录，与 cookie-storage-path 假设中描述的 aha/users/<user_id>/PartitionsV2/*/Network/Cookies 路径结构一致。
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-19T01:05:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/Default/`，列出 Default 目录内容：Cookies（0 字节，确认该文件为空）、Preferences（231776 字节）、Secure Preferences（231792 字节）。该观察再次验证了 cookie-storage-path 假设中"Default/Cookies 为 0 字节"的结论，同时发现了两个约 230KB 的 Preferences 文件，可能包含浏览器级配置和安全相关设置。
+        出处: bash session fa26096d step [18]
+        时间: "2026-04-19T00:36:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/aha/users/b12adeef66bf9162917e119866815449/PartitionsV2/user-approval-7469976784941547522/Network/`，列出了该 partition 的 Network 目录内容：Cookies（28672 字节，创建时间 Apr 9 20:59）、Cookies-journal（0 字节）、Network Persistent State（3163 字节）、NetworkDataMigrated（0 字节）、Reporting and NEL（36864 字节）、Trust Tokens（36864 字节）、SCT Auditing Pending Reports（2 字节）等。该观察直接确认了 Cookies 数据库文件及其伴生 journal 文件存在于 user-approval partition 的 Network 子目录下，且该目录遵循标准 Chromium Network 存储结构（包含 Persistent State、NEL 报告、Trust Tokens 等 Chromium 特有文件）。Cookies 文件大小 28672 字节与之前 session 1a8c0133 中观察到的大小一致。
+        出处: bash session fa26096d step [19]
+        时间: "2026-04-19T01:10:00Z"
+        session: fa26096d
+    state_log:
+      - {从: draft, 到: living, 理由: 通过实际文件遍历确认了 Cookies 的真实存储路径, 时间: "2026-04-17T14:16:52Z"}
+    created_at: "2026-04-17T14:16:52Z"
+    created_in_session: 1a8c0133
+
+  - id: cookie-db-access-failure
+    summary: 在 bash 环境下通过 Python sqlite3 直接访问 LarkShell Cookies 数据库文件（路径: aha/users/<user_id>/PartitionsV2/user-approval-<id>/Network/Cookies）失败，sqlite3 返回 "unable to open database file" 错误。该路径在 bash shell 中存在且 ls 可正常列出，但 Python sqlite3 模块无法打开——可能原因：路径转义问题、文件被 LarkShell 进程锁定、或 bash 环境与 Windows 原生路径映射不一致。此外，OmniGuardian 的 drawer 权限机制也会阻止在非声明目录内写入文件副本，导致"复制后分析"的间接方案同样受阻
+    maturity: draft
+    kind: transition
+    format_in: {summary: "触发条件：已通过 ls 确认 Cookies SQLite 文件存在于 aha/users/<user_id>/PartitionsV2/user-approval-<id>/Network/Cookies 路径，尝试用 Python sqlite3 模块直接连接或通过 cp 复制到工作目录后连接", file_path: "/c/Users/lilithgames/AppData/Roaming/LarkShell/aha/users/b12adeef66bf9162917e119866815449/PartitionsV2/user-approval-7469976784941547522/Network/Cookies", required_tools: ["python", "sqlite3", "cp"], drawer_constraint: "OmniGuardian 仅允许向已声明 drawer 路径写入"}
+    format_out: {summary: "预期输出：sqlite3.connect() 成功打开数据库，可执行 SELECT 查询获取 schema 和 cookie 数据；实际输出：两种失败模式——(a) 直接连接时 sqlite3.OperationalError: unable to open database file，(b) 复制到工作目录时 OmniGuardian 拦截（returncode -1，路径不在任何已声明 drawer 内）", expected_schema: ["cookies", "meta", "origin_bound_certs", "origin_protection_space"], actual_error: "sqlite3.OperationalError: unable to open database file 或 OmniGuardian blocked write", exit_code: 1}
+    evidence:
+      - 描述: Experimenter 调用 bash 执行 Python 脚本，尝试用 sqlite3 连接 Cookies 数据库并获取 schema 和 sample data，但 sqlite3.connect() 在打开路径 "/c/Users/lilithgames/AppData/Roaming/LarkShell/aha/users/b12adeef66bf9162917e119866815449/PartitionsV2/user-approval-7469976784941547522/Network/Cookies" 时抛出 OperationalError: unable to open database file。该路径此前已通过 ls 命令确认存在（Cookies 文件 28672 字节），但 sqlite3 无法打开——可能由于文件被 LarkShell 进程独占锁定（Chromium 系应用在运行时通常独占其 SQLite 数据库），或 bash 环境的 POSIX 路径到 Windows 路径映射在 sqlite3 C 扩展层失效
+        出处: bash session fa26096d step [20]
+        时间: "2026-04-19T01:15:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 cp 命令将 Cookies 数据库文件复制到 /e/WindowsWorkspace/omnifactory/cookies_copy.db（复制步骤本身无报错），随后立即用 Python sqlite3 尝试打开该副本并查询 sqlite_master 获取表结构，同样抛出 OperationalError: unable to open database file。该观察表明即使将文件复制到工作目录、排除了原始路径映射问题，sqlite3 仍然无法打开——这进一步排除了"路径转义/POSIX 到 Windows 映射失效"作为唯一原因，文件本身可能已损坏、使用了不兼容的 SQLite 格式、或存在编码问题。值得注意的是，该步骤同时尝试查询 cookies 表行数及前 10 条记录的 host_key/name/encrypted_value 等字段，但由于数据库无法打开，所有查询均未执行。
+        出处: bash session fa26096d step [21]
+        时间: "2026-04-19T01:20:00Z"
+        session: fa26096d
+    state_log:
+      - {从: draft, 到: draft, 理由: 首次记录，sqlite3 直接访问 Cookies 数据库失败，需探索替代方案（如关闭 LarkShell 后重试、或复制文件后查询副本）, 时间: "2026-04-19T01:15:00Z"}
+      - {从: draft, 到: draft, 理由: "复制文件到工作目录后 sqlite3 仍然无法打开——排除路径映射问题，可能原因：LarkShell 仍在运行并持有文件句柄（复制的是脏文件）、文件本身损坏、或 SQLite WAL/journal 模式导致副本不可读。下一步建议：确保 LarkShell 完全退出后重新复制并查询，或使用 file/xxd 检查文件头部是否符合 SQLite 魔数（'SQLite format 3\\000'）", 时间: "2026-04-19T01:20:00Z"}
+    created_at: "2026-04-19T01:15:00Z"
+    created_in_session: fa26096d
+
+  - id: cookie-encrypted-dpapi
+    summary: LarkShell Cookies 文件中的 cookie 值均使用 DPAPI 加密存储（encrypted_value 字段有值，has_value_attr=0），明文不可直接读取
+    maturity: living
+    kind: state
+    format_in: {summary: "触发条件：已定位到 LarkShell Cookies 数据库文件，使用 sqlite3 查询 cookies 表结构", required_data: ["Cookies SQLite file"], query_fields: ["host_key", "name", "encrypted_value", "has_value_attr"], tools: ["sqlite3"]}
+    format_out: {summary: "预测输出：所有 feishu/lark 相关 cookie 的 value 存储在 encrypted_value 字段，前缀 v10，has_value_attr=0，表明 DPAPI 加密", encryption_prefix: "v10", exit_code: 0}
+    evidence:
+      - 描述: Experimenter 用 sqlite3 查询 Cookies 表，确认 QXV0aHpDb250ZXh0 等认证 cookie 的 encrypted_value 有值（如 b'v10\xbe\x93...'），has_value_attr=0，说明所有值均经过加密而非明文存储
+        出处: bash session 1a8c0133 steps [13][14][27][29]
+        时间: "2026-04-17T15:30:00Z"
+        session: 1a8c0133
+    counterexamples:
+      - 描述: Experimenter 在本轮（session fa26096d step 20）尝试用 Python sqlite3 直接连接 LarkShell 的 Cookies 数据库文件时收到 "unable to open database file" 错误。该文件此前已通过 ls 确认存在（28672 字节），但 sqlite3 无法打开。这与早期 session 1a8c0133 中 sqlite3 能正常查询的情况形成对比——推测差异来自文件锁定状态：session 1a8c0133 时 LarkShell 可能未运行或已释放文件锁，而本轮中 LarkShell 可能正在运行并独占该 SQLite 数据库
+        出处: bash session fa26096d step [20]
+        时间: "2026-04-19T01:15:00Z"
+        session: fa26096d
+    state_log:
+    summary: lark-cli（@larksuite/cli）在 Windows 上使用 DPAPI + HKCU 注册表作为 keychain 后端，加密密钥绑定 (service, account) 熵值
+    maturity: living
+    kind: state
+    format_in: {summary: "触发条件：@larksuite/cli npm 包已安装，阅读其 Windows keychain 相关 Go 源码", required_data: ["@larksuite/cli source code"], source_files: ["internal/keychain/keychain_windows.go", "cmd/auth/login.go", "internal/auth/token_store.go"], tools: ["cat", "ls"]}
+    format_out: {summary: "预测输出：确认 Windows 平台使用 DPAPI (CryptProtectData/CryptUnprotectData) + HKCU 注册表路径 Software\\LarkCli\\keychain，熵值为 service+\\x00+account", registry_path: "HKCU\\Software\\LarkCli\\keychain", entropy_pattern: "service+\\x00+account", exit_code: 0}
+    evidence:
+      - 描述: Experimenter 阅读 npm 安装的 @larksuite/cli 源码（internal/keychain/keychain_windows.go），确认 Windows 平台使用 windows.CryptProtectData/CryptUnprotectData 进行 DPAPI 加解密，密钥存储在 HKCU\Software\LarkCli\keychain 注册表路径下，熵值为 service+"\x00"+account
+        出处: bash session 1a8c0133 steps [52][53][55][57]
+        时间: "2026-04-17T15:30:00Z"
+        session: 1a8c0133
+      - 描述: Experimenter 进一步确认 CLI 通过 npm 全局安装，位于 C:\Users\lilithgames\AppData\Roaming\npm\node_modules\@larksuite\cli，包含 cmd/auth/login.go 和 internal/auth/token_store.go 等认证相关源码
+        出处: bash session 1a8c0133 steps [44][45][46][49][50][51]
+        时间: "2026-04-17T15:30:00Z"
+        session: 1a8c0133
+    state_log:
+      - {从: draft, 到: living, 理由: 源码阅读确认了 Windows keychain 的完整实现机制, 时间: "2026-04-17T15:30:00Z"}
+    created_at: "2026-04-17T15:30:00Z"
+    created_in_session: 1a8c0133
+
+  - id: lark-cli-npm-install
+    summary: lark-cli 在本机通过 npm 全局安装为 @larksuite/cli 包，是 Go 编写的 CLI 工具（有 login.go、token_store.go 等源码）
+    maturity: stable
+    kind: state
+    format_in: {summary: "触发条件：在 Windows 系统上检查 lark-cli 安装方式，预期通过 npm 全局安装", tools: ["where", "ls", "python os.listdir", "which"], expected_paths: ["C:\\Users\\<user>\\AppData\\Roaming\\npm\\node_modules\\@larksuite\\cli"]}
+    format_out: {summary: "预测输出：确认 lark-cli 位于 npm 全局安装路径下，包含 cmd/ 和 internal/ Go 源码目录", confirmed_path: "C:\\Users\\lilithgames\\AppData\\Roaming\\npm\\node_modules\\@larksuite\\cli", language: "Go", exit_code: 0}
+    evidence:
+      - 描述: Experimenter 通过 where lark、ls 和 python os.listdir 确认 lark-cli 位于 C:\Users\lilithgames\AppData\Roaming\npm\node_modules\@larksuite\cli，包含 cmd/ 和 internal/ 目录结构，源码为 Go 语言
+        出处: bash session 1a8c0133 steps [38][44][45][46][49]
+        时间: "2026-04-17T15:30:00Z"
+        session: 1a8c0133
+      - 描述: Experimenter 调用 which lark-cli 确认其路径为 /c/Users/lilithgames/AppData/Roaming/npm/lark-cli，与 npm 全局安装位置一致；同时输出了完整 PATH 环境变量，确认 mingw64/bin、usr/bin、.cargo/bin 等目录均在搜索路径中
+        出处: bash session de7677a1 step [1]
+        时间: "2026-04-17T15:30:00Z"
+        session: de7677a1
+    state_log:
+      - {从: draft, 到: stable, 理由: 安装路径和源码结构已确认，无需进一步验证, 时间: "2026-04-17T15:30:00Z"}
+    created_at: "2026-04-17T15:30:00Z"
+    created_in_session: 1a8c0133
+
+  - id: jwt-token-format
+    summary: "飞书开放平台 access_token 采用 JWT 格式，使用 ES256 签名，feature_code 为 FeatureOAuthJWTSign_CN，payload 中包含加密 opaque 字段（enc_ver: v1），scope 涵盖 board/docs/drive/sheets/wiki/base/search 等大量权限，tenant_unit 为 eu_nc（欧洲数据中心）"
+    maturity: draft
+    kind: state
+    format_in: {summary: "触发条件：获取到飞书开放平台的 access_token（JWT 格式的三段式 base64url 编码字符串）", token_source: "lark-cli 认证流程或 API 响应", required_tools: ["python", "base64", "json"]}
+    format_out: {summary: "预测输出：成功解析 JWT header（alg: ES256, feature_code, kid, typ）和 payload（client_id, scope, unit/tenant_unit, opaque 加密数据, auth_id, auth_time/exp 时间戳等）", expected_header_keys: ["alg", "feature_code", "kid", "typ"], expected_payload_keys: ["client_id", "scope", "unit", "tenant_unit", "opaque", "enc", "enc_ver", "auth_id", "auth_time", "auth_exp"], exit_code: 0}
+    evidence:
+      - 描述: Experimenter 调用 python 执行 base64 解码脚本，成功解析 JWT token 的 header 和 payload。Header 显示 alg: ES256, feature_code: "FeatureOAuthJWTSign_CN", kid: "7628027028020710365", typ: "JWT"。Payload 包含 client_id: "cli_a721b7e46b1dd01c", 大量 scope（board:whiteboard:node:create/delete/read, docs:document.*, drive:*, sheets:*, wiki:*, base:*, search:docs:read 等）, unit: "eu_nc", tenant_unit: "eu_nc", opaque: true, enc 字段为加密二进制数据（enc_ver: v1）, auth_id: "7628961790512106443", auth_time: 1776256494, auth_exp: 1807792494。该观察首次揭示了飞书 access_token 的完整 JWT 结构。
+        出处: bash session fa26096d step [13]
+        时间: "2026-04-18T16:00:00Z"
+        session: fa26096d
+    state_log:
+      - {从: draft, 到: draft, 理由: 首次发现，成功解码 JWT token 并解析出完整结构，尚需观察更多 token 样本验证一致性, 时间: "2026-04-18T16:00:00Z"}
+    created_at: "2026-04-18T16:00:00Z"
+    created_in_session: fa26096d
+
+  - id: lark-cli-home-config
+    summary: 用户主目录下存在 ~/.lark-cli 配置目录和 ~/.lark-doc-cli.env 环境变量文件。~/.lark-doc-cli.env 中存储的是 FEISHU_MCP_URL（飞书 MCP 端点地址），非认证凭据。~/.lark-cli/logs/ 目录下存在按日期分割的 auth-YYYY-MM-DD.log 认证日志文件，记录了 4/13 至 4/18 共 6 天的认证活动。这表明 lark-cli 在用户级有独立的配置存储（MCP 连接地址 + 认证日志），不依赖 Windows 注册表 keychain；但凭据存储仍走注册表 keychain 路径（见 cli-keychain-dpapi-registry 假设）
+    maturity: draft
+    kind: state
+    format_in: {summary: "触发条件：在 Windows 用户主目录（~/）下执行 ls -la 查看隐藏文件和目录", tools: ["bash ls -la"], expected_patterns: ["~/.lark-cli", "~/.lark-doc-cli.env"]}
+    format_out: {summary: "预测输出：确认 ~/.lark-cli 目录存在且包含 cache/ 子目录（用于缓存远程元数据，如 remote_meta.meta.json）和 logs/ 子目录（按日期分割的认证日志）；同时 ~/.lark-doc-cli.env 文件存在（-rw-r--r--，132 字节，存储 FEISHU_MCP_URL）", discovered_paths: ["~/.lark-cli/cache/remote_meta.meta.json", "~/.lark-cli/logs/auth-YYYY-MM-DD.log", "~/.lark-doc-cli.env"], exit_code: 0}
+    evidence:
+      - 描述: Experimenter 调用 bash 执行 ls -la ~/，在输出中发现 ~/.lark-cli 目录（drwxr-xr-x，lilithgames:197121，Apr 18 14:27）和 ~/.lark-doc-cli.env 文件（-rw-r--r--，132 字节，Mar 27 16:50），表明 lark-cli 系列工具在主目录下有独立配置存储
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-18T14:27:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 ls -la ~/.lark-doc-cli.env，直接确认该文件存在（-rw-r--r--，lilithgames:197121，132 字节，Mar  7 19:07），文件大小与上次观察一致（132 字节），但文件创建时间显示为 Mar 7 19:07（上次记录为 Mar 27 16:50，可能为不同文件系统元数据或文件被修改过）
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-18T14:27:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 read_file 尝试读取 ~/.lark-cli/update-state.json，返回文件不存在错误。该观察排除了 lark-cli 在用户配置目录下维护 update-state.json 状态文件的可能性
+        出处: read_file session fa26096d step [1]
+        时间: "2026-04-18T15:00:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 cat ~/.lark-doc-cli.env，成功读取文件内容。文件中包含唯一一行环境变量：FEISHU_MCP_URL='https://open.feishu.cn/mcp/stream/mcp_zohhcjEYgBomUF1c8lLwwQD7IOpvAzuSxRniVoF6y7mR0dBTq-12J50jKSLFrFNxu0aEYPaJ2uo'，指向飞书开放平台的 MCP（Model Context Protocol）流式端点。该观察首次揭示了 ~/.lark-doc-cli.env 文件的实际内容，确认该文件用于存储 lark-doc-cli 的 MCP 服务连接地址，而非认证凭据或 token
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-18T15:30:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 ls -laR ~/.lark-cli/logs/ 2>/dev/null | sed '1,30!d'，成功查看 lark-cli logs 目录结构。发现 ~/.lark-cli/logs/ 目录下存在按日期分割的 auth-YYYY-MM-DD.log 认证日志文件，共 6 个文件：auth-2026-04-13.log（70292 字节）、auth-2026-04-14.log（120964 字节）、auth-2026-04-15.log（337496 字节）、auth-2026-04-16.log（213083 字节）、auth-2026-04-17.log（107656 字节）、auth-2026-04-18.log（17123 字节）。文件大小逐日变化，表明 lark-cli 在每次认证活动时都会追加日志记录。该观察揭示了 lark-cli 的认证日志存储机制，这些日志文件可能包含认证流程的详细信息（如 token 交换、授权码等），是潜在的认证信息来源。
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-18T14:11:00Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 cat ~/.lark-cli/cache/remote_meta.meta.json，读取到远程元数据缓存文件，内容为 {"last_check_at":1776408475}（Unix 时间戳 ≈ 2026-04-15）。该观察首次确认 ~/.lark-cli/ 目录下存在 cache/ 子目录，用于缓存远程元数据检查时间，表明 lark-cli 会定期与远端同步状态。
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-18T14:16:52Z"
+        session: fa26096d
+      - 描述: Experimenter 调用 bash 执行 which python || which node || which jq，返回 Python 3.12 的路径 /c/Users/lilithgames/AppData/Local/Programs/Python/Python312/python，确认当前 bash 环境中 python 命令可用（而非 python3）。此观察解释了此前 round 8 中 python3 命令失败的原因，后续如需执行 Python 脚本（如 JWT 解码）应使用 python 命令。
+        出处: bash session fa26096d step [1]
+        时间: "2026-04-18T15:30:00Z"
+        session: fa26096d
+    state_log:
+      - {从: draft, 到: draft, 理由: 首次发现，需要进一步探索 ~/.lark-cli 目录内容和 ~/.lark-doc-cli.env 文件格式, 时间: "2026-04-18T14:27:00Z"}
+      - {从: draft, 到: draft, 理由: 成功读取 ~/.lark-doc-cli.env 内容，确认存储 FEISHU_MCP_URL（MCP 端点），非认证凭据；仍需探索 ~/.lark-cli/ 目录结构, 时间: "2026-04-18T15:30:00Z"}
+      - {从: draft, 到: draft, 理由: 发现 ~/.lark-cli/logs/ 目录下存在按日期分割的 auth 日志文件（4/13-4/18 共 6 天），记录了认证活动，为潜在的认证信息来源, 时间: "2026-04-18T14:11:00Z"}
+    created_at: "2026-04-18T14:27:00Z"
+    created_in_session: fa26096d
+
+  - id: larkshell-local-state-structure
+    summary: "LarkShell/Local State 文件是完整的 JSON 配置文件，存储了浏览器级状态信息：包括 os_crypt.encrypted_key（DPAPI 加密的 AES 密钥）、多 profile 信息（用户1-4）、国际化设置（zh-CN）、克隆安装时间戳、用户体验指标等。该文件是 passport-encryption 假设的关键依赖——其中的 os_crypt.encrypted_key 用于解密 persistent_passport_info_v2"
+    maturity: living
+    kind: state
+    format_in: {summary: "触发条件：在已登录飞书桌面客户端的 Windows 环境下，LarkShell 配置目录下存在 Local State 文件", file_path: "LarkShell/Local State", required_tools: ["cat", "json"]}
+    format_out: {summary: "预测输出：成功解析 JSON 结构，包含 os_crypt.encrypted_key（DPAPI blob 格式）、profile.info_cache（多 profile 元数据）、intl.app_locale、cloned_install 时间戳、user_experience_metrics.stability 等字段", expected_keys: ["os_crypt.encrypted_key", "profile.info_cache", "intl.app_locale", "cloned_install", "user_experience_metrics"], exit_code: 0}
+    evidence:
+      - 描述: Experimenter 调用 bash 执行 `cat /c/Users/lilithgames/AppData/Roaming/LarkShell/Local State`，成功读取 Local State 文件的完整 JSON 内容。该文件包含以下关键配置：os_crypt.encrypted_key（DPAPI 加密的 AES 密钥，用于解密 persistent_passport_info_v2）、profile.info_cache（记录了 4 个 profile：global\\profile_global（用户1）、b12adeef...\\profile_main（用户2）、b12adeef...\\profile_explorer（用户3）、b12adeef...\\PartitionsV2\\user-approval-7469976784941547522（用户4））、intl.app_locale 为 zh-CN、cloned_install 首次时间戳 1772242694（约 2026-02-28）、user_experience_metrics（含 stability.exited_cleanly: true、system_crash_count: 1）、variations_limited_entropy_synthetic_trial_seed_v2: "36" 等。该观察完整揭示了 Local State 文件的数据结构，确认 os_crypt.encrypted_key 字段的存在及其在 passport 解密链路中的关键角色。
+        出处: bash session fa26096d step [16]
+        时间: "2026-04-19T01:00:00Z"
+        session: fa26096d
+    state_log:
+      - {从: draft, 到: living, 理由: 完整读取 Local State 文件，确认其 JSON 结构和关键字段，与 passport-encryption 假设形成直接依赖关系, 时间: "2026-04-19T01:00:00Z"}
+    created_at: "2026-04-19T01:00:00Z"
+    created_in_session: fa26096d
+
+  - id: larkshell-default-preferences
+    summary: "LarkShell/Default/ 目录下存在 Preferences（231776 字节）和 Secure Preferences（231792 字节）两个 JSON 配置文件，遵循 Chromium 浏览器偏好文件结构。与 Local State 文件（位于 LarkShell 根目录）不同，这两个文件属于 Default profile 级别，可能包含扩展配置、安全策略、站点设置等浏览器运行时状态。Cookies 文件在同一目录下但为 0 字节，证实 cookie 数据实际存储在 per-user partition 路径下"
+    maturity: draft
+    kind: state
+    format_in: {summary: "触发条件：在已登录飞书桌面客户端的 Windows 环境下，LarkShell/Default/ 目录下存在 Preferences 和 Secure Preferences 文件", directory_path: "LarkShell/Default/", expected_files: ["Preferences", "Secure Preferences", "Cookies"], tools: ["ls", "cat", "json"]}
+    format_out: {summary: "预测输出：Preferences 和 Secure Preferences 为 Chromium 风格的 JSON 配置文件（各约 230KB），包含 Default profile 的运行时状态、扩展信息、安全策略等；同目录下 Cookies 文件为 0 字节", file_sizes: {"Preferences": "~231KB", "Secure Preferences": "~232KB", "Cookies": "0 bytes"}, format: "Chromium JSON preferences", exit_code: 0}
+    evidence:
+      - 描述: Experimenter 调用 bash 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/Default/`，列出 Default 目录下的三个文件：Cookies（0 字节，创建时间 Apr 17 21:33）、Preferences（231776 字节，创建时间 Apr 19 00:15）、Secure Preferences（231792 字节，创建时间 Apr 19 00:15）。Preferences 和 Secure Preferences 文件大小几乎一致（差 16 字节），且最后修改时间相同，表明两者是同步更新的配对文件。Cookies 文件虽存在但为空，进一步验证了 cookie 数据不存储在此处的假设。
+        出处: bash session fa26096d step [18]
+        时间: "2026-04-19T00:36:00Z"
+        session: fa26096d
+    state_log:
+      - {从: draft, 到: draft, 理由: 首次发现 Default 目录下的 Preferences/Secure Preferences 文件，尚未读取内容验证结构, 时间: "2026-04-19T00:36:00Z"}
+    created_at: "2026-04-19T00:36:00Z"
+    created_in_session: fa26096d
+
+deleted_hypotheses: []
+---
+
+# lark-cli 探索笔记
+
+在本机已登录飞书桌面客户端的前提下，找出不需要用户再次浏览器授权就能获取 lark user token 的方法。
+
+背景：用户已在 Feishu 桌面客户端登录，目标绕过浏览器交互。探索方向：注册表、配置目录、桌面客户端缓存。
+
+## 场景
+
+- tool: lark-cli
+- os: Windows 10
+- timestamp: 2026-04-17
+
+## 探索过程
+
+### Session 1a8c0133 — 解密持久化 passport 信息并探索 token 兑换路径
+
+1. **解密 persistent_passport_info_v2 成功** — Experimenter 从 `LarkShell\Local State` 读取 `os_crypt.encrypted_key`，用 DPAPI（`win32crypt.CryptUnprotectData`）解密得到 AES 密钥，随后对 `persistent_passport_info_v2` 执行 AES-GCM 解密，成功获得包含 `user_auth_list` 的 JSON，其中包含 `suite_session_key`、`device_id`、`install_id` 等字段。
+
+2. **验证 session key 在 web 端的有效性** — Experimenter 将 `suite_session_key` 作为 `session` cookie 发送给 `www.feishu.cn`，收到 HTTP 200 响应，确认该 key 在飞书网页端具有认证效力。
+
+3. **开放平台 API 尝试失败** — Experimenter 尝试用 session cookie 访问多个开放平台端点（`open.feishu.cn/open-apis/authen/v1/user_info`、`open.feishu.cn/open-apis/contact/v3/users/me`、`open.larksuite.com` 等），均未返回有效用户信息。
+
+4. **passport token 端点尝试失败** — Experimenter 尝试访问 `passport.feishu.cn/suite/login/token`，返回 404 Not Found。尝试了 `/passport/token/get`、`/suite/oauth/code`、`/accounts/v3/api/token` 等多个路径，均未成功获取 token。
+
+5. **定位 Cookies 真实存储路径** — Experimenter 发现 `LarkShell\Default\Cookies` 文件大小为 0 字节。通过 `os.walk` 遍历发现实际 cookies 存储在 `aha\users\<user_id>\PartitionsV2\user-approval-<id>\Network\Cookies`（28672 字节）和 `aha\users\global\profile_global\Network\Cookies`（20480 字节）中。成功将 user-approval 分区的 Cookies 文件复制到工作目录准备分析。
+
+**当前结论**：AES-GCM 解密链路已打通，可以获得 session key。但 session key 到 lark user token 的兑换路径尚未找到——开放平台 API 不接受该 cookie 作为认证凭据，passport 的 token 兑换端点返回 404。下一步可能方向：分析 user-approval 分区 Cookies 文件中的认证 cookie、追踪飞书客户端实际网络请求。
+
+### Session 1a8c0133 — 第 1 轮：token 文件深度分析与 CLI 源码阅读
+
+1. **发现 python_user_token.json 文件** — Experimenter 在 `~/.lark-cli/python_user_token.json` 中找到 token 文件，包含 `accessToken`、`refreshToken`、`appId` 等字段。AccessToken 是标准 JWT 格式，payload 包含 `exp`、`client_id`、`scope` 等信息。`auth_exp` 和 `refresh_expires_in` 在 JSON 顶层为 `None`。
+
+2. **尝试刷新 token 失败** — Experimenter 用 refreshToken 和 appId 向 `passport.feishu.cn/suite/passport/oauth/token` 发起 POST 请求尝试刷新，但未成功获得新 token。
+
+3. **access token 调用 API 失败** — Experimenter 将 accessToken 作为 Bearer token 尝试调用多个开放平台端点（`open.feishu.cn/open-apis/authen/v1/user_info`、`contact/v3/users/me`、`auth/v3/tenant_access_token/internal/` 等），均未返回有效用户信息。
+
+4. **确认 Cookies 全加密存储** — Experimenter 用 sqlite3 查询 LarkShell Cookies 数据库，确认所有 feishu/lark 相关 cookie（包括 `QXV0aHpDb250ZXh0`）均存储在 `encrypted_value` 字段中，`has_value_attr=0`，无法直接读取明文。cookie 值前缀为 `v10`，表明是 Chrome 格式的 DPAPI 加密。
+
+5. **LarkShell 的 os_crypt DPAPI 解密失败** — Experimenter 从 `LarkShell\Local State` 读取 `os_crypt.encrypted_key`，确认为 DPAPI blob（前缀 `b'DPAPI'`），但用 `win32crypt.CryptUnprotectData` 和 ctypes 调用 `CryptUnprotectData` 均失败（错误码 13，"数据无效"）。推测可能是当前用户上下文或 LarkShell 加密方式与标准 Chrome 不完全一致。
+
+6. **阅读 lark-cli 源码确认 keychain 机制** — Experimenter 在 `@larksuite/cli` npm 包中找到 Go 源码，确认 Windows 平台 keychain 实现（`internal/keychain/keychain_windows.go`）使用 DPAPI + HKCU 注册表（`Software\LarkCli\keychain`）存储凭据，加密时使用 `service+"\x00"+account` 作为熵值。同时阅读了 `cmd/auth/login.go` 和 `internal/auth/token_store.go` 了解认证流程。
+
+7. **无活跃网络连接** — Experimenter 用 netstat 检查，未发现 Lark/Feishu 相关的网络连接或本地监听端口。
+
+**当前结论更新**：lark-cli 的 keychain 机制已明确（DPAPI + HKCU 注册表），但 DPAPI 解密在当前上下文中失败。python_user_token.json 中的 accessToken 是 JWT 但调用开放平台 API 无效。Cookies 全部加密存储，需要正确的 DPAPI 上下文才能解密。关键阻塞点：DPAPI 解密失败原因未明（可能是权限、用户上下文或加密方式差异）。
+
+### Session 7e924936 — 第 0 轮：查看工作目录结构
+
+1. **列出项目根目录** — Experimenter 调用 `bash` 执行 `pwd && ls -la`，确认当前工作目录为 `/e/WindowsWorkspace/omnifactory`，目录中包含 `.claude`、`.git`、`.omni`、`config`、`data`、`docs`、`scripts`、`src`、`tests` 等子目录，以及 `.env`、`pyproject.toml`、`token_data.json` 等文件。该步骤为环境侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session 7e924936 — 第 1 轮：查看 docs/、data/、src/ 子目录结构
+
+1. **列出关键子目录** — Experimenter 调用 `bash` 执行 `ls -la docs/ && ls -la data/ && ls -la src/`，查看三个子目录的结构。`docs/` 包含 ARCHITECTURE.md、PROGRESS.md、README.md、SDK_CONTRACT.md、archmap.yaml、taxonomy.yaml、控制结构.md 等文档及 gaps/、plans/、reports/、standards/、theory/ 等子目录。`data/` 包含 events.db（约 9.4GB）、ide_events.db、intent_traces.db 等数据库文件，以及 crystallize/、default/、hypothesis/、knowledge/、registry/、workflow/ 等子目录。`src/` 包含 data/、omnifactory/、router/ 三个子目录。该步骤为项目结构侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session 7e924936 — 第 2 轮：查看假设数据与理论文档目录
+
+1. **查看假设存储与理论文档** — Experimenter 调用 `bash` 执行 `ls -la data/hypothesis/ && ls -la docs/theory/`。`data/hypothesis/` 下仅有 `sessions/` 子目录（用于存储各 session 的假设快照）。`docs/theory/` 包含 `pain_as_semantic_structure.md`、`testing_methodology.md`、`大迁移路线图.md`、`用户语义信号需求.md`、`验收与进化路线图.md` 等理论文档以及 `六元语义/` 子目录。该步骤为项目知识体系侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session 7e924936 — 第 3 轮：查看假设会话数据目录
+
+1. **查看假设会话存储** — Experimenter 调用 `bash` 执行 `ls -la data/hypothesis/sessions/`，列出假设会话数据目录内容。返回结果显示存在 7 个历史 session 文件夹：`lark-api-exploration`、`lark-api-exploration-debug`、`lark-api-exploration-v2`、`lark-debug2`、`lark-final`、`lark-free-explore`、`lark-v3`。该步骤为知识基础设施侦察，确认此前 lark 相关探索的会话数据均有存档。未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session 7e924936 — 第 4 轮：尝试读取 PROGRESS.md 失败
+
+1. **尝试读取进度文档** — Experimenter 调用 `read_file` 尝试读取 `/data/WindowsWorkspace/omnifactory/docs/PROGRESS.md`，返回文件不存在错误。该步骤为环境侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session 7e924936 — 第 5 轮：再次尝试读取 PROGRESS.md 失败
+
+1. **尝试读取进度文档（路径修正后仍失败）** — Experimenter 调用 `read_file` 尝试读取 `/E:\WindowsWorkspace\omnifactory\docs\PROGRESS.md`（Windows 绝对路径但以 `/` 为前缀），返回文件不存在错误。该步骤为环境侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session 7e924936 — 第 6 轮：尝试 cd 到 docs 目录失败
+
+1. **尝试切换至 docs 目录失败** — Experimenter 调用 `bash` 执行 `cd /data/WindowsWorkspace/omnifactory/docs && pwd`，返回 `No such file or directory` 错误。路径 `/data/WindowsWorkspace/omnifactory/docs` 在 bash 环境下不存在（正确路径应为 `/e/WindowsWorkspace/omnifactory/docs`）。该步骤为环境侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session e7b0c3d8 — 第 1 轮：查看用户目录结构
+
+1. **查看 C:\Users 目录** — Experimenter 调用 `bash` 执行 `ls C:\Users\`，返回 Windows 系统用户目录列表：All Users、Default、Default User、DefaultAppPool、Public、desktop.ini、lilithgames、zhouhaowen。该步骤为环境侦察，确认了系统上存在的用户账户。此前 lark-cli 相关探索集中在 `lilithgames` 用户下（如 `C:\Users\lilithgames\AppData\Roaming\npm\node_modules\@larksuite\cli`），本次观察确认了该用户目录确实存在于系统中。未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session e7b0c3d8 — 第 2 轮：尝试查看 Local AppData 目录失败
+
+1. **尝试查看 lilithgames 用户的 Local AppData 目录失败** — Experimenter 调用 `bash` 执行 `dir "C:\Users\lilithgames\AppData\Local\" /b`，期望列出 Local AppData 目录内容。由于 bash 环境无法正确处理 Windows `dir` 命令及双引号转义，返回 `unexpected EOF while looking for matching '"'` 错误（returncode 2）。该步骤为环境侦察，未获取有效信息，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session e7b0c3d8 — 第 3 轮：跨用户 AppData 搜索 Lark 数据路径
+
+1. **在 zhouhaowen 用户的 AppData 中搜索 Lark 相关目录** — Experimenter 调用 `bash` 执行 `pwd && ls -la` 确认当前工作目录为 `/e/WindowsWorkspace/omnifactory`，随后执行 `ls C:\Users\zhouhaowen\AppData\Local 2>/dev/null | grep -i lark` 和 `ls C:\Users\zhouhaowen\AppData\Roaming 2>/dev/null | grep -i lark` 在 zhouhaowen 用户的 Local 和 Roaming AppData 目录中搜索 lark 相关内容，结果均为空。同时检查了 `C:\Users\lilithgames\AppData\Local` 和 `C:\Users\lilithgames\AppData\Roaming` 下含 lark 关键字的目录，grep 匹配结果均未输出。该步骤确认 `zhouhaowen` 用户下没有 Lark 相关的本地缓存或配置数据，与此前确认的 `lilithgames` 用户下存在 `@larksuite/cli` 安装的事实一致。未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session e7b0c3d8 — 第 4 轮：尝试 glob 搜索 Python 文件失败
+
+1. **尝试 glob 搜索 Python 文件失败** — Experimenter 调用 `glob` 工具，参数为 `pattern: "**/*.py"`、`path: "/e/WindowsWorkspace/omnifactory"`，返回错误 `'/e/WindowsWorkspace/omnifactory' is not a directory.`。该路径在 glob 工具的上下文中无法被识别为有效目录（此前 bash 环境下同路径可正常使用）。该步骤为环境侦察，未获取有效信息，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session e7b0c3d8 — 第 5 轮：查看项目根目录结构
+
+1. **列出项目根目录** — Experimenter 调用 `bash` 执行 `pwd && ls`，确认当前工作目录为 `/e/WindowsWorkspace/omnifactory`，目录下包含 `config`、`data`、`docs`、`figma_snapshots`、`logs`、`pyproject.toml`、`scripts`、`src`、`temp`、`tests`、`tmp`、`token_data.json`、`venv` 等。该步骤为环境侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session e7b0c3d8 — 第 6 轮：glob 搜索 Markdown 文件
+
+1. **全局搜索 Markdown 文件** — Experimenter 调用 `glob` 工具，参数为 `pattern: "**/*.md"`（未指定 path），返回找到 725 个匹配文件（显示前 100 个）。返回结果包括 omnifactory 项目中的各类文档：测试 fixtures、设计文档、计划文档（`docs/plans/` 下的多个历史计划）、架构说明、进度报告等。该步骤为项目文档结构侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session e7b0c3d8 — 第 7 轮：查看 data 目录结构
+
+1. **列出 data 目录** — Experimenter 调用 `bash` 执行 `ls data/`，返回 `data/` 目录下包含 `_archive`、`_archive_agent_loop`、`_archive_event_split`、`_archive_pre_move8`、`blockworks`、`crystallize`、`default`、`doctor`、`domains`、`events.db`、`hypothesis`、`ide_events.db`、`igame`、`intent_traces.db`、`knowledge`、`llm_audit`、`private_domain_nodes.db`、`registry`、`repair`、`rewrite`、`scratch`、`workflow`、`workflow_factory_output` 等子目录和数据库文件。该步骤为项目数据基础设施侦察，确认了假设数据库（`hypothesis`）、知识库（`knowledge`）、事件追踪数据库（`events.db`、`ide_events.db`、`intent_traces.db`）等关键组件的存在。未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session 96012aff — 第 2 轮：读取 hypothesis routers 源码
+
+1. **读取 routers.py 了解假设系统架构** — Experimenter 调用 `read_file` 读取 `E:\WindowsWorkspace\omnifactory\src\omnifactory\packages\services\hypothesis\routers.py`，获取了假设系统中三个核心 Router 的完整源码：`ExperimenterRouter`（主 agent，自由探索）、`LockstepExperimenterRouter`（双脑 lockstep 模式）、`ReflectorRouter`（总结 agent，编辑假设文档）。源码显示 Phase C 迁移后基类从旧 `AgentNodeLoop` 改为 `packages.services.agent.AgentNodeLoop`，工具注册从 `TOOLS` 改为 `TOOL_ROUTERS`（`SingleToolRouter` 子类），并定义了四个 hypothesis 域专用工具 Router：`BashRouter`、`EditRouter`、`WriteFileRouter`、`ValidateHypothesisDocRouter`。Experimenter 的 prompt 中包含 `bash`、`read_file`、`glob`、`grep`、`finish` 五个工具；Reflector 的 prompt 中包含 `read_file`、`edit`、`write_file`、`glob`、`grep`、`validate_hypothesis_doc`、`finish` 七个工具。该步骤为对假设探索基础设施的元侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session de7677a1 — 第 0 轮：检查 PATH 和 lark-cli 位置
+
+1. **检查 PATH 环境变量和 lark-cli 路径** — Experimenter 调用 `bash` 执行 `echo "PATH=$PATH" && which lark-cli`，返回完整的 PATH 环境变量（包含 mingw64/bin、usr/bin、.cargo/bin、VS Code、Python312、Node.js、Git 等路径）以及 `lark-cli` 的可执行路径 `/c/Users/lilithgames/AppData/Roaming/npm/lark-cli`。该观察再次确认 lark-cli 通过 npm 全局安装，与 `lark-cli-npm-install` 假设一致。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session de7677a1 — 第 1 轮：搜索 writer 相关文件
+
+1. **搜索 writer 相关文件** — Experimenter 调用 `glob` 工具，参数为 `pattern: "**/*writer*"`（未指定 path），返回找到 5 个匹配文件：`src/omnifactory/_graveyard/autonomous_loop/sedimentation/nodes/writer.py`（已归档节点）、`src/omnifactory/packages/services/trace_induction/requirement_writer.py`（trace_induction 服务）、`src/omnifactory/packages/services/absorption/routers/report_writer.py`（absorption 服务）、以及 `packages/domains/igame/benchmark/prompts/` 下的 `requirement_writer.txt` 和 `code_writer_agent.txt`（igame 域 prompt 模板）。未发现与 lark-cli 直接相关的 writer 文件。该步骤为 omnifactory 项目代码结构侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session de7677a1 — 第 2 轮：读取 smoke.py 冒烟测试源码
+
+1. **读取冒烟测试文件** — Experimenter 调用 `read_file` 读取 `E:\WindowsWorkspace\omnifactory\tests\smoke.py`，获取了系统冒烟测试的完整源码。该文件包含 6 项检查：F1 Protocol（anchor + pipeline 导入与 Verdict 创建）、F2 Bus/MemoryBus（事件发布与读取）、F3 Runner/PipelineRunner（使用 EchoRouter 执行管线）、F5 ToolExecutor（导入检查）、F6 AgentLoop（导入检查）、以及 DB 健康检查（schema 完整性、无 NULL agent_success、无 deprecated 节点、统计快照）。该步骤为 omnifactory 项目基础设施侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 0 轮：查看用户主目录结构
+
+1. **查看用户主目录** — Experimenter 调用 `bash` 执行 `ls -la ~/`，查看 C:\Users\lilithgames 下的完整目录结构。返回结果中发现了两个此前未被记录的 lark-cli 相关条目：`~/.lark-cli/` 目录（drwxr-xr-x，创建时间 2026-04-18 14:27）和 `~/.lark-doc-cli.env` 文件（-rw-r--r--，132 字节，创建时间 2026-03-27 16:50）。同时确认了 `~/.lark-doc-cli.env`（132 字节）与 `~/.lark-cli` 目录的存在。此外还发现了 `.env`（190 字节）、`.env_clean`（584 字节）、`.env_remote`（1184 字节）三个环境变量文件。该步骤确认 lark-cli 在用户主目录下有独立的隐藏配置目录，与此前已知的 Windows 注册表 keychain 路径（HKCU\Software\LarkCli\keychain）形成补充，可能对应不同组件或版本。
+
+**当前状态**：新增 `lark-cli-home-config` 假设（draft），记录 ~/.lark-cli 目录和 ~/.lark-doc-cli.env 文件的发现。
+
+### Session fa26096d — 第 1 轮：直接查看 .lark-doc-cli.env 文件
+
+1. **直接查看 .lark-doc-cli.env 文件** — Experimenter 调用 `bash` 执行 `ls -la ~/.lark-doc-cli.env`，直接确认该文件存在（-rw-r--r--，lilithgames:197121，132 字节，Mar  7 19:07）。文件大小与上次观察一致（132 字节），但文件创建时间显示为 Mar 7 19:07（上次通过 `ls -la ~/` 间接记录为 Mar 27 16:50，两者差异可能是文件系统元数据解析问题）。该步骤进一步确认 `.lark-doc-cli.env` 文件确实存在且大小未变，但尚未读取其内容。
+
+**当前状态**：`lark-cli-home-config` 假设仍为 draft，需进一步读取 `~/.lark-cli/` 目录内容和 `~/.lark-doc-cli.env` 文件内容以深入理解配置结构。
+
+### Session fa26096d — 第 2 轮：尝试读取 update-state.json 失败
+
+1. **尝试读取 update-state.json** — Experimenter 调用 `read_file` 尝试读取 `/c/Users/lilithgames/.lark-cli/update-state.json`，返回文件不存在错误。该观察排除了 lark-cli 在用户配置目录下维护 `update-state.json` 状态文件的可能性。
+
+**当前状态**：`lark-cli-home-config` 假设仍为 draft，update-state.json 路径已排除，需继续探索 `~/.lark-cli/` 目录的实际内容。
+
+### Session fa26096d — 第 3 轮：确认工作目录
+
+1. **确认当前工作目录** — Experimenter 调用 `bash` 执行 `pwd`，返回 `/e/WindowsWorkspace/omnifactory`，确认工作目录为项目根目录。该步骤为环境侦察，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 4 轮：尝试 glob 搜索 .lark-cli 目录失败
+
+1. **尝试 glob 搜索 .lark-cli 目录内容失败** — Experimenter 调用 `glob` 工具，参数为 `pattern: "**/.lark-cli/**"`、`path: "/c/Users/lilithgames"`，返回错误 `'/c/Users/lilithgames' is not a directory.`。该路径在 glob 工具的上下文中无法被识别为有效目录（此前 bash 环境下同路径格式同样失败）。该步骤为环境侦察，意图探索 `~/.lark-cli/` 目录的实际内容，但未获取有效信息。`lark-cli-home-config` 假设仍为 draft，需通过其他途径（如 bash 下 `ls -la ~/.lark-cli/`）继续探索该目录结构。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 5 轮：成功读取 .lark-doc-cli.env 文件内容
+
+1. **读取 .lark-doc-cli.env 文件** — Experimenter 调用 `bash` 执行 `cat ~/.lark-doc-cli.env`，成功读取文件内容。返回结果显示文件中仅包含一行环境变量：`FEISHU_MCP_URL='https://open.feishu.cn/mcp/stream/mcp_zohhcjEYgBomUF1c8lLwwQD7IOpvAzuSxRniVoF6y7mR0dBTq-12J50jKSLFrFNxu0aEYPaJ2uo'`，指向飞书开放平台的 MCP（Model Context Protocol）流式端点。该观察首次揭示了 `~/.lark-doc-cli.env` 文件的实际内容——它存储的是 MCP 服务连接地址，而非认证凭据或 token。这表明 lark-doc-cli（可能是 lark-cli 的文档相关组件）通过该环境变量与飞书 MCP 服务端建立连接，但该路径不提供绕过浏览器授权获取 user token 的捷径。
+
+**当前状态**：`lark-cli-home-config` 假设的 summary 已更新，补充了 `~/.lark-doc-cli.env` 的实际内容说明（FEISHU_MCP_URL）。该假设仍为 draft，`~/.lark-cli/` 目录结构尚未探索。
+
+### Session fa26096d — 第 6 轮：查看 lark-cli logs 目录结构
+
+1. **查看 lark-cli 认证日志目录** — Experimenter 调用 `bash` 执行 `ls -laR ~/.lark-cli/logs/ 2>/dev/null | sed '1,30!d'`，成功列出 `~/.lark-cli/logs/` 目录内容。发现该目录下存在 6 个按日期分割的认证日志文件：`auth-2026-04-13.log`（70292 字节）、`auth-2026-04-14.log`（120964 字节）、`auth-2026-04-15.log`（337496 字节）、`auth-2026-04-16.log`（213083 字节）、`auth-2026-04-17.log`（107656 字节）、`auth-2026-04-18.log`（17123 字节）。文件按日期命名（auth-YYYY-MM-DD.log），大小逐日变化（4/15 最大，337KB；4/18 最小，17KB）。该观察揭示了 lark-cli 的认证日志存储机制，这些日志文件可能包含认证流程的详细信息（如 token 交换、授权码等），是潜在的认证信息来源。
+
+**当前状态**：`lark-cli-home-config` 假设的 summary 已更新，补充了 auth 日志文件的发现。该假设仍为 draft，下一步可考虑读取 auth 日志内容以探索其中是否包含可用的认证信息。
+
+### Session fa26096d — 第 8 轮：尝试解码 python_user_token.json 中的 JWT token 失败
+
+1. **尝试解码 JWT token** — Experimenter 调用 `bash` 执行 `python3 -c "..."` 尝试解码 `python_user_token.json` 中的 accessToken（JWT 格式），意图解析 token header 和 payload 以获取 `exp`、`client_id`、`scope` 等字段的详细信息。但由于 bash 环境中不存在 `python3` 命令（`/usr/bin/bash: line 1: python3: command not found`），该步骤执行失败。此前历史探索（session 1a8c0133）已通过其他方式确认 python_user_token.json 包含 accessToken、refreshToken、appId 等字段，但 JWT payload 的详细结构尚未被解析。该步骤表明当前 bash 环境中 python3 不可用，后续如需执行 Python 脚本需改用 `python` 命令。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 10 轮：尝试解码 JWT token 被 OmniGuardian 拦截
+
+1. **尝试解码 JWT token 被拦截** — Experimenter 调用 `bash` 执行一段 Python 脚本，尝试解码一个飞书开放平台 access_token（JWT 格式，scope 包含 board:whiteboard:node:create/delete/read、docs:document.*、drive:*、sheets:*、wiki:*、base:* 等大量权限）。脚本意图解析 header 和 payload，提取 `client_id`、`exp`、`scope` 等字段信息。但该调用被 OmniGuardian 拦截（returncode -1），原因为"路径不在任何已声明 drawer 内"，未产生有效输出。该步骤表明当前 bash 环境下仍存在路径写入限制，此前通过 `python` 命令执行解码脚本的策略仍受 OmniGuardian 约束。`session-key-web-access` 假设中关于"无法直接用于开放平台 API 获取 user token"的结论仍成立，本 token 的 scope 虽多但未涉及 `authen/v1/user_info` 所需的认证端点。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 11 轮：尝试 glob 搜索 .omni 目录失败
+
+1. **尝试 glob 搜索 .omni 目录失败** — Experimenter 调用 `glob` 工具，参数为 `pattern: "**/.omni/**"`、`path: "/e/WindowsWorkspace/omnifactory"`，返回错误 `'/e/WindowsWorkspace/omnifactory' is not a directory.`。该路径在 glob 工具的上下文中无法被识别为有效目录（此前 bash 环境下同路径可正常使用，但 glob 工具对路径的识别与 bash 不一致）。该步骤为环境侦察，未获取有效信息，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 12 轮：尝试 glob 搜索 .omni 目录失败（Home 路径）
+
+1. **尝试 glob 搜索 .omni 目录失败（Home 路径）** — Experimenter 调用 `glob` 工具，参数为 `pattern: "**/.omni/**"`、`path: "/home/lilithgames"`，返回错误 `'/home/lilithgames' is not a directory.`。该路径格式与之前 fa26096d 第 4 轮和第 11 轮的失败原因类似——glob 工具对 Linux 风格路径的识别与 bash 不一致。该步骤为环境侦察，意图寻找可能的 Omni 相关配置目录，但未获取有效信息，未涉及 lark-cli 相关的 token 或加密机制探索。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 13 轮：成功解码 JWT token 并解析完整结构
+
+1. **解码飞书 access_token JWT** — Experimenter 调用 `bash` 执行 Python 脚本，使用 `base64.urlsafe_b64decode` 对 JWT token 的三段进行解码。Header 解析结果：alg: "ES256", feature_code: "FeatureOAuthJWTSign_CN", kid: "7628027028020710365", typ: "JWT"。Payload 解析结果：client_id: "cli_a721b7e46b1dd01c", scope 涵盖 board:whiteboard:node:create/delete/read、docs:document.*、drive:*、sheets:*、wiki:*、base:*、search:docs:read 等大量权限；unit 和 tenant_unit 均为 "eu_nc"（欧洲数据中心）；opaque: true；enc 字段为加密二进制数据（enc_ver: v1）；auth_id: "7628961790512106443"，auth_time: 1776256494，auth_exp: 1807792494；此外还有 jti、iat、exp、ver 等标准 JWT 字段。该观察首次完整揭示了飞书 access_token 的 JWT 结构，其中 opaque 字段经过额外加密（enc_ver: v1），说明 token 的核心权限信息被隐藏。
+
+**当前状态**：新增 `jwt-token-format` 假设（draft），记录 JWT token 的完整结构解析结果。
+
+### Session fa26096d — 第 14 轮：确认 AppData Roaming 中的 LarkShell 目录
+
+1. **确认 AppData Roaming 中的 LarkShell 目录** — Experimenter 调用 `bash` 执行 `ls /c/Users/lilithgames/AppData/Roaming/ | grep -i -E "lark|feishu"`，返回 "LarkShell"。该观察再次确认 LarkShell 配置目录存在于 AppData/Roaming 路径下，与 `passport-encryption` 假设中描述的解密路径一致。此步骤为对已知 LarkShell 存在性的再次验证，未产生新的机制发现。
+
+**当前状态**：无更新，沿用此前结论。
+
+### Session fa26096d — 第 15 轮：完整列出 LarkShell Roaming 目录结构
+
+1. **完整列出 LarkShell Roaming 目录** — Experimenter 调用 `bash` 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/`，获取了 LarkShell 配置目录下约 60 个条目的完整清单。关键发现包括：
+   - **存储文件**：Local State（5229 字节）、persistent_passport_info_v2（5080 字节）、persistent_storage.db（217088 字节，含 -shm/-wal 伴生文件）、persistent_storage.enc.db（4096 字节，含 -wal）、persistent_storage.preload.db（4935680 字节，含 -wal）、persistent_storage_kv（21185 字节）——构成完整的持久化存储体系。
+   - **远端配置**：Remote_State（10136 字节）、Remote_Feature_7469976784941547522（25198 字节）、Remote_Feature_Default（25198 字节）——表明 LarkShell 从远端拉取功能标记和状态配置。
+   - **用户标识关联**：Remote_Feature_7469976784941547522 中的数字 ID 与之前 cookie-storage-path 假设中发现的 `user-approval-7469976784941547522` 路径完全一致，证实该 ID 为当前登录用户的唯一标识。
+   - **认证相关**：logout_token（28 字节，可能包含登出状态凭据）、passport_storage/ 子目录、aha/ 子目录（含用户分区数据）。
+   - **其他组件**：DeviceInfo.json（197 字节）、exception_config.json（350 字节）、first_party_sets.db（49152 字节）、lockfile（0 字节）、以及 Default/、IronDefault/、media_center/、net_config/、sdk_storage/、doctor/、update/ 等子目录。
+   该步骤为对 LarkShell 完整数据基础设施的一次系统性侦察，为后续探索 logout_token 内容、Remote_State 结构、passport_storage 目录等提供了清晰的目标清单。
+
+**当前状态**：`passport-encryption` 和 `cookie-storage-path` 假设获得新的支持性证据。新增 `larkshell-local-state-structure` 假设（living），记录 Local State 文件的完整 JSON 结构解析。
+
+### Session fa26096d — 第 16 轮：读取 Local State 文件完整内容
+
+1. **读取 Local State 文件** — Experimenter 调用 `bash` 执行 `cat /c/Users/lilithgames/AppData/Roaming/LarkShell/Local State`，成功获取该文件的完整 JSON 内容。关键发现：
+   - **os_crypt.encrypted_key**：DPAPI 加密的 AES 密钥（b'DPAPI\x01...'格式），用于解密 persistent_passport_info_v2 等加密数据
+   - **profile.info_cache**：记录 4 个 profile 的元数据——global\\profile_global（用户1）、b12adeef...\\profile_main（用户2）、b12adeef...\\profile_explorer（用户3）、b12adeef...\\PartitionsV2\\user-approval-7469976784941547522（用户4）；所有 profile 均使用默认头像（IDR_PROFILE_AVATAR_26）、默认名称、非临时账户
+   - **intl.app_locale**：zh-CN，确认客户端语言设置为简体中文
+   - **cloned_install**：首次安装时间戳 1772242694（约 2026-02-28），count: 1 表明非克隆安装
+   - **user_experience_metrics.stability**：exited_cleanly: true（上次正常退出）、system_crash_count: 1、browser_last_live_timestamp: 13420997522783069
+   - **variations_limited_entropy_synthetic_trial_seed_v2**："36"，用于 A/B 测试分组
+   - **local.password_hash_data_list**：空数组，表明未存储密码哈希
+   - **lark.app_config.gwp_asan_setting_v2**：内存安全调试配置（GwpAsanMalloc/GwpAsanPartitionAlloc）
+   该观察完整揭示了 LarkShell 的状态配置文件结构，为 `passport-encryption` 假设提供了关键依赖确认。
+
+**当前状态**：`passport-encryption` 假设获得新的支持性证据（Local State 文件结构确认）。新增 `larkshell-local-state-structure` 假设（living）。
+
+### Session fa26096d — 第 17 轮：查看 LarkShell aha 目录结构
+
+1. **查看 aha 目录结构** — Experimenter 调用 `bash` 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/aha/`，返回仅包含 `users` 子目录（drwxr-xr-x，创建时间 Feb 27 18:44）。该观察再次确认 aha/ 目录下存在 users/ 子目录，与 `cookie-storage-path` 假设中描述的 aha/users/<user_id>/PartitionsV2/*/Network/Cookies 路径结构一致。未发现其他子目录或文件，表明 aha/ 目录的唯一用途是存储 per-user 分区数据。
+
+**当前状态**：`cookie-storage-path` 假设获得新的支持性证据（Default/Cookies 再次确认 0 字节）。无新假设产生。
+
+### Session fa26096d — 第 18 轮：查看 LarkShell Default 目录内容
+
+1. **查看 Default 目录结构** — Experimenter 调用 `bash` 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/Default/`，列出该目录下的三个文件：`Cookies`（0 字节，创建时间 Apr 17 21:33）、`Preferences`（231776 字节）、`Secure Preferences`（231792 字节）。Preferences 和 Secure Preferences 文件大小几乎一致（仅差 16 字节），且最后修改时间相同（Apr 19 00:15），表明两者是同步更新的 Chromium 风格配对文件。Cookies 文件虽存在但为空，再次验证了 cookie 数据不存储在 Default 路径下的结论，与 `cookie-storage-path` 假设一致。新增 `larkshell-default-preferences` 假设（draft），记录这两个 Preferences 文件的发现。
+
+**当前状态**：`cookie-storage-path` 假设获得新的支持性证据。新增 `larkshell-default-preferences` 假设（draft），等待后续读取 Preferences 文件内容以确认其 JSON 结构。
+
+### Session fa26096d — 第 19 轮：查看 user-approval partition 的 Network 目录
+
+1. **查看 Network 目录结构** — Experimenter 调用 `bash` 执行 `ls -la /c/Users/lilithgames/AppData/Roaming/LarkShell/aha/users/b12adeef66bf9162917e119866815449/PartitionsV2/user-approval-7469976784941547522/Network/`，列出了该 partition 的 Network 目录内容。发现以下文件：`Cookies`（28672 字节，创建时间 Apr 9 20:59）、`Cookies-journal`（0 字节）、`Network Persistent State`（3163 字节）、`NetworkDataMigrated`（0 字节）、`Reporting and NEL`（36864 字节）、`Reporting and NEL-journal`（0 字节）、`SCT Auditing Pending Reports`（2 字节）、`Trust Tokens`（36864 字节）、`Trust Tokens-journal`（0 字节）。该观察直接确认了 Cookies 数据库文件及其 SQLite journal 伴生文件存在于 user-approval partition 的 Network 子目录下，且该目录遵循标准 Chromium Network 存储结构——包含 Persistent State（网络会话状态）、NEL（Network Error Logging）报告、Trust Tokens 等 Chromium 特有组件。Cookies 文件大小 28672 字节与之前 session 1a8c0133 中观察到的大小一致，表明数据在此期间未发生明显变化。
+
+**当前状态**：`cookie-storage-path` 假设获得进一步的直接证据支持，Cookies 文件在 Network 目录中的存在及其 Chromium 标准结构被再次确认。无新假设产生。
+
+### Session fa26096d — 第 21 轮：复制 Cookies 副本后 sqlite3 仍无法打开
+
+1. **复制 Cookies 副本并查询** — Experimenter 调用 `bash` 执行 `cp` 命令将 `user-approval-7469976784941547522/Network/Cookies` 复制到 `/e/WindowsWorkspace/omnifactory/cookies_copy.db`（复制步骤无报错），随后立即用 Python `sqlite3.connect()` 打开该副本并查询 `sqlite_master` 获取表结构。执行失败，抛出 `sqlite3.OperationalError: unable to open database file`。值得注意的是，该命令是一个多行 Python 脚本，依次执行了：查询 sqlite_master 表结构、查询 cookies 表行数、查询前 10 条记录的 host_key/name/encrypted_value 等字段。但由于第一步打开数据库即失败，后续查询均未执行。
+
+**当前状态**：`cookie-db-access-failure` 假设获得新的证据——即使将文件复制到工作目录（排除路径映射问题），sqlite3 仍无法打开。这进一步排除了"路径转义/POSIX 到 Windows 映射失效"作为唯一原因，可能原因转向：LarkShell 仍在运行并持有文件句柄导致复制了脏文件、文件本身损坏、或 SQLite WAL/journal 模式导致副本不可读。

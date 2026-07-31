@@ -58,6 +58,15 @@ class OriginRequestLoaderWorker(Worker):
                 "data/services/team_builder/runs/<run_id>/.omni/origin_request.md"
             ),
         }
+        target_package_path = input_data.get("target_package_path")
+        if target_package_path is not None:
+            if not isinstance(target_package_path, str) or not target_package_path.strip():
+                return Verdict(
+                    kind=VerdictKind.FAIL,
+                    output={},
+                    diagnosis="request_trigger.target_package_path must be a non-empty string",
+                )
+            origin["target_package_path"] = target_package_path.strip()
 
         return Verdict(
             kind=VerdictKind.PASS,

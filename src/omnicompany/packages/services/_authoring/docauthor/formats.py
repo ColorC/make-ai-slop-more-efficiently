@@ -17,7 +17,7 @@ MANIFEST_REQUEST = Material(
     description=(
         "请求 ManifestAuthorWorker 为指定 service/package 生成 .omni/manifest.yaml draft. "
         "target_service_path 是仓库相对路径 (如 'src/omnicompany/packages/services/foo' 或 "
-        "'src/omnicompany/packages/domains/voxelcraft/item'). Worker 依此扫目录 + 读 DESIGN + "
+        "'src/omnicompany/packages/domains/example_domain/item'). Worker 依此扫目录 + 读 DESIGN + "
         "grep plan history + 调 LLM (qwen-3.6-plus) 产三 kind (data_layout / aging_policy / "
         "size_limits) 的 manifest 内容."
     ),

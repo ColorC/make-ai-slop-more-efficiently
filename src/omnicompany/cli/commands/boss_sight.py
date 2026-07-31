@@ -30,11 +30,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 import click
 
 from omnicompany.bus.memory import MemoryBus
+from omnicompany.dashboard.boss_sight.reviewstage.links import review_material_open_url
 from omnicompany.runtime.agent.agent_loop_tools import ToolContext
 
 from .._access import any_caller, external_or_controller
@@ -76,6 +78,26 @@ def _invoke_router(router_cls, args: dict[str, Any]) -> str:
         return router._execute(args, ctx)
     except Exception as e:  # noqa: BLE001
         raise click.ClickException(f"{router_cls.TOOL_NAME} failed: {type(e).__name__}: {e}")
+
+
+def _resolve_material_ref(ref: str) -> str:
+    """材料引用解析: 接受内部 id 或**材料全名**(精确匹配)——人按名字找材料,
+    不该要求记内部编号(2026-07-19 用户裁决: review 相关命令输出与输入都只报名字)。
+    名字精确命中唯一才解析; 零命中/多命中如实报错并给候选。"""
+    from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+    store = get_store()
+    if store.get(ref) is not None:
+        return ref
+    matches = [m for m in store.list(include_archived=True) if m.title == ref]
+    if len(matches) == 1:
+        return matches[0].id
+    if not matches:
+        raise click.ClickException(
+            f"找不到材料 {ref!r}: 既不是有效 id 也不是材料全名(精确匹配); "
+            f"请用 `omni review list` 按名字查")
+    raise click.ClickException(
+        f"材料名 {ref!r} 精确命中 {len(matches)} 条, 请改用更完整的名字区分: "
+        + " / ".join(m.title for m in matches[:5]))
 
 
 def _run_third_party_audit(
@@ -356,20 +378,202 @@ def _register_plan_commands(cmd_plan: click.Group) -> None:
 
 
 # ────────────────────────────────────────────────────────────────────────
-# 新 omni review group (submit / list / annotate / push / verdict)
+# 新 omni review group (submit / list / annotate / push / archive / verdict)
 # ────────────────────────────────────────────────────────────────────────
 
 
 @click.group("review")
 def cmd_review() -> None:
-    """BOSS SIGHT reviewstage: submit / list / annotate / push / verdict materials."""
+    """BOSS SIGHT reviewstage: submit / list / annotate / push / archive / verdict materials."""
+
+
+@cmd_review.command("capabilities")
+@click.option("--json-output", is_flag=True, help="输出完整机器可读能力目录。")
+@any_caller
+def cmd_review_capabilities(json_output: bool) -> None:
+    """按需查看审阅场景、载体、关联、动作和实现状态。"""
+
+    from omnicompany.dashboard.boss_sight.reviewstage.capabilities import (
+        capability_catalog,
+    )
+    from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+
+    catalog = capability_catalog(get_store().format_registry)
+    if json_output:
+        click.echo(json.dumps(catalog, ensure_ascii=False, indent=2))
+        return
+    validation = catalog["validation"]
+    click.echo(
+        f"review capability catalog v{catalog['catalog_version']} "
+        f"(delivery={catalog['delivery']}, valid={str(validation['ok']).lower()})"
+    )
+    facility_discovery = catalog["facility_discovery"]
+    click.echo(
+        "facility-manual="
+        f"{facility_discovery['manual_path']} "
+        f"load={facility_discovery['load_policy']}"
+    )
+    for profile in catalog["profiles"]:
+        fallback = profile.get("fallback_by_carrier") or profile.get("fallback_profile_id") or "carrier"
+        embed = profile.get("embed_renderer_id") or "generic-card"
+        click.echo(
+            f"- {profile['profile_id']} [{profile['status']}] "
+            f"carriers={','.join(profile['accepted_carriers'])} "
+            f"embed={embed} fallback={fallback}"
+        )
+    if validation["errors"]:
+        for error in validation["errors"]:
+            click.echo(f"ERROR: {error}")
+
+
+@cmd_review.command("guide")
+@click.option(
+    "--event",
+    type=click.Choice(["submission_preflight", "embed_preflight", "material_open"]),
+    default="submission_preflight",
+    show_default=True,
+)
+@click.option("--kind", default="")
+@click.option("--tier", default="")
+@click.option("--title", default="")
+@click.option("--plan-id", "source_plan_id", default="")
+@click.option("--file", "file_path", default="")
+@click.option("--content", "inline_content", default="")
+@click.option("--schema-id", "data_schema_id", default="")
+@click.option("--extra-json", default=None)
+@click.option("--review-context-json", default=None)
+@click.option(
+    "--review-context-file",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="从 UTF-8 JSON 文件读取 review_context；Windows 下推荐。",
+)
+@click.option("--project", default="")
+@click.option("--track", default="")
+@click.option("--version", type=int, default=None)
+@click.option("--version-family", default="")
+@click.option("--subject-id", default="")
+@click.option("--subject-type", default="")
+@click.option("--revision", type=int, default=None)
+@click.option("--json-output", is_flag=True)
+@any_caller
+def cmd_review_guide(
+    event,
+    kind,
+    tier,
+    title,
+    source_plan_id,
+    file_path,
+    inline_content,
+    data_schema_id,
+    extra_json,
+    review_context_json,
+    review_context_file,
+    project,
+    track,
+    version,
+    version_family,
+    subject_id,
+    subject_type,
+    revision,
+    json_output,
+) -> None:
+    """在提交、嵌入或打开时按需解析一次；不安装 hook。"""
+
+    from omnicompany.dashboard.boss_sight.reviewstage.capabilities import (
+        ReviewSubmissionIntent,
+        resolve_review_submission,
+    )
+    from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+
+    def parse_object(raw: str | None, label: str) -> dict[str, Any]:
+        if not raw:
+            return {}
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise click.UsageError(f"{label} must be a JSON object: {exc}") from exc
+        if not isinstance(value, dict):
+            raise click.UsageError(f"{label} must be a JSON object")
+        return value
+
+    if review_context_json and review_context_file:
+        raise click.UsageError("use only one of --review-context-json or --review-context-file")
+    if review_context_file:
+        review_context_json = Path(review_context_file).read_text(encoding="utf-8")
+    payload = {
+        "kind": kind,
+        "tier": tier,
+        "title": title,
+        "source_plan_id": source_plan_id,
+        "file_path": file_path,
+        "inline_content": inline_content,
+        "data_schema_id": data_schema_id,
+        "extra": parse_object(extra_json, "--extra-json"),
+        "review_context": (
+            parse_object(review_context_json, "--review-context-json/--review-context-file")
+            if review_context_json
+            else None
+        ),
+        "project": project,
+        "track": track,
+        "version": version,
+        "version_family": version_family,
+        "subject_id": subject_id,
+        "subject_type": subject_type,
+        "revision": revision,
+    }
+    result = resolve_review_submission(
+        ReviewSubmissionIntent.from_mapping(payload),
+        event=event,
+        registry=get_store().format_registry,
+    ).to_dict()
+    if json_output:
+        click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    context = result["review_context"]
+    trace = context["resolution"]
+    capability = result["capability"]
+    fallback = (
+        capability.get("fallback_by_carrier", {}).get(kind)
+        or capability.get("fallback_profile_id")
+        or "generic-card"
+    )
+    click.echo(
+        f"profile={context['profile_id']} blocked={str(result['blocked']).lower()} "
+        f"routing={trace['routing_level']} selected_by={trace['selected_by']} "
+        f"confidence={trace['confidence']} "
+        f"renderer={capability.get('renderer_id') or 'carrier'} "
+        f"embed={capability.get('embed_renderer_id') or 'generic-card'} "
+        f"fallback={fallback}"
+    )
+    facility_discovery = result["facility_discovery"]
+    if facility_discovery["consult_manual"]:
+        search_terms = ",".join(facility_discovery["search_terms"]) or context["profile_id"]
+        click.echo(
+            f"MANUAL: {facility_discovery['manual_path']} "
+            f"search={search_terms} reason={facility_discovery['reason']}"
+        )
+    reminders = context["reminders"]
+    if not reminders:
+        click.echo("ready: no reminder for this event")
+        return
+    for reminder in reminders:
+        click.echo(
+            f"{reminder['severity'].upper()}: {reminder['message']} "
+            f"[{reminder['field_path']}]"
+        )
 
 
 @cmd_review.command("submit")
-@click.option("--kind", required=True, type=click.Choice(["image", "markdown", "html", "key_question", "custom_web_template", "video", "webgame-spec", "plan", "static-report", "demo", "aigc-image", "agent-workflow-report"]),
+@click.option("--kind", required=True, type=str,
               help="按内容格式选, 别按用途名望文生义: md 报告=markdown/plan/agent-workflow-report; "
-                   "static-report/demo/html=自包含 HTML 网页(或 extra.live_url)。kind 决定渲染器, 错配会被拒。")
-@click.option("--tier", required=True, type=click.Choice(["mandatory", "important", "processual", "ignored"]))
+                   "static-report/demo/html=自包含 HTML 网页(或 extra.live_url)。kind 决定渲染器, 错配会被拒。"
+                   "image/aigc-image 只能作为报告附件，必须配 --attachment-of。"
+                   "decision-candidate=决策候选(建议走 omni decisions candidate, 自动带机器载荷)。"
+                   "可用值以 `omni review capabilities` 的 Format 投影为准。")
+@click.option("--tier", required=True, type=str,
+              help="审阅级别；常用 mandatory/important/processual/ignored，最终由 FormatRegistry 校验。")
 @click.option("--title", required=True)
 @click.option("--plan-id", "source_plan_id", required=True)
 @click.option("--subagent-id", "source_subagent_id", default=None)
@@ -378,9 +582,14 @@ def cmd_review() -> None:
 @click.option("--annotations-allowed/--no-annotations", default=True)
 @click.option("--file-ext", default=None)
 @click.option("--schema-id", "data_schema_id", default=None)
+@click.option("--review-context-json", "review_context_json", default=None,
+              help="一等审阅场景 JSON: profile_id/schema_id/references。")
+@click.option("--review-context-file", "review_context_file",
+              type=click.Path(exists=True, dir_okay=False), default=None,
+              help="从 UTF-8 JSON 文件读取 review_context；Windows 下推荐。")
 @click.option("--extra-json", "extra_json", default=None,
               help="JSON 对象 merge 进 material.extra (webgame-spec 三件套引用 / 兄弟材料 attached_to)。"
-                   "禁止塞 project/track/version/version_family — 用同名正式选项。")
+                   "禁止塞 project/track/version/version_family/subject_id/subject_type/revision — 用正式选项。")
 @click.option("--project", default=None,
               help="必填(store 会拒绝空值)。项目名录真源=决策库: `omni decisions list` 看已有项目, "
                    "或 `omni decisions record -p <project>` 先立项。'unfiled'=未分组待办。")
@@ -390,15 +599,29 @@ def cmd_review() -> None:
               help="必填。版本号(同 --version-family 内递增, 从 1 起)。")
 @click.option("--version-family", "version_family", default=None,
               help="版本族(同一份稿的多版本共 family)。省略则默认=--title。")
+@click.option("--subject-id", "subject_id", default=None,
+              help="内容主体唯一 ID，如 EP0。B 站在册生产阶段必填。")
+@click.option("--subject-type", "subject_type", default=None,
+              help="内容主体类型，如 episode。B 站在册生产阶段必填。")
+@click.option("--revision", "revision", type=int, default=None,
+              help="跨阶段共享的整期修改版本，如 EP0 的 v13 填 13；不同于材料族自身 --version。")
 @click.option("--links-json", "links_json", default=None,
               help='JSON 对象, 如 {"parent":"mat_xxx","supersedes":["mat_yyy"],"related":["mat_zzz"]}。')
+@click.option("--links-json-file", "links_json_file", type=click.Path(exists=True, dir_okay=False), default=None,
+              help="从 UTF-8 JSON 文件读取 links；Windows 下推荐，避免 shell 剥离双引号。")
+@click.option("--attachment-of", default=None,
+              help="图片附件所属的报告 material id；image/aigc-image 必填，禁止顶层单图送审。")
+@click.option("--dry-run", is_flag=True,
+              help="只解析 profile、缺失上下文和提醒；不复制文件、不写 Material、不做远程探测。")
 # M2 Phase 2 步骤 4: subagent 在收尾时通过 omni review submit emit material 是核心协议
 # (emit_material_protocol = A_explicit_tool, 见 plan.md). 把 submit 放开给三档 caller.
 # annotate / push 仍受限 — 那是总控/外部的活, subagent 不应该自评和自推.
 @any_caller
 def cmd_review_submit(kind, tier, title, source_plan_id, source_subagent_id, file_path,
-                      inline_content, annotations_allowed, file_ext, data_schema_id, extra_json,
-                      project, track, version, version_family, links_json):
+                      inline_content, annotations_allowed, file_ext, data_schema_id,
+                      review_context_json, review_context_file, extra_json,
+                      project, track, version, version_family, subject_id, subject_type, revision,
+                      links_json, links_json_file, attachment_of, dry_run):
     """Submit a material to the review stage (§2.7).
 
     project/track/version 是强制标签(阻断校验在 store.create 唯一收口, 这里只透传;
@@ -418,12 +641,80 @@ def cmd_review_submit(kind, tier, title, source_plan_id, source_subagent_id, fil
     if inline_content: args["inline_content"] = inline_content
     if file_ext: args["file_ext"] = file_ext
     if data_schema_id: args["data_schema_id"] = data_schema_id
+    if review_context_json and review_context_file:
+        raise click.UsageError("use only one of --review-context-json or --review-context-file")
+    if review_context_file:
+        review_context_json = Path(review_context_file).read_text(encoding="utf-8")
+    if review_context_json:
+        try:
+            parsed_review_context = json.loads(review_context_json)
+        except json.JSONDecodeError as exc:
+            raise click.UsageError(f"review context must be a JSON object: {exc}") from exc
+        if not isinstance(parsed_review_context, dict):
+            raise click.UsageError("review context must be a JSON object")
+        args["review_context"] = parsed_review_context
     if extra_json: args["extra_json"] = extra_json
     if project is not None: args["project"] = project
     if track is not None: args["track"] = track
     if version is not None: args["version"] = version
     if version_family is not None: args["version_family"] = version_family
-    if links_json: args["links_json"] = links_json
+    if subject_id is not None: args["subject_id"] = subject_id
+    if subject_type is not None: args["subject_type"] = subject_type
+    if revision is not None: args["revision"] = revision
+    if links_json and links_json_file:
+        raise click.UsageError("use only one of --links-json or --links-json-file")
+    if links_json_file:
+        links_json = Path(links_json_file).read_text(encoding="utf-8")
+    try:
+        parsed_links = json.loads(links_json) if links_json else {}
+    except json.JSONDecodeError as exc:
+        raise click.UsageError(f"links_json must be a JSON object: {exc}") from exc
+    if not isinstance(parsed_links, dict):
+        raise click.UsageError("links_json must be a JSON object")
+    if attachment_of:
+        declared_parent = parsed_links.get("parent")
+        if declared_parent not in (None, attachment_of):
+            raise click.UsageError("--attachment-of conflicts with links.parent")
+        parsed_links["parent"] = attachment_of
+    if parsed_links:
+        args["links_json"] = json.dumps(parsed_links, ensure_ascii=False)
+    if dry_run:
+        from omnicompany.dashboard.boss_sight.reviewstage.capabilities import (
+            ReviewSubmissionIntent,
+            resolve_review_submission,
+        )
+        from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+
+        try:
+            parsed_extra = json.loads(extra_json) if extra_json else {}
+        except json.JSONDecodeError as exc:
+            raise click.UsageError(f"extra_json must be a JSON object: {exc}") from exc
+        if not isinstance(parsed_extra, dict):
+            raise click.UsageError("extra_json must be a JSON object")
+        store = get_store()
+        try:
+            store.validate_attachment_policy(
+                kind=kind,
+                links=parsed_links,
+                extra=parsed_extra,
+                review_context=args.get("review_context"),
+            )
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        intent = ReviewSubmissionIntent.from_mapping({
+            **args,
+            "file_path": file_path or "",
+            "inline_content": inline_content or "",
+            "data_schema_id": data_schema_id or "",
+            "extra": parsed_extra,
+            "links": parsed_links,
+        })
+        result = resolve_review_submission(
+            intent,
+            registry=store.format_registry,
+        )
+        click.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        return
     click.echo(_invoke_router(SubmitToReviewstageRouter, args))
 
 
@@ -513,6 +804,75 @@ def cmd_review_list(status, tier, plan_id, max_results):
     click.echo(_invoke_router(ListReviewstageMaterialsRouter, args))
 
 
+@cmd_review.command("readback")
+@click.option("--session-id", default=None, help="省略时使用当前原生 agent 会话。")
+@click.option("--conversation-id", default=None, help="显式指定用户可见的根对话。")
+@click.option("--provider", default=None, type=click.Choice(["codex", "claude_code"]))
+@click.option("--include-archived", is_flag=True)
+@click.option("--max", "max_results", type=int, default=200, show_default=True)
+@click.option("--json", "as_json", is_flag=True)
+@any_caller
+def cmd_review_readback(session_id, conversation_id, provider, include_archived, max_results, as_json):
+    """快速读回本对话送审材料, 只突出有理由且对话未说明的具体内容。"""
+    from omnicompany.dashboard.boss_sight.reviewstage.readback import build_review_readback
+    from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+
+    payload = build_review_readback(
+        get_store(),
+        session_id=session_id,
+        conversation_id=conversation_id,
+        provider=provider,
+        include_archived=include_archived,
+        limit=max_results,
+    )
+    if not payload.get("context", {}).get("resolved"):
+        raise click.ClickException("无法解析当前会话; 请显式传 --session-id 和 --provider。")
+    if as_json:
+        click.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    counts = payload["counts"]
+    ctx = payload["context"]
+    click.echo(
+        f"conversation={ctx['conversation_id']} · 共 {counts['all']} 份 · "
+        f"重点 {counts['highlight']} · 对话已说明 {counts['explained']} · "
+        f"低关注 {counts['background']}"
+    )
+    labels = {
+        "highlight": "重点: 有明确理由和内容, 但对话未说明",
+        "explained": "已在对话说明",
+        "background": "低关注: 未填写具体理由或内容不明确",
+    }
+    for presentation in ("highlight", "explained", "background"):
+        rows = [item for item in payload["items"] if item["presentation"] == presentation]
+        if not rows:
+            continue
+        click.echo(f"\n{labels[presentation]} ({len(rows)})")
+        for row in rows:
+            reason = f" · 理由: {row['reason']}" if row.get("reason") else ""
+            url = review_material_open_url(_dashboard_base(), row["id"])
+            click.echo(f"- {row['title']} · {url}{reason}")
+
+
+@cmd_review.command("archive")
+@click.argument("material_id")
+@click.option(
+    "--restore",
+    is_flag=True,
+    help="Restore a previously soft-archived material.",
+)
+@external_or_controller
+def cmd_review_archive(material_id: str, restore: bool) -> None:
+    """Soft-archive a material; --restore makes it visible again."""
+    from omnicompany.dashboard.boss_sight.controller.tools import (
+        ArchiveReviewstageMaterialRouter,
+    )
+
+    click.echo(_invoke_router(
+        ArchiveReviewstageMaterialRouter,
+        {"material_id": _resolve_material_ref(material_id), "archived": not restore},
+    ))
+
+
 @cmd_review.command("judge")
 @click.argument("material_id")
 @click.option("--context", default=None)
@@ -521,7 +881,7 @@ def cmd_review_list(status, tier, plan_id, max_results):
 def cmd_review_judge(material_id, context, max_content_chars):
     """Judge a reviewstage material and return model_hint advice."""
     from omnicompany.dashboard.boss_sight.controller.tools import JudgeReviewstageMaterialRouter
-    args = {"material_id": material_id, "max_content_chars": max_content_chars}
+    args = {"material_id": _resolve_material_ref(material_id), "max_content_chars": max_content_chars}
     if context:
         args["context"] = context
     click.echo(_invoke_router(JudgeReviewstageMaterialRouter, args))
@@ -535,7 +895,7 @@ def cmd_review_judge(material_id, context, max_content_chars):
 def cmd_review_annotate(material_id, content, target):
     """Add an AI annotation to a material (§4.4 / §4.5)."""
     from omnicompany.dashboard.boss_sight.controller.tools import AnnotateMaterialRouter
-    args = {"material_id": material_id, "content": content}
+    args = {"material_id": _resolve_material_ref(material_id), "content": content}
     if target:
         try:
             args["target"] = json.loads(target)
@@ -551,9 +911,13 @@ def cmd_review_annotate(material_id, content, target):
 def cmd_review_push(material_id, reason):
     """Push an existing material to the user (§2.10)."""
     from omnicompany.dashboard.boss_sight.controller.tools import PushMaterialToUserRouter
-    click.echo(_invoke_router(PushMaterialToUserRouter, {
-        "material_id": material_id, "reason": reason,
-    }))
+
+    output = _invoke_router(PushMaterialToUserRouter, {
+        "material_id": _resolve_material_ref(material_id), "reason": reason,
+    })
+    if output.startswith("ERROR:"):
+        raise click.ClickException(output.removeprefix("ERROR:").strip())
+    click.echo(output)
 
 
 @cmd_review.command("relay")
@@ -569,7 +933,7 @@ def cmd_review_relay(material_id, reason, plan_id, task_id, verdict, no_inject, 
     """审阅意见回流: 用户带反馈的驳回/批注 → 注入回原 agent 会话继续 (修断掉的回路)。"""
     import json as _json
     from omnicompany.packages.services._core.lifecycle.review_relay import relay_feedback
-    res = relay_feedback(material_id, reason, plan_id=plan_id, task_id=task_id,
+    res = relay_feedback(_resolve_material_ref(material_id), reason, plan_id=plan_id, task_id=task_id,
                          verdict=verdict, inject=not no_inject)
     if as_json:
         click.echo(_json.dumps(res, ensure_ascii=False, indent=2))

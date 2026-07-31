@@ -1,0 +1,95 @@
+# [OMNI] origin=claude-code domain=services/_learning agent=ai-ide-e32f0243 ts=2026-06-23T05:54:32Z
+{
+  "skeleton": {
+    "name": "op-fde992",
+    "candidate_op": "探查目录与读取关键文档定位上下文",
+    "trigger": "进入陌生项目时",
+    "materials": [
+      {
+        "id": "op_fde992.request",
+        "kind": "source",
+        "desc": "探查目录与读取关键文档定位上下文 的输入请求"
+      },
+      {
+        "id": "op_fde992.s1",
+        "kind": "internal",
+        "desc": "第1步产物"
+      },
+      {
+        "id": "op_fde992.s2",
+        "kind": "internal",
+        "desc": "第2步产物"
+      },
+      {
+        "id": "op_fde992.s3",
+        "kind": "internal",
+        "desc": "第3步产物"
+      },
+      {
+        "id": "op_fde992.result",
+        "kind": "sink",
+        "desc": "探查目录与读取关键文档定位上下文 的最终产物"
+      }
+    ],
+    "workers": [
+      {
+        "id": "op_fde992_step1_worker",
+        "purpose": "Bash 列目录结构",
+        "format_in": "op_fde992.request",
+        "format_out": "op_fde992.s1"
+      },
+      {
+        "id": "op_fde992_step2_worker",
+        "purpose": "Read 关键入口文档",
+        "format_in": "op_fde992.s1",
+        "format_out": "op_fde992.s2"
+      },
+      {
+        "id": "op_fde992_step3_worker",
+        "purpose": "跨 base 搜索比对真实位置",
+        "format_in": "op_fde992.s2",
+        "format_out": "op_fde992.s3"
+      },
+      {
+        "id": "op_fde992_step4_worker",
+        "purpose": "确定后续目标目录",
+        "format_in": "op_fde992.s3",
+        "format_out": "op_fde992.result"
+      }
+    ],
+    "entry": "op_fde992.request",
+    "topology": [
+      "op_fde992.request → op_fde992_step1_worker → op_fde992.s1",
+      "op_fde992.s1 → op_fde992_step2_worker → op_fde992.s2",
+      "op_fde992.s2 → op_fde992_step3_worker → op_fde992.s3",
+      "op_fde992.s3 → op_fde992_step4_worker → op_fde992.result"
+    ]
+  },
+  "all_operations": [
+    {
+      "name": "探查目录与读取关键文档定位上下文",
+      "trigger": "进入陌生项目时",
+      "frequency": 18,
+      "steps": [
+        "Bash 列目录结构",
+        "Read 关键入口文档",
+        "跨 base 搜索比对真实位置",
+        "确定后续目标目录"
+      ],
+      "evidence": [
+        "10/Bash",
+        "13/Read"
+      ]
+    },
+    {
+      "name": "搜索引用并核对规范口径",
+      "frequency": 12,
+      "steps": [
+        "grep 关键词",
+        "读命中上下文",
+        "决定改名/迁移"
+      ]
+    }
+  ],
+  "summary": "测试"
+}

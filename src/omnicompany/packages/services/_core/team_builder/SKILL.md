@@ -74,4 +74,4 @@ result = run_team_builder(
 - agent-first 哲学 → [docs/standards/concepts/agent_first.md](../../../../../../docs/standards/concepts/agent_first.md)
 - workflow → .omni/build_workflow.md
 - workspace → .omni/workspace.yaml
-- 旧实现 (Diamond 归档) → [_archive/](_archive/)
+- 旧实现 (Diamond) → [routers_legacy.py](routers_legacy.py)

@@ -1,0 +1,1094 @@
+...........................FFFFFF...FFF..FF.............FFFFFFFFFFF..... [ 11%]
+..............FF.FF............F.................................F...... [ 22%]
+..................F..................................................... [ 34%]
+.........................................F............F..FF....F........ [ 45%]
+........................................................................ [ 57%]
+..........EEEEEE........................................................ [ 68%]
+........................................................................ [ 80%]
+........................................................................ [ 91%]
+.....................................................                    [100%]
+=================================== ERRORS ====================================
+______________ ERROR at setup of test_red_fixture_has_v1_schema _______________
+
+    @pytest.fixture
+    def red_fixture_data():
+        p = PLAN_DIR / "sample_hypothesis_red_easy_falsify.yaml"
+>       assert p.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/_infra/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/sample_hypothesis_red_easy_falsify.yaml').exists
+
+tests\services\_diagnosis\doctor\test_challenge_diagnostic_agent_smoke.py:145: AssertionError
+________ ERROR at setup of test_red_fixture_statement_overly_absolute _________
+
+    @pytest.fixture
+    def red_fixture_data():
+        p = PLAN_DIR / "sample_hypothesis_red_easy_falsify.yaml"
+>       assert p.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/_infra/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/sample_hypothesis_red_easy_falsify.yaml').exists
+
+tests\services\_diagnosis\doctor\test_challenge_diagnostic_agent_smoke.py:145: AssertionError
+__________ ERROR at setup of test_red_fixture_starts_in_active_state __________
+
+    @pytest.fixture
+    def red_fixture_data():
+        p = PLAN_DIR / "sample_hypothesis_red_easy_falsify.yaml"
+>       assert p.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/_infra/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/sample_hypothesis_red_easy_falsify.yaml').exists
+
+tests\services\_diagnosis\doctor\test_challenge_diagnostic_agent_smoke.py:145: AssertionError
+_____________ ERROR at setup of test_green_fixture_has_v1_schema ______________
+
+    @pytest.fixture
+    def green_fixture_data():
+        p = PLAN_DIR / "sample_hypothesis_green_solid.yaml"
+>       assert p.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/_infra/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/sample_hypothesis_green_solid.yaml').exists
+
+tests\services\_diagnosis\doctor\test_challenge_diagnostic_agent_smoke.py:153: AssertionError
+_________ ERROR at setup of test_green_fixture_state_allows_challenge _________
+
+    @pytest.fixture
+    def green_fixture_data():
+        p = PLAN_DIR / "sample_hypothesis_green_solid.yaml"
+>       assert p.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/_infra/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/sample_hypothesis_green_solid.yaml').exists
+
+tests\services\_diagnosis\doctor\test_challenge_diagnostic_agent_smoke.py:153: AssertionError
+_________ ERROR at setup of test_red_and_green_fixtures_are_distinct __________
+
+    @pytest.fixture
+    def red_fixture_data():
+        p = PLAN_DIR / "sample_hypothesis_red_easy_falsify.yaml"
+>       assert p.exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/_infra/diagnosis/[2026-05-05]DIAGNOSIS-RECONSOLIDATION/sample_hypothesis_red_easy_falsify.yaml').exists
+
+tests\services\_diagnosis\doctor\test_challenge_diagnostic_agent_smoke.py:145: AssertionError
+================================== FAILURES ===================================
+_________ test_generator_produces_html_and_manifest_with_all_anchors __________
+
+    def test_generator_produces_html_and_manifest_with_all_anchors() -> None:
+>       manifest = v8.build(build_time="2026-07-12T00:00:00+00:00")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_guildvs_anchor_review.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:508: in build
+    ug = _load_json(UNITY_GOLD_RECTS_PATH)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:164: in _load_json
+    return json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/unity-prefab-gold/pbui_guildvs_battle.rects.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\unity-prefab-gold\\pbui_guildvs_battle.rects.json'
+
+pathlib.py:1013: FileNotFoundError
+____________________ test_manifest_sha_matches_html_bytes _____________________
+
+    def test_manifest_sha_matches_html_bytes() -> None:
+>       manifest = v8.build(build_time="2026-07-12T00:00:00+00:00")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_guildvs_anchor_review.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:508: in build
+    ug = _load_json(UNITY_GOLD_RECTS_PATH)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:164: in _load_json
+    return json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/unity-prefab-gold/pbui_guildvs_battle.rects.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\unity-prefab-gold\\pbui_guildvs_battle.rects.json'
+
+pathlib.py:1013: FileNotFoundError
+_________________ test_two_builds_identical_except_timestamp __________________
+
+    def test_two_builds_identical_except_timestamp() -> None:
+>       v8.build(build_time="2026-07-12T00:00:00+00:00")
+
+tests\domains\igame\test_build_guildvs_anchor_review.py:58: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:508: in build
+    ug = _load_json(UNITY_GOLD_RECTS_PATH)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:164: in _load_json
+    return json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/unity-prefab-gold/pbui_guildvs_battle.rects.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\unity-prefab-gold\\pbui_guildvs_battle.rects.json'
+
+pathlib.py:1013: FileNotFoundError
+_________________ test_html_has_no_external_links_or_scripts __________________
+
+    def test_html_has_no_external_links_or_scripts() -> None:
+>       v8.build(build_time="2026-07-12T00:00:00+00:00")
+
+tests\domains\igame\test_build_guildvs_anchor_review.py:69: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:508: in build
+    ug = _load_json(UNITY_GOLD_RECTS_PATH)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:164: in _load_json
+    return json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/unity-prefab-gold/pbui_guildvs_battle.rects.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\unity-prefab-gold\\pbui_guildvs_battle.rects.json'
+
+pathlib.py:1013: FileNotFoundError
+_________________ test_embedded_image_count_matches_manifest __________________
+
+    def test_embedded_image_count_matches_manifest() -> None:
+>       manifest = v8.build(build_time="2026-07-12T00:00:00+00:00")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_guildvs_anchor_review.py:80: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:508: in build
+    ug = _load_json(UNITY_GOLD_RECTS_PATH)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_anchor_review.py:164: in _load_json
+    return json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/unity-prefab-gold/pbui_guildvs_battle.rects.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\unity-prefab-gold\\pbui_guildvs_battle.rects.json'
+
+pathlib.py:1013: FileNotFoundError
+_ test_complete_io_review_binds_exact_saved_inputs_outputs_and_corrected_draft _
+
+tmp_path = WindowsPath('C:/Users/lilithgames/AppData/Local/Temp/pytest-of-lilithgames/pytest-6996/test_complete_io_review_binds_0')
+
+    def test_complete_io_review_binds_exact_saved_inputs_outputs_and_corrected_draft(
+        tmp_path: Path,
+    ) -> None:
+>       target, manifest, payload = build_guildvs_io_review.write(
+            tmp_path / "guildvs-io.html"
+        )
+
+tests\domains\igame\test_build_guildvs_io_review.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_io_review.py:648: in write
+    target.write_text(build_html(payload), encoding="utf-8")
+                      ^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_io_review.py:633: in build_html
+    {_story_visual_html(story_visual_map)}
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_io_review.py:576: in _story_visual_html
+    image_uri = _thumbnail_data_uri(Path(screen["visual"]["path"]))
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_io_review.py:544: in _thumbnail_data_uri
+    with Image.open(path) as source:
+         ^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fp = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/guildvs-white-mock-match.png')
+mode = 'r', formats = ['PNG']
+
+    def open(
+        fp: StrOrBytesPath | IO[bytes],
+        mode: Literal["r"] = "r",
+        formats: list[str] | tuple[str, ...] | None = None,
+    ) -> ImageFile.ImageFile:
+        """
+        Opens and identifies the given image file.
+    
+        This is a lazy operation; this function identifies the file, but
+        the file remains open and the actual image data is not read from
+        the file until you try to process the data (or call the
+        :py:meth:`~PIL.Image.Image.load` method).  See
+        :py:func:`~PIL.Image.new`. See :ref:`file-handling`.
+    
+        :param fp: A filename (string), os.PathLike object or a file object.
+           The file object must implement ``file.read``,
+           ``file.seek``, and ``file.tell`` methods,
+           and be opened in binary mode. The file object will also seek to zero
+           before reading.
+        :param mode: The mode.  If given, this argument must be "r".
+        :param formats: A list or tuple of formats to attempt to load the file in.
+           This can be used to restrict the set of formats checked.
+           Pass ``None`` to try all supported formats. You can print the set of
+           available formats by running ``python3 -m PIL`` or using
+           the :py:func:`PIL.features.pilinfo` function.
+        :returns: An :py:class:`~PIL.Image.Image` object.
+        :exception FileNotFoundError: If the file cannot be found.
+        :exception PIL.UnidentifiedImageError: If the image cannot be opened and
+           identified.
+        :exception ValueError: If the ``mode`` is not "r", or if a ``StringIO``
+           instance is used for ``fp``.
+        :exception TypeError: If ``formats`` is not ``None``, a list or a tuple.
+        """
+    
+        if mode != "r":
+            msg = f"bad mode {repr(mode)}"  # type: ignore[unreachable]
+            raise ValueError(msg)
+        elif isinstance(fp, io.StringIO):
+            msg = (  # type: ignore[unreachable]
+                "StringIO cannot be used to open an image. "
+                "Binary data must be used instead."
+            )
+            raise ValueError(msg)
+    
+        if formats is None:
+            formats = ID
+        elif not isinstance(formats, (list, tuple)):
+            msg = "formats must be a list or tuple"  # type: ignore[unreachable]
+            raise TypeError(msg)
+    
+        exclusive_fp = False
+        filename: str | bytes = ""
+        if is_path(fp):
+            filename = os.fspath(fp)
+>           fp = builtins.open(filename, "rb")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\guildvs-white-mock-match.png'
+
+venv\Lib\site-packages\PIL\Image.py:3635: FileNotFoundError
+_ test_stage3_manifest_proves_three_portrait_rounds_and_keeps_figma_boundary __
+
+    def test_stage3_manifest_proves_three_portrait_rounds_and_keeps_figma_boundary():
+>       result = build_guildvs_stage3_formal.build_manifest(ROOT)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_guildvs_stage3_formal.py:10: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_stage3_formal.py:124: in build_manifest
+    "sha256": sha256(reference),
+              ^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_stage3_formal.py:75: in sha256
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+                          ^^^^^^^^^^^^^^^^^
+pathlib.py:1019: in read_bytes
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/guildvs-white-mock-pioneer-admin.png')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\guildvs-white-mock-pioneer-admin.png'
+
+pathlib.py:1013: FileNotFoundError
+_________ test_visual_map_places_every_user_story_on_a_screen_region __________
+
+    def test_visual_map_places_every_user_story_on_a_screen_region() -> None:
+>       payload = build_guildvs_story_visual_map.build()
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_guildvs_story_visual_map.py:7: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_story_visual_map.py:225: in build
+    "sha256": _sha256(visual_path),
+              ^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_story_visual_map.py:207: in _sha256
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+                          ^^^^^^^^^^^^^^^^^
+pathlib.py:1019: in read_bytes
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/guildvs-white-mock-match.png')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\guildvs-white-mock-match.png'
+
+pathlib.py:1013: FileNotFoundError
+____ test_visual_map_distinguishes_evidence_backed_and_theoretical_regions ____
+
+    def test_visual_map_distinguishes_evidence_backed_and_theoretical_regions() -> None:
+>       payload = build_guildvs_story_visual_map.build()
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_guildvs_story_visual_map.py:33: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_story_visual_map.py:225: in build
+    "sha256": _sha256(visual_path),
+              ^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_story_visual_map.py:207: in _sha256
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+                          ^^^^^^^^^^^^^^^^^
+pathlib.py:1019: in read_bytes
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/guildvs-white-mock-match.png')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\guildvs-white-mock-match.png'
+
+pathlib.py:1013: FileNotFoundError
+___________ test_full_guildvs_sample_is_grouped_and_visually_bound ____________
+
+    def test_full_guildvs_sample_is_grouped_and_visually_bound() -> None:
+>       manifest = build_guildvs_visual_gold.build_manifest(ROOT)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_guildvs_visual_gold.py:13: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_visual_gold.py:300: in build_manifest
+    width, height = _png_size(image_path)
+                    ^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_visual_gold.py:203: in _png_size
+    payload = path.read_bytes()[:24]
+              ^^^^^^^^^^^^^^^^^
+pathlib.py:1019: in read_bytes
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/guildvs-white-mock-match.png')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\guildvs-white-mock-match.png'
+
+pathlib.py:1013: FileNotFoundError
+___________________ test_visual_gold_write_is_deterministic ___________________
+
+tmp_path = WindowsPath('C:/Users/lilithgames/AppData/Local/Temp/pytest-of-lilithgames/pytest-6996/test_visual_gold_write_is_dete0')
+
+    def test_visual_gold_write_is_deterministic(tmp_path: Path) -> None:
+        first = tmp_path / "first.json"
+        second = tmp_path / "second.json"
+    
+>       build_guildvs_visual_gold.write_manifest(ROOT, first)
+
+tests\domains\igame\test_build_guildvs_visual_gold.py:53: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_visual_gold.py:431: in write_manifest
+    json.dumps(build_manifest(repo_root), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_visual_gold.py:300: in build_manifest
+    width, height = _png_size(image_path)
+                    ^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_guildvs_visual_gold.py:203: in _png_size
+    payload = path.read_bytes()[:24]
+              ^^^^^^^^^^^^^^^^^
+pathlib.py:1019: in read_bytes
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/guildvs-white-mock-match.png')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\guildvs-white-mock-match.png'
+
+pathlib.py:1013: FileNotFoundError
+_____________ test_self_contained_report_embeds_current_evidence ______________
+
+tmp_path = WindowsPath('C:/Users/lilithgames/AppData/Local/Temp/pytest-of-lilithgames/pytest-6996/test_self_contained_report_emb0')
+
+    def test_self_contained_report_embeds_current_evidence(tmp_path: Path) -> None:
+        target = tmp_path / "review.html"
+    
+>       written = build_paradigm_review_report.write_report(ROOT, target)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_paradigm_review_report.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_paradigm_review_report.py:1110: in write_report
+    target.write_text(build_report(repo_root), encoding="utf-8")
+                      ^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_paradigm_review_report.py:918: in build_report
+    browser_manifest = _load_json(browser_manifest_path)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_paradigm_review_report.py:98: in _load_json
+    value = json.loads(path.read_text(encoding="utf-8"))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/browser-evidence-manifest.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\browser-evidence-manifest.json'
+
+pathlib.py:1013: FileNotFoundError
+________________________ test_report_is_deterministic _________________________
+
+    def test_report_is_deterministic() -> None:
+>       first = build_paradigm_review_report.build_report(ROOT)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_paradigm_review_report.py:98: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_paradigm_review_report.py:918: in build_report
+    browser_manifest = _load_json(browser_manifest_path)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_paradigm_review_report.py:98: in _load_json
+    value = json.loads(path.read_text(encoding="utf-8"))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/browser-evidence-manifest.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\browser-evidence-manifest.json'
+
+pathlib.py:1013: FileNotFoundError
+_______ test_reviewstage_v11_runtime_proves_all_embedded_images_loaded ________
+
+    def test_reviewstage_v11_runtime_proves_all_embedded_images_loaded() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+>       runtime = json.loads((evidence_root / "reviewstage-v11-runtime.json").read_text("utf-8"))
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_build_paradigm_review_report.py:114: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v11-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v11-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+________ test_reviewstage_v12_runtime_proves_candidate_visuals_loaded _________
+
+    def test_reviewstage_v12_runtime_proves_candidate_visuals_loaded() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v12-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:177: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v12-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v12-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+____ test_reviewstage_v14_runtime_proves_a0_visuals_and_current_projection ____
+
+    def test_reviewstage_v14_runtime_proves_a0_visuals_and_current_projection() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v14-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:218: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v14-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v14-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+_ test_reviewstage_v16_runtime_proves_l2_static_and_runtime_failure_evidence __
+
+    def test_reviewstage_v16_runtime_proves_l2_static_and_runtime_failure_evidence() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v16-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v16-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v16-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+_____ test_reviewstage_v17_runtime_preserves_historical_l2_atomic_signoff _____
+
+    def test_reviewstage_v17_runtime_preserves_historical_l2_atomic_signoff() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v17-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:361: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v17-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v17-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+___ test_reviewstage_v20_runtime_proves_runtime_gold_and_current_projection ___
+
+    def test_reviewstage_v20_runtime_proves_runtime_gold_and_current_projection() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v20-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:438: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v20-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v20-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+_____ test_reviewstage_v21_runtime_proves_human_readable_portrait_report ______
+
+    def test_reviewstage_v21_runtime_proves_human_readable_portrait_report() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v21-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:518: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v21-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v21-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+__ test_reviewstage_v22_runtime_proves_past_work_and_exact_guild_gvg_visuals __
+
+    def test_reviewstage_v22_runtime_proves_past_work_and_exact_guild_gvg_visuals() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v22-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:564: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v22-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v22-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+_____ test_reviewstage_v23_runtime_proves_actual_guildvs_white_mock_flow ______
+
+    def test_reviewstage_v23_runtime_proves_actual_guildvs_white_mock_flow() -> None:
+        evidence_root = (
+            ROOT
+            / "docs"
+            / "plans"
+            / "igame"
+            / "[2026-07-06]IGAME-UI-PARADIGM-DEMO"
+            / "stage-v3"
+            / "visual-evidence"
+        )
+        runtime = json.loads(
+>           (evidence_root / "reviewstage-v23-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_build_paradigm_review_report.py:612: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/reviewstage-v23-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\reviewstage-v23-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+___________________ test_pipeline_end_to_end_lands_material ___________________
+
+tmp_path = WindowsPath('C:/Users/lilithgames/AppData/Local/Temp/pytest-of-lilithgames/pytest-6996/test_pipeline_end_to_end_lands0')
+
+    @pytest.mark.skipif(not _BENCH.exists(), reason="benchmark 绿样缺失(gitignore 数据面)")
+    def test_pipeline_end_to_end_lands_material(tmp_path):
+        """四节点串跑(no-llm): 协作绿样 → 0 FAIL → 落点建材料 track=细化案协作稿。"""
+        store = _store(tmp_path)
+        # 四节点顺序调用, 手动串 output(等价 TeamRunner 线性推进; 隔离掉生产 store)。
+        lexicon = dlp.LexiconNode()
+        lint = dlp.LintNode()
+        review = dlp.SemanticReviewNode()
+        landing = dlp.LandingNode()
+        landing.store_factory = lambda: store
+    
+        v1 = lexicon.run({"doc": str(_BENCH), "mode": "协作", "no_llm": "1"})
+        assert v1.kind.value == "pass", v1.diagnosis
+        v2 = lint.run(v1.output)
+        assert v2.kind.value == "pass"
+        assert v2.output["lint_fail"] == 0  # c2_looped.md 是循环修复绿样
+        v3 = review.run(v2.output)
+        assert v3.kind.value == "pass"
+>       assert v3.output["review_status"] == "no-llm"  # 确定性路径, 无 LLM
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 'no-llm+lexicon' == 'no-llm'
+E         
+E         - no-llm
+E         + no-llm+lexicon
+
+tests\domains\igame\test_design_lint_pipeline.py:64: AssertionError
+_______________________ test_landing_version_increments _______________________
+
+tmp_path = WindowsPath('C:/Users/lilithgames/AppData/Local/Temp/pytest-of-lilithgames/pytest-6996/test_landing_version_increment0')
+
+    @pytest.mark.skipif(not _BENCH.exists(), reason="benchmark 绿样缺失(gitignore 数据面)")
+    def test_landing_version_increments(tmp_path):
+        """同 (project, track, version_family) 再落一次 → version 递增到 2。"""
+        store = _store(tmp_path)
+        landing = dlp.LandingNode()
+        landing.store_factory = lambda: store
+        base_out = {
+            "doc": str(_BENCH), "mode": "协作",
+            "lint_results": [], "review_findings": [], "lint_fail": 0, "lint_warn": 0,
+            "review_status": "no-llm",
+        }
+        v1 = landing.run(dict(base_out))
+>       assert v1.output["version"] == 1
+               ^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'version'
+
+tests\domains\igame\test_design_lint_pipeline.py:98: KeyError
+___________ test_final_report_is_self_contained_and_human_readable ____________
+
+    def test_final_report_is_self_contained_and_human_readable() -> None:
+>       page = build(ROOT)
+               ^^^^^^^^^^^
+
+tests\domains\igame\test_design_reference_final_report.py:12: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_design_reference_final_report.py:60: in build
+    image_card(root, "docs/plans/igame/[2026-07-12]IGAME-DESIGN-REFERENCE-LIBRARY/evidence/e1-unity-html/01-button-html.png", "简单按钮转译", "独立组件缺少父画布，位置不能直接相信。", "compact"),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_design_reference_final_report.py:30: in image_card
+    f"<figure class='{html.escape(css)}'><img src='{data_uri(path)}' alt='{html.escape(title)}'>"
+                                                    ^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_design_reference_final_report.py:24: in data_uri
+    return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+                                                  ^^^^^^^^^^^^^^^^^
+pathlib.py:1019: in read_bytes
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-12]IGAME-DESIGN-REFERENCE-LIBRARY/evidence/e1-unity-html/01-button-html.png')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-12]IGAME-DESIGN-REFERENCE-LIBRARY\\evidence\\e1-unity-html\\01-button-html.png'
+
+pathlib.py:1013: FileNotFoundError
+___________ test_final_report_contains_exact_three_current_prompts ____________
+
+    def test_final_report_contains_exact_three_current_prompts() -> None:
+>       page = build(ROOT)
+               ^^^^^^^^^^^
+
+tests\domains\igame\test_design_reference_final_report.py:29: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\omnicompany\packages\domains\igame\ux\tools\build_design_reference_final_report.py:60: in build
+    image_card(root, "docs/plans/igame/[2026-07-12]IGAME-DESIGN-REFERENCE-LIBRARY/evidence/e1-unity-html/01-button-html.png", "简单按钮转译", "独立组件缺少父画布，位置不能直接相信。", "compact"),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_design_reference_final_report.py:30: in image_card
+    f"<figure class='{html.escape(css)}'><img src='{data_uri(path)}' alt='{html.escape(title)}'>"
+                                                    ^^^^^^^^^^^^^^
+src\omnicompany\packages\domains\igame\ux\tools\build_design_reference_final_report.py:24: in data_uri
+    return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+                                                  ^^^^^^^^^^^^^^^^^
+pathlib.py:1019: in read_bytes
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-12]IGAME-DESIGN-REFERENCE-LIBRARY/evidence/e1-unity-html/01-button-html.png')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-12]IGAME-DESIGN-REFERENCE-LIBRARY\\evidence\\e1-unity-html\\01-button-html.png'
+
+pathlib.py:1013: FileNotFoundError
+________ test_lucky_landlord_reward_choice_uses_the_real_choice_frame _________
+
+    def test_lucky_landlord_reward_choice_uses_the_real_choice_frame() -> None:
+        manifest = json.loads((LIBRARY / "records/manifest.v1.json").read_text(encoding="utf-8"))
+        row = next(item for item in manifest["records"] if item["id"] == "figma-expanded-activity-lucky-landlord-reward-choice")
+        record = json.loads((ROOT / row["path"]).read_text(encoding="utf-8"))
+        assert record["figma"]["node_id"] == "20:1831"
+>       assert record["title"] == "幸运房东 · 幸运房东奖励选择"
+E       AssertionError: assert '周年工坊 · 周年跑商奖励选择' == '幸运房东 · 幸运房东奖励选择'
+E         
+E         - 幸运房东 · 幸运房东奖励选择
+E         + 周年工坊 · 周年跑商奖励选择
+
+tests\domains\igame\test_external_html_designs.py:16: AssertionError
+____________ test_crosswalk_is_reproducible_from_read_only_sources ____________
+
+tmp_path = WindowsPath('C:/Users/lilithgames/AppData/Local/Temp/pytest-of-lilithgames/pytest-6996/test_crosswalk_is_reproducible0')
+
+    def test_crosswalk_is_reproducible_from_read_only_sources(tmp_path: Path) -> None:
+        rebuilt_path = tmp_path / "pilot-crosswalk.v1.json"
+>       rebuilt = build_pilot(
+            seed_path=SEED,
+            output_path=rebuilt_path,
+            repo_root=REPO_ROOT,
+            roadmap_path=ROADMAP,
+        )
+
+tests\domains\igame\test_game_business_model_pilot.py:174: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+    def build_pilot(
+        *,
+        seed_path: Path,
+        output_path: Path,
+        repo_root: Path,
+        roadmap_path: Path,
+        taxonomy_path: Path | None = None,
+    ) -> dict[str, Any]:
+        seed_doc = _read_json(seed_path)
+        manifest = _read_json(repo_root / DEFAULT_DESIGN_MANIFEST)
+        design_rows = {row["id"]: row for row in manifest["records"]}
+        roadmap = yaml.safe_load(roadmap_path.read_text(encoding="utf-8"))
+        roadmap_states = roadmap.get("states", {}) if isinstance(roadmap, dict) else {}
+        resolved_taxonomy_path = taxonomy_path or (repo_root / DEFAULT_TAXONOMY)
+        taxonomy = _read_json(resolved_taxonomy_path)
+    
+        runtime_identity_rows = seed_doc.get("runtime_state_identities", [])
+        runtime_identity_by_source = {
+            row["source_state_id"]: row for row in runtime_identity_rows
+        }
+        if len(runtime_identity_by_source) != len(runtime_identity_rows):
+            raise PilotBuildError("runtime source state IDs must be unique")
+        if len({row["id"] for row in runtime_identity_rows}) != len(runtime_identity_rows):
+            raise PilotBuildError("canonical runtime-state IDs must be unique")
+        for row in runtime_identity_rows:
+            if row["source_state_id"] not in roadmap_states:
+>               raise PilotBuildError(
+                    f"runtime-state source not found in roadmap: {row['source_state_id']}"
+                )
+E               omnicompany.packages.domains.igame.ux.tools.build_game_business_model_pilot.PilotBuildError: runtime-state source not found in roadmap: guildvs_daily_report
+
+src\omnicompany\packages\domains\igame\ux\tools\build_game_business_model_pilot.py:339: PilotBuildError
+_____________________ test_battle_validation_gate_passes ______________________
+
+    def test_battle_validation_gate_passes():
+>       result = G.validate_battle()
+                 ^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_guildvs_expand_prefab_rects.py:224: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+gold_path = 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\unity-prefab-gold\\pbui_guildvs_battle.rects.json'
+
+    def validate_battle(gold_path: str = _GOLD_BATTLE) -> dict[str, Any]:
+        battle_dir = os.path.join(_GUILDVS_ROOT, "Stage1", "pbui_guildvs_battle")
+        record = build_record(battle_dir)
+        computed = {n["path"]: n for n in record["nodes"]}
+    
+>       with open(gold_path, encoding="utf-8") as fh:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\unity-prefab-gold\\pbui_guildvs_battle.rects.json'
+
+src\omnicompany\packages\domains\igame\ux\tools\guildvs_expand_prefab_rects.py:374: FileNotFoundError
+__________ test_a0_fixed_seed_review_browser_evidence_is_hash_bound ___________
+
+    def test_a0_fixed_seed_review_browser_evidence_is_hash_bound() -> None:
+        runtime = json.loads(
+>           (EVIDENCE_ROOT / "pw-a0-fixed-seed-review-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_paradigm_a0_review_evidence.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/pw-a0-fixed-seed-review-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\pw-a0-fixed-seed-review-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+__ test_static_prefab_gold_binds_real_prefab_pixels_rects_and_truth_sources ___
+
+    def test_static_prefab_gold_binds_real_prefab_pixels_rects_and_truth_sources() -> None:
+        manifest = _load(PACKAGE_ROOT / "manifest.json")
+    
+        assert manifest["schema_version"] == "igame_paradigm_v3_l2_prefab_gold_manifest.v1"
+        assert manifest["claim_boundary"] == {
+            "final_runtime_gold_present": False,
+            "placeholder_glyphs_are_visible_evidence": True,
+            "real_p4_asset_bytes_bound": True,
+            "rect_transform_structure_bound": True,
+            "runtime_account_data_bound": False,
+            "runtime_localization_bound": False,
+            "static_prefab_gold_present": True,
+            "v3_complete": False,
+        }
+        assert {screen["screen_id"] for screen in manifest["screens"]} == {
+            "pbui_guildvs_battle",
+            "pbui_championship_main",
+        }
+        for screen in manifest["screens"]:
+            for binding_name in (
+                "source_prefab",
+                "source_gold",
+                "source_semantic_archive",
+                "preview_image",
+                "rect_transform_dump",
+            ):
+                binding = screen[binding_name]
+                path = Path(binding["path"])
+                if not path.is_absolute():
+                    path = ROOT / path
+                assert path.is_file(), (binding_name, path)
+>               assert path.stat().st_size == binding["size_bytes"]
+E               AssertionError: assert 1188665 == 1181518
+E                +  where 1188665 = os.stat_result(st_mode=33206, st_ino=844424931679785, st_dev=5516910031276106804, st_nlink=1, st_uid=0, st_gid=0, st_size=1188665, st_atime=1784878293, st_mtime=1784623893, st_ctime=1784703550).st_size
+E                +    where os.stat_result(st_mode=33206, st_ino=844424931679785, st_dev=5516910031276106804, st_nlink=1, st_uid=0, st_gid=0, st_size=1188665, st_atime=1784878293, st_mtime=1784623893, st_ctime=1784703550) = stat()
+E                +      where stat = WindowsPath('D:/P4/main/Client/Assets/Res/UI/Prefabs/GuildVS/Stage1/pbui_guildvs_battle.prefab').stat
+
+tests\domains\igame\test_paradigm_l2_prefab_evidence.py:60: AssertionError
+__ test_live_pw_runtime_loaded_every_image_and_bound_the_51_file_projection ___
+
+    def test_live_pw_runtime_loaded_every_image_and_bound_the_51_file_projection() -> None:
+>       runtime = _load(EVIDENCE_ROOT / "pw-l2-prefab-gold-runtime.json")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_paradigm_l2_prefab_evidence.py:152: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\domains\igame\test_paradigm_l2_prefab_evidence.py:26: in _load
+    return json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/pw-l2-prefab-gold-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\pw-l2-prefab-gold-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+_______ test_pw_projection_whitelists_the_complete_l2_evidence_package ________
+
+    def test_pw_projection_whitelists_the_complete_l2_evidence_package() -> None:
+>       manifest = _load(PW_MANIFEST)
+                   ^^^^^^^^^^^^^^^^^^
+
+tests\domains\igame\test_paradigm_l2_prefab_evidence.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\domains\igame\test_paradigm_l2_prefab_evidence.py:26: in _load
+    return json.loads(path.read_text(encoding="utf-8"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('D:/P4/main/AIWorkSpace/app/tool/prefab-workstation/data/igame_ux/paradigm_v3/manifest.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'D:\\P4\\main\\AIWorkSpace\\app\\tool\\prefab-workstation\\data\\igame_ux\\paradigm_v3\\manifest.json'
+
+pathlib.py:1013: FileNotFoundError
+______ test_l3_gap_review_runtime_binds_visuals_and_zero_action_receipt _______
+
+    def test_l3_gap_review_runtime_binds_visuals_and_zero_action_receipt() -> None:
+        runtime = json.loads(
+>           (EVIDENCE_ROOT / "pw-l3-gap-review-runtime.json").read_text("utf-8")
+        )
+
+tests\domains\igame\test_paradigm_l3_gap_review_evidence.py:22: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+pathlib.py:1027: in read_text
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('E:/WindowsWorkspace/omnicompany/docs/plans/igame/[2026-07-06]IGAME-UI-PARADIGM-DEMO/stage-v3/visual-evidence/pw-l3-gap-review-runtime.json')
+mode = 'r', buffering = -1, encoding = 'utf-8', errors = None, newline = None
+
+>   ???
+E   FileNotFoundError: [Errno 2] No such file or directory: 'E:\\WindowsWorkspace\\omnicompany\\docs\\plans\\igame\\[2026-07-06]IGAME-UI-PARADIGM-DEMO\\stage-v3\\visual-evidence\\pw-l3-gap-review-runtime.json'
+
+pathlib.py:1013: FileNotFoundError
+=========================== short test summary info ===========================
+FAILED tests/domains/igame/test_build_guildvs_anchor_review.py::test_generator_produces_html_and_manifest_with_all_anchors
+FAILED tests/domains/igame/test_build_guildvs_anchor_review.py::test_manifest_sha_matches_html_bytes
+FAILED tests/domains/igame/test_build_guildvs_anchor_review.py::test_two_builds_identical_except_timestamp
+FAILED tests/domains/igame/test_build_guildvs_anchor_review.py::test_html_has_no_external_links_or_scripts
+FAILED tests/domains/igame/test_build_guildvs_anchor_review.py::test_embedded_image_count_matches_manifest
+FAILED tests/domains/igame/test_build_guildvs_io_review.py::test_complete_io_review_binds_exact_saved_inputs_outputs_and_corrected_draft
+FAILED tests/domains/igame/test_build_guildvs_stage3_formal.py::test_stage3_manifest_proves_three_portrait_rounds_and_keeps_figma_boundary
+FAILED tests/domains/igame/test_build_guildvs_story_visual_map.py::test_visual_map_places_every_user_story_on_a_screen_region
+FAILED tests/domains/igame/test_build_guildvs_story_visual_map.py::test_visual_map_distinguishes_evidence_backed_and_theoretical_regions
+FAILED tests/domains/igame/test_build_guildvs_visual_gold.py::test_full_guildvs_sample_is_grouped_and_visually_bound
+FAILED tests/domains/igame/test_build_guildvs_visual_gold.py::test_visual_gold_write_is_deterministic
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_self_contained_report_embeds_current_evidence
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_report_is_deterministic
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v11_runtime_proves_all_embedded_images_loaded
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v12_runtime_proves_candidate_visuals_loaded
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v14_runtime_proves_a0_visuals_and_current_projection
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v16_runtime_proves_l2_static_and_runtime_failure_evidence
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v17_runtime_preserves_historical_l2_atomic_signoff
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v20_runtime_proves_runtime_gold_and_current_projection
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v21_runtime_proves_human_readable_portrait_report
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v22_runtime_proves_past_work_and_exact_guild_gvg_visuals
+FAILED tests/domains/igame/test_build_paradigm_review_report.py::test_reviewstage_v23_runtime_proves_actual_guildvs_white_mock_flow
+FAILED tests/domains/igame/test_design_lint_pipeline.py::test_pipeline_end_to_end_lands_material
+FAILED tests/domains/igame/test_design_lint_pipeline.py::test_landing_version_increments
+FAILED tests/domains/igame/test_design_reference_final_report.py::test_final_report_is_self_contained_and_human_readable
+FAILED tests/domains/igame/test_design_reference_final_report.py::test_final_report_contains_exact_three_current_prompts
+FAILED tests/domains/igame/test_external_html_designs.py::test_lucky_landlord_reward_choice_uses_the_real_choice_frame
+FAILED tests/domains/igame/test_game_business_model_pilot.py::test_crosswalk_is_reproducible_from_read_only_sources
+FAILED tests/domains/igame/test_guildvs_expand_prefab_rects.py::test_battle_validation_gate_passes
+FAILED tests/domains/igame/test_paradigm_a0_review_evidence.py::test_a0_fixed_seed_review_browser_evidence_is_hash_bound
+FAILED tests/domains/igame/test_paradigm_l2_prefab_evidence.py::test_static_prefab_gold_binds_real_prefab_pixels_rects_and_truth_sources
+FAILED tests/domains/igame/test_paradigm_l2_prefab_evidence.py::test_live_pw_runtime_loaded_every_image_and_bound_the_51_file_projection
+FAILED tests/domains/igame/test_paradigm_l2_prefab_evidence.py::test_pw_projection_whitelists_the_complete_l2_evidence_package
+FAILED tests/domains/igame/test_paradigm_l3_gap_review_evidence.py::test_l3_gap_review_runtime_binds_visuals_and_zero_action_receipt
+ERROR tests/services/_diagnosis/doctor/test_challenge_diagnostic_agent_smoke.py::test_red_fixture_has_v1_schema
+ERROR tests/services/_diagnosis/doctor/test_challenge_diagnostic_agent_smoke.py::test_red_fixture_statement_overly_absolute
+ERROR tests/services/_diagnosis/doctor/test_challenge_diagnostic_agent_smoke.py::test_red_fixture_starts_in_active_state
+ERROR tests/services/_diagnosis/doctor/test_challenge_diagnostic_agent_smoke.py::test_green_fixture_has_v1_schema
+ERROR tests/services/_diagnosis/doctor/test_challenge_diagnostic_agent_smoke.py::test_green_fixture_state_allows_challenge
+ERROR tests/services/_diagnosis/doctor/test_challenge_diagnostic_agent_smoke.py::test_red_and_green_fixtures_are_distinct
+34 failed, 589 passed, 6 errors in 172.70s (0:02:52)

@@ -38,7 +38,16 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
 )
 from omnicompany.packages.services._core.agent.spawn_surface import (
     ENTRY_AGENT_TOOL,
+    ENTRY_CONTEXT_FORK,
     agent_spawn_metadata,
+)
+from omnicompany.packages.services._core.agent.context_fork import (
+    CONTEXT_FORK_CHECKPOINT_KEY,
+    AgentContextCheckpoint,
+    ContextForkBudget,
+    ContextForkRequest,
+    run_context_fork,
+    validate_context_fork_allocation,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,7 +93,8 @@ class AgentRouter(SingleToolRouter):
         "- When you launch multiple agents for independent work, send them in a single message with multiple tool uses so they run concurrently\n"
         "- When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.\n"
         "- Trust but verify: an agent's summary describes what it intended to do, not necessarily what it did. When an agent writes or edits code, check the actual changes before reporting the work as done.\n"
-        "- Each Agent invocation starts fresh — provide a complete task description.\n"
+        "- Each Agent invocation defaults to `cold_delegate` and starts fresh — provide a complete task description.\n"
+        "- `context_fork` is available only when the deterministic Agent allocation gate selected it. The runtime inherits a real parent checkpoint and returns a reference-only receipt; never paste or summarize the parent conversation into `prompt` to imitate a fork.\n"
         "- Clearly tell the agent whether you expect it to write code or just to do research (search, file reads, web fetches, etc.), since it is not aware of your conversation context.\n"
         "- If the agent description mentions that it should be used proactively, then you should try your best to use it without the user having to ask for it first.\n"
         "- If the user specifies that they want you to run agents \"in parallel\", you MUST send a single message with multiple Agent tool use content blocks. For example, if you need to launch both a build-validator agent and a test-runner agent in parallel, send a single message with both tool calls.\n"
@@ -122,6 +132,26 @@ class AgentRouter(SingleToolRouter):
                 "type": "string",
                 "description": "Optional LLM override (default per agent config)",
             },
+            "execution_mode": {
+                "type": "string",
+                "enum": ["cold_delegate", "context_fork"],
+                "description": (
+                    "Agent session mode. context_fork requires a runtime-injected "
+                    "checkpoint and unblocked allocation decision."
+                ),
+            },
+            "timeout_seconds": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 3600,
+                "description": "context_fork child timeout (default 300 seconds)",
+            },
+            "max_turns": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 500,
+                "description": "context_fork child turn ceiling (default 50)",
+            },
         },
         "required": ["description", "prompt"],
     }
@@ -133,18 +163,30 @@ class AgentRouter(SingleToolRouter):
         prompt = (args.get("prompt") or "").strip()
         subagent_type = (args.get("subagent_type") or _DEFAULT_SUBAGENT).strip()
         model = (args.get("model") or "").strip()
+        execution_mode = (args.get("execution_mode") or "cold_delegate").strip()
 
         if not description:
             raise ToolExecutionError("description is required (3-5 word)")
         if not prompt:
             raise ToolExecutionError("prompt is required")
+        if execution_mode not in {"cold_delegate", "context_fork"}:
+            raise ToolExecutionError(
+                "execution_mode must be 'cold_delegate' or 'context_fork'"
+            )
 
         if os.environ.get("OMNI_AGENT_DRY_RUN") == "1":
+            if execution_mode == "context_fork":
+                _validate_fork_context(ctx)
             return json.dumps({
-                **agent_spawn_metadata(ENTRY_AGENT_TOOL),
+                **agent_spawn_metadata(
+                    ENTRY_CONTEXT_FORK
+                    if execution_mode == "context_fork"
+                    else ENTRY_AGENT_TOOL
+                ),
                 "subagent_type": subagent_type,
                 "description": description,
                 "model": model or "(default)",
+                "execution_mode": execution_mode,
                 "result": f"(mock sub-agent result for '{description}', dry-run)",
                 "dry_run": True,
             }, ensure_ascii=False, indent=2)
@@ -185,7 +227,18 @@ class AgentRouter(SingleToolRouter):
         # 2) 异步驱动真 .run() — 子 agent 自己有完整 PromptBuilder / LLMCall /
         #    ToolDispatch / ExtractResult 链, 拿独立 messages 列表 (跟主 agent 隔离)
         trace_id = getattr(ctx, "trace_id", "") or ""
-        sub_trace_id = f"{trace_id}.spawn.{subagent_type}" if trace_id else ""
+        fork_data = None
+        if execution_mode == "context_fork":
+            if not trace_id:
+                raise ToolExecutionError("context_fork requires a non-empty parent trace_id")
+            fork_data = _validate_fork_context(ctx)
+            checkpoint = fork_data["checkpoint"]
+            checkpoint_suffix = checkpoint.checkpoint_id.rsplit(":", 1)[-1][:10]
+            sub_trace_id = (
+                f"{trace_id}.fork.{subagent_type}.{checkpoint_suffix}"
+            )
+        else:
+            sub_trace_id = f"{trace_id}.spawn.{subagent_type}" if trace_id else ""
 
         # P1.2 (2026-05-05): 把子 trace_id 加进 ctx.spawned_traces, 让主 agent
         # extract_result 时知道哪些 sub-agent 跑了, owner 可按 trace 回溯子事件流.
@@ -195,6 +248,32 @@ class AgentRouter(SingleToolRouter):
                 spawned_traces.append(sub_trace_id)
             except Exception:
                 pass  # list 注入有问题不影响 spawn
+
+        if execution_mode == "context_fork":
+            assert fork_data is not None
+            try:
+                budget = ContextForkBudget(
+                    timeout_seconds=args.get("timeout_seconds") or 300.0,
+                    max_turns=args.get("max_turns") or 50,
+                )
+                request = ContextForkRequest(
+                    description=description,
+                    task=prompt,
+                    subagent_type=subagent_type,
+                    child_trace_id=sub_trace_id,
+                    parent_trace_id=trace_id,
+                    checkpoint=fork_data["checkpoint"],
+                    allocation_decision_ref=fork_data["decision_ref"],
+                    budget=budget,
+                )
+            except Exception as exc:
+                raise ToolExecutionError(f"invalid context_fork request: {exc}") from exc
+
+            return _run_context_fork_sync(
+                agent,
+                request,
+                parent_abort_event=getattr(ctx, "abort_event", None),
+            )
 
         agent_input = {
             **agent_spawn_metadata(ENTRY_AGENT_TOOL),
@@ -240,3 +319,53 @@ class AgentRouter(SingleToolRouter):
         if verdict_kind != "PASS" and diagnosis:
             return f"[sub-agent {verdict_kind}] {diagnosis}\n\n{final_text}"
         return final_text
+
+
+def _validate_fork_context(ctx: ToolContext) -> dict[str, object]:
+    raw_checkpoint = getattr(ctx, CONTEXT_FORK_CHECKPOINT_KEY, None)
+    if raw_checkpoint is None:
+        raise ToolExecutionError(
+            "context_fork requires a runtime-injected parent checkpoint"
+        )
+    decision = getattr(ctx, "agent_allocation_decision", None)
+    decision_ref = str(
+        getattr(ctx, "agent_allocation_decision_ref", "") or ""
+    ).strip()
+    try:
+        validate_context_fork_allocation(
+            decision,
+            decision_ref=decision_ref,
+        )
+        checkpoint = AgentContextCheckpoint.model_validate(raw_checkpoint)
+    except Exception as exc:
+        raise ToolExecutionError(f"context_fork gate rejected: {exc}") from exc
+    return {
+        "checkpoint": checkpoint,
+        "decision_ref": decision_ref,
+    }
+
+
+def _run_context_fork_sync(
+    agent: object,
+    request: ContextForkRequest,
+    *,
+    parent_abort_event: object | None,
+) -> str:
+    run_coro = run_context_fork(
+        agent,
+        request,
+        parent_abort_event=parent_abort_event,
+    )
+    try:
+        receipt = asyncio.run(run_coro)
+    except RuntimeError as exc:
+        if "asyncio.run() cannot be called from a running event loop" not in str(exc):
+            raise ToolExecutionError(f"context_fork run crashed: {exc}") from exc
+        loop = asyncio.new_event_loop()
+        try:
+            receipt = loop.run_until_complete(run_coro)
+        finally:
+            loop.close()
+    except Exception as exc:
+        raise ToolExecutionError(f"context_fork run crashed: {exc}") from exc
+    return receipt.model_dump_json()

@@ -27,6 +27,32 @@ from ._paths import DATA_ROOT, VERB_ANNOTATIONS_PATH
 # 草案 A 六词默认词表(调研报告第三节,认知动作/最贴用户直觉)。
 VERBS: tuple[str, ...] = ("拆分", "推导", "联想", "生成", "反证", "延伸")
 
+# 边词表统一(决策本体合并清单#10):六动词为正典,links 与因果边全部映射进六词。
+# 旧字段(links.rests_on 等 / causal_edges rel)兼容读——rel 保留为机器键,verb 是它的正典语义;
+# 禁止新增第三套词表:新边 rel 必须能映射进六词,映射不了=本体层设计问题,先回手册裁决。
+REL_TO_VERB: dict[str, str] = {
+    # links(记录内权威边,formats._LINKS)
+    "rests_on": "推导",       # 立足前提而得
+    "parent": "拆分",         # 父决策拆出子决策
+    "related": "联想",        # 相关联想
+    "supersedes": "延伸",     # 版本演化:新版在旧版基础上延伸取代
+    "enforced_by": "生成",    # 裁决生成执法投影(载体标识)
+    # 因果边 sidecar(exploration.causal_extract._RELS)
+    "refines": "生成",              # 据指正产出新版本
+    "critiques": "反证",            # 审阅/指正=反证尝试
+    "responds_to_critique": "延伸", # 回应指正,延伸论证
+    # 决策空间投影边(exploration.projection.REL_REJECTED)
+    "rejected": "反证",       # 被否项=被反证掉的选项
+    # 挑战记录(challenge_log 条目视作边时)
+    "challenge": "反证",
+}
+
+
+def verb_for_rel(rel: str) -> str | None:
+    """rel → 正典动词。表外 rel 返 None(调用方据此报「第三套词表」违规,见巡检)。"""
+    return REL_TO_VERB.get((rel or "").strip())
+
+
 _SOURCE_KINDS = ("human", "ai")
 
 

@@ -17,13 +17,14 @@ import ast
 from pathlib import Path
 from typing import Any
 
+from omnicompany.core.config import omni_workspace_root
 from omnicompany.packages.services._core.omnicompany import Worker
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 from .format_patcher import FormatPatcherWorker
 from .repair_planner import RepairPlannerWorker
 
-_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
+_DEFAULT_SOURCE_ROOT = omni_workspace_root() / "src" / "omnicompany"
 
 
 def _run_diagnosis(format_id: str, source_root: str) -> dict:

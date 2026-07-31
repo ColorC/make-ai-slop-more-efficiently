@@ -1,0 +1,293 @@
+# [OMNI] origin=internal-engine domain=services/repo_learner ts=2026-04-09T12:27:44Z
+{
+  "canonical_name": "@google/gemini-cli",
+  "working_path": "C:\\Users\\user\\AppData\\Local\\Temp\\smoke_targets\\gemini-cli",
+  "budget_tracker": {
+    "main_steps": 0,
+    "sub_steps_total": 12,
+    "sub_agents_spawned": 1
+  },
+  "files": [
+    {
+      "file": "README.md",
+      "importance": "key",
+      "module": "",
+      "summary": "Gemini CLI: Google官方终端AI助手，支持MCP扩展、沙箱执行、会话checkpointing、多种认证方式",
+      "relevant_to_dimension": "AI框架"
+    },
+    {
+      "file": "package.json",
+      "importance": "key",
+      "module": "",
+      "summary": "Monorepo结构：packages/cli(970文件)+packages/core(759文件)为核心，支持沙箱执行、多平台打包",
+      "relevant_to_dimension": ""
+    },
+    {
+      "file": "packages/core/src/agent/agent-session.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "AgentSession封装AgentProtocol，提供AsyncIterable事件流API，支持历史重放和流重新绑定",
+      "relevant_to_dimension": "AI框架"
+    },
+    {
+      "file": "packages/core/src/agent/types.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "AgentProtocol定义完整事件类型：initialize/message/tool_request/tool_response/elicitation等，支持trajectory历史",
+      "relevant_to_dimension": "AI框架"
+    },
+    {
+      "file": "packages/core/src/policy/policy-engine.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "PolicyEngine完整权限策略引擎：规则匹配+沙箱权限+安全检查器+钩子系统，支持MCP工具通配符",
+      "relevant_to_dimension": "安全防护"
+    },
+    {
+      "file": "packages/core/src/tools/tools.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "ToolInvocation抽象：getDescription/shouldConfirmExecute/execute三阶段，MessageBus策略决策，BackgroundExecutionData后台执行元数据",
+      "relevant_to_dimension": "工具处理"
+    },
+    {
+      "file": "packages/core/src/services/sandboxManager.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "SandboxManager接口：prepareCommand/isKnownSafeCommand/isDangerousCommand/parseDenials，跨平台沙箱抽象",
+      "relevant_to_dimension": "安全防护"
+    },
+    {
+      "file": "packages/core/src/sandbox/linux/LinuxSandboxManager.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "Linux沙箱实现：Bubblewrap(bwrap)+seccomp BPF过滤器，动态生成ptrace阻止规则，权限合并逻辑",
+      "relevant_to_dimension": "安全防护"
+    },
+    {
+      "file": "packages/core/src/scheduler/tool-executor.ts",
+      "importance": "base",
+      "module": "",
+      "summary": "ToolExecutor执行工具：executeToolWithHooks+输出截断+取消处理+telemetry集成",
+      "relevant_to_dimension": "工具处理"
+    },
+    {
+      "file": "packages/core/src/scheduler/confirmation.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "resolveConfirmation异步确认循环：waitForConfirmation竞速（MessageBus vs IDE）、ModifyWithEditor外部编辑循环、AbortSignal超时防护",
+      "relevant_to_dimension": "AI框架"
+    },
+    {
+      "file": "packages/core/src/scheduler/hook-utils.ts",
+      "importance": "base",
+      "module": "",
+      "summary": "evaluateBeforeToolHook钩子评估：可阻止执行、强制确认用户、修改工具参数后重新构建invocation",
+      "relevant_to_dimension": "扩展机制"
+    },
+    {
+      "file": "packages/core/src/scheduler/policy.ts",
+      "importance": "base",
+      "module": "",
+      "summary": "checkPolicy查询策略引擎，updatePolicy根据用户选择更新权限模式，AutoEdit模式转换逻辑",
+      "relevant_to_dimension": "权限控制"
+    },
+    {
+      "file": "packages/core/src/confirmation-bus/message-bus.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "MessageBus继承EventEmitter：publish集成PolicyEngine检查、derive方法创建子agent作用域消息总线、监听器计数决定是否直接拒绝",
+      "relevant_to_dimension": "消息总线"
+    },
+    {
+      "file": "packages/core/src/hooks/types.ts",
+      "importance": "base",
+      "module": "",
+      "summary": "HookEventName完整事件：BeforeTool/AfterTool/BeforeAgent/AfterAgent/SessionStart/SessionEnd/PreCompress/BeforeModel/AfterModel，HookType分为Command和Runtime",
+      "relevant_to_dimension": "扩展机制"
+    },
+    {
+      "file": "packages/core/src/sandbox/macos/MacOsSandboxManager.ts",
+      "importance": "base",
+      "module": "",
+      "summary": "Mac沙箱实现：Seatbelt配置构建器、虚拟命令转换（__read/__write）、权限合并与只读模式强制",
+      "relevant_to_dimension": "安全防护"
+    },
+    {
+      "file": "packages/core/src/sandbox/windows/WindowsSandboxManager.ts",
+      "importance": "base",
+      "module": "",
+      "summary": "Windows沙箱实现：Restricted Token+Job Object+Low Integrity隔离、C#原生helper编译、icacls权限控制",
+      "relevant_to_dimension": "安全防护"
+    },
+    {
+      "file": "packages/core/src/agents/agentLoader.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "AgentLoader用Zod验证agent定义：local/remote两种类型，支持include/exclude工具过滤、MCP服务器配置、多种认证（apiKey/http/oauth/google-credentials）",
+      "relevant_to_dimension": "多agent协作"
+    },
+    {
+      "file": "packages/core/src/context/agentHistoryProvider.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "AgentHistoryProvider实现上下文压缩：enforceMessageSizeLimits分grace zone/normal两档，normalizeMessage按比例压缩，splitHistoryForTruncation保留retainedTokens",
+      "relevant_to_dimension": "上下文管理"
+    },
+    {
+      "file": "packages/core/src/tools/mcp-tool.ts",
+      "importance": "key",
+      "module": "",
+      "summary": "DiscoveredMCPTool实现：命名规范mcp_server_tool、allowlist机制、MCP内容块类型（text/media/resource/resource_link）、策略更新选项",
+      "relevant_to_dimension": "工具处理"
+    }
+  ],
+  "modules": [],
+  "subagent_reports": [
+    {
+      "module": "packages/core/src/scheduler",
+      "focus_hint": "工具调用循环的实现：schedule方法如何编排批量工具调用、状态管理如何流转（Validating→Executing→Completed）、确认流程（shouldConfirmExecute）如何与MessageBus集成、钩子系统集成点",
+      "why": "scheduler是agent循环结构的核心编排器，包含工具批处理、状态流转、权限确认、钩子触发等关键逻辑，值得深读以学习完整的工具调用生命周期管理",
+      "findings": {
+        "summary": "Scheduler 是 agent 工具调用循环的核心编排器，实现了完整的工具生命周期管理：从批量请求排序入队，到两阶段处理（Validating 阶段的钩子/策略/确认 -> Executing 阶段的实际执行），再到状态流转与沙箱扩展。其设计亮点包括：基于队列的事件循环、可中断的确认机制、钩子系统的多维度干预（修改参数/阻止执行/强制确认）、尾调用链实现工具串联，以及执行时权限扩展的\"暂停-重试\"模式。",
+        "learning_points": [
+          {
+            "point": "批量工具调用通过队列+状态机循环处理，Validating→Scheduled→AwaitingApproval→Executing→Completed 形成完整生命周期",
+            "file": "packages/core/src/scheduler/scheduler.ts",
+            "lines": "414-536",
+            "why_worth": "展示了如何用 while 循环 + 状态机编排异步工具调用，通过 queueMicrotask 让出控制权等待外部事件",
+            "dimension": "agent 循环结构"
+          },
+          {
+            "point": "钩子系统集成在 Validating 阶段，可修改参数、阻止执行或强制要求用户确认",
+            "file": "packages/core/src/scheduler/scheduler.ts",
+            "lines": "588-627",
+            "why_worth": "展示了钩子作为第一公民介入工具执行流程的设计，支持动态改写工具行为",
+            "dimension": "扩展机制"
+          },
+          {
+            "point": "shouldConfirmExecute 通过 MessageBus 发布 WAITING_FOR_CONFIRMATION 事件，配合 onWaitingForConfirmation 回调实现异步等待用户响应",
+            "file": "packages/core/src/scheduler/confirmation.ts",
+            "lines": "27-91",
+            "why_worth": "展示了如何将确认流程从执行逻辑解耦，通过事件总线让 UI 层参与决策",
+            "dimension": "消息总线"
+          },
+          {
+            "point": "尾调用链（tailToolCallRequest）让工具可以返回下一个要执行的工具调用，实现工具链式调用",
+            "file": "packages/core/src/scheduler/scheduler.ts",
+            "lines": "746-804",
+            "why_worth": "巧妙的设计模式，工具可动态追加后续工具而不阻塞主循环",
+            "dimension": "流程编排"
+          },
+          {
+            "point": "沙箱权限不足时自动回到 AwaitingApproval 状态，获取新权限后重新执行",
+            "file": "packages/core/src/scheduler/scheduler.ts",
+            "lines": "806-908",
+            "why_worth": "展示了执行时异常如何优雅地转化为确认流程，保持状态机完整",
+            "dimension": "异常处理"
+          },
+          {
+            "point": "状态转换通过状态管理器集中管理，有显式的状态转换校验函数",
+            "file": "packages/core/src/scheduler/state-manager.ts",
+            "lines": "46-101",
+            "why_worth": "展示了状态机模式的核心实现，确保状态转换的合法性和可追溯",
+            "dimension": "状态管理"
+          },
+          {
+            "point": "策略引擎（PolicyEngine）在 Validating 阶段决定 ALLOW/DENY/ASK_USER，结果可持久化到会话或配置文件",
+            "file": "packages/core/src/scheduler/policy.ts",
+            "lines": "53-108",
+            "why_worth": "展示了权限决策如何与工具执行解耦，支持细粒度的策略规则",
+            "dimension": "权限控制"
+          }
+        ],
+        "key_files": [
+          "packages/core/src/scheduler/scheduler.ts",
+          "packages/core/src/scheduler/types.ts",
+          "packages/core/src/scheduler/state-manager.ts",
+          "packages/core/src/scheduler/confirmation.ts",
+          "packages/core/src/scheduler/policy.ts",
+          "packages/core/src/scheduler/hook-utils.ts",
+          "packages/core/src/scheduler/tool-executor.ts"
+        ]
+      }
+    }
+  ],
+  "notable_locations": [
+    {
+      "file": "packages/core/src/agent/types.ts",
+      "lines": "1-200",
+      "one_line_why": "AgentProtocol事件类型定义，包含initialize/message/tool_request/tool_response/elicitation等完整事件"
+    },
+    {
+      "file": "packages/core/src/agent/agent-session.ts",
+      "lines": "1-200",
+      "one_line_why": "AgentSession封装AgentProtocol，提供AsyncIterable事件流API"
+    },
+    {
+      "file": "packages/core/src/scheduler/scheduler.ts",
+      "lines": "410-560",
+      "one_line_why": "Scheduler核心循环：Validating → Scheduled → Executing状态流转，批量并行执行优化"
+    },
+    {
+      "file": "packages/core/src/scheduler/confirmation.ts",
+      "lines": "1-150",
+      "one_line_why": "resolveConfirmation异步确认循环，ModifyWithEditor外部编辑状态机"
+    },
+    {
+      "file": "packages/core/src/policy/policy-engine.ts",
+      "lines": "1-200",
+      "one_line_why": "PolicyEngine权限匹配引擎，支持MCP工具通配符、权限合并、安全检查器注册"
+    },
+    {
+      "file": "packages/core/src/sandbox/linux/LinuxSandboxManager.ts",
+      "lines": "1-200",
+      "one_line_why": "Linux沙箱：bwrap + seccomp BPF过滤器，动态生成ptrace阻止规则"
+    },
+    {
+      "file": "packages/core/src/sandbox/macos/MacOsSandboxManager.ts",
+      "lines": "1-150",
+      "one_line_why": "macOS沙箱：Seatbelt配置构建器，虚拟命令转换"
+    },
+    {
+      "file": "packages/core/src/sandbox/windows/WindowsSandboxManager.ts",
+      "lines": "1-150",
+      "one_line_why": "Windows沙箱：Restricted Token + Job Object + Low Integrity隔离"
+    },
+    {
+      "file": "packages/core/src/services/sandboxManager.ts",
+      "lines": "1-100",
+      "one_line_why": "SandboxManager接口定义，跨平台沙箱抽象层"
+    },
+    {
+      "file": "packages/core/src/tools/tools.ts",
+      "lines": "1-200",
+      "one_line_why": "ToolInvocation三阶段抽象：getDescription/shouldConfirmExecute/execute"
+    },
+    {
+      "file": "packages/core/src/tools/mcp-tool.ts",
+      "lines": "1-200",
+      "one_line_why": "DiscoveredMCPTool实现：命名规范、allowlist、MCP内容块类型"
+    },
+    {
+      "file": "packages/core/src/context/agentHistoryProvider.ts",
+      "lines": "1-200",
+      "one_line_why": "AgentHistoryProvider：Grace Zone机制、比例压缩、结构完整性保留"
+    },
+    {
+      "file": "packages/core/src/hooks/types.ts",
+      "lines": "1-100",
+      "one_line_why": "HookType和HookEventName定义，完整生命周期事件"
+    },
+    {
+      "file": "packages/core/src/confirmation-bus/message-bus.ts",
+      "lines": "1-150",
+      "one_line_why": "MessageBus：publish集成PolicyEngine检查，derive创建子作用域"
+    },
+    {
+      "file": "packages/core/src/agents/agentLoader.ts",
+      "lines": "1-200",
+      "one_line_why": "AgentLoader：Zod验证local/remote agent定义，支持多种认证方式"
+    }
+  ]
+}

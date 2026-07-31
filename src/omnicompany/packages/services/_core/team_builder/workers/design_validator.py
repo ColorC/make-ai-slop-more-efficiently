@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-23T00:00:00Z type=worker
 # [OMNI] material_id="material:core.team_builder.design_validator.seven_dimension.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """DesignValidatorWorker — Phase 7 · AgentNodeLoop (2026-04-23).
 
 Worker 协议 (composite fan-in and):
@@ -9,7 +10,7 @@ Worker 协议 (composite fan-in and):
 **职责**: AgentNodeLoop · 综合判 7 维草图级健康:
   1. 格式 (DESIGN 七节 / Material 五要素)
   2. 命名 B 层 (禁 Format/Router/Pipeline class 名)
-  3. workspace 合规 (`src/omnicompany/packages/services/<pkg>/` + `data/services/<pkg>/`)
+  3. workspace 合规 (唯一 canonical target package + 同源 data path)
   4. ServiceBus 对接 (HARD grep 式: 新 Worker 代码禁 subprocess/open('w')/requests)
   5. 契约闭环 (引用 contract_audit 结果)
   6. F-15 诚实 (context_sources 覆盖)
@@ -59,9 +60,11 @@ PASS → 进 Phase 8 代码生成. PARTIAL → NEXT 带 warn. FAIL → JUMP 回�
 - Material id 合规: 小写 + 点号分隔
 
 ### 3. workspace 合规
-- workspace_spec.write_prefixes 包含 `src/omnicompany/packages/services/<pkg>/`
-- 和 `data/services/<pkg>/`
-- generated_package_path 一致
+- team_design.target_package_path 与 workspace_spec.target_package_path 完全一致
+- business-private Team 使用 `src/omnicompany/packages/domains/<domain>/<pkg>/`
+- shared service Team 使用 `src/omnicompany/packages/services/<canonical_bucket>/<pkg>/`
+- 禁止平铺 `packages/services/<pkg>/`
+- write_prefixes 第一项是 target_package_path，第二项是同 namespace 的 data path
 
 ### 4. ServiceBus 对接 (静态设计层审计)
 - worker_design_detailed 若 impl_type=HARD 应**避免**声明直用 subprocess/open('w')/requests
@@ -79,6 +82,15 @@ PASS → 进 Phase 8 代码生成. PARTIAL → NEXT 带 warn. FAIL → JUMP 回�
 - 每 Worker 有 hallucination_risks (≥ 1 条)
 - 每 Worker 有 output_token_budget
 - routes PASS + FAIL + PARTIAL 覆盖
+
+## EXISTING Worker 复用规则
+
+- `impl_type=EXISTING` 表示 WorkerDesigner 已从 `binding_ref` 导入真实 Worker 类并读取
+  FORMAT_IN/OUT；它没有本 Team 新生成的本地 Worker 文件。
+- 全部 Worker 都是 EXISTING 时，`material_design_detailed` 可以为空；格式契约由既有
+  Worker 拥有。此时直接服从 HARD `contract_audit.overall_ok`，不得要求复制 Material。
+- Worker 18 项代码生成检查不适用于 EXISTING；只检查 binding_ref 已解析、没有把
+  model/prompt/tools/permissions/budget 写入 binding_kwargs。
 - SOFT/AGENT 有 prompt_template, HARD 有 rule_spec
 
 ## 工具
@@ -283,9 +295,12 @@ class DesignValidatorWorker(AgentNodeLoop):
     TOOL_ROUTERS: ClassVar[list] = [ReadFileRouter, GlobRouter, GrepRouter, ListDirRouter, SubmitDesignReportRouter]
     NODE_PROMPT: ClassVar[str] = _SYSTEM_PROMPT
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any) -> _DesignValidatorPromptBuilder:
         return _DesignValidatorPromptBuilder(template=self.NODE_PROMPT, bus=bus)

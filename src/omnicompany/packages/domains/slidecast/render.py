@@ -14,8 +14,11 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
+
+from .themes import theme_css
 
 _CJK = "一-鿿㐀-䶿　-〿＀-￯"
 _PUNCT_MAP = {",": "，", ":": "：", ";": "；", "!": "！", "?": "？"}
@@ -141,90 +144,16 @@ def _slot(name: str, content: str) -> str:
     return f"<template v-slot:{name}>\n\n{content}\n\n</template>"
 
 
-# ── webworks-terminal 皮:套在 fm-theme 上(只覆盖 CSS 变量 + 扫描线/辉光,24 布局原样不动)──
-# 调色/配方据真站 colorc.cc theme.css;点阵字体 Fusion Pixel(OFL+MIT 可商用,自托管 /fonts/)。
-STYLE_CSS = """/* ===== webworks-terminal SKIN(套 field-manual,只换皮)===== */
-@font-face{font-family:"FusionPixelLatin";src:url("/fonts/fusion-pixel-latin.woff2") format("woff2");font-display:swap;}
-@font-face{font-family:"FusionPixelZH";src:url("/fonts/fusion-pixel-zh.woff2") format("woff2");font-display:swap;}
+# Backwards-compatible default used by callers that still expect one stylesheet.
+# New runs ask ``themes.theme_css`` for one or more comparable variants.
+STYLE_CSS = theme_css("crt")
 
-:root{
-  /* 背景:近黑磷管 */
-  --c-paper:#020503; --c-paper-dark:#061009; --c-paper-deeper:#07130d; --c-paper-shadow:#0a1810;
-  /* 文字:薄荷绿 */
-  --c-ink:#d7ffe8; --c-ink-muted:#9fe0bf; --c-ink-light:#75b98f;
-  /* 橄榄→磷光绿(规则/结构线) */
-  --c-olive-dark:#15cc70; --c-olive:#1aff8c; --c-olive-mid:#36ffa0; --c-olive-light:#5effb0;
-  --c-olive-ghost:rgba(26,255,140,.08); --c-olive-subtle:rgba(26,255,140,.16);
-  /* khaki→暗绿 */
-  --c-khaki-dark:#3a7a60; --c-khaki:#4ea882; --c-khaki-light:#6abf95; --c-khaki-pale:#2a4a3a;
-  /* 琥珀:链接/次强调 */
-  --c-amber:#ffd166; --c-amber-pale:rgba(255,209,102,.12);
-  /* 红:危险/警示(少用) */
-  --c-red:#ff5d73; --c-red-light:#ff7d8d; --c-red-pale:rgba(255,93,115,.14);
-  /* 蓝:important 留点终端蓝 */
-  --c-blue:#3a6da8; --c-blue-mid:#4a7db8; --c-blue-light:#5a8dc8; --c-blue-pale:rgba(58,109,168,.16);
-  /* 语义:强调/规则线用绿不用红 */
-  --color-accent:#1aff8c; --color-accent-alt:#3a6da8; --color-rule:#1aff8c; --color-rule-light:rgba(26,255,140,.55);
-  --bracket-color:#1aff8c;
-  /* 字体:标题点阵(latin→zh),正文薄荷可读 sans,代码 Cascadia */
-  --font-heading:"FusionPixelLatin","FusionPixelZH",monospace;
-  --font-condensed-sans:"FusionPixelLatin","FusionPixelZH",monospace;
-  --font-label:"FusionPixelLatin","FusionPixelZH",monospace;
-  --font-body:"Noto Sans SC","Microsoft YaHei","PingFang SC",sans-serif;
-  --font-mono:"Cascadia Code","FusionPixelLatin","Microsoft YaHei",monospace;
+_THEME_UI_LABELS = {
+    "blueprint": {"doc": "SYSTEM DRAWING", "end": "END OF SCHEMATIC"},
+    "crt": {"doc": "TERMINAL LOG", "end": "SESSION COMPLETE"},
+    "comic": {"doc": "STORYBOARD 01", "end": "END OF ISSUE"},
+    "notebook": {"doc": "WORKING NOTES", "end": "END OF NOTES"},
 }
-
-/* 点阵标题:关抗锯齿保锐利 + 磷光辉光 */
-.slidev-layout h1,.slidev-layout h2,.slidev-layout h3,.fm-label,.fm-stat{
-  -webkit-font-smoothing:none; image-rendering:pixelated;
-  text-shadow:0 0 4px rgba(26,255,140,.5),0 0 14px rgba(26,255,140,.22);
-}
-.fm-stat{color:#1aff8c !important; text-shadow:0 0 6px rgba(26,255,140,.6),0 0 18px rgba(26,255,140,.3) !important;}
-/* figlet ASCII logo(封面英文大字) */
-.fm-ascii{color:#1aff8c; font-family:"Cascadia Code",monospace; font-size:.6rem; line-height:1.02; white-space:pre; overflow:hidden; margin:0 0 .5rem; text-shadow:0 0 6px rgba(26,255,140,.6);}
-
-/* 背景:扫描线 + 顶/底绿辉光 + 暗角(贴 colorc.cc 配方;走 background-image 不动 DOM 伪元素)*/
-.slidev-layout{
-  background-color:#020503 !important;
-  background-image:
-    repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px),
-    repeating-linear-gradient(0deg, rgba(26,255,140,.022) 0 1px, transparent 1px 4px),
-    radial-gradient(ellipse at 50% 116%, rgba(26,255,140,.10), transparent 55%),
-    radial-gradient(ellipse at 50% -12%, rgba(26,255,140,.15), transparent 45%) !important;
-  box-shadow: inset 0 0 160px rgba(0,0,0,.5), inset 0 0 70px rgba(26,255,140,.04);
-}
-/* 封面:加协调的终端示意图形(扫描线 + 终端网格 + 磷光团 + 暗角),比纯黑底更有"屏幕感" */
-.slidev-layout.layout-cover{
-  background-image:
-    repeating-linear-gradient(0deg, rgba(0,0,0,.15) 0 1px, transparent 1px 3px),
-    linear-gradient(rgba(26,255,140,.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(26,255,140,.05) 1px, transparent 1px),
-    radial-gradient(circle at 84% 26%, rgba(26,255,140,.20), transparent 38%),
-    radial-gradient(circle at 14% 86%, rgba(26,255,140,.13), transparent 42%),
-    radial-gradient(ellipse at 50% 55%, rgba(2,12,7,0) 60%, #020503 92%) !important;
-  background-size: auto, 46px 46px, 46px 46px, auto, auto, auto !important;
-}
-
-/* 正文薄荷绿可读 sans;代码块终端化 */
-.slidev-layout, .slidev-layout p, .slidev-layout li, .slidev-layout td, .slidev-layout th{ font-family:var(--font-body); color:#d7ffe8; }
-.slidev-layout pre, .slidev-layout .shiki{ background:#020805 !important; border-color:rgba(26,255,140,.28) !important; }
-.slidev-layout pre code, .slidev-layout .shiki code, .slidev-layout .shiki span{ color:#cdeede !important; }
-.slidev-layout :not(pre)>code{ color:#ffd166 !important; background:#061009 !important; border:1px solid rgba(26,255,140,.28); }
-.slidev-layout a{ color:#ffd166 !important; }
-/* —— 用户反馈修正 —— */
-/* 1. 中文点阵大字克制尺寸(点阵字本身偏大,整体缩一档;封面/陈述是硬编码,单独压) */
-:root{ --text-lg:1.4rem; --text-xl:1.85rem; --text-2xl:2.3rem; --text-3xl:3rem; --text-4xl:4.6rem; }
-.cover-title{ font-size:3.3rem !important; }
-.statement-content h1,.statement-content h2,.statement-content p{ font-size:2.2rem !important; }
-/* 2. 亮绿底标题条撞色看不清 → 改深底 + 绿字(终端反白条,高对比) */
-.cdf-code-header,.cdr-code-header,.thc-col-header,.db-panel-header{
-  background:#07130d !important; border-bottom-color:rgba(26,255,140,.35) !important; }
-.cdf-code-title,.cdr-code-title,.thc-col-header,.db-panel-label{ color:#1aff8c !important; }
-.cdf-code-badge,.cdr-code-badge{ color:#9fe0bf !important; border-color:rgba(26,255,140,.45) !important; }
-/* 3. 去掉每页页眉一直显示的 UNCLASSIFIED */
-.fm-header__class{ display:none !important; }
-@media (prefers-reduced-motion: reduce){ .slidev-layout h1,.slidev-layout h2,.slidev-layout h3{ text-shadow:none; } }
-"""
 
 
 def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> tuple[str, dict]:
@@ -235,14 +164,21 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
     lead = _s(s.get("lead"))
     fm: dict[str, Any] = {}
     body: list[str] = []
-    doc = _s((meta or {}).get("docNumber")) or "FIELD NOTE"
+    theme_id = _s((meta or {}).get("_visual_theme"))
+    ui_labels = _THEME_UI_LABELS.get(
+        theme_id, {"doc": "FIELD NOTE", "end": "END OF BRIEFING"})
+    doc = _s((meta or {}).get("docNumber")) or ui_labels["doc"]
 
     if layout == "cover":
         fm = {"layout": "cover", "docNumber": doc}
         if _s(s.get("date")) or _s((meta or {}).get("date")):
             fm["date"] = _s(s.get("date")) or _s((meta or {}).get("date"))
         fm["classification"] = _s((meta or {}).get("info")) or "据 colorc.cc 原文自动生成"
-        banner = _ascii_banner(_s(s.get("banner")) or _s((meta or {}).get("banner")))
+        # ASCII 标题不再作为主题默认件。它会强行把不同视觉方向拉回同一套
+        # “终端海报”语法；只有内容 IR 明确 opt-in 时才渲染。
+        banner = ""
+        if bool((meta or {}).get("use_ascii_banner")):
+            banner = _ascii_banner(_s(s.get("banner")) or _s((meta or {}).get("banner")))
         if banner:  # figlet ASCII logo(英文,像 colorc.cc 的 webworks)
             body.append(f'<pre class="fm-ascii">\n{banner}\n</pre>')
         # 封面标题按长度缩放:长标题(LLM 偶尔写成整句)自动缩小,避免挤成多行
@@ -267,7 +203,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
     elif layout == "statement":
         bc = _v_clicks(s.get("bullets"), flatten)
         if bc:  # 有要点 → 普通内页(statement 布局无要点槽)
-            fm = {"layout": "default", "title": title, "docNumber": doc}
+            fm = {"layout": "default", "slideTitle": title, "docNumber": doc}
             if lead:
                 body.append(lead)
             body.append(bc)
@@ -277,7 +213,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
             body.append(stmt)
 
     elif layout == "bullets":
-        fm = {"layout": "default", "title": title, "docNumber": doc}
+        fm = {"layout": "default", "slideTitle": title, "docNumber": doc}
         if lead:
             body.append(lead)
         bc = _v_clicks(s.get("bullets"), flatten)
@@ -285,7 +221,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
             body.append(bc)
 
     elif layout == "big-stat":
-        fm = {"layout": "default", "title": title, "docNumber": doc}
+        fm = {"layout": "default", "slideTitle": title, "docNumber": doc}
         if lead:
             body.append(lead)
         stat = _rich(s.get("stat"))
@@ -305,18 +241,18 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
         left = _v_clicks(s.get("left"), flatten)
         right = _v_clicks(s.get("right"), flatten)
         if layout == "comparison" or _s(s.get("left_header")) or _s(s.get("right_header")):
-            fm = {"layout": "comparison", "title": title, "docNumber": doc,
+            fm = {"layout": "comparison", "slideTitle": title, "docNumber": doc,
                   "leftHeader": _s(s.get("left_header")) or "方案 A",
                   "rightHeader": _s(s.get("right_header")) or "方案 B",
                   "leftAccent": _s(s.get("left_accent")) or "red",
                   "rightAccent": _s(s.get("right_accent")) or "olive"}
         else:
-            fm = {"layout": "two-column", "title": title, "docNumber": doc}
+            fm = {"layout": "two-column", "slideTitle": title, "docNumber": doc}
         body.append(_slot("left", left or " "))
         body.append(_slot("right", right or " "))
 
     elif layout == "code":
-        fm = {"layout": "code-full", "title": title, "docNumber": doc,
+        fm = {"layout": "code-full", "slideTitle": title, "docNumber": doc,
               "codeTitle": _s(s.get("code_title")) or (title or "LISTING"),
               "codeLang": _s(s.get("lang")) or "text"}
         if lead:
@@ -326,22 +262,31 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
             body.append(_slot("caption", _s(s.get("caption"))))
 
     elif layout == "mermaid":
-        fm = {"layout": "chart-full", "docNumber": doc,
+        fm = {"layout": "chart-full", "slideTitle": title, "docNumber": doc,
               "figNumber": _s(s.get("fig_number")) or "", "figLabel": _s(s.get("fig_label")) or title}
         mm = _s(s.get("mermaid"))
         mm = re.sub(r"\b(flowchart|graph)\s+TD\b", r"\1 LR", mm)
         mm = re.sub(r"\b(flowchart|graph)\s+TB\b", r"\1 LR", mm)
+        theme_id = _s((meta or {}).get("_visual_theme"))
+        mermaid_vars = _MERMAID_VARS_BY_THEME.get(
+            theme_id, _MERMAID_VARS_BY_THEME["notebook"])
+        init = json.dumps(
+            {"theme": "base", "themeVariables": mermaid_vars},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        mm = f"%%{{init: {init}}}%%\n{mm}"
         body.append(_slot("chart", _fence(mm, "mermaid")))
 
     elif layout == "magic-move":
         frames = [f for f in (s.get("frames") or []) if _s(f)]
         lang = _s(s.get("lang")) or "text"
-        fm = {"layout": "two-column", "title": title, "docNumber": doc}
+        fm = {"layout": "two-column", "slideTitle": title, "docNumber": doc}
         if len(frames) >= 2:
             body.append(_slot("left", "**之前**\n\n" + _fence(frames[0], lang)))
             body.append(_slot("right", "**之后**\n\n" + _fence(frames[-1], lang)))
         elif frames:
-            fm = {"layout": "code-full", "title": title, "docNumber": doc, "codeLang": lang}
+            fm = {"layout": "code-full", "slideTitle": title, "docNumber": doc, "codeLang": lang}
             body.append(_fence(frames[-1], lang))
 
     elif layout == "quote":
@@ -351,7 +296,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
         body.append(_s(s.get("quote")) or title)
 
     elif layout == "callout":
-        fm = {"layout": "callout", "title": title, "docNumber": doc,
+        fm = {"layout": "callout", "slideTitle": title, "docNumber": doc,
               "calloutType": _s(s.get("callout_type")) or "warning",
               "calloutTitle": _s(s.get("callout_title")) or "注意"}
         if lead:
@@ -362,7 +307,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
         body.append(_slot("callout", _s(s.get("callout")) or lead or title))
 
     elif layout == "timeline":
-        fm = {"layout": "timeline", "title": title, "docNumber": doc,
+        fm = {"layout": "timeline", "slideTitle": title, "docNumber": doc,
               "direction": _s(s.get("direction")) or "horizontal"}
         entries = []
         for e in (s.get("events") or []):
@@ -379,7 +324,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
 
     elif layout == "dashboard":
         panels = (s.get("panels") or [])[:4]
-        fm = {"layout": "dashboard", "title": title, "docNumber": doc}
+        fm = {"layout": "dashboard", "slideTitle": title, "docNumber": doc}
         for i, p in enumerate(panels, 1):
             p = p or {}
             fm[f"panel{i}Label"] = _s(p.get("label")) or f"指标 {i}"
@@ -389,10 +334,14 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
                 body.append(_slot(f"caption{i}", _rich(p.get("caption"))))
 
     elif layout == "end":
-        fm = {"layout": "end", "docNumber": doc}
+        fm = {"layout": "end", "docNumber": doc, "endLabel": ui_labels["end"]}
         fm["classification"] = _s((meta or {}).get("info")) or "据 colorc.cc 原文自动生成"
         body.append(_slot("title", title or "完"))
-        contact = _s(s.get("info")) or _s((meta or {}).get("info"))
+        contact = (
+            _s(s.get("subtitle"))
+            or _s(s.get("info"))
+            or _s((meta or {}).get("info"))
+        )
         bullets = [b for b in (s.get("bullets") or []) if _s(b)]
         if bullets:
             body.append(_slot("contact", "<br>".join(_rich(b) for b in bullets)))
@@ -400,7 +349,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
             body.append(_slot("contact", contact))
 
     else:  # 兜底 → default
-        fm = {"layout": "default", "title": title, "docNumber": doc}
+        fm = {"layout": "default", "slideTitle": title, "docNumber": doc}
         if lead:
             body.append(lead)
         bc = _v_clicks(s.get("bullets"), flatten)
@@ -420,15 +369,40 @@ def _yaml_val(v: Any) -> str:
     return "'" + s.replace("'", "''") + "'"
 
 
-_MERMAID_VARS = {
-    "background": "#f5f0e0", "primaryColor": "#ede8d0", "primaryTextColor": "#1a1a14",
-    "primaryBorderColor": "#8a7a50", "lineColor": "#8b1a1a", "mainBkg": "#ede8d0",
-    "nodeBorder": "#8a7a50", "secondaryColor": "#e0d8be", "tertiaryColor": "#f5f0e0",
-    "edgeLabelBackground": "#f5f0e0", "titleColor": "#3a3a1e",
+_MERMAID_VARS_BY_THEME = {
+    "blueprint": {
+        "background": "#0a4770", "primaryColor": "#0b527e", "primaryTextColor": "#f3fbff",
+        "primaryBorderColor": "#d7f4ff", "lineColor": "#ffd15c", "mainBkg": "#0b527e",
+        "nodeBorder": "#d7f4ff", "secondaryColor": "#0a4167", "tertiaryColor": "#0d5b89",
+        "edgeLabelBackground": "#0a4770", "titleColor": "#f3fbff",
+    },
+    "crt": {
+        "background": "#020503", "primaryColor": "#061009", "primaryTextColor": "#d7ffe8",
+        "primaryBorderColor": "#1aff8c", "lineColor": "#1aff8c", "mainBkg": "#061009",
+        "nodeBorder": "#1aff8c", "secondaryColor": "#07130d", "tertiaryColor": "#0a1810",
+        "edgeLabelBackground": "#020503", "titleColor": "#d7ffe8",
+    },
+    "comic": {
+        "background": "#fff7df", "primaryColor": "#ffd83d", "primaryTextColor": "#151515",
+        "primaryBorderColor": "#151515", "lineColor": "#151515", "mainBkg": "#ffd83d",
+        "nodeBorder": "#151515", "secondaryColor": "#79d6ff", "tertiaryColor": "#ff8fa0",
+        "edgeLabelBackground": "#fff7df", "titleColor": "#151515",
+    },
+    "notebook": {
+        "background": "#fffdf4", "primaryColor": "#fffef9", "primaryTextColor": "#242a31",
+        "primaryBorderColor": "#477eb4", "lineColor": "#477eb4", "mainBkg": "#fffef9",
+        "nodeBorder": "#477eb4", "secondaryColor": "#f3ead5", "tertiaryColor": "#eee1c2",
+        "edgeLabelBackground": "#fffdf4", "titleColor": "#242a31",
+    },
 }
 
 
-def _headmatter(meta: dict, no_trans: bool, fm0: dict) -> str:
+def _headmatter(
+    meta: dict,
+    no_trans: bool,
+    fm0: dict,
+    visual_theme: str | None = None,
+) -> str:
     title = _s(meta.get("title")) or "演示"
     lines = [
         f"theme: {THEME}",
@@ -448,7 +422,9 @@ def _headmatter(meta: dict, no_trans: bool, fm0: dict) -> str:
         "  theme: base",
         "  themeVariables:",
     ]
-    lines += [f"    {k}: '{v}'" for k, v in _MERMAID_VARS.items()]
+    mermaid_vars = _MERMAID_VARS_BY_THEME.get(
+        visual_theme or "", _MERMAID_VARS_BY_THEME["notebook"])
+    lines += [f"    {k}: '{v}'" for k, v in mermaid_vars.items()]
     for k, v in fm0.items():
         if k == "title":
             continue
@@ -456,22 +432,33 @@ def _headmatter(meta: dict, no_trans: bool, fm0: dict) -> str:
     return "---\n" + "\n".join(lines) + "\n---"
 
 
-def render_slidev(deck: dict, video: bool = False, steps: bool = False) -> str:
+def render_slidev(
+    deck: dict,
+    video: bool = False,
+    steps: bool = False,
+    visual_theme: str | None = None,
+) -> str:
     """deck IR -> Slidev Markdown(field-manual 主题)。
     video=True 静态全显;steps=True 保 v-clicks/magic-move 但禁转场(视频逐 click 截帧)。"""
     deck = _normalize_deck(deck)
     meta = deck.get("meta") or {}
+    render_meta = dict(meta)
+    render_meta["_visual_theme"] = visual_theme or ""
     slides = deck.get("slides") or [{"layout": "cover", "title": _s(meta.get("title")) or "演示"}]
 
     flatten = video and not steps
     no_trans = video or steps
 
-    body0, fm0 = _render_slide(slides[0], flatten, meta)
-    chunks = [_headmatter(meta, no_trans, fm0) + "\n\n" + body0]
+    body0, fm0 = _render_slide(slides[0], flatten, render_meta)
+    chunks = [
+        _headmatter(meta, no_trans, fm0, visual_theme=visual_theme)
+        + "\n\n"
+        + body0
+    ]
     for s in slides[1:]:
         if not isinstance(s, dict):
             continue
-        body, fm = _render_slide(s, flatten, meta)
+        body, fm = _render_slide(s, flatten, render_meta)
         fm_lines = "\n".join(f"{k}: {_yaml_val(v)}" for k, v in fm.items())
         chunks.append(f"---\n{fm_lines}\n---\n\n{body}")
     return "\n\n".join(chunks) + "\n"

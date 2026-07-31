@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/runtime_test_builder/workers ts=2026-04-27T00:00:00Z type=worker
 # [OMNI] material_id="material:utility.runtime_test.builder.hypothesis_proposer.agent.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """HypothesisProposerWorker — Worker #2 (AGENT, 真 meta 层 v2 核心创新).
 
 接 target_profile (上游 TargetExplorer 产), 综合 hypothesis_library (4 通用 + 5 模式)
@@ -9,7 +10,10 @@
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
+
+logger = logging.getLogger(__name__)
 
 from omnicompany.packages.services._core.agent.loop import AgentNodeLoop
 from omnicompany.packages.services._core.agent.routers.extract_result import ExtractResultRouter
@@ -31,6 +35,7 @@ except ModuleNotFoundError:
     def render_for_prompt(*_a, **_k):
         return 
 from omnicompany.protocol.anchor import Verdict, VerdictKind
+from omnicompany.runtime.agent.agent_loop_config import PRESET_LIGHTWEIGHT
 
 
 _SYSTEM_PROMPT = """你是 runtime_test_builder · HypothesisProposer (真 meta 层 v2 核心节点).
@@ -221,6 +226,46 @@ class SubmitHypothesisSetRouter(SingleToolRouter):
         return f"submitted {len(args.get('hypotheses', []))} hypotheses for {args.get('target_team_id')}"
 
 
+def _land_beliefs_in_library(inp: dict) -> int:
+    """特化假设产出挂统一决策库(决策本体合并清单#2:不再自有形态)。
+
+    每条假设 → kind=belief, track={plan, team:<target_team_id>};
+    幂等键=alias rtb:<team>:<hypothesis_id>(重跑合并不重复)。失败不阻塞管线。
+    """
+    from omnicompany.packages.domains.decisions import library
+
+    team_id = (inp.get("target_team_id") or "").strip() or "unknown-team"
+    by_alias: dict[str, str] = {}
+    for rec in library.active_records():
+        for a in rec.get("aliases") or []:
+            by_alias.setdefault(a, rec["id"])
+    _IMPORTANCE_TO_RISK = {"high": "high", "medium": "medium", "low": "low"}
+    n = 0
+    for h in inp.get("hypotheses") or []:
+        if not isinstance(h, dict):
+            continue
+        alias = f"rtb:{team_id}:{h.get('hypothesis_id', '')}"[:80]
+        payload: dict = {
+            "kind": "belief",
+            "statement": (h.get("description") or "")[:300],
+            "nature": "factual",
+            "risk_if_wrong": _IMPORTANCE_TO_RISK.get(h.get("importance") or "", "medium"),
+            "evidence_query": (h.get("verification_recipe") or "")[:400],
+            "rationale": (h.get("rationale_for_this_target") or "")[:400],
+            "tags": ["runtime-test-builder", f"team:{team_id}"],
+            "track": {"kind": "plan", "id": f"team:{team_id}"},
+            "origin": {"channel": "claude", "author": "runtime_test_builder.hypothesis_proposer"},
+            "created_by": "runtime_test_builder",
+        }
+        existing = by_alias.get(alias)
+        if existing:
+            payload["id"] = existing
+        payload["aliases"] = [alias]
+        library.upsert(payload)
+        n += 1
+    return n
+
+
 class _ExtractResult(ExtractResultRouter):
     def extract(self, *, final_text, messages, turn_count, stop_reason) -> Verdict:
         for msg in reversed(messages):
@@ -237,10 +282,16 @@ class _ExtractResult(ExtractResultRouter):
                             inp.setdefault("novelty_signals", [])
                             inp.setdefault("skipped_universal_ids", [])
                             count = len(inp.get("hypotheses", []))
+                            try:
+                                landed = _land_beliefs_in_library(inp)
+                            except Exception as exc:  # 挂库失败不阻塞验证主流程
+                                logger.warning("特化假设挂库失败(非致命): %s", exc)
+                                landed = 0
                             return Verdict(
                                 kind=VerdictKind.PASS,
                                 output=dict(inp),
-                                diagnosis=f"提出 {count} 条假设 for {inp.get('target_team_id')}",
+                                diagnosis=(f"提出 {count} 条假设 for {inp.get('target_team_id')}"
+                                           f" (挂库 belief {landed} 条)"),
                                 confidence=0.9,
                             )
         return Verdict(
@@ -257,10 +308,15 @@ class HypothesisProposerWorker(AgentNodeLoop):
     ALLOW_NO_BUS: ClassVar[bool] = True
     TOOL_ROUTERS: ClassVar[list] = [SubmitHypothesisSetRouter]
     NODE_PROMPT: ClassVar[str] = _SYSTEM_PROMPT
+    LOOP_CONFIG = PRESET_LIGHTWEIGHT
+    TERMINATING_TOOLS = ("submit_hypothesis_set",)
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any):
         return _PromptBuilder(template=self.NODE_PROMPT, bus=bus)

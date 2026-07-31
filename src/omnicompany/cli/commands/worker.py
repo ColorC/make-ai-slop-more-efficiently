@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import hashlib
 import json
 import sqlite3
 import sys
@@ -16,12 +17,18 @@ from typing import Any
 import click
 
 from omnicompany.packages.services._core.agent.external_workers import (
+    AgentCapabilityGrant,
+    AgentContextEnvelope,
+    AgentRuntimeProfile,
+    AgentRuntimeRequest,
     ExternalAgentPermissionMode,
     ExternalAgentRunRequest,
     ExternalAgentStatus,
     build_default_external_agent_worker_registry,
     resolve_external_agent_model,
+    run_agent_runtime_request,
     run_external_agent_request,
+    select_agent_runtime,
 )
 from omnicompany.packages.services._core.agent.spawn_surface import (
     ENTRY_EXTERNAL_WORKER_RUN,
@@ -78,7 +85,7 @@ def worker_providers(as_json: bool) -> None:
 
 
 @cmd_worker.command("run")
-@click.argument("provider", required=False, default="claude-code")
+@click.argument("provider", required=False, default=None)
 @click.option("--prompt", "-p", default=None, help="Inline task/spec text.")
 @click.option(
     "--spec",
@@ -108,7 +115,21 @@ def worker_providers(as_json: bool) -> None:
     help="Required when --permission trusted-bypass is used.",
 )
 @click.option("--model", default=None, help="Provider model override.")
+@click.option(
+    "--model-provider",
+    default=None,
+    help="LLM provider identity inside the selected harness (for example openai).",
+)
 @click.option("--profile", default=None, help="Provider profile override.")
+@click.option(
+    "--runtime-profile",
+    type=click.Choice([profile.value for profile in AgentRuntimeProfile]),
+    default=None,
+    help=(
+        "Canonical runtime lane: stable_pi, native_bus, or compat. "
+        "Without this option the legacy explicit provider path is preserved."
+    ),
+)
 @click.option(
     "--model-policy",
     type=click.Choice(["none", "cheap"]),
@@ -116,7 +137,21 @@ def worker_providers(as_json: bool) -> None:
     show_default=True,
     help="Default-model resolver policy. Use cheap mainly for Codex.",
 )
-@click.option("--timeout", "timeout_s", type=float, default=900.0, show_default=True)
+@click.option(
+    "--minimal-context",
+    is_flag=True,
+    help=(
+        "Use a narrow provider context for bounded review/schema tasks; Codex "
+        "skips ambient user config, memories, plugins, apps, and multi-agent tools."
+    ),
+)
+@click.option(
+    "--timeout",
+    "timeout_s",
+    type=float,
+    default=None,
+    help="Optional caller-selected total deadline in seconds; omitted means no total deadline.",
+)
 @click.option(
     "--context",
     "context_paths",
@@ -137,6 +172,17 @@ def worker_providers(as_json: bool) -> None:
     help=(
         "Attach a context file as alias=path. Use an ASCII alias for paths "
         "that Claude may misread, especially Chinese filenames."
+    ),
+)
+@click.option(
+    "--image",
+    "image_paths",
+    type=click.Path(dir_okay=False, path_type=Path),
+    multiple=True,
+    help=(
+        "Attach an image to the worker initial turn. May be repeated; "
+        "the canonical omni-native Agent and supported compatibility harnesses "
+        "accept images. Each image must stay under --cwd."
     ),
 )
 @click.option(
@@ -188,7 +234,7 @@ def worker_providers(as_json: bool) -> None:
     help="Write the full JSON result to this file.",
 )
 def worker_run(
-    provider: str,
+    provider: str | None,
     prompt: str | None,
     spec_path: Path | None,
     from_stdin: bool,
@@ -196,12 +242,16 @@ def worker_run(
     permission_mode: str,
     allow_trusted_bypass: bool,
     model: str | None,
+    model_provider: str | None,
     profile: str | None,
+    runtime_profile: str | None,
     model_policy: str,
-    timeout_s: float,
+    minimal_context: bool,
+    timeout_s: float | None,
     context_paths: tuple[Path, ...],
     context_texts: tuple[str, ...],
     context_alias_items: tuple[str, ...],
+    image_paths: tuple[Path, ...],
     output_schema_path: Path | None,
     watch_paths: tuple[Path, ...],
     run_root_path: Path | None,
@@ -227,9 +277,36 @@ def worker_run(
     if permission == ExternalAgentPermissionMode.TRUSTED_BYPASS and not allow_trusted_bypass:
         raise click.UsageError("trusted-bypass requires --allow-trusted-bypass")
 
+    selection = None
+    if runtime_profile is not None:
+        try:
+            selection = select_agent_runtime(
+                runtime_profile,
+                requested_harness=provider or "",
+            )
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        provider = selection.harness_id
+        if selection.profile == AgentRuntimeProfile.STABLE_PI and (
+            not (model_provider or "").strip() or not (model or "").strip()
+        ):
+            raise click.UsageError(
+                "stable_pi requires --model-provider and --model; "
+                "ambient model selection is disabled for the stable profile"
+            )
+    else:
+        provider = provider or "claude-code"
+
     cwd = cwd_path.expanduser().resolve()
     if not cwd.is_dir():
         raise click.UsageError(f"cwd must be an existing directory: {cwd}")
+    if image_paths and provider != "codex":
+        raise click.UsageError(
+            "--image is currently supported only by the codex compatibility harness"
+        )
+    resolved_image_paths = [
+        _resolve_image_file(path, cwd=cwd) for path in image_paths
+    ]
 
     task = _read_task_text(prompt=prompt, spec_path=spec_path, from_stdin=from_stdin)
     attached_context = _read_attached_context(
@@ -238,6 +315,10 @@ def worker_run(
         context_alias_items,
         cwd=cwd,
     )
+    context_envelope = AgentContextEnvelope.from_legacy(
+        attached_context,
+        provenance=("cli:omni-worker-run",),
+    )
     run_id = f"external-cli-{uuid.uuid4().hex}"
     run_dir = _prepare_run_record_dir(run_root_path, run_id) if run_root_path is not None else None
     metadata = ensure_agent_spawn_metadata(
@@ -245,11 +326,41 @@ def worker_run(
         _parse_key_values(metadata_items, option_name="--metadata"),
         cli_entrypoint="omni_worker_run",
     )
+    if spec_path is not None:
+        # The full spec body is already the task. Keep its source identity in
+        # the audit record instead of embedding an absolute path in the prompt:
+        # models otherwise spend an unnecessary tool call rereading identical
+        # content before doing the real task.
+        metadata["spec_source_path"] = str(spec_path.expanduser().resolve())
+    if minimal_context:
+        metadata["minimal_context"] = True
     if run_dir is not None:
         metadata["run_record_dir"] = str(run_dir)
     env = _parse_key_values(env_items, option_name="--env")
     env.setdefault("OMNI_EXTERNAL_WORKER_RUN_ID", run_id)
     env.setdefault("OMNI_EXTERNAL_WORKER_PROVIDER", provider)
+    capability_grant = None
+    if provider == "omni-native":
+        if permission == ExternalAgentPermissionMode.TRUSTED_BYPASS:
+            raise click.UsageError(
+                f"{provider} canonical runtime does not support trusted-bypass"
+            )
+        raw_prefixes = metadata.get("allowed_bash_command_prefixes") or ()
+        prefixes = (
+            (str(raw_prefixes),)
+            if isinstance(raw_prefixes, str)
+            else tuple(str(item) for item in raw_prefixes)
+        )
+        capability_grant = AgentCapabilityGrant.for_workspace(
+            cwd,
+            permission_mode=permission.value,
+            grant_id=f"grant:{run_id}",
+            policy_ref=str(
+                metadata.get("capability_policy_ref")
+                or "policy:omni-worker-cli"
+            ),
+            allowed_shell_command_prefixes=prefixes,
+        )
 
     if run_dir is not None:
         _write_run_input_record(
@@ -260,31 +371,68 @@ def worker_run(
             timeout_s=timeout_s,
             prompt=task,
             attached_context=attached_context,
+            image_paths=resolved_image_paths,
             watch_paths=watch_paths,
             env_keys=sorted(env),
             metadata=metadata,
         )
 
-    request = ExternalAgentRunRequest(
-        provider=provider,
-        prompt=task,
-        cwd=cwd,
-        run_id=run_id,
-        permission_mode=permission,
-        model=model,
-        model_policy=model_policy,  # type: ignore[arg-type]
-        profile=profile,
-        timeout_s=timeout_s,
-        attached_context=attached_context,
-        output_schema_path=output_schema_path,
-        watch_paths=list(watch_paths),
-        env=env,
-        trace_id=trace_id or "",
-        metadata=metadata,
-    )
-
     try:
-        result = asyncio.run(run_external_agent_request(request))
+        if selection is not None:
+            runtime_request = AgentRuntimeRequest(
+                prompt=task,
+                cwd=cwd,
+                runtime_profile=selection.profile,
+                harness_id=selection.harness_id,
+                run_id=run_id,
+                permission_mode=permission,
+                model_provider=model_provider or "",
+                model=model,
+                model_policy=model_policy,  # type: ignore[arg-type]
+                provider_profile=profile,
+                timeout_s=timeout_s,
+                context_envelope=context_envelope,
+                capability_grant=capability_grant,
+                image_paths=resolved_image_paths,
+                output_schema_path=output_schema_path,
+                watch_paths=list(watch_paths),
+                env=env,
+                trace_id=trace_id or "",
+                metadata=metadata,
+            )
+            result = asyncio.run(run_agent_runtime_request(runtime_request))
+        else:
+            request = ExternalAgentRunRequest(
+                provider=provider,
+                harness_id=provider,
+                model_provider=model_provider or "",
+                prompt=task,
+                cwd=cwd,
+                run_id=run_id,
+                permission_mode=permission,
+                model=model,
+                model_policy=model_policy,  # type: ignore[arg-type]
+                profile=profile,
+                timeout_s=timeout_s,
+                attached_context=(
+                    []
+                    if provider == "omni-native"
+                    else attached_context
+                ),
+                context_envelope=(
+                    context_envelope
+                    if provider == "omni-native"
+                    else None
+                ),
+                capability_grant=capability_grant,
+                image_paths=resolved_image_paths,
+                output_schema_path=output_schema_path,
+                watch_paths=list(watch_paths),
+                env=env,
+                trace_id=trace_id or "",
+                metadata=metadata,
+            )
+            result = asyncio.run(run_external_agent_request(request))
     except KeyboardInterrupt:
         click.echo("[interrupted]", err=True)
         raise SystemExit(130)
@@ -346,10 +494,7 @@ def worker_trace(trace_id: str, db_selector: str, limit: int, as_json: bool) -> 
 def _read_task_text(*, prompt: str | None, spec_path: Path | None, from_stdin: bool) -> str:
     sections: list[str] = []
     if spec_path is not None:
-        sections.append(
-            f"# Spec file: {spec_path.resolve()}\n\n"
-            + spec_path.read_text(encoding="utf-8")
-        )
+        sections.append(spec_path.read_text(encoding="utf-8"))
     if from_stdin:
         sections.append(sys.stdin.read())
     if prompt:
@@ -376,6 +521,7 @@ def _write_run_input_record(
     timeout_s: float,
     prompt: str,
     attached_context: list[str],
+    image_paths: list[Path],
     watch_paths: tuple[Path, ...],
     env_keys: list[str],
     metadata: dict[str, Any],
@@ -392,6 +538,14 @@ def _write_run_input_record(
         "timeout_s": timeout_s,
         "prompt_path": str(prompt_path),
         "attached_context_count": len(attached_context),
+        "image_inputs": [
+            {
+                "path": str(path),
+                "bytes": path.stat().st_size,
+                "sha256": _sha256_path(path),
+            }
+            for path in image_paths
+        ],
         "watch_paths": [str(path) for path in watch_paths],
         "env_keys": env_keys,
         "metadata": metadata,
@@ -463,6 +617,26 @@ def _resolve_context_file(path: Path, *, cwd: Path) -> Path:
     if not resolved.is_file():
         raise click.UsageError(f"context path must be an existing file: {resolved}")
     return resolved
+
+
+def _resolve_image_file(path: Path, *, cwd: Path) -> Path:
+    resolved = path.expanduser()
+    resolved = (resolved if resolved.is_absolute() else cwd / resolved).resolve()
+    try:
+        resolved.relative_to(cwd)
+    except ValueError as exc:
+        raise click.UsageError(f"--image must stay under --cwd: {resolved}") from exc
+    if not resolved.is_file():
+        raise click.UsageError(f"--image must be an existing file: {resolved}")
+    return resolved
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _parse_key_values(items: tuple[str, ...], *, option_name: str) -> dict[str, str]:

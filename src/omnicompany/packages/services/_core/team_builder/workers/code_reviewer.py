@@ -246,6 +246,10 @@ class CodeReviewer(Worker):
             worker_id = w.get("worker_id") or ""
             if not worker_id:
                 continue
+            if str(w.get("impl_type") or "").upper() == "EXISTING":
+                # WorkerDesigner has already imported and type-checked this live
+                # Worker class. It intentionally has no generated local file.
+                continue
             module = _module_name_for(worker_id)
             rel_path = f"workers/{module}.py"
             expected_class = _class_name_for(worker_id)
@@ -364,8 +368,12 @@ class CodeReviewer(Worker):
                     })
 
         # Check 2: Worker file 数量与 worker_design_detailed 一致
-        expected_files = {f"workers/{_module_name_for(w.get('worker_id',''))}.py"
-                          for w in worker_details if w.get("worker_id")}
+        expected_files = {
+            f"workers/{_module_name_for(w.get('worker_id',''))}.py"
+            for w in worker_details
+            if w.get("worker_id")
+            and str(w.get("impl_type") or "").upper() != "EXISTING"
+        }
         actual_worker_files = {f for f in files if f.startswith("workers/") and f.endswith(".py") and f != "workers/__init__.py"}
         extra = actual_worker_files - expected_files
         missing_files = expected_files - actual_worker_files

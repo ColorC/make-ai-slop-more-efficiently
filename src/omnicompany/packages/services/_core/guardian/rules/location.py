@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from ._base import FileContext, GuardianRule, _is_external
+from ._base import FileContext, GuardianRule, _is_external, _is_scratch
 
 
 def _check_format_location(ctx: FileContext) -> bool:
@@ -102,8 +102,23 @@ def _check_data_no_code(ctx: FileContext) -> bool:
         return False
     if "/_workspaces/" in p or "/repo_abs_" in p or "/scratch/" in p:
         return False
-    # references/ 是 voxelcraft 等真业务参考的上游 mod 真源码, 同 vendors/ 性质
+    # scratch 自由开获区 (2026-05-08 用户裁决, 与 _base._is_scratch 对齐;
+    # 补 data/_scratch/ 顶级 — 原只匹 "/scratch/" 漏了下划线变体)
+    if _is_scratch(ctx):
+        return False
+    # references/ 是业务域参考的上游 mod 真源码, 同 vendors/ 性质
     if "/references/" in p:
+        return False
+    # 数据产物豁免 (2026-07-26 技术债裁决): 以下路径里的代码文件是**数据产物**
+    # (导出快照/修复备份/生成脚手架), 不会被当作系统代码执行, 同快照树性质:
+    #   repo_exporter jobs staged_*   — 仓库导出暂存快照 (导出对象本身)
+    #   doctor repair backups/        — router 修复前自动备份
+    #   workflow_factory output/      — 生成的 team 脚手架产物
+    if p.startswith("data/services/repo_exporter/jobs/"):
+        return False
+    if p.startswith("data/services/doctor/repair/backups/"):
+        return False
+    if p.startswith("data/services/workflow_factory/output/"):
         return False
     # 必须是可执行代码后缀
     if not any(p.endswith(ext) for ext in _DATA_CODE_EXTS):

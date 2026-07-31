@@ -22,6 +22,8 @@ from .store import (
     LedgerEvent,
     append,
     iter_since,
+    list_deviations,
+    report_deviation,
     set_verdict,
     tail,
 )
@@ -32,4 +34,6 @@ __all__ = [
     "tail",
     "iter_since",
     "set_verdict",
+    "report_deviation",
+    "list_deviations",
 ]

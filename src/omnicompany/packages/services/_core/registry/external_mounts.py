@@ -21,7 +21,7 @@ omnicompany 的管线注册表 (:mod:`omnicompany.core.registry`) 历来只认�
    .. code-block:: yaml
 
        mounts:
-         - path: "E:/WindowsWorkspace/quant-lab"
+         - path: "/path/to/external/project"
            owner: quant-lab
            note: "只读状态入口; 重型日更管线只声明不执行(18:00 有计划任务在跑)"
 

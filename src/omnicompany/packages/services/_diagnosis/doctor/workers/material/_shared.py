@@ -13,11 +13,13 @@ import logging
 import re
 from pathlib import Path
 
+from omnicompany.core.config import omni_workspace_root
+
 logger = logging.getLogger("omnicompany.doctor.format")
 
 
 # 默认 source root (omnicompany 项目的 src/omnicompany/)
-DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
+DEFAULT_SOURCE_ROOT = omni_workspace_root() / "src" / "omnicompany"
 
 # ── HealthArchive 可选集成 ─────────────────────────────────────────
 try:

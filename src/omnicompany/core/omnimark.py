@@ -35,6 +35,7 @@ from typing import Optional
 ORIGIN_VALUES = frozenset({
     "human",
     "claude-code",
+    "codex",
     "ai-ide",          # 2026-05-01 用户拍板的新称呼, 跟 claude-code 等价但语义化
     "workflow-factory",
     "skill-import",

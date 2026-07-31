@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/team_builder/workers ts=2026-04-24T00:00:00Z type=worker
 # [OMNI] material_id="material:core.team_builder.code_generator_loop.engine.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """CodeGeneratorLoopWorker — Phase 8 · AgentNodeLoop (2026-04-24 · 铁律对齐 fix).
 
 **V3.1 修正 (2026-04-24)**:
@@ -38,6 +39,9 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
     ListDirRouter,
     ReadFileRouter,
     SingleToolRouter,
+)
+from omnicompany.packages.services._core.team_builder.package_location import (
+    canonical_team_package_path,
 )
 from omnicompany.runtime.agent.agent_loop_tools import ToolContext
 from omnicompany.protocol.anchor import Verdict, VerdictKind
@@ -685,9 +689,13 @@ class CodeGeneratorLoopWorker(AgentNodeLoop):
         target = (
             workspace_spec.get("target_package_path")
             or team_design.get("target_package_path")
-            or (f"src/omnicompany/packages/services/{team_name}/" if team_name else "")
         )
-        return team_name, target
+        if not isinstance(team_name, str) or not team_name:
+            raise ValueError("team_name is required")
+        return team_name, canonical_team_package_path(
+            target,
+            team_name=team_name,
+        )
 
     async def run(self, input_data: Any) -> Verdict:
         # 条件激活: design_validation_report.overall != FAIL
@@ -702,7 +710,14 @@ class CodeGeneratorLoopWorker(AgentNodeLoop):
                 )
 
         # 注入 run-scope context 给 extract_result (team_name / target_package_path)
-        team_name, target_path = self._infer_team_context(input_data)
+        try:
+            team_name, target_path = self._infer_team_context(input_data)
+        except ValueError as exc:
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output={},
+                diagnosis=f"team package location invalid: {exc}",
+            )
         if hasattr(self._extract_result, "set_run_context"):
             self._extract_result.set_run_context(
                 team_name=team_name, target_package_path=target_path,

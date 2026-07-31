@@ -10,11 +10,11 @@ Worker 协议:
   - files_to_write 清单 (abs path + size + sha256 preview)
   - pipeline_entry_code (要追加到 core/pipelines.py 的代码段)
   - dry_run=True · human_review_required=True
-  - **V3 MVP 不真落盘** (保护 src/ 不被 agent 污染; 未来接 HumanBus 审批后再真写)
+  - **V3 MVP 不真落盘** (保护 src/ 不被 agent 污染; 当前对话明确授权后再真写)
 
 **不调 LLM** · 规则驱动:
-  - 从 code_package.team_name 推 package path
-  - 验 target_package_path 合规 (`src/omnicompany/packages/services/<team_name>/`)
+  - 消费 code_package 已声明的唯一 target_package_path
+  - 验 target_package_path 属于规范 services bucket 或具体 business domain
   - 生成 PipelineEntry 模板代码
 
 HARD 铁律:
@@ -31,6 +31,13 @@ from pathlib import Path
 from typing import Any
 
 from omnicompany.packages.services._core.omnicompany import Worker
+from omnicompany.packages.services._core.team_builder.package_location import (
+    canonical_package_file_path,
+    canonical_team_package_path,
+    team_data_path,
+    team_omni_domain,
+    team_python_module,
+)
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 
@@ -75,14 +82,21 @@ def _preview_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
 
 
-def _synthesize_testmap_yaml(team_name: str) -> str:
+def _synthesize_testmap_yaml(
+    team_name: str,
+    target_package_path: str,
+) -> str:
     """骨架接管(与 py_compile / DESIGN.md 章节规范化同款): code_package 若未含
     testmap.yaml, 确定性合成一份最小骨架(app=team_name, features 空), 与
     `templates/team/骨架/testmap.yaml` 内容对齐(见 OMNI-100 · 2026-07-03
     完成标准接线批)。不调 LLM, 不影响既有 files_to_write 结构。
     """
+    package_domain = team_omni_domain(
+        target_package_path,
+        team_name=team_name,
+    )
     return (
-        "# [OMNI] origin=team-builder domain=services/" + team_name + " ts=" + _now_iso() + " type=data\n"
+        "# [OMNI] origin=team-builder domain=" + package_domain + " ts=" + _now_iso() + " type=data\n"
         "# testmap.yaml — 功能点-测试对照表。真源跟随本软件;omnicompany 只注册指针。\n"
         "# 契约: src/omnicompany/packages/services/_governance/testmap.py; 查询: omni testmap show <app>\n"
         "# 首个登记期限: 本软件首个功能性计划完成时,features 必须至少登记该计划交付的功能点"
@@ -102,25 +116,43 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _build_pipeline_entry_code(team_name: str, description: str) -> str:
+def _build_pipeline_entry_code(
+    team_name: str,
+    description: str,
+    target_package_path: str,
+) -> str:
     """生成要追加到 core/pipelines.py 的 PipelineEntry 代码段."""
     snake = team_name.replace("-", "_")
     cli_name = snake.replace("_", "-")
+    module = team_python_module(
+        target_package_path,
+        team_name=team_name,
+    )
+    data_dir = team_data_path(
+        target_package_path,
+        team_name=team_name,
+    ).rstrip("/")
+    target_parts = target_package_path.rstrip("/").split("/")
+    pipeline_domain = (
+        target_parts[4]
+        if target_parts[3] == "domains"
+        else snake
+    )
     return f'''    # ── {cli_name} · 由 team_builder V3 生成 (dry_run · 2026-04-23) ──
     try:
         register(PipelineEntry(
             name="{cli_name}",
             description={description!r},
-            domain="{snake}",
+            domain="{pipeline_domain}",
             build_team=_lazy(
-                "omnicompany.packages.services.{snake}.team",
+                "{module}.team",
                 "build_team",
             ),
             build_bindings=_lazy_fn(
-                "omnicompany.packages.services.{snake}.run",
+                "{module}.run",
                 "build_bindings",
             ),
-            default_db_dir="data/services/{snake}",
+            default_db_dir="{data_dir}",
             default_max_steps=1000,
             cli_args=[
                 CliArg(name="text", help="自然语言需求"),
@@ -136,9 +168,13 @@ class RegistrarWorker(Worker):
 
     DESCRIPTION = (
         "Phase 10 · HARD · 接 code_package 产 registration_plan (dry_run=True · human_review) · "
-        "列 files_to_write 清单 + PipelineEntry 代码段 · 不真落盘 (V3 MVP 保 src/ 不污染, 未来 HumanBus 审批)."
+        "列 files_to_write 清单 + PipelineEntry 代码段 · 不真落盘 (V3 MVP 保 src/ 不污染, 当前对话授权后执行)."
     )
-    FORMAT_IN = "team_builder.material.code_package"
+    FORMAT_IN = [
+        "team_builder.material.code_package",
+        "team_builder.material.code_review_report",
+        "team_builder.material.scale_assessment",
+    ]
     FORMAT_OUT = "team_builder.material.registration_plan"
 
     def run(self, input_data: Any) -> Verdict:
@@ -163,23 +199,32 @@ class RegistrarWorker(Worker):
         target_path = input_data.get("target_package_path") or upstream.get("target_package_path")
         files = input_data.get("files") or upstream.get("files")
 
-        if not team_name or not target_path or not isinstance(files, dict):
+        if (
+            not isinstance(team_name, str)
+            or not team_name.strip()
+            or not target_path
+            or not isinstance(files, dict)
+        ):
             return Verdict(
                 kind=VerdictKind.FAIL,
                 output={},
                 diagnosis=(
-                    f"code_package 缺字段 · team_name={bool(team_name)} "
+                    f"code_package 缺字段 · team_name={isinstance(team_name, str) and bool(team_name.strip())} "
                     f"target={bool(target_path)} files={isinstance(files, dict)}"
                 ),
             )
 
-        # 合规性校验 target_path
-        expected_prefix = "src/omnicompany/packages/services/"
-        if not target_path.startswith(expected_prefix):
+        # 合规性校验 target_path；不允许 Registrar 重建或改写路径。
+        try:
+            target_path = canonical_team_package_path(
+                target_path,
+                team_name=team_name,
+            )
+        except ValueError as exc:
             return Verdict(
                 kind=VerdictKind.FAIL,
                 output={},
-                diagnosis=f"target_package_path 不合规 · 必须以 {expected_prefix!r} 开头 (got {target_path!r})",
+                diagnosis=f"target_package_path 不合规: {exc}",
             )
 
         # 骨架接管 · code_package 若未含 testmap.yaml, 确定性合成一份最小骨架
@@ -187,7 +232,10 @@ class RegistrarWorker(Worker):
         # 不调 LLM、不重构本管线, 只在 files dict 缺失时补一条。
         if not any(Path(rel).name == "testmap.yaml" for rel in files):
             files = dict(files)
-            files["testmap.yaml"] = _synthesize_testmap_yaml(team_name)
+            files["testmap.yaml"] = _synthesize_testmap_yaml(
+                team_name,
+                target_path,
+            )
 
         # 骨架接管 · 对所有 .py 跑 py_compile 检测语法错
         # 100% 必做: "落盘前要能 import" 是确定性约束, 不靠 LLM 自觉
@@ -214,9 +262,17 @@ class RegistrarWorker(Worker):
         for rel_path, content in files.items():
             if not isinstance(content, str):
                 continue
-            abs_path = target_path.rstrip("/") + "/" + rel_path.lstrip("/")
+            try:
+                canonical_rel_path = canonical_package_file_path(rel_path)
+            except ValueError as exc:
+                return Verdict(
+                    kind=VerdictKind.FAIL,
+                    output={},
+                    diagnosis=f"generated file path 不合规 ({rel_path!r}): {exc}",
+                )
+            abs_path = target_path + canonical_rel_path
             files_to_write.append({
-                "rel_path": rel_path,
+                "rel_path": canonical_rel_path,
                 "abs_path": abs_path,
                 "size_bytes": len(content.encode("utf-8")),
                 "sha256_preview": _preview_hash(content),
@@ -228,7 +284,11 @@ class RegistrarWorker(Worker):
             f"({len(files_to_write)} 个文件, "
             f"{sum(f['size_bytes'] for f in files_to_write)} bytes)"
         )
-        pipeline_entry_code = _build_pipeline_entry_code(team_name, description)
+        pipeline_entry_code = _build_pipeline_entry_code(
+            team_name,
+            description,
+            target_path,
+        )
 
         plan = {
             "team_name": team_name,
@@ -246,7 +306,7 @@ class RegistrarWorker(Worker):
                 "V3 MVP: **未真落盘** · 保护 src/ 不被 agent 污染",
                 "已骨架校验: 每个 .py 通过 py_compile (无语法错 · 可 import)",
                 "真落盘需 L1 人类审阅 files_to_write 清单 + 人工执行",
-                "未来方向: 接 HumanBus 审批机制后自动执行 (方案 kind=human_blocking)",
+                "未来方向: 当前 agent 对话明确授权后执行 (方案 kind=needs_user_input)",
                 "pipeline_entry_code 已生成, 落盘时追加到 core/pipelines.py",
                 "V3.2 (2026-04-24): plan['files'] 含完整 rel_path→content, deploy 不再需 scrape audit",
             ],

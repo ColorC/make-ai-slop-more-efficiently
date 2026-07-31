@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -139,31 +140,87 @@ class AuthoredStore:
         self.root = Path(root)
         self._lock = threading.RLock()
         self._cache: dict[str, Note] | None = None
+        # 文件级签名台账: name → (mtime_ns, size)。reload() 靠它做增量加载 —
+        # 签名没变的文件复用已解析对象, 不全量重读 (571 文件全量重解析是
+        # _attach_notes_to_materials 每次 reload 的主开销, 2026-07 P0 批)。
+        self._file_sigs: dict[str, tuple[int, int]] = {}
+
+    def _scan_file_sigs(self) -> dict[str, tuple[int, int]] | None:
+        """os.scandir 取每个 note JSON 的 (mtime_ns, size) 签名。
+        None = 扫盘失败(临时 IO 错), 调用方保守保持现状; 空 dict = 目录不存在/无文件。"""
+        sigs: dict[str, tuple[int, int]] = {}
+        try:
+            with os.scandir(self.root) as it:
+                for entry in it:
+                    try:
+                        if not entry.is_file() or not entry.name.lower().endswith(".json"):
+                            continue
+                        st = entry.stat()
+                    except OSError:
+                        continue
+                    sigs[entry.name] = (st.st_mtime_ns, st.st_size)
+        except FileNotFoundError:
+            return {}
+        except OSError:
+            return None
+        return sigs
+
+    def _refresh_locked(self) -> None:
+        """签名增量刷新 (须已持 self._lock 且 self._cache 非 None):
+        签名没变的文件复用已解析对象; 只重读变化的、补读新增的、删除消失的。"""
+        assert self._cache is not None
+        sigs = self._scan_file_sigs()
+        if sigs is None:
+            return
+        for name, sig in sigs.items():
+            stem = name[:-len(".json")]
+            # 未变 — 复用缓存对象, 不重读 (缓存里必须真有该对象才算命中, 防孤签名挡掉首载;
+            # 坏文件缓存里没有, 每次 reload 会重试一次, 与原全量重读语义一致)
+            if self._file_sigs.get(name) == sig and stem in self._cache:
+                continue
+            try:
+                self._cache[stem] = Note.from_dict(json.loads((self.root / name).read_text(encoding="utf-8")))
+            except Exception:
+                # 坏文件静默跳过 (沿袭原 _ensure_loaded 语义)
+                self._cache.pop(stem, None)
+            self._file_sigs[name] = sig
+        # 盘上消失的文件 → 缓存同步摘除
+        for name in list(self._file_sigs):
+            if name not in sigs:
+                self._file_sigs.pop(name)
+                self._cache.pop(name[:-len(".json")], None)
 
     def _ensure_loaded(self) -> dict[str, Note]:
         with self._lock:
             if self._cache is None:
-                cache: dict[str, Note] = {}
-                if self.root.exists():
-                    for p in self.root.glob("*.json"):
-                        try:
-                            cache[p.stem] = Note.from_dict(json.loads(p.read_text(encoding="utf-8")))
-                        except Exception:
-                            pass
-                self._cache = cache
+                self._cache = {}
+                self._refresh_locked()
             return self._cache
 
     def reload(self) -> None:
+        """重新扫盘, 保证调用后看到盘上最新内容 (CLI 进程外直写, 测试/外部修改时用)。
+
+        增量实现: 文件级 (mtime_ns, size) 签名比对, 未变文件不重读 — 对外语义不变。
+        """
         with self._lock:
-            self._cache = None
+            if self._cache is None:
+                return  # 尚未加载 — 下次 _ensure_loaded 首载即全量
+            self._refresh_locked()
 
     def json_path(self, note_id: str) -> str:
         return str((self.root / f"{note_id}.json").resolve())
 
     def _persist(self, n: Note) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
-        (self.root / f"{n.id}.json").write_text(
+        path = self.root / f"{n.id}.json"
+        path.write_text(
             json.dumps(n.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+        # 自己写的文件同步签名台账, 下次 reload 不会把自己刚写的盘当"外部变更"重读
+        try:
+            st = path.stat()
+            self._file_sigs[path.name] = (st.st_mtime_ns, st.st_size)
+        except OSError:
+            self._file_sigs.pop(path.name, None)
 
     # ── CRUD ──
 
@@ -225,7 +282,8 @@ class AuthoredStore:
 
     def update(self, note_id: str, *, content: str | None = None,
                uses: list[str] | None = None, feedback_status: str | None = None,
-               title: str | None = None, by: str = "user") -> Note:
+               title: str | None = None,
+               by: str = "user") -> Note:
         with self._lock:
             n = self.get(note_id)
             if n is None:

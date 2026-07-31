@@ -1,6 +1,6 @@
 # [OMNI] origin=claude-code domain=omnicompany/cli ts=2026-06-22 type=cli status=active
 # [OMNI] summary="omni atlas —— project_atlas 资源中心的审/导闭环:list 待审 / approve 入 canonical / export 到两个 AI 的 skills 目录 / reject。"
-# [OMNI] why="收集 worker 产出落在 staging(待人审);这条 CLI 把'人审→批准→export 到 ~/.claude+~/.codex'闭环补上,让 object-SKILL 真正被两个 AI 用上(防重复造轮)。"
+# [OMNI] why="收集 worker 产出落在 staging(待人审);这条 CLI 把'人审→批准→export 到 ~/.claude+~/.agents'闭环补上,让 object-SKILL 真正被两个 AI 用上(防重复造轮)。"
 # [OMNI] tags=cli,atlas,project_atlas,review,export
 """omni atlas —— project_atlas object-SKILL 审/导闭环。"""
 
@@ -23,21 +23,7 @@ from omnicompany.packages.domains.project_atlas._paths import (
 from omnicompany.packages.domains.project_atlas.spaces import SPACES
 
 _CLAUDE_SKILLS = Path.home() / ".claude" / "skills"
-_CODEX_SKILLS = Path.home() / ".codex" / "skills"
-
-
-def _last_refresh_summary() -> str | None:
-    """上次重采时刻: 读 atlas-refresh-monthly.json 的 work_trigger_state.last_triggered_at, 退而 last_run_at。"""
-    from omnicompany.core.config import omni_workspace_root
-    p = omni_workspace_root() / ".omni" / "cron" / "atlas-refresh-monthly.json"
-    if not p.is_file():
-        return None
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    ts = (data.get("work_trigger_state") or {}).get("last_triggered_at") or data.get("last_run_at")
-    return ts
+_CODEX_SKILLS = Path.home() / ".agents" / "skills"
 
 
 def _last_health_summary() -> tuple[str, int] | None:
@@ -100,9 +86,6 @@ def atlas_list(space: str | None, status: str, warn_only: bool, as_json: bool) -
     if as_json:
         click.echo(json.dumps({"items": rows, "total": len(rows)}, ensure_ascii=False, indent=2))
         return
-    refresh_ts = _last_refresh_summary()
-    if refresh_ts:
-        click.echo(f"上次重采: {refresh_ts}(工作量触发记录)")
     health = _last_health_summary()
     if health:
         h_ts, h_n = health
@@ -177,7 +160,7 @@ def atlas_reject(ref: str) -> None:
 @click.option("--targets", default="claude,codex", help="导出目标(逗号分隔): claude,codex")
 @click.option("--dry-run", is_flag=True)
 def atlas_export(space: str | None, targets: str, dry_run: bool) -> None:
-    """导出已批准的 canonical object-SKILL → ~/.claude/skills + ~/.codex/skills(各为 <name>/SKILL.md)。"""
+    """导出已批准的 canonical object-SKILL → ~/.claude/skills + ~/.agents/skills(各为 <name>/SKILL.md)。"""
     tg = []
     if "claude" in targets:
         tg.append(_CLAUDE_SKILLS)

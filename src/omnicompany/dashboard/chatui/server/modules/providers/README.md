@@ -76,6 +76,12 @@ The existing provider folders are `claude`, `codex`, `cursor`, `gemini`, and
 
 ## How To Add A Provider
 
+> Note: this module is the **web dashboard** session stack (chatui). If the new
+> CLI should also be reachable from the lofa mobile app, add a matching Python
+> provider in ccdaemon too — see the "与 chatui 的分工" section in
+> `src/omnicompany/dashboard/ccdaemon/DESIGN.md`. Do not create a third
+> session stack.
+
 1. Add the provider id everywhere it is part of the contract.
 
 - Update `server/shared/types.ts` `LLMProvider`.
@@ -142,7 +148,7 @@ Current skill discovery roots are:
 | Provider | User Roots | Project / Repo Roots | Prefix | Notes |
 | --- | --- | --- | --- | --- |
 | Claude | `~/.claude/skills` | `<workspace>/.claude/skills` | `/` | Also discovers Claude plugin skills from enabled plugin installs. Command skills live under `commands/`; markdown skills live under `skills/` and are scanned recursively. |
-| Codex | `~/.agents/skills`, `~/.codex/skills/.system`, `/etc/codex/skills` | `<workspace>/.agents/skills`, `path.dirname(workspacePath)/.agents/skills`, topmost git root `.agents/skills` | `$` | Overlapping roots are deduplicated before scanning. |
+| Codex | `~/.agents/skills`, `$CODEX_HOME/skills`, `$CODEX_HOME/skills/.system`, `/etc/codex/skills` | Every `.agents/skills` directory from the workspace cwd through the topmost git root | `$` | `CODEX_HOME` defaults to `~/.codex`. Overlapping roots are deduplicated. Enabled plugin skills are read from `$CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>/` using `.codex-plugin/plugin.json`; stale cached versions and disabled plugins are ignored. |
 | Cursor | `~/.cursor/skills` | `<workspace>/.cursor/skills`, `<workspace>/.agents/skills` | `/` | Uses slash-style commands. |
 | Gemini | `~/.gemini/skills`, `~/.agents/skills` | `<workspace>/.gemini/skills`, `<workspace>/.agents/skills` | `/` | Uses slash-style commands. |
 | OpenCode | `~/.config/opencode/skills`, `~/.claude/skills`, `~/.agents/skills` | Cwd-to-topmost-git-root `.opencode/skills`, `.claude/skills`, and `.agents/skills` | `/` | Reuses OpenCode, Claude, and Agents skill locations. Overlapping roots are deduplicated before scanning. |
@@ -152,6 +158,7 @@ Command forms currently used by the providers are:
 - Claude user/project skills: `/skill-name`
 - Claude plugin skills: `/plugin-name:skill-name`
 - Codex skills: `$skill-name`
+- Codex plugin skills: `$plugin-name:skill-name`
 - Cursor skills: `/skill-name`
 - Gemini skills: `/skill-name`
 - OpenCode skills: `/skill-name`

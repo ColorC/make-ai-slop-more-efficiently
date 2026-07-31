@@ -1,0 +1,6 @@
+# Proposal feedback · hermes-agent · 2026-04-18
+
+补充综合要求：
+
+- 当前 8 条提案没有直接回应 hermes-agent **自述主卖点** "self-improving learning loop"（README 明文）。请补一条独立提案：把 finding #7（轻量级技能元数据解析与发现）+ #10（会话轨迹JSONL持久化）+ #12（会话使用分析与成本洞察）+ #19（多维度会话洞察与成本分析引擎）+ #21（长周期会话智能检索与摘要）**综合为一个自学习闭环系统**。该提案应独立于现有 PRO-007（遥测）和 PRO-006（技能发现），强调"轨迹记录 → 会话分析 → 技能沉淀 → 再检索"这个循环。
+- 为每个提案加一个 `layer` 字段，值域 `{infrastructure, service, tool}`。判断规则：若 target_changes 涉及 `core/*` / `runtime/*` / `protocol/*` / `bus/*` → infrastructure；若新增 `packages/services/X` 或 `packages/domains/X` → service；若单文件工具 → tool。这个字段影响后续审批流（infrastructure 必须人工显式审批）。

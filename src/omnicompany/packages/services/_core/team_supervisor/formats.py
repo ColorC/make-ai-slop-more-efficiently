@@ -24,7 +24,7 @@ M_TARGET_SPEC = Material(
         "team_supervisor 管线入口配置. 由外部触发 (CLI 或编排层) 一次性注入. "
         "告诉 supervisor 要监督哪个 target team, 给什么 sample input 跑它, 跑几次, 是否累积上次 ledger.\n\n"
         "字段含义: target_team_id (str): 待监督的 team 的协议层 id, 必须在全局 PipelineRegistry 中已注册 "
-        "(如 'repo-absorption'). sample_input (dict): 给 target team 跑用的 input_data; 留空则 supervisor "
+        "(如 'csv-to-md'). sample_input (dict): 给 target team 跑用的 input_data; 留空则 supervisor "
         "尝试从 data/services/{target}/ 历史 traces 中找; 实在找不到则 TestExecutor 报 PARTIAL. "
         "run_count (int): 跑 target 的次数; 默认 1; ≥2 用于稳定性观察. previous_ledger_path (str): "
         "上次跑出的 hypothesis ledger 路径, 用于跨 run 累积新假设.\n\n"
@@ -39,7 +39,7 @@ M_TARGET_SPEC = Material(
         "properties": {
             "target_team_id": {
                 "type": "string",
-                "description": "待监督 team 的协议层 id (如 'repo-absorption')",
+                "description": "待监督 team 的协议层 id (如 'csv-to-md')",
                 "minLength": 1,
             },
             "sample_input": {

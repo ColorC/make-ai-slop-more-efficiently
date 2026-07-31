@@ -17,7 +17,7 @@ Clean Migration 硬规则:
   - 14 Worker 都继承自 omnicompany.Worker (见 workers/)
   - 每条 Material 标 kind.source / kind.internal / kind.sink (见 formats.py)
   - 旧 *Router 名通过 routers.py shim 保留兼容
-  - legacy 业务逻辑暂存 _archive/routers_legacy.py (Diamond shortcut)
+  - legacy 业务逻辑在 routers_legacy.py (2026-07-26 OMNI-040 Stage 3 迁回正式位置)
 """
 from __future__ import annotations
 
@@ -47,6 +47,36 @@ from .formats import (
     ALL_FORMATS,
     ALL_MATERIALS,
     register_formats,
+)
+from .agent_allocation import (
+    AgentAllocationDecision,
+    AgentAllocationEvidence,
+    AgentAllocationGate,
+    AgentAllocationMode,
+    ContextCoupling,
+    decide_agent_allocation,
+)
+from .agent_spec_candidates import (
+    AGENT_SPEC_CANDIDATE_PAYLOAD_KEY,
+    AGENT_SPEC_REVIEW_CARRIER,
+    AgentSpecCandidate,
+    AgentSpecGateDecision,
+    AgentSpecGateStage,
+    AgentSpecVerificationEvidence,
+    agent_spec_digest,
+    build_agent_spec_candidate,
+    build_agent_spec_canary_class,
+    decide_agent_spec_gate,
+    record_agent_spec_promotion,
+    record_agent_spec_rollback,
+    record_agent_spec_verification,
+    submit_agent_spec_candidate,
+)
+from .facility_gate import (
+    TeamFacility,
+    TeamFacilityDecision,
+    TeamFacilityEvidence,
+    decide_team_facility_admission,
 )
 
 # ─── 旧名兼容 shim (routers.py 转发) ───────────────────────────────────
@@ -96,6 +126,33 @@ __all__ = [
     "ALL_FORMATS",
     "ALL_MATERIALS",
     "register_formats",
+    # Agent session allocation gate (not Team decomposition)
+    "AgentAllocationDecision",
+    "AgentAllocationEvidence",
+    "AgentAllocationGate",
+    "AgentAllocationMode",
+    "ContextCoupling",
+    "decide_agent_allocation",
+    # Versioned AgentSpec candidates (Reviewstage is the only store)
+    "AGENT_SPEC_CANDIDATE_PAYLOAD_KEY",
+    "AGENT_SPEC_REVIEW_CARRIER",
+    "AgentSpecCandidate",
+    "AgentSpecGateDecision",
+    "AgentSpecGateStage",
+    "AgentSpecVerificationEvidence",
+    "agent_spec_digest",
+    "build_agent_spec_candidate",
+    "build_agent_spec_canary_class",
+    "decide_agent_spec_gate",
+    "record_agent_spec_promotion",
+    "record_agent_spec_rollback",
+    "record_agent_spec_verification",
+    "submit_agent_spec_candidate",
+    # Stateless facility admission (WhatNow remains progress authority)
+    "TeamFacility",
+    "TeamFacilityDecision",
+    "TeamFacilityEvidence",
+    "decide_team_facility_admission",
     # 旧名 Router 兼容
     "ReqAnalyzerRouter",
     "FormatDesignerRouter",

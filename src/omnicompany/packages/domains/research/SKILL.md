@@ -1,6 +1,6 @@
 ---
 name: research
-description: 公开调研 / 查资料 / 联网搜一下 / 调研某主题 / 找参考 / 文献方案综述的统一入口。用前台 agent(Claude Code / Codex)自己的原生 WebSearch/WebFetch 搜,不走任何外部搜索 API(Serper/Tavily/DDG)、不自写爬虫。omni 只提供确定性脚手架:开跑前查重(check)、落进累积去重的统一研究库(save)。触发关键词:调研、研究、research、查证、文献综述、联网搜索、找方案、search、综述、信息收集、查重、不重复调研。开跑前先查重(同题只补缺口不重搜),只认带来源的发现、不编造、结论不打分。
+description: 公开调研 / 查资料 / 联网搜一下 / 调研某主题 / 找参考 / 文献方案综述的统一入口。优先由当前前台 agent(Claude Code / Codex)使用自己的原生 WebSearch/WebFetch 调研；可把相互独立的研究角度交给自己的 subagent 并行，主 agent 负责核源和综合。禁止把 omni agent 当默认调研执行者。omni 只提供可选的确定性脚手架：开跑前查重(check)、落进累积去重的统一研究库(save)。触发关键词:调研、研究、research、查证、文献综述、联网搜索、找方案、search、综述、信息收集、查重、不重复调研。开跑前先查重(同题只补缺口不重搜),只认带来源的发现、不编造、结论不打分。
 ---
 
 # research —— 原生搜索做调研 + 累积去重的统一研究库
@@ -13,11 +13,14 @@ description: 公开调研 / 查资料 / 联网搜一下 / 调研某主题 / 找�
 
 ## 铁律
 
+- **前台模型原生搜索优先**：当前 agent 自己用 WebSearch / WebFetch 搜、读、判断和综合；需要并行时可分派给自己的 subagent，但主 agent 必须复核关键来源并形成最终结论。禁止默认转交 `omni run research.run` 或其它 omni agent。
 - **只用原生 WebSearch / WebFetch**。禁外部搜索 API(Serper / Tavily / DuckDuckGo)、禁 requests/BeautifulSoup/Playwright 自写爬虫、禁临时写「检索→总结」小脚本。
-- **先查重再搜**:动手前先 `omni research check`,同题已有就只补 `perspectives_open` 的缺口,不从头重搜。
+- **先查重再搜，但脚手架不阻塞调研**：动手前优先跑 `omni research check`；同题已有就只补 `perspectives_open` 的缺口，不从头重搜。若 CLI 不可用、明显变慢或无观测，记录降级并直接进入原生搜索，不得把查重设施变成主任务阻塞点。
 - **全面性核查是强制步**:同一概念的多种说法/别名/角度都要真搜过,别让其中一种没搜出来就当「没有」。
 - **只认页面里有的**:每条结论带它依据的 url,页面里没支撑的不写;客观、给证据、**不打分**。
 - **产物只落统一库**:`omni research save`,别让研究记录散到别处。
+- **发现设施问题立即止损**：任何可选 helper / worker 若 60 秒内无阶段性输出，先检查进程与产物；首次超时只允许在缩小题目或确认根因后重试一次；第二次同类超时、出现孤儿进程、无结果目录或不可观测时，立即终止本次 helper、清理本次启动的残留进程，改由前台 agent 原生搜索，并把稳定性/时间效率问题记入修复范围。禁止盲目续等或重复启动。
+- 可选无人值守 `research.run` 会在本次 run 目录分别写阶段事件流与 native 状态文件；不要用比内部总时限更短的 shell timeout 代替 worker 终止协议。
 
 ## 协议(交互式,前台 agent 跑)
 
@@ -40,6 +43,7 @@ omni refs find "<关键词>"             # 本地有没有已拉 repo / 资料 /
 
 - 用 **WebSearch** 逐角度搜,**同一角度换几种说法各搜一次**(覆盖第 1 步的别名清单)。
 - 用 **WebFetch** 抓有料的页读正文,抽出带 `source_url` 的发现(claim + 依据 url)。
+- 可将彼此独立的角度拆给自己的 subagent 并行搜索；每个 subagent 必须返回查询角度、直接 URL、事实/推论边界，主 agent 不得把其摘要未经复核直接当结论。
 - 顺藤摸瓜有界:撞见新线索可再追一两轮,收益递减就停。
 
 ### 3. 全面性核查(comprehensiveness)
@@ -81,7 +85,7 @@ omni research save --file <path-to.json>     # 或 -j '{...}' 或 stdin 管道
 
 ## 无人值守 / 批量(codex worker)
 
-同一套协议、同一个 `omni research save` 落点,把执行者换成带原生搜索的 codex worker 即可(走 `omni worker run codex`),适合批量/定时。交互式走本 skill 用前台 agent 自己搜。
+同一套协议、同一个 `omni research save` 落点,把执行者换成带原生搜索的 codex worker 即可(走 `omni worker run codex`),适合批量/定时。交互式一律走本 skill，由前台 agent 自己搜；不得为了普通交互式调研启动 `omni run research.run`。
 
 ## 导航 / 查询
 
@@ -97,6 +101,6 @@ omni research save --file <path-to.json>     # 或 -j '{...}' 或 stdin 管道
 
 ## 落点
 
-统一研究库 `data/domains/research/library/records.jsonl`(append-only,最新行权威)+ `index.json`(查重倒排)+ `snapshots/`(源原文本地快照)+ `reports/`(待发布 markdown)。同题再跑 = 增量合并,richness 单增,不重复。
+统一研究库由 `omni research save` 管理：append-only 记录流（最新行权威）+ 查重倒排索引 + 原文快照 + 待发布报告。同题再跑 = 增量合并，richness 单增，不重复；不要直接编辑库文件。
 
-> 历史:早期是六节点 Team(`omni run research.run`,便宜模型编排 Serper/Tavily 外部搜索)。已被本「原生搜索 + 三件脚手架」取代;外部搜索源(`sources/web.py`)与便宜模型编排节点(`routers/deep.py` / `routers/synth.py`)进入退役,落库核心 `library.save_research_record` 三路共用。
+> 历史:早期是六节点 Team(便宜模型编排 Serper/Tavily 外部搜索)，已被本「原生搜索 + 三件脚手架」取代；外部搜索源与便宜模型编排节点退役。现在仍注册的三节点 `research.run` 只是有总时限、空闲时限和状态文件的可选无人值守 Codex 通道，不是交互式默认入口；落库核心 `library.save_research_record` 两路共用。

@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/runtime_test_builder/workers ts=2026-04-27T00:00:00Z type=worker
 # [OMNI] material_id="material:utility.runtime_test.builder.target_explorer.agent.py"
+# OMNI-024 ALLOW: 域内私有 worker, 一类一文件经 workers/__init__ 聚合出口, 类实现与本文件模块级 prompt/helper/装配紧耦合, 迁入共享 routers.py 会割裂内聚
 """TargetExplorerWorker — Worker #1 (AGENT, 真 meta 层 v2 入口).
 
 替代旧 TargetAnalyzerAndSpecBuilderWorker.
@@ -23,9 +24,11 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
 )
 from omnicompany.protocol.anchor import Verdict, VerdictKind
+from omnicompany.runtime.agent.agent_loop_config import PRESET_LIGHTWEIGHT
 
+from .._paths import PROJECT_ROOT
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[6]
+_PROJECT_ROOT = PROJECT_ROOT
 
 
 _SYSTEM_PROMPT = """你是 runtime_test_builder · TargetExplorer (真 meta 层 v2 第 1 节点).
@@ -191,10 +194,15 @@ class TargetExplorerWorker(AgentNodeLoop):
         SubmitTargetProfileRouter,
     ]
     NODE_PROMPT: ClassVar[str] = _SYSTEM_PROMPT
+    LOOP_CONFIG = PRESET_LIGHTWEIGHT
+    TERMINATING_TOOLS = ("submit_target_profile",)
 
-    def __init__(self) -> None:
+    def __init__(self, *, model: str | None = None) -> None:
         from omnicompany.bus.memory import MemoryBus
-        super().__init__(bus=MemoryBus(), role="runtime_main")
+        if model:
+            super().__init__(bus=MemoryBus(), model=model)
+        else:
+            super().__init__(bus=MemoryBus(), role="runtime_main")
 
     def build_prompt_builder(self, *, bus: Any):
         return _PromptBuilder(template=self.NODE_PROMPT, bus=bus)

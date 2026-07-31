@@ -75,7 +75,7 @@ agent-first 不等于"放任 agent 自由写代码". 治理:
 
 1. **workspace 约束**: agent 写入紧限于 package 声明范围 (见 `workspace.md`)
 2. **ServiceBus 审计**: 所有 bus 动作回流 EventBus 可追踪 (见 ServiceBus 定位)
-3. **HumanBus 回路**: agent 认为"超出可确定性处理"时提 human_blocking, 不硬闯
+3. **当前对话回路**: agent 认为"超出可确定性处理"时返回 `USER_INPUT_REQUIRED`, 在原聊天直接询问, 不硬闯
 4. **max_turns 铁律 B**: 预算宽松但有, 触发即 bug 不是正常路径
 5. **Guardian 后置巡查**: agent 留下的痕迹入合规扫描; 涉及核心设施统一时必须过 `OMNI-093a~d`, 防止分散文档或新 agent prompt 再造第二套唯一权威
 

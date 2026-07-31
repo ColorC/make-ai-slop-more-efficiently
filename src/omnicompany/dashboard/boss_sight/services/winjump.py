@@ -5,7 +5,7 @@
 机制(2026-06-21 实测可行, VSCode→Codex 跳转 SWITCHED:True): AttachThreadInput 把当前前台
 线程的输入队列挂到目标窗口线程, 绕过 Windows 的"前台锁", 再 SetForegroundWindow。非管理员、
 不弹控制台窗口。给总控派发的 send_active_window 用: 路由判"发给某外部已活跃对话"时, 把那个
-app 的窗口弄到最前(配合剪贴板, 用户粘贴即可)。
+app 的窗口弄到最前；执行端可在确认目标仍是前台窗口后粘贴并自动提交。
 
 ⚠ 注意: 这只到"窗口"粒度。VSCode 把多条 claude/codex 对话放在同一个窗口的 tab 里, 激活窗口
 不切 tab —— 切到具体对话的精准跳转得走 Claude 扩展的本地 WS 通道(~/.claude/ide/<port>.lock),
@@ -103,8 +103,13 @@ def activate_hwnd(hwnd: int) -> bool:
     return ok
 
 
-def set_clipboard(text: str) -> bool:
-    """用 CF_UNICODETEXT 正确写剪贴板(Windows `clip` 命令会把 UTF-8 中文搞乱, 这里走 ctypes)。"""
+def set_clipboard(text: str, *, confirmed: bool = False) -> bool:
+    """用 CF_UNICODETEXT 正确写剪贴板(Windows `clip` 命令会把 UTF-8 中文搞乱, 这里走 ctypes)。
+
+    物理动作硬门(2026-07 总控止血「非确认不主动」): confirmed=False 时直接拒绝,
+    不碰任何 user32/kernel32 调用。自动派发路径不传 confirmed → 物理断电。"""
+    if not confirmed:
+        return False
     if not _is_win():
         return False
     u = ctypes.windll.user32
@@ -131,7 +136,7 @@ def set_clipboard(text: str) -> bool:
         u.CloseClipboard()
 
 
-def send_paste(delay_ms: int = 140) -> None:
+def send_paste(delay_ms: int = 140, *, expected_hwnd: int | None = None) -> bool:
     """给当前前台窗口发 Ctrl+V(把剪贴板粘进聚焦的输入框)。
 
     ⚠ 粘进的是"当前聚焦处"。case1 用于"发给已活跃对话, 复制到对话框里"(用户 2026-06-21 明确要)。
@@ -140,11 +145,28 @@ def send_paste(delay_ms: int = 140) -> None:
     import time
     time.sleep(delay_ms / 1000.0)
     u = ctypes.windll.user32
+    if expected_hwnd is not None and int(u.GetForegroundWindow()) != expected_hwnd:
+        return False
     VK_CONTROL, VK_V, KEYUP = 0x11, 0x56, 0x0002
     u.keybd_event(VK_CONTROL, 0, 0, 0)
     u.keybd_event(VK_V, 0, 0, 0)
     u.keybd_event(VK_V, 0, KEYUP, 0)
     u.keybd_event(VK_CONTROL, 0, KEYUP, 0)
+    return True
+
+
+def send_submit(delay_ms: int = 180, *, expected_hwnd: int | None = None) -> bool:
+    """给当前前台窗口发 Enter，供已确认目标的派发执行端自动提交。"""
+    import time
+
+    time.sleep(delay_ms / 1000.0)
+    u = ctypes.windll.user32
+    if expected_hwnd is not None and int(u.GetForegroundWindow()) != expected_hwnd:
+        return False
+    VK_RETURN, KEYUP = 0x0D, 0x0002
+    u.keybd_event(VK_RETURN, 0, 0, 0)
+    u.keybd_event(VK_RETURN, 0, KEYUP, 0)
+    return True
 
 
 def _procs_for(location: str | None) -> list[str]:
@@ -158,11 +180,26 @@ def _procs_for(location: str | None) -> list[str]:
     return []
 
 
-def activate_location(location: str, *, title_hint: str | None = None, paste: bool = False) -> dict:
+def activate_location(
+    location: str,
+    *,
+    title_hint: str | None = None,
+    paste: bool = False,
+    submit: bool = False,
+    confirmed: bool = False,
+) -> dict:
     """把 location 对应 app 的主窗口激活到最前。title_hint 多窗口时优选标题含该串的;
-    paste=True 则在确认窗口到前台后发 Ctrl+V(把剪贴板粘进聚焦输入框)。"""
+    paste=True 则在确认窗口到前台后发 Ctrl+V；submit=True 会在再次确认前台窗口后
+    自动发 Enter。submit 只能与 paste 一起使用，避免提交未知输入。
+
+    物理动作硬门(2026-07 总控止血「非确认不主动」): confirmed=False 时直接拒绝,
+    不执行任何 user32/win32 调用。自动派发路径不传 confirmed → 物理断电。"""
+    if not confirmed:
+        return {"ok": False, "refused": True, "reason": "物理动作已硬关闭，需显式 --yes"}
     if not _is_win():
         return {"ok": False, "error": "非 Windows 平台"}
+    if submit and not paste:
+        return {"ok": False, "error": "自动提交必须同时启用粘贴"}
     procs = _procs_for(location)
     if not procs:
         return {"ok": False, "error": f"未知位置: {location}"}
@@ -174,18 +211,41 @@ def activate_location(location: str, *, title_hint: str | None = None, paste: bo
     h, p, t, matched = cands[0][0], cands[0][1], cands[0][2], "process"
     if title_hint:
         for hh, pp, tt in cands:
-            if title_hint in tt:
+            if title_hint.casefold() in tt.casefold():
                 h, p, t, matched = hh, pp, tt, "title_hint"
                 break
+    if submit and len(cands) > 1 and matched != "title_hint":
+        return {
+            "ok": False,
+            "error": "同一应用存在多个窗口，无法唯一确认自动提交目标",
+            "candidate_count": len(cands),
+            "submitted": False,
+        }
     ok = activate_hwnd(h)
     pasted = False
+    submitted = False
     if ok and paste:
         # 只在目标确实到了前台时才粘, 降低粘错地方
         u = _u32()
         if u.GetForegroundWindow() == h:
-            send_paste()
-            pasted = True
-    return {"ok": ok, "title": t, "pid": p, "matched": matched, "pasted": pasted}
+            pasted = send_paste(expected_hwnd=h)
+            if submit and pasted:
+                submitted = send_submit(expected_hwnd=h)
+    return {
+        "ok": ok,
+        "title": t,
+        "pid": p,
+        "matched": matched,
+        "candidate_count": len(cands),
+        "pasted": pasted,
+        "submitted": submitted,
+    }
 
 
-__all__ = ["activate_location", "activate_hwnd"]
+__all__ = [
+    "activate_location",
+    "activate_hwnd",
+    "send_paste",
+    "send_submit",
+    "set_clipboard",
+]

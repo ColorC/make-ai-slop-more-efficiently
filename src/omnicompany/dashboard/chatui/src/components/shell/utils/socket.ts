@@ -3,9 +3,11 @@ import type { ShellIncomingMessage, ShellOutgoingMessage } from '../types/types'
 
 export function getShellWebSocketUrl(): string | null {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const base = (window.__ROUTER_BASENAME__ || '').replace(/\/+$/, '');
+  const shellPath = `${base}/shell` || '/shell';
 
   if (IS_PLATFORM) {
-    return `${protocol}//${window.location.host}/shell`;
+    return `${protocol}//${window.location.host}${shellPath}`;
   }
 
   const token = localStorage.getItem('auth-token');
@@ -14,7 +16,7 @@ export function getShellWebSocketUrl(): string | null {
     return null;
   }
 
-  return `${protocol}//${window.location.host}/shell?token=${encodeURIComponent(token)}`;
+  return `${protocol}//${window.location.host}${shellPath}?token=${encodeURIComponent(token)}`;
 }
 
 export function parseShellMessage(payload: string): ShellIncomingMessage | null {

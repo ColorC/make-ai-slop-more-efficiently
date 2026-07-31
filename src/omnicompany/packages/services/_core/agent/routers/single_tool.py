@@ -60,6 +60,36 @@ class ToolExecutionError(Exception):
     pass
 
 
+def _resolve_path_from_ctx(path: str | Path, ctx: ToolContext) -> Path:
+    """Resolve relative tool paths against the Agent workspace, not process cwd."""
+
+    raw = Path(path).expanduser()
+    if raw.is_absolute():
+        resolved = raw.resolve()
+    else:
+        base = Path(getattr(ctx, "cwd", "") or os.getcwd()).expanduser().resolve()
+        resolved = (base / raw).resolve()
+
+    # General-purpose legacy agents omit allowed_read_roots and preserve their
+    # established behavior. Runtime-profile agents always declare it so Pi and
+    # AgentNodeLoop share the same fail-closed read boundary.
+    allowed_read_roots = getattr(ctx, "allowed_read_roots", None) or ()
+    if allowed_read_roots:
+        allowed = False
+        for item in allowed_read_roots:
+            try:
+                resolved.relative_to(Path(item).expanduser().resolve())
+                allowed = True
+                break
+            except ValueError:
+                continue
+        if not allowed:
+            raise ToolExecutionError(
+                f"path REFUSED: {resolved} is outside allowed_read_roots"
+            )
+    return resolved
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # SingleToolRouter 基类
 # ═══════════════════════════════════════════════════════════════════════
@@ -79,6 +109,7 @@ class SingleToolRouter(Router):
     INPUT_SCHEMA: ClassVar[dict] = {}
     IS_CONCURRENCY_SAFE: ClassVar[bool] = False
     IS_READONLY: ClassVar[bool] = False
+    ERROR_RESULT_STYLE: ClassVar[str] = "tool_use_error_xml"
 
     # ── 元 IO 声明 (用户原始需求 6.6, 2026-05-02 加) ──
     # 规范: docs/standards/cli/meta_io.md
@@ -153,6 +184,12 @@ class SingleToolRouter(Router):
         turn = input_data.get("turn", 0)
         ctx_data = input_data.get("context", {}) or {}
         ctx = self._build_ctx(ctx_data)
+        # Give synchronous tool implementations enough run identity to emit
+        # progress materials while they execute in ``asyncio.to_thread``.
+        # These are observability fields, not additional authority.
+        ctx.trace_id = trace_id  # type: ignore[attr-defined]
+        ctx.tool_use_id = tool_use_id  # type: ignore[attr-defined]
+        ctx.turn = turn  # type: ignore[attr-defined]
 
         # 名字校验（dispatch 应该已经分发对了，但防御一下）
         if tool_name != self.TOOL_NAME:
@@ -183,7 +220,11 @@ class SingleToolRouter(Router):
             # 来源: 参考项目/claude-code-analysis/src/services/tools/toolExecution.ts L480-482
             is_error = True
             err_msg = str(exc)
-            result = f"<tool_use_error>{err_msg}</tool_use_error>"
+            result = (
+                err_msg
+                if self.ERROR_RESULT_STYLE == "plain"
+                else f"<tool_use_error>{err_msg}</tool_use_error>"
+            )
             logger.warning("[SingleToolRouter] %s failed: %s", self.TOOL_NAME, err_msg)
         duration_ms = (time.time() - t0) * 1000
 
@@ -284,6 +325,8 @@ class GlobRouter(SingleToolRouter):
     IS_READONLY: ClassVar[bool] = True
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
+        args = dict(args)
+        args["path"] = str(_resolve_path_from_ctx(args.get("path") or ".", ctx))
         return self._executor.execute("glob", args)
 
 
@@ -391,6 +434,7 @@ class GrepRouter(SingleToolRouter):
             args["-i"] = args.pop("case_insensitive")
         if "include" in args and "glob" not in args:
             args["glob"] = args.pop("include")
+        args["path"] = str(_resolve_path_from_ctx(args.get("path") or ".", ctx))
         return self._executor.execute("grep", args)
 
 
@@ -617,9 +661,23 @@ class ReadFileRouter(SingleToolRouter):
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
         # CC 用 file_path；接受 path 作为 legacy alias
-        path = args.get("file_path") or args.get("path", "")
-        if not path:
+        raw_path = args.get("file_path") or args.get("path", "")
+        if not raw_path:
             raise ToolExecutionError("file_path is required (absolute path to a file)")
+        path = str(_resolve_path_from_ctx(raw_path, ctx))
+
+        # Optional exact-file allowlist for narrow correction agents.  General
+        # agents omit this field and retain the normal READ_ANY behavior.
+        allowed_read_files = getattr(ctx, "allowed_read_files", None) or ()
+        if allowed_read_files:
+            target = Path(path)
+            allowed = {Path(item).expanduser().resolve() for item in allowed_read_files}
+            if target not in allowed:
+                listing = "\n  - ".join(str(item) for item in sorted(allowed))
+                raise ToolExecutionError(
+                    f"read_file REFUSED: {target} is outside allowed_read_files.\n"
+                    f"Allowed files:\n  - {listing}"
+                )
         offset = args.get("offset", 0)
         limit = args.get("limit", 2000)
         is_full_read = offset == 0 and limit >= 2000
@@ -774,13 +832,14 @@ class EditRouter(SingleToolRouter):
     IS_READONLY: ClassVar[bool] = False
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
-        path = (args.get("file_path") or args.get("path") or "").strip()
+        raw_path = (args.get("file_path") or args.get("path") or "").strip()
         old = args.get("old_string", "")
         new = args.get("new_string", "")
         replace_all = bool(args.get("replace_all", False))
 
-        if not path:
+        if not raw_path:
             raise ToolExecutionError("file_path is required (absolute path to a file)")
+        path = str(_resolve_path_from_ctx(raw_path, ctx))
         if not isinstance(old, str) or not isinstance(new, str):
             raise ToolExecutionError("old_string and new_string must be strings")
         if old == new:
@@ -887,7 +946,7 @@ class ListDirRouter(SingleToolRouter):
     IS_READONLY: ClassVar[bool] = True
 
     def _execute(self, args: dict, ctx: ToolContext) -> str:
-        path = args.get("path", ctx.cwd or os.getcwd())
+        path = str(_resolve_path_from_ctx(args.get("path") or ".", ctx))
         target = Path(path)
         if not target.is_dir():
             return f"Error: '{path}' is not a directory."

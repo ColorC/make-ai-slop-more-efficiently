@@ -1,0 +1,12 @@
+{
+  "schema": "xiaohongshu.authoring-packet.v1",
+  "files": {
+    "publication_summary": "path/to/post-summaries.md",
+    "content_brief": "path/to/content-brief.md",
+    "fact_ledger": "path/to/fact-ledger.md",
+    "uncompressed_master": "path/to/uncompressed-master.md",
+    "carrier_plan": "path/to/carrier-plan.md",
+    "visual_source": "path/to/cards.html",
+    "checklist_report": "path/to/checklist-report.json"
+  }
+}

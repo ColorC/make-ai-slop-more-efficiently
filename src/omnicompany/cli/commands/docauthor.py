@@ -149,7 +149,7 @@ def cmd_run(kind: str, target: str, max_refine: int, dry_run: bool, repo_root: s
 
     示例:
       omni docauthor run manifest src/omnicompany/packages/services/foo
-      omni docauthor run design src/omnicompany/packages/domains/voxelcraft/item --max-refine 2
+      omni docauthor run design src/omnicompany/packages/domains/publish/snapshot --max-refine 2
     """
     from omnicompany.packages.services._authoring.docauthor.team import run_job, summarize_events
 

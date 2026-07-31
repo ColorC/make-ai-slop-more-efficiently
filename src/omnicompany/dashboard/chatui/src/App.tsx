@@ -8,6 +8,7 @@ import { TasksSettingsProvider } from './contexts/TasksSettingsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { PluginsProvider } from './contexts/PluginsContext';
 import AppContent from './components/app/AppContent';
+import CliWorkspace from './components/cli-workspace/CliWorkspace';
 import i18n from './i18n/config.js';
 
 const DEPLOYMENT_ASSET_DIRECTORIES = new Set(['assets', 'static', 'icons', 'images']);
@@ -102,6 +103,18 @@ function detectRouterBasename() {
 
 export default function App() {
   const routerBasename = detectRouterBasename();
+  if (typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '').endsWith('/cli')) {
+    window.__ROUTER_BASENAME__ = routerBasename;
+    return (
+      <I18nextProvider i18n={i18n}>
+        <ThemeProvider>
+          <Router basename={routerBasename}>
+            <Routes><Route path="/cli" element={<CliWorkspace />} /></Routes>
+          </Router>
+        </ThemeProvider>
+      </I18nextProvider>
+    );
+  }
 
   return (
     <I18nextProvider i18n={i18n}>
@@ -116,6 +129,7 @@ export default function App() {
                     <Routes>
                       <Route path="/" element={<AppContent />} />
                       <Route path="/session/:sessionId" element={<AppContent />} />
+                      <Route path="/cli" element={<CliWorkspace />} />
                     </Routes>
                   </Router>
                 </ProtectedRoute>

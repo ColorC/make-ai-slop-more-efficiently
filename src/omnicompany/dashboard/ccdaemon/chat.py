@@ -48,7 +48,9 @@ import logging
 import os
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import claude_agent_sdk as casdk
@@ -56,12 +58,20 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from omnicompany.core.caller_identity import CALLER_ENV, CALLER_SUBAGENT
-from .pty import _read_meta_store, _write_meta_store
+from omnicompany.dashboard.session_workdir import default_session_cwd, resolve_session_cwd
+from .pty import _read_meta_store, _sanitize_nonfinite, _write_meta_store
 from .providers.base import BaseProvider, ProviderOptions
 from .hooks._shared import emit_event as _emit_ide_event
 from .write_scope import planned_write_denial_with_scope
 
 logger = logging.getLogger(__name__)
+
+# meta store 持久化专用单 worker 执行器。
+# cc_sessions.json 是"全量读-改-写" (9MB+), 若用 asyncio.to_thread (共享多 worker 池)
+# 两个 session 的 persist 会交错: 各读旧 store 再整量写回, 后写者覆盖先写者丢更新。
+# 单 worker 队列保证 提交序=执行序, read-modify-write 不会交错; 同时把 145ms 级的
+# 磁盘 IO 挪出事件循环 (原是"任意请求随机慢到秒级"的主因之一, 2026-07 P0 批)。
+_PERSIST_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cc-meta-persist")
 
 
 def _emit_chat_event(
@@ -125,16 +135,29 @@ def _normalize_permission_mode(value: Any) -> str:
 # N2b 推理强度档 (effort): claude-agent-sdk EffortLevel = low/medium/high/xhigh/max.
 # None = 不传 effort, 用模型/CLI 默认。空串 / "default" / "auto" 都归一成 None。
 EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+CODEX_EFFORT_LEVELS = ("minimal", "low", "medium", "high")
+CODEBUDDY_EFFORT_LEVELS = ("minimal", "low", "medium", "high", "xhigh", "max")
 
 
-def _normalize_effort(value: Any) -> str | None:
+def _normalize_effort(value: Any, provider: str | None = None) -> str | None:
     if value is None:
         return None
     v = str(value).strip().lower()
     if v in ("", "default", "auto", "none"):
         return None
-    if v not in EFFORT_LEVELS:
-        raise ValueError(f"invalid effort: {value!r} (want one of {EFFORT_LEVELS} or default)")
+    if provider in ("kimi", "opencode"):
+        # 两家 CLI 的非交互模式都不消费 effort 档; 已知档位接受并存档 (展示用),
+        # 未知档位回落默认 (None), 不报错.
+        return v if v in EFFORT_LEVELS else None
+    levels = (
+        CODEX_EFFORT_LEVELS
+        if provider == "codex"
+        else CODEBUDDY_EFFORT_LEVELS
+        if provider == "codebuddy"
+        else EFFORT_LEVELS
+    )
+    if v not in levels:
+        raise ValueError(f"invalid effort for {provider or 'provider'}: {value!r} (want one of {levels} or default)")
     return v
 
 
@@ -167,6 +190,25 @@ def _resolve_context_window(model: str) -> int:
 
 # ── 会话数据模型 ────────────────────────────────────────────────────────────
 
+_PROVIDER_CN_NAMES = {
+    "claude": "Claude 编程",
+    "claude_code": "Claude 编程",
+    "codex": "Codex 编程",
+    "codebuddy": "CodeBuddy 编程",
+    "kimi": "Kimi",
+    "opencode": "OpenCode 编程",
+    "controller": "总控协作",
+    "omni_agent": "Omni 智能体",
+}
+
+
+def _default_session_name(provider: str, cwd: str, started_at: float | None = None) -> str:
+    """Generate a stable, meaningful Chinese title before the first prompt exists."""
+    provider_name = _PROVIDER_CN_NAMES.get((provider or "").lower(), "智能体对话")
+    workspace = Path(cwd or os.getcwd()).name.strip() or "工作区"
+    stamp = time.localtime(started_at or time.time())
+    return f"{provider_name} · {workspace} · {stamp.tm_mon:02d}月{stamp.tm_mday:02d}日 {stamp.tm_hour:02d}:{stamp.tm_min:02d}"
+
 
 @dataclass
 class CcChatSession:
@@ -180,12 +222,16 @@ class CcChatSession:
     cwd: str
     started_at: float
     provider: str = "claude_code"  # claude_code (默认, 走 SDK 直连) / omni_agent / codex
-    name: str = ""  # 用户可编辑的 session 名字; 空字符串 = UI 用 id tail 兜底显示
+    name: str = ""  # 后端保证非空中文显示名; 用户仍可编辑
     archived: bool = False
     favorite: bool = False
     model: str | None = DEFAULT_MODEL  # None = 用本地 ~/.claude/settings.json 配置
     history_summary: list[dict[str, str]] = field(default_factory=list)  # [{"role":..,"text":..}]
     event_history: list[dict[str, Any]] = field(default_factory=list)
+    # event_history 的 id→index 旁路索引: _append_event_history 的按 id 查重从 O(N) 全扫
+    # 降为 O(1) 查表 (原实现每条消息扫一遍全历史, 长会话下是 O(N²), 2026-07 P0 批)。
+    # 只在 _append_event_history / 会话恢复两处维护, event_history 没有其它写入点。
+    _eh_id_index: dict[str, int] = field(default_factory=dict)
     subscribers: set[asyncio.Queue[dict[str, Any]]] = field(default_factory=set)
     active_plan: str | None = None
     goal_state: dict[str, Any] = field(default_factory=dict)
@@ -208,7 +254,7 @@ class CcChatSession:
     # 用户在 ChatComposer 顶栏切 permission 模式 (default/acceptEdits/auto/bypassPermissions/plan).
     # 每条 user.message 可带 permissionMode 字段覆盖. can_use_tool callback 看这个字段
     # 决定弹横幅还是自动 allow.
-    current_permission_mode: str = "default"
+    current_permission_mode: str = DEFAULT_PERMISSION_MODE
     # N2b 推理强度档 (low/medium/high/xhigh/max), None=用模型默认。连接时通过
     # ClaudeAgentOptions(effort=) 透传给 claude binary; 改档若会话空闲则断开 client,
     # 下轮 resume 重连应用新档 (见 set_effort)。codex 路径暂不消费 (留作后续)。
@@ -243,6 +289,17 @@ class CcChatSession:
     _last_turn_text: str = ""
 
     def to_meta(self) -> dict[str, Any]:
+        reported_tokens = (
+            self.cumulative_input_tokens
+            + self.cumulative_output_tokens
+            + self.cumulative_cache_creation_input_tokens
+            + self.cumulative_cache_read_input_tokens
+        )
+        last_message = next((
+            str(item.get("text") or "").strip()
+            for item in reversed(self.history_summary)
+            if str(item.get("text") or "").strip()
+        ), "")
         return {
             "id": self.id,
             "kind": "chat",
@@ -253,8 +310,14 @@ class CcChatSession:
             "cwd": self.cwd,
             "started_at": self.started_at,
             "alive": self.ended_at is None,
+            # alive=逻辑会话仍可续接；runtime_alive=当前 daemon 仍持有真实 provider
+            # runtime。Multiagent/恢复全部只认后者，避免重启后把全部历史会话当活进程。
+            "runtime_alive": self.client is not None or self.provider_impl is not None,
+            "running": self.in_flight_turn,
             "subscribers": len(self.subscribers),
             "buffered_chunks": len(self.history_summary),
+            "message_count": len(self.history_summary),
+            "last_message": last_message or None,
             "claude_session_id": self.claude_session_id,
             "provider_session_id": self.claude_session_id,
             "active_plan": self.active_plan,
@@ -265,6 +328,17 @@ class CcChatSession:
             "model": self.model or "(local default)",
             "permission_mode": self.current_permission_mode,
             "effort": self.effort,
+            # 只投影 provider 实际回传后累计的用量。PTY/未回传 usage 的 adapter
+            # 不制造估算值, 前端据此决定是否展示 Token。
+            "token_usage": ({
+                "total": reported_tokens,
+                "input": self.cumulative_input_tokens,
+                "output": self.cumulative_output_tokens,
+                "cache_creation_input": self.cumulative_cache_creation_input_tokens,
+                "cache_read_input": self.cumulative_cache_read_input_tokens,
+                "source": "provider_reported",
+            } if reported_tokens > 0 else None),
+            "last_token_budget": self.last_token_budget,
             "ended_at": self.ended_at,
             "exit_reason": self.exit_reason,
             "status": "alive" if self.ended_at is None else "ended",
@@ -299,18 +373,21 @@ class CcChatSessionManager:
         for sid, entry in store.items():
             if entry.get("kind") != "chat" or entry.get("ended_at") is not None:
                 continue
+            # 脏数据防线: 历史 store 文件可能混着 NaN/Infinity (json 默认 allow_nan 会
+            # 原样往返毒化), 读回时递归洗成 None, 保证脏数据进过一次也不会再循环。
+            entry = _sanitize_nonfinite(entry)
             has_resume_anchor = bool(entry.get("claude_session_id") or entry.get("provider_session_id"))
             has_visible_state = bool(entry.get("name") or entry.get("history_summary") or entry.get("event_history"))
             if not has_resume_anchor and not has_visible_state:
                 continue
             model = _normalize_session_model(entry.get("model"))
-            permission_mode = entry.get("permission_mode") or entry.get("current_permission_mode") or "default"
+            permission_mode = entry.get("permission_mode") or entry.get("current_permission_mode") or DEFAULT_PERMISSION_MODE
             try:
                 permission_mode = _normalize_permission_mode(permission_mode)
             except ValueError:
-                permission_mode = "default"
+                permission_mode = DEFAULT_PERMISSION_MODE
             try:
-                effort = _normalize_effort(entry.get("effort"))
+                effort = _normalize_effort(entry.get("effort"), str(entry.get("provider") or "claude_code"))
             except ValueError:
                 effort = None
             try:
@@ -319,7 +396,11 @@ class CcChatSessionManager:
                     cwd=str(entry.get("cwd") or os.getcwd()),
                     started_at=float(entry.get("started_at") or time.time()),
                     provider=str(entry.get("provider") or "claude_code"),
-                    name=str(entry.get("name") or ""),
+                    name=str(entry.get("name") or _default_session_name(
+                        str(entry.get("provider") or "claude_code"),
+                        str(entry.get("cwd") or os.getcwd()),
+                        float(entry.get("started_at") or time.time()),
+                    )),
                     archived=bool(entry.get("archived") or False),
                     favorite=bool(entry.get("favorite") or False),
                     model=model,
@@ -330,6 +411,10 @@ class CcChatSessionManager:
                     claude_session_id=entry.get("claude_session_id") or entry.get("provider_session_id"),
                     ended_at=entry.get("ended_at"),
                     exit_reason=entry.get("exit_reason"),
+                    cumulative_input_tokens=int((entry.get("token_usage") or {}).get("input", 0) or 0),
+                    cumulative_output_tokens=int((entry.get("token_usage") or {}).get("output", 0) or 0),
+                    cumulative_cache_creation_input_tokens=int((entry.get("token_usage") or {}).get("cache_creation_input", 0) or 0),
+                    cumulative_cache_read_input_tokens=int((entry.get("token_usage") or {}).get("cache_read_input", 0) or 0),
                     last_token_budget=entry.get("last_token_budget"),
                     current_permission_mode=permission_mode,
                     effort=effort,
@@ -342,6 +427,11 @@ class CcChatSessionManager:
             except Exception:
                 logger.exception("cc_chat_bridge: failed to restore chat session %s", sid)
                 continue
+            # 旁路索引随恢复一并建好 (恢复自盘的历史在 persist 时已去重, setdefault 即首见位置)
+            for _i, _m in enumerate(sess.event_history):
+                _mid = str(_m.get("id") or "")
+                if _mid:
+                    sess._eh_id_index.setdefault(_mid, _i)
             self._sessions[sess.id] = sess
 
     def get(self, sid: str) -> CcChatSession | None:
@@ -370,10 +460,11 @@ class CcChatSessionManager:
                 continue
             if sess.archived and not include_archived and sess.id != pinned_id:
                 continue
+            first_msg, last_msg = self._first_last_message(sess)
             meta = {
                 **sess.to_meta(),
-                "first_message": self._first_last_message(sess)[0],
-                "last_message": self._first_last_message(sess)[1],
+                "first_message": first_msg,
+                "last_message": last_msg,
                 "message_count": len(sess.event_history) or len(sess.history_summary),
             }
             score = self._session_search_score(sess, query, full_text)
@@ -393,10 +484,11 @@ class CcChatSessionManager:
         if pinned_id and not any(item.get("id") == pinned_id for item in items):
             pinned = self._sessions.get(pinned_id)
             if pinned and pinned.ended_at is None and (include_archived or not pinned.archived):
+                pinned_first, pinned_last = self._first_last_message(pinned)
                 pinned_meta = {
                     **pinned.to_meta(),
-                    "first_message": self._first_last_message(pinned)[0],
-                    "last_message": self._first_last_message(pinned)[1],
+                    "first_message": pinned_first,
+                    "last_message": pinned_last,
                     "message_count": len(pinned.event_history) or len(pinned.history_summary),
                     "pinned": True,
                 }
@@ -600,7 +692,7 @@ class CcChatSessionManager:
                 },
                 tools={"type": "preset", "preset": "claude_code"},
                 setting_sources=["user", "project", "local"],
-                permission_mode="default",
+                permission_mode=sess.current_permission_mode,
                 can_use_tool=self._make_can_use_tool(sess),
                 resume=resume,
                 fork_session=False,
@@ -648,9 +740,7 @@ class CcChatSessionManager:
                 },
                 tools={"type": "preset", "preset": "claude_code"},
                 setting_sources=["user", "project", "local"],
-                permission_mode=(
-                    DEFAULT_PERMISSION_MODE if sess.caller_identity == CALLER_SUBAGENT else "default"
-                ),
+                permission_mode=sess.current_permission_mode,
                 can_use_tool=self._make_can_use_tool(sess),
                 resume=sess.claude_session_id,
                 fork_session=False,
@@ -675,14 +765,12 @@ class CcChatSessionManager:
             provider_opts: ProviderOptions = {
                 "cwd": sess.cwd,
                 "active_plan": sess.active_plan,
-                "permission_mode": (
-                    DEFAULT_PERMISSION_MODE
-                    if sess.caller_identity == CALLER_SUBAGENT
-                    else sess.current_permission_mode
-                ),
+                "permission_mode": sess.current_permission_mode,
             }
             if sess.model:
                 provider_opts["model"] = sess.model
+            if sess.effort:
+                provider_opts["effort"] = sess.effort
             if sess.claude_session_id:
                 provider_opts["provider_session_id"] = sess.claude_session_id
             if sess.caller_identity:
@@ -693,6 +781,33 @@ class CcChatSessionManager:
             except RuntimeError as e:
                 sess.provider_impl = None
                 raise RuntimeError(f"CodexProvider startup failed: {e}") from e
+            sess.provider_consume_task = asyncio.create_task(self._consume_provider(sess))
+            return
+
+        if sess.provider in ("kimi", "opencode", "codebuddy"):
+            if sess.provider_impl is not None:
+                return
+            from .providers.codebuddy import CodeBuddyProvider
+            from .providers.kimi import KimiProvider
+            from .providers.opencode import OpenCodeProvider
+            provider_opts = ProviderOptions(cwd=sess.cwd)
+            if sess.model:
+                provider_opts["model"] = sess.model
+            if sess.claude_session_id:
+                provider_opts["provider_session_id"] = sess.claude_session_id  # type: ignore[typeddict-unknown-key]
+            if sess.caller_identity:
+                provider_opts["env"] = {**os.environ, CALLER_ENV: sess.caller_identity}
+            provider_classes = {
+                "kimi": KimiProvider,
+                "opencode": OpenCodeProvider,
+                "codebuddy": CodeBuddyProvider,
+            }
+            sess.provider_impl = provider_classes[sess.provider](provider_opts)
+            try:
+                await sess.provider_impl.connect()
+            except RuntimeError as e:
+                sess.provider_impl = None
+                raise RuntimeError(f"{sess.provider} provider startup failed: {e}") from e
             sess.provider_consume_task = asyncio.create_task(self._consume_provider(sess))
             return
 
@@ -758,7 +873,7 @@ class CcChatSessionManager:
             tags=[f"kind:{kind}", "raw"],
         )
 
-    def _append_event_history(self, sess: CcChatSession, nm: dict[str, Any]) -> None:
+    async def _append_event_history(self, sess: CcChatSession, nm: dict[str, Any]) -> None:
         kind = nm.get("kind")
         if kind not in {"text", "thinking", "tool_use", "tool_result", "error", "context_event"}:
             return
@@ -806,13 +921,20 @@ class CcChatSessionManager:
             msg["content"] = msg["summary"]
             msg["context"] = nm.get("context") or {}
             msg["planId"] = nm.get("planId") or sess.active_plan
-        for i, existing in enumerate(sess.event_history):
-            if existing.get("id") == msg["id"]:
-                sess.event_history[i] = {**existing, **msg}
-                self._persist(sess)
-                return
+        # 按 id 查重走 _eh_id_index 旁路索引 O(1) (原实现每条消息线性扫全历史 O(N),
+        # 工具调用高频更新同一 tool_id 时整体 O(N²), 长会话实测拖慢每条消息)。
+        hit = sess._eh_id_index.get(msg["id"])
+        if (
+            hit is not None
+            and hit < len(sess.event_history)
+            and sess.event_history[hit].get("id") == msg["id"]  # 防御索引失稳: 错槽不当命中
+        ):
+            sess.event_history[hit] = {**sess.event_history[hit], **msg}
+            await self._persist(sess)
+            return
+        sess._eh_id_index[msg["id"]] = len(sess.event_history)
         sess.event_history.append(msg)
-        self._persist(sess)
+        await self._persist(sess)
 
     def _dedupe_event_history(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
@@ -833,7 +955,11 @@ class CcChatSessionManager:
         output = int(usage.get("output_tokens", 0) or 0)
         cache_creation = int(usage.get("cache_creation_input_tokens", 0) or 0)
         used = max(raw_input - cached, 0) + output + cache_creation
-        total = int(usage.get("context_window") or (400_000 if sess.provider == "codex" else 200_000))
+        total = int(usage.get("context_window") or (
+            400_000 if sess.provider == "codex"
+            else 262_144 if sess.provider == "kimi"  # Kimi K2 系列 256K
+            else 200_000
+        ))
         return {"used": used, "total": total}
 
     async def create(
@@ -852,6 +978,7 @@ class CcChatSessionManager:
         以 fork_session=True 启 SDK, 新会话继承源对话历史但写入新 session_id.
         源会话**不受影响**继续跑 (用户原话 §6.2: '不进行打断, 而是对其进行 fork').
         """
+        resolved_cwd = resolve_session_cwd(cwd)
         async with self._lock:
             # P0-a 不依赖 env 的第二道防线: subagent 并发硬上限, 封顶递归 spawn 失控规模
             if caller_identity == CALLER_SUBAGENT:
@@ -871,14 +998,19 @@ class CcChatSessionManager:
             effective_model = model or DEFAULT_MODEL
             if not effective_model and provider == "controller":
                 effective_model = "claude-opus-4-7"
+            if not effective_model and provider == "opencode":
+                from .providers.opencode import DEFAULT_OPENCODE_MODEL
+
+                effective_model = DEFAULT_OPENCODE_MODEL
             sess = CcChatSession(
                 id=sid,
-                cwd=cwd or os.getcwd(),
+                cwd=resolved_cwd,
                 started_at=time.time(),
                 provider=provider,
+                name=_default_session_name(provider, resolved_cwd),
                 model=effective_model,
                 caller_identity=caller_identity,
-                effort=_normalize_effort(effort),
+                effort=_normalize_effort(effort, provider),
             )
             # #2 接管式采纳: resume 别处已有会话(同 session_id, fork_session=False)→ 接管它继续跑。
             # claude: 设 claude_session_id 即走 resume(下方 resume_id 用之); codex: 走 provider_session_id 续接。
@@ -900,18 +1032,9 @@ class CcChatSessionManager:
                     },
                     tools={"type": "preset", "preset": "claude_code"},
                     setting_sources=["user", "project", "local"],
-                    # default 模式 = SDK 调 can_use_tool 询问. 老的 bypassPermissions 不询问.
-                    # 跟前端 ChatComposer 默认 permissionMode 'default' 配对.
-                    #
-                    # 例外: subagent 是 headless 后台 session, 没有浏览器 UI 在监听 permission_request
-                    # WS 广播. 走 "default" 会让 subagent 每个 Write/Bash 都卡 1800s 后 permission timeout
-                    # (2026-05-30 M2 真闭环事故根因: subagent Write 30 分钟 timeout 后没机会跑
-                    # omni review submit, 审阅台一直空, 总裁以为没派出). 用 caller_identity 区分:
-                    #   - caller_identity="subagent" → bypassPermissions (后台 headless, 无人点准许)
-                    #   - 其它 (用户直连 / 总控 / external) → "default" (前端能弹窗)
-                    permission_mode=(
-                        DEFAULT_PERMISSION_MODE if caller_identity == CALLER_SUBAGENT else "default"
-                    ),
+                    # 所有 Dashboard 原生会话默认完全授权；用户仍可在顶栏显式切回确认模式。
+                    # 这里读取 session 状态，保证新会话、恢复会话和运行时切换语义一致。
+                    permission_mode=sess.current_permission_mode,
                     can_use_tool=self._make_can_use_tool(sess),
                     resume=resume_id,
                     fork_session=bool(fork_from_provider_session_id),
@@ -934,11 +1057,7 @@ class CcChatSessionManager:
                 provider_opts: ProviderOptions = {
                     "cwd": sess.cwd,
                     "active_plan": sess.active_plan,
-                    "permission_mode": (
-                        DEFAULT_PERMISSION_MODE
-                        if caller_identity == CALLER_SUBAGENT
-                        else sess.current_permission_mode
-                    ),
+                    "permission_mode": sess.current_permission_mode,
                 }
                 if sess.model:
                     provider_opts["model"] = sess.model
@@ -958,6 +1077,33 @@ class CcChatSessionManager:
                 except RuntimeError as e:
                     raise RuntimeError(f"CodexProvider 启动失败: {e}") from e
                 # spawn consume task — provider streams NormalizedMessage wire frames.
+                sess.provider_consume_task = asyncio.create_task(self._consume_provider(sess))
+            elif provider in ("kimi", "opencode", "codebuddy"):
+                # 路径 B-kimi/opencode: 子进程包装本地 CLI (spawn-per-prompt),
+                # 转 NormalizedMessage 流. 两家 resume 都靠 provider_session_id 续接.
+                from .providers.codebuddy import CodeBuddyProvider
+                from .providers.kimi import KimiProvider
+                from .providers.opencode import OpenCodeProvider
+                provider_opts = ProviderOptions(cwd=sess.cwd)
+                if sess.model:
+                    provider_opts["model"] = sess.model
+                if fork_from_provider_session_id or adopt_session_id:
+                    resume_session_id = fork_from_provider_session_id or adopt_session_id
+                    sess.claude_session_id = resume_session_id
+                    provider_opts["provider_session_id"] = resume_session_id  # type: ignore[typeddict-unknown-key]
+                # P0-a: 子进程注入身份 (provider 支持 env 透传, 同 codex 路径)。
+                if caller_identity:
+                    provider_opts["env"] = {**os.environ, CALLER_ENV: caller_identity}
+                provider_classes = {
+                    "kimi": KimiProvider,
+                    "opencode": OpenCodeProvider,
+                    "codebuddy": CodeBuddyProvider,
+                }
+                sess.provider_impl = provider_classes[provider](provider_opts)
+                try:
+                    await sess.provider_impl.connect()
+                except RuntimeError as e:
+                    raise RuntimeError(f"{provider} provider 启动失败: {e}") from e
                 sess.provider_consume_task = asyncio.create_task(self._consume_provider(sess))
             elif provider == "omni_agent":
                 # 路径 B-omni: 走 OmniAgentProvider. 要 bus + agent_class, 暂用默认 ChatAgent
@@ -996,11 +1142,11 @@ class CcChatSessionManager:
             else:
                 raise RuntimeError(
                     f"未知 provider: {provider!r} "
-                    "(支持: claude_code / omni_agent / codex / controller)"
+                    "(支持: claude_code / omni_agent / codex / codebuddy / kimi / opencode / controller)"
                 )
 
             self._sessions[sid] = sess
-            self._persist(sess)
+            await self._persist(sess)
             self._emit_session_event(sess, "chat.session.created", {
                 "model": sess.model,
                 "name": sess.name,
@@ -1021,7 +1167,7 @@ class CcChatSessionManager:
             async for nm in sess.provider_impl.consume_messages():
                 try:
                     if nm.get("kind") in {"text", "thinking", "tool_use", "tool_result", "error"}:
-                        self._append_event_history(sess, nm)
+                        await self._append_event_history(sess, nm)
                     else:
                         self._emit_normalized_message(sess, nm)
                     # 路径 B 去返回: 直发上游 wire NM.
@@ -1053,7 +1199,7 @@ class CcChatSessionManager:
                     new_sid = nm.get("newSessionId")
                     if new_sid and not sess.claude_session_id:
                         sess.claude_session_id = new_sid
-                        self._persist(sess)
+                        await self._persist(sess)
                         self._emit_session_event(sess, "chat.provider_session.bound", {
                             "provider_session_id": new_sid,
                         }, tags=["session", "provider_session"])
@@ -1109,7 +1255,7 @@ class CcChatSessionManager:
             sess.ended_at = time.time()
             sess.exit_reason = "killed"
             await self._broadcast(sess, {"kind": "exit", "reason": "killed"})
-            self._persist(sess)
+            await self._persist(sess)
             return True
 
     def patch_active_plan(self, sid: str, plan_id: str | None) -> dict[str, Any]:
@@ -1119,7 +1265,7 @@ class CcChatSessionManager:
         sess.active_plan = plan_id
         if sess.provider_impl is not None:
             sess.provider_impl.options["active_plan"] = plan_id
-        self._persist(sess)
+        self._persist_queued(sess)
         self._emit_session_event(
             sess,
             "chat.session.context.updated",
@@ -1142,19 +1288,22 @@ class CcChatSessionManager:
         if sess is None:
             raise KeyError(sid)
         sess.taken_over = bool(on)
-        self._persist(sess)
+        self._persist_queued(sess)
         self._emit_session_event(
             sess, "chat.session.takeover", {"taken_over": sess.taken_over}, tags=["session", "takeover"],
         )
         return {"session_id": sid, "taken_over": sess.taken_over, "adopted": sess.adopted}
 
     def rename(self, sid: str, name: str) -> dict[str, Any]:
-        """重命名 session. 空字符串 = 清空 (UI 兜底显示 id tail)."""
+        """重命名 session；显示名是产品不变量，不允许回退到无意义 id。"""
         sess = self._sessions.get(sid)
         if sess is None:
             raise KeyError(sid)
-        sess.name = (name or "").strip()[:120]  # 限制长度防过长
-        self._persist(sess)
+        normalized = (name or "").strip()[:120]
+        if not normalized:
+            raise ValueError("会话名称不能为空")
+        sess.name = normalized
+        self._persist_queued(sess)
         self._emit_session_event(
             sess,
             "chat.session.renamed",
@@ -1190,7 +1339,7 @@ class CcChatSessionManager:
             sess.current_permission_mode = _normalize_permission_mode(permission_mode)
             if sess.provider_impl is not None:
                 sess.provider_impl.options["permission_mode"] = sess.current_permission_mode
-        self._persist(sess)
+        self._persist_queued(sess)
         payload = {
             "archived": sess.archived,
             "favorite": sess.favorite,
@@ -1212,18 +1361,29 @@ class CcChatSessionManager:
           - 会话还没连 client → 存档, 下次连接 (_ensure_runtime / _connect_controller_claude) 生效。
           - claude client 在跑且空闲 → 当场断开 client (resume 保历史), 下轮自动重连应用新档。
           - claude client 在途 (in_flight) → 挂 _pending_effort_reconnect, 下轮 submit 前重连。
-          - codex → 暂不消费 effort (留作后续), 仅存档。
+          - codex → 重建 CodexProvider, 新 thread/resume 时把档位传给
+            ThreadOptions.model_reasoning_effort。
         """
         sess = self._sessions.get(sid)
         if sess is None:
             raise KeyError(sid)
-        norm = _normalize_effort(effort)  # 非法值抛 ValueError
+        norm = _normalize_effort(effort, sess.provider)  # 非法值抛 ValueError
         changed = norm != sess.effort
         sess.effort = norm
         applied = "unchanged"
         if changed:
-            if sess.provider == "codex":
-                applied = "stored_codex_pending"  # codex effort 后续再接
+            if sess.provider == "codex" and sess.provider_impl is not None and not sess.in_flight_turn:
+                async with sess.submit_lock:
+                    await sess.provider_impl.disconnect()
+                    if sess.provider_consume_task is not None:
+                        sess.provider_consume_task.cancel()
+                        await asyncio.gather(sess.provider_consume_task, return_exceptions=True)
+                    sess.provider_impl = None
+                    sess.provider_consume_task = None
+                applied = "reconnected"
+            elif sess.provider == "codex" and sess.provider_impl is not None:
+                sess._pending_effort_reconnect = True
+                applied = "after_current_turn"
             elif sess.client is not None and not sess.in_flight_turn:
                 async with sess.submit_lock:
                     try:
@@ -1237,7 +1397,7 @@ class CcChatSessionManager:
                 applied = "after_current_turn"
             else:
                 applied = "next_turn"
-        self._persist(sess)
+        await self._persist(sess)
         self._emit_session_event(
             sess,
             "chat.session.effort.updated",
@@ -1246,17 +1406,57 @@ class CcChatSessionManager:
         )
         return {"session_id": sid, "effort": sess.effort, "applied": applied}
 
-    def _persist(self, sess: CcChatSession) -> None:
-        store = _read_meta_store()
-        store[sess.id] = {
-            **sess.to_meta(),
-            "kind": "chat",
-            "history_summary": sess.history_summary,
-            "event_history": self._dedupe_event_history(sess.event_history),
-            "goal_state": sess.goal_state or None,
-            "last_token_budget": sess.last_token_budget,
-        }
-        _write_meta_store(store)
+    def _persist_snapshot(self, sess: CcChatSession) -> tuple:
+        """在事件循环上取会话持久化快照 (纯内存读, 微秒级)。
+
+        必须先快照再下线程: 线程里直接读 sess.event_history 的话, 循环上并发的
+        append/replace 会让落盘内容不确定; list/dict 浅拷贝即可 — 元素 dict 从不原地改
+        (_append_event_history 用 {**old, **new} 替换式更新)。
+        """
+        return (
+            sess.id,
+            sess.to_meta(),
+            list(sess.history_summary),
+            list(sess.event_history),
+            dict(sess.goal_state) if sess.goal_state else None,
+            dict(sess.last_token_budget) if sess.last_token_budget else None,
+        )
+
+    def _persist_write(self, snap: tuple) -> None:
+        """全量读-改-写 cc_sessions.json (~145ms 磁盘 IO) — 只在持久化线程里跑。
+
+        persist 失败不抛: 内存态是真源, 落盘只是恢复锚点, 不能反过来拖死业务。"""
+        sid, meta, history_summary, event_history, goal_state, last_token_budget = snap
+        try:
+            _write_meta_store({sid: {
+                **meta,
+                "kind": "chat",
+                "history_summary": history_summary,
+                "event_history": self._dedupe_event_history(event_history),
+                "goal_state": goal_state or None,
+                "last_token_budget": last_token_budget,
+            }})
+        except Exception:  # noqa: BLE001
+            logger.exception("cc_chat_bridge: persist session %s failed", sid)
+
+    async def _persist(self, sess: CcChatSession) -> None:
+        """持久化会话元数据。重 IO 挪 _PERSIST_EXECUTOR (单 worker, 提交序=执行序);
+        逐次 await 调用即保持逐条顺序语义, 不并发。"""
+        snap = self._persist_snapshot(sess)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(_PERSIST_EXECUTOR, self._persist_write, snap)
+
+    def _persist_queued(self, sess: CcChatSession) -> None:
+        """sync 上下文 (rename/patch_metadata 等低频元数据方法) 的持久化出口:
+        有运行中的 loop → 投持久化线程不堵循环; 无 loop (单测/脚本) → 就地同步写,
+        保持旧的"调用完即可见"语义。"""
+        snap = self._persist_snapshot(sess)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._persist_write(snap)
+            return
+        loop.run_in_executor(_PERSIST_EXECUTOR, self._persist_write, snap)
 
     def _goal_snapshot(self, sess: CcChatSession) -> dict[str, Any] | None:
         goal = sess.goal_state or {}
@@ -1312,7 +1512,7 @@ class CcChatSessionManager:
             },
             "planId": sess.active_plan,
         }
-        self._append_event_history(sess, frame)
+        await self._append_event_history(sess, frame)
         await self._broadcast(sess, frame)
 
     async def set_goal(
@@ -1341,7 +1541,7 @@ class CcChatSessionManager:
             "updated_at": now,
         }
         sess._last_injected_plan = self._NEVER_INJECTED
-        self._persist(sess)
+        await self._persist(sess)
         await self._broadcast_goal_event(sess, action="set")
         # N2c: auto 模式 + active → 立即开跑 (idle 直接 kick 第一轮; 在途则当前轮完成时接管)。
         if auto and status == "active":
@@ -1371,7 +1571,7 @@ class CcChatSessionManager:
             return
         sess.goal_state["status"] = "paused"
         sess.goal_state["updated_at"] = time.time()
-        self._persist(sess)
+        await self._persist(sess)
         await self._broadcast_goal_event(sess, action="paused")
 
     async def _continue_goal_if_active(self, sess: CcChatSession, last_text: str) -> bool:
@@ -1390,7 +1590,7 @@ class CcChatSessionManager:
         if GOAL_DONE_SENTINEL in (last_text or ""):
             g["status"] = "complete"
             g["updated_at"] = time.time()
-            self._persist(sess)
+            await self._persist(sess)
             await self._broadcast_goal_event(sess, action="complete")
             return False
         # 2) 轮数上限。
@@ -1400,7 +1600,7 @@ class CcChatSessionManager:
         g["updated_at"] = time.time()
         if iters > maxi:
             g["status"] = "paused"
-            self._persist(sess)
+            await self._persist(sess)
             await self._broadcast_goal_event(sess, action="paused")
             await self._broadcast(sess, {
                 "kind": "status",
@@ -1409,7 +1609,7 @@ class CcChatSessionManager:
                 "canInterrupt": False,  # 终态通知, 非在途 turn — 别让前端卡 loading
             })
             return False
-        self._persist(sess)
+        await self._persist(sess)
         # 3) 续发一轮。
         await self._broadcast(sess, {
             "kind": "status",
@@ -1435,7 +1635,7 @@ class CcChatSessionManager:
         sess.goal_state["status"] = status
         sess.goal_state["updated_at"] = time.time()
         sess._last_injected_plan = self._NEVER_INJECTED
-        self._persist(sess)
+        await self._persist(sess)
         await self._broadcast_goal_event(sess, action=status)
         return {"session_id": sid, "goal_state": sess.goal_state}
 
@@ -1445,7 +1645,7 @@ class CcChatSessionManager:
             raise KeyError(sid)
         sess.goal_state = {}
         sess._last_injected_plan = self._NEVER_INJECTED
-        self._persist(sess)
+        await self._persist(sess)
         await self._broadcast_goal_event(sess, action="clear")
         return {"session_id": sid, "goal_state": None}
 
@@ -1472,7 +1672,7 @@ class CcChatSessionManager:
         new = await self.create(provider="controller", cwd=old.cwd)
         # 归档旧会话(保留落盘, 不删)
         old.archived = True
-        self._persist(old)
+        await self._persist(old)
         self._emit_session_event(old, "chat.session.compacted", {"new_session": new.id}, tags=["session"])
         # 用折叠记录给新会话起步(controller 读后简短确认, 一轮)
         seed = (
@@ -1529,7 +1729,7 @@ class CcChatSessionManager:
         )
         event_frame["id"] = event_id
         event_frame["summary"] = summary
-        self._append_event_history(sess, {
+        await self._append_event_history(sess, {
             "id": event_id,
             "kind": "context_event",
             "status": status,
@@ -1685,7 +1885,7 @@ class CcChatSessionManager:
     # ── 主对话流程 ──
 
     async def _broadcast_turn_error(self, sess: CcChatSession, code: str, message: str) -> None:
-        self._append_event_history(sess, {
+        await self._append_event_history(sess, {
             "kind": "error",
             "error": message,
             "sessionId": sess.id,
@@ -1731,6 +1931,14 @@ class CcChatSessionManager:
             except Exception:  # noqa: BLE001
                 logger.debug("pending effort reconnect disconnect ignored", exc_info=True)
             sess.client = None
+        if sess._pending_effort_reconnect and sess.provider_impl is not None and not sess.in_flight_turn:
+            sess._pending_effort_reconnect = False
+            await sess.provider_impl.disconnect()
+            if sess.provider_consume_task is not None:
+                sess.provider_consume_task.cancel()
+                await asyncio.gather(sess.provider_consume_task, return_exceptions=True)
+            sess.provider_impl = None
+            sess.provider_consume_task = None
 
         try:
             await self._ensure_runtime(sess)
@@ -1742,9 +1950,14 @@ class CcChatSessionManager:
         # 路径 B: provider abstraction
         if sess.provider_impl is not None:
             try:
-                await sess.provider_impl.send_prompt(effective_prompt, {
+                turn_options: dict[str, Any] = {
                     "permission_mode": sess.current_permission_mode,
-                })
+                }
+                if sess.model:
+                    turn_options["model"] = sess.model
+                if sess.effort:
+                    turn_options["effort"] = sess.effort
+                await sess.provider_impl.send_prompt(effective_prompt, turn_options)
                 sess.history_summary.append({"role": "user", "text": prompt})
                 self._emit_session_event(sess, "chat.input.user.accepted", {
                     "content": prompt,
@@ -1761,7 +1974,7 @@ class CcChatSessionManager:
                         frame=context_frame,
                     )
                 if record_history:
-                    self._append_event_history(sess, {
+                    await self._append_event_history(sess, {
                         "kind": "text",
                         "role": "user",
                         "content": prompt,
@@ -1830,7 +2043,7 @@ class CcChatSessionManager:
                         frame=context_frame,
                     )
                 if record_history:
-                    self._append_event_history(sess, {
+                    await self._append_event_history(sess, {
                         "kind": "text",
                         "role": "user",
                         "content": prompt,
@@ -1889,7 +2102,7 @@ class CcChatSessionManager:
                                     or sess.history_summary[-1].get("text") != last_assistant_text
                                 ):
                                     sess.history_summary.append({"role": "assistant", "text": last_assistant_text})
-                                    self._append_event_history(sess, {
+                                    await self._append_event_history(sess, {
                                         "kind": "text", "role": "assistant", "content": last_assistant_text,
                                     })
                             # 块 3: 路径 A 完成 turn → emit subagent.completed (排除 controller 自唤)
@@ -1920,7 +2133,7 @@ class CcChatSessionManager:
                             sid_from_claude = (d.get("data") or {}).get("session_id")
                             if sid_from_claude and not sess.claude_session_id:
                                 sess.claude_session_id = sid_from_claude
-                                self._persist(sess)
+                                await self._persist(sess)
                                 self._emit_session_event(sess, "chat.provider_session.bound", {
                                     "provider_session_id": sid_from_claude,
                                 }, tags=["session", "provider_session"])
@@ -1934,9 +2147,9 @@ class CcChatSessionManager:
                             if text_parts:
                                 last_assistant_text = "".join(text_parts)
                             for thinking in thinking_parts:
-                                self._append_event_history(sess, {"kind": "thinking", "content": thinking})
+                                await self._append_event_history(sess, {"kind": "thinking", "content": thinking})
                             for tu in tool_use_parts:
-                                self._append_event_history(sess, {
+                                await self._append_event_history(sess, {
                                     "kind": "tool_use",
                                     "toolId": tu.get("id", ""),
                                     "toolName": tu.get("name", ""),
@@ -1950,7 +2163,7 @@ class CcChatSessionManager:
                                 for b in content:
                                     bd = _content_block_to_dict(b)
                                     if bd.get("type") in ("tool_result", "server_tool_result"):
-                                        self._append_event_history(sess, {
+                                        await self._append_event_history(sess, {
                                             "kind": "tool_result",
                                             "toolId": bd.get("tool_use_id", ""),
                                             "content": bd.get("content", ""),
@@ -1998,7 +2211,7 @@ class CcChatSessionManager:
                                 except Exception:  # noqa: BLE001
                                     logger.exception("goal auto-continue failed for %s", sess.id)
                         finally:
-                            self._persist(sess)
+                            await self._persist(sess)
 
                     asyncio.create_task(finish_receive())
 
@@ -2012,7 +2225,7 @@ class CcChatSessionManager:
                 logger.exception("cc_chat_bridge: query/receive failed for %s", sess.id)
                 sess.in_flight_turn = False
                 await self._broadcast_turn_error(sess, type(e).__name__, str(e))
-                self._persist(sess)
+                await self._persist(sess)
 
     async def interrupt(self, sess: CcChatSession) -> None:
         # 路径 A
@@ -2239,11 +2452,14 @@ cc_chat_router = APIRouter(prefix="/cc/chat", tags=["cc-chat"])
 
 
 class CreateChatSessionBody(BaseModel):
-    cwd: str | None = Field(default=None, description="工作目录, 默认 server CWD")
+    cwd: str | None = Field(
+        default=None,
+        description="工作目录，默认 E:\\WindowsWorkspace；其他目录会记录在会话元数据中",
+    )
     model: str | None = Field(default=None, description=f"模型短名, 默认 {DEFAULT_MODEL}")
     provider: str | None = Field(
         default="claude_code",
-        description="LLM provider: claude_code (默认, claude binary 订阅) / omni_agent (本地 qwen) / codex (codex CLI) / controller (BOSS SIGHT 总控)",
+        description="LLM provider: claude_code / omni_agent / codex / codebuddy (CodeBuddy CLI) / kimi / opencode / controller",
     )
     # BOSS SIGHT 块 3: spawn subagent 用 — 创 session 后 fire-and-forget 发第一条 prompt
     initial_prompt: str | None = Field(
@@ -2285,6 +2501,7 @@ async def chat_health() -> dict[str, Any]:
         "status": "ok",
         "default_model": DEFAULT_MODEL or "(local claude default)",
         "session_count": len(get_chat_manager().list_meta()),
+        "default_cwd": default_session_cwd(),
         "claude_agent_sdk_version": getattr(casdk, "__version__", "?"),
         "note": "走本地 claude binary, 认证用 claude login 订阅, 不要 ANTHROPIC_API_KEY",
     }
@@ -2346,6 +2563,26 @@ async def create_session(body: CreateChatSessionBody | None = None) -> dict[str,
     return sess.to_meta()
 
 
+def _list_sessions_sync(
+    q: str,
+    full_text: bool,
+    limit: int,
+    offset: int,
+    pinned_id: str | None,
+    include_archived: bool,
+) -> dict[str, Any]:
+    """list_sessions 的同步实现体: list_meta_page 遍历全部会话 + (full_text 时)读历史消息,
+    阻塞 I/O, 抽出来给 asyncio.to_thread 用, 不堵事件循环。"""
+    return get_chat_manager().list_meta_page(
+        q=q,
+        full_text=full_text,
+        limit=limit,
+        offset=offset,
+        pinned_id=pinned_id,
+        include_archived=include_archived,
+    )
+
+
 @cc_chat_router.get("/sessions")
 async def list_sessions(
     q: str = "",
@@ -2355,13 +2592,8 @@ async def list_sessions(
     pinned_id: str | None = None,
     include_archived: bool = False,
 ) -> dict[str, Any]:
-    return get_chat_manager().list_meta_page(
-        q=q,
-        full_text=full_text,
-        limit=limit,
-        offset=offset,
-        pinned_id=pinned_id,
-        include_archived=include_archived,
+    return await asyncio.to_thread(
+        _list_sessions_sync, q, full_text, limit, offset, pinned_id, include_archived
     )
 
 
@@ -2451,7 +2683,7 @@ async def patch_session_goal(sid: str, body: PatchGoalBody) -> dict[str, Any]:
 
 
 class RenameSessionBody(BaseModel):
-    name: str = Field(default="", description="session 显示名字, 空字符串清空走 id tail 兜底")
+    name: str = Field(min_length=1, description="始终非空的中文优先会话显示名")
 
 
 @cc_chat_router.patch("/sessions/{sid}/name")
@@ -2460,6 +2692,8 @@ async def rename_session(sid: str, body: RenameSessionBody) -> dict[str, Any]:
         return get_chat_manager().rename(sid, body.name)
     except KeyError:
         raise HTTPException(404, f"session {sid} not found")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
 
 class PatchSessionMetadataBody(BaseModel):
@@ -2513,7 +2747,13 @@ async def get_session_history(sid: str) -> dict[str, Any]:
     if sess is None:
         raise HTTPException(404, f"session {sid} not found")
     if sess.event_history:
-        messages = get_chat_manager()._dedupe_event_history(sess.event_history)
+        # 大会话的去重是 CPU 重活, 必须下线程 —— 同步跑会堵死整个 ccdaemon 事件循环
+        # (本仓已知病类, 治法=to_thread; 移动端批量取标题时实测把 8201 卡到分钟级)。
+        import asyncio as _asyncio
+
+        messages = await _asyncio.to_thread(
+            get_chat_manager()._dedupe_event_history, list(sess.event_history)
+        )
         return {
             "messages": messages,
             "total": len(messages),
@@ -2564,10 +2804,15 @@ async def chat_ws(ws: WebSocket, sid: str) -> None:
 
     # snapshot: 把 history_summary 喂给新订阅者
     try:
+        # 大会话的去重是 CPU 重活, 照搬 get_session_history 的 to_thread 模式,
+        # 同步跑会堵死整个 ccdaemon 事件循环 (2026-07 P0 批)。
+        messages = await asyncio.to_thread(
+            mgr._dedupe_event_history, list(sess.event_history)
+        )
         await ws.send_json({
             "kind": "snapshot",
             "history": sess.history_summary,
-            "messages": mgr._dedupe_event_history(sess.event_history),
+            "messages": messages,
             "tokenUsage": sess.last_token_budget,
         })
     except Exception:
@@ -2617,12 +2862,12 @@ async def chat_ws(ws: WebSocket, sid: str) -> None:
                         continue
                     if sess.provider_impl is not None:
                         sess.provider_impl.options["permission_mode"] = sess.current_permission_mode
-                    mgr._persist(sess)
+                    await mgr._persist(sess)
                 elif frame.get("skipPermissions"):
                     sess.current_permission_mode = "bypassPermissions"
                     if sess.provider_impl is not None:
                         sess.provider_impl.options["permission_mode"] = sess.current_permission_mode
-                    mgr._persist(sess)
+                    await mgr._persist(sess)
                 # fire-and-forget — submit_user_prompt 内部跑 receive_response, 不阻塞 ws 接收
                 asyncio.create_task(mgr.submit_user_prompt(sess, text))
             elif t == "user.interrupt":
@@ -2635,7 +2880,7 @@ async def chat_ws(ws: WebSocket, sid: str) -> None:
                     continue
                 if sess.provider_impl is not None:
                     sess.provider_impl.options["permission_mode"] = sess.current_permission_mode
-                mgr._persist(sess)
+                await mgr._persist(sess)
                 mgr._emit_session_event(
                     sess,
                     "chat.session.permission_mode.updated",
@@ -2651,7 +2896,7 @@ async def chat_ws(ws: WebSocket, sid: str) -> None:
                         sess.provider_impl.options["model"] = sess.model
                     else:
                         sess.provider_impl.options.pop("model", None)
-                mgr._persist(sess)
+                await mgr._persist(sess)
                 mgr._emit_session_event(
                     sess,
                     "chat.session.model.updated",

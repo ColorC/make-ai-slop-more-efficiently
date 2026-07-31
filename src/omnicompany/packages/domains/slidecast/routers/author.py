@@ -30,7 +30,9 @@ class Outline(Router):
         run_dir = Path(ctx["run_dir"])
         body = ctx.get("body") or ""
         outline = None
-        if body.strip():
+        if ctx.get("prebuilt_deck_ir"):
+            outline = {"reused_deck_ir": True, "beats": []}
+        elif body.strip():
             outline = safe_json(
                 prompts.OUTLINE_SYSTEM,
                 {"title": ctx.get("title", ""), "oneliner": ctx.get("oneliner", ""),
@@ -64,8 +66,8 @@ class AuthorIR(Router):
         oneliner = ctx.get("oneliner", "")
         source_label = ctx.get("source_label", "")
 
-        deck = None
-        if body.strip():
+        deck = ctx.get("prebuilt_deck_ir")
+        if not deck and body.strip():
             deck = safe_json(
                 prompts.AUTHOR_SYSTEM,
                 {"title": title, "oneliner": oneliner, "source": source_label,

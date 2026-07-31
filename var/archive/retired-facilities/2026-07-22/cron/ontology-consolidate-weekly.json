@@ -1,0 +1,9 @@
+{
+  "name": "ontology-consolidate-weekly",
+  "schedule": "@weekly",
+  "command": "omni decisions consolidate -p omnicompany",
+  "prompt": "",
+  "description": "决策本体固化聚类周跑(信号入口②):已拍板高权威裁决→规则候选→只落周报文件(data/registry/下报告)。2026-07-17 用户裁决: 候选不再 --submit 进审阅台(污染且意义不明; 审阅台只放工作报告类); 要人裁走对话内问答。",
+  "created_at": "2026-07-10T10:34:46.119100+00:00",
+  "last_run_at": "2026-07-17T10:39:02.945309+00:00"
+}

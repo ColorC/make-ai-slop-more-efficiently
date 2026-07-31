@@ -9,7 +9,7 @@ CLI 和 Dashboard 共享的观测层 API。
     from omnicompany.core.observe import list_traces, read_trace, tail_events
 
     # 在 CLI 中
-    traces = await list_traces(domain="demogame", n=10)
+    traces = await list_traces(domain="my_domain", n=10)
 
     # 在 Dashboard 中
     @app.get("/api/v3/traces")

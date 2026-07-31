@@ -1,0 +1,60 @@
+logLevel: info
+logDestinations: [stdout]
+readTimeout: 10s
+writeTimeout: 10s
+writeQueueSize: 1024
+
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: publish
+        path: game-observatory
+      - action: read
+        path: game-observatory
+      - action: api
+      - action: metrics
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: read
+        path: game-observatory
+
+api: true
+apiAddress: 127.0.0.1:9997
+metrics: true
+metricsAddress: 127.0.0.1:9998
+pprof: false
+playback: false
+
+rtsp: false
+rtmp: false
+srt: false
+
+hls: true
+hlsAddress: :8888
+hlsAllowOrigins: ['*']
+hlsAlwaysRemux: true
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ['*']
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+webrtcIPsFromInterfaces: true
+webrtcAdditionalHosts: [10.3.43.246]
+
+pathDefaults:
+  source: publisher
+  overridePublisher: true
+  maxReaders: 64
+
+paths:
+  game-observatory:

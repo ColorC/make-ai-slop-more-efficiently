@@ -59,7 +59,7 @@ def cmd_decisions_status() -> None:
 @click.option("--choose", "choose", multiple=True, help="采纳项 '选项:理由'(decision,可多次)")
 @click.option("--reject", "reject", multiple=True, help="被否决项 '选项:理由'(decision,可多次)")
 @click.option("--rationale", "-r", default="", help="为什么这么选(理由综述)")
-@click.option("--anchor", default="", help="挂在哪份载体上 'kind:ref' 如 doc:path/to.md / feishu_msg:<id>")
+@click.option("--anchor", default="", help="挂在哪份载体上 'kind:ref' 如 doc:path/to.md / msg:<id>")
 @click.option("--project", default="", help="所属项目 id(如 vilo / omnicompany)")
 @click.option("--track", default="", help="所属轨道 'kind:id',如 plan:DECISION-MEMORY / business:vilo-card-creation")
 @click.option("--applies-to", default="", help="针对对象:具体那张卡/材料/对象的描述")
@@ -68,7 +68,7 @@ def cmd_decisions_status() -> None:
 @click.option("--confidence", type=click.Choice(["high", "medium", "low"]), default=None)
 @click.option("--authority", type=click.Choice(["user_explicit", "high", "medium", "low", "derived", "unknown"]),
               default="user_explicit", help="来源权威(默认 user_explicit=本人手记拍板)")
-@click.option("--channel", type=click.Choice(["claude", "codex", "feishu", "note", "demogame_doc", "manual"]),
+@click.option("--channel", type=click.Choice(["claude", "codex", "api", "note", "internal_doc", "manual"]),
               default="manual", help="来源渠道(手记默认 manual)")
 @click.option("--risk", type=click.Choice(["low", "medium", "high"]), default=None, help="belief: 猜想错了的代价")
 @click.option("--query", "evidence_query", default="", help="belief: 怎么验证这个猜想")
@@ -79,7 +79,16 @@ def cmd_decisions_record(kind, statement, choose, reject, rationale, anchor, pro
     """手记一条决策/猜想/评论 → 落统一库。"""
     from omnicompany.packages.domains.decisions import record as record_one
 
-    fields: dict = {"authority": authority, "origin": {"channel": channel}}
+    _trace_id = None
+    try:  # 会话链接: best-effort
+        from omnicompany.packages.services._core.identity import resolve_active_trace_id
+        _trace_id = resolve_active_trace_id()
+    except Exception:
+        pass
+    _origin = {"channel": channel}
+    if _trace_id:
+        _origin["session"] = _trace_id
+    fields: dict = {"authority": authority, "origin": _origin}
     if project:
         fields["project"] = project
     if track:
@@ -113,6 +122,12 @@ def cmd_decisions_record(kind, statement, choose, reject, rationale, anchor, pro
             fields["evidence_query"] = evidence_query
 
     rec = record_one(kind, statement, **fields)
+    try:  # 会话侧反向挂一条引用(这个会话产出了这条决策)
+        from omnicompany.packages.services._core.identity import link_record_to_session
+        link_record_to_session(_trace_id, kind="decision", record_id=rec["id"],
+                               ref_id=(track or project or None))  # track 已是 'kind:id' 形
+    except Exception:
+        pass
     ok = (rec.get("validation") or {}).get("ok")
     click.echo(f"✓ 记下 {rec['id']}  [{rec['kind']}] {rec['statement'][:50]}")
     if not ok:
@@ -238,15 +253,86 @@ def cmd_decisions_mark(record_id, status) -> None:
     click.echo(f"✓ {record_id} → status={rec.get('status')}")
 
 
-@cmd_decisions.command("doctor")
+@cmd_decisions.command("challenge")
+@click.argument("record_id")
+@click.option("--reason", "-r", required=True, help="挑战理由(什么观察/证据在质疑它)")
+@click.option("--source", default="", help="证据出处(路径/URL/会话)")
+@click.option("--by", "challenger", default="", help="挑战者(缺省=当前执行方)")
 @any_caller
-def cmd_decisions_doctor() -> None:
-    """列带病记录:落库校验不过(缺字段/决策没列被否决项/猜想没标风险)。"""
+def cmd_decisions_challenge(record_id, reason, source, challenger) -> None:
+    """挑战一条记录(反证优先):追加 challenge_log;belief 同时置 challenged。"""
+    from omnicompany.packages.domains.decisions import catalog, library
+
+    try:
+        rec = library.challenge(record_id, reason, source=source, challenger=challenger)
+    except ValueError as e:
+        click.echo(f"✗ {e}")
+        return
+    catalog.rebuild_index()
+    click.echo(f"✓ {record_id} 已记挑战 → status={rec.get('status')}")
+
+
+@cmd_decisions.command("resolve")
+@click.argument("record_id")
+@click.argument("outcome", type=click.Choice(["supported", "partial", "falsified"]))
+@click.option("--evidence", "-e", default="", help="证据(什么观察支持这个裁定)")
+@click.option("--method", "-m", default="", help="验证方法(怎么验的)")
+@click.option("--by", default="", help="裁定者")
+@any_caller
+def cmd_decisions_resolve(record_id, outcome, evidence, method, by) -> None:
+    """裁定 belief 下场(supported/partial/falsified);falsified 时自动点名下游受影响记录(回传必做)。"""
+    from omnicompany.packages.domains.decisions import catalog, library
+
+    try:
+        rec = library.resolve(record_id, outcome, evidence=evidence, method=method, by=by)
+    except ValueError as e:
+        click.echo(f"✗ {e}")
+        return
+    catalog.rebuild_index()
+    click.echo(f"✓ {record_id} → {outcome}")
+    if outcome == "falsified":
+        downstream = library.impacted_by(record_id)
+        if downstream:
+            click.echo(f"⚠ 回传必做:{len(downstream)} 条记录 rests_on 此条,逐条复核(不自动改状态):")
+            for d in downstream:
+                click.echo(f"    {d.get('id','')}  {d.get('statement','')[:50]}")
+        else:
+            click.echo("  无下游 rests_on 依赖。")
+
+
+@cmd_decisions.command("impacted")
+@click.argument("record_id")
+@any_caller
+def cmd_decisions_impacted(record_id) -> None:
+    """查哪些记录 rests_on 此条(证伪传播点名;只查直接一层,不自动改状态)。"""
+    from omnicompany.packages.domains.decisions import library
+
+    downstream = library.impacted_by(record_id)
+    if not downstream:
+        click.echo("(无下游 rests_on 依赖)")
+        return
+    for d in downstream:
+        click.echo(f"  {d.get('id','')}  [{d.get('status','')}]  {d.get('statement','')[:60]}")
+
+
+@cmd_decisions.command("doctor")
+@click.option("--stamped", is_flag=True, help="只读写入时校验戳(快);缺省按当前规则现场重验全库")
+@any_caller
+def cmd_decisions_doctor(stamped) -> None:
+    """列带病记录:落库校验不过(缺字段/决策没列被否决项/猜想没标风险/状态词表外)。"""
     from omnicompany.packages.domains.decisions import library
 
     recs = library.active_records()
-    bad = [(r, (r.get("validation") or {}).get("issues") or [])
-           for r in recs if (r.get("validation") or {}).get("ok") is False]
+    if stamped:
+        bad = [(r, (r.get("validation") or {}).get("issues") or [])
+               for r in recs if (r.get("validation") or {}).get("ok") is False]
+    else:
+        # 现场重验:规则演进后旧库存量也照新规则点名(不改库,只报告)
+        bad = []
+        for r in recs:
+            issues = library.validate_record(r)
+            if issues:
+                bad.append((r, issues))
     if not bad:
         click.echo(f"✓ {len(recs)} 条记录全部合法。")
         return
@@ -260,15 +346,22 @@ def cmd_decisions_doctor() -> None:
 @cmd_decisions.command("extract-run")
 @click.option("--batch", "-n", default=3, help="本次炼几个会话(小的先)")
 @click.option("--model", "-m", default=None, help="便宜模型档(默认 omni 默认结构化模型;可传 gpt-5.3-codex 等)")
+@click.option("--source", type=click.Choice(["claude", "codex", "all"]), default="claude",
+              help="会话来源;Codex 使用原生 rollout JSONL")
+@click.option("--session-id", "session_ids", multiple=True, help="只炼指定真实 session id(可多次)")
+@click.option("--chunk-chars", default=24000, type=click.IntRange(4000, 48000),
+              help="每次原生结构化调用的正文字符数;长会话默认 24k")
 @click.option("--loop", is_flag=True, help="循环炼到 pending 清空(后台持续炼化用)")
 @any_caller
-def cmd_decisions_extract_run(batch, model, loop) -> None:
+def cmd_decisions_extract_run(batch, model, source, session_ids, chunk_chars, loop) -> None:
     """后台炼化存量对话:断点续跑/增量。每批炼 N 个未炼会话,带证据+严格归位,去重并库,标 checkpoint。"""
     from omnicompany.packages.domains.decisions import extract_run
 
     rounds = 0
     while True:
-        res = extract_run.run_batch(limit=batch, model=model)
+        selected = set(session_ids) or None
+        res = extract_run.run_batch(limit=batch, model=model, source=source,
+                                    session_ids=selected, chunk_chars=chunk_chars)
         rounds += 1
         for p in res["processed"]:
             tag = f"+{p['added']}" if "error" not in p else f"ERR {p['error']}"
@@ -276,17 +369,103 @@ def cmd_decisions_extract_run(batch, model, loop) -> None:
         click.echo(f"  本轮 {len(res['processed'])} 个,剩 {res['remaining']} 个未炼")
         if not loop or res["remaining"] == 0 or not res["processed"]:
             break
-    click.echo(f"完成 {rounds} 轮。" + ("(pending 已清空)" if extract_run.status()["remaining"] == 0 else ""))
+    click.echo(f"完成 {rounds} 轮。" + ("(pending 已清空)" if extract_run.status(source=source)["remaining"] == 0 else ""))
 
 
 @cmd_decisions.command("extract-status")
+@click.option("--source", type=click.Choice(["claude", "codex", "all"]), default="claude")
 @any_caller
-def cmd_decisions_extract_status() -> None:
+def cmd_decisions_extract_status(source) -> None:
     """炼化进度:已炼/未炼会话数、剩余体量、出错数。"""
     from omnicompany.packages.domains.decisions import extract_run
 
-    s = extract_run.status()
+    s = extract_run.status(source=source)
     click.echo(f"炼化进度: 已炼 {s['done']} 个会话 · 未炼 {s['remaining']} 个(约 {s['remaining_mb']}MB)· 出错 {s['errors']} 个")
+    if extract_run.PROGRESS.is_file():
+        import json as _json
+        try:
+            p = _json.loads(extract_run.PROGRESS.read_text(encoding="utf-8"))
+            click.echo(f"当前: {p.get('status')} · {str(p.get('session', ''))[:12]} · "
+                       f"块 {p.get('chunk', 0)}/{p.get('chunks', 0)} · 已入库 {p.get('added', 0)}")
+        except (OSError, ValueError):
+            pass
+
+
+@cmd_decisions.command("brief")
+@click.option("--plan", default="", help="计划 id(缺省=当前会话绑定的 active_plan)")
+@click.option("--project", "-p", default="", help="项目(缺省=当前会话绑定)")
+@click.option("--pipeline", default="", help="管线名(拉它声明的 book_refs/when/scale)")
+@click.option("--keys", default="", help="关键词,逗号分隔(条目名/结论子串硬筛)")
+@click.option("--no-binding", is_flag=True, help="不读会话绑定(看全书索引)")
+@click.option("--json", "as_json", is_flag=True)
+@any_caller
+def cmd_decisions_brief(plan, project, pipeline, keys, no_binding, as_json) -> None:
+    """开工切片:正在推进的 plan/project(缺省自动读会话绑定)该延续什么、该守什么、别踩什么。"""
+    import json as _json
+
+    from omnicompany.packages.domains.decisions.brief import build_brief, render_brief_text
+
+    b = build_brief(plan=plan, project=project, pipeline=pipeline,
+                    keys=[k for k in keys.split(",") if k.strip()],
+                    use_session_binding=not no_binding)
+    click.echo(_json.dumps(b, ensure_ascii=False, indent=2) if as_json else render_brief_text(b))
+
+
+@cmd_decisions.command("patrol")
+@click.option("--json", "as_json", is_flag=True, help="输出完整 JSON 报告")
+@any_caller
+def cmd_decisions_patrol(as_json) -> None:
+    """决策本体巡检:双向引用完整性(手册↔库↔管线)+清场废墟检测+when 覆盖。违规时退出码 1。"""
+    import json as _json
+
+    from omnicompany.packages.domains.decisions.patrol import run_patrol
+
+    report = run_patrol()
+    if as_json:
+        click.echo(_json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        cov = report.get("when_coverage") or {}
+        click.echo(("✓ 本体巡检零违规" if report["ok"]
+                    else f"⚠ 本体巡检 {report['violation_count']} 项违规"))
+        for key, items in (report.get("issues") or {}).items():
+            if items:
+                click.echo(f"  [{key}] × {len(items)}")
+                for it in items[:8]:
+                    click.echo(f"      {it}")
+        for r in report.get("ruins") or []:
+            click.echo(f"  [清场未完成] {r['path']}  ({r['why']})")
+        if "total" in cov:
+            click.echo(f"  when 覆盖: {cov['with_when']}/{cov['total']} 条管线已声明"
+                       f"(scale {cov['with_scale']}/{cov['total']})")
+    if not report["ok"]:
+        raise SystemExit(1)
+
+
+@cmd_decisions.command("checklist")
+@click.argument("part_stem")
+@any_caller
+def cmd_decisions_checklist(part_stem) -> None:
+    """把手册分册渲染成检查单投影(每节≤9条;如: omni decisions checklist 10-vilo叙事)。"""
+    from omnicompany.packages.domains.decisions.checklist_projection import render_checklist
+
+    try:
+        path = render_checklist(part_stem)
+    except ValueError as e:
+        click.echo(f"✗ {e}")
+        raise SystemExit(1)
+    click.echo(f"✓ 检查单投影已渲染 → {path}")
+
+
+@cmd_decisions.command("knowledge")
+@any_caller
+def cmd_decisions_knowledge() -> None:
+    """重渲 30-知识 投影(belief 按域摘要 → docs/ontology/30-知识.md;投影可重建非真源)。"""
+    from omnicompany.packages.domains.decisions.knowledge_projection import (
+        render_knowledge_projection,
+    )
+
+    path = render_knowledge_projection()
+    click.echo(f"✓ 30-知识 投影已重渲 → {path}")
 
 
 @cmd_decisions.command("reindex")
@@ -419,41 +598,135 @@ def cmd_decisions_causal(project, model, write) -> None:
 @click.option("--project", "-p", required=True, help="按项目筛候选裁决(必填)")
 @click.option("--tag", default=None, help="再按标签筛(可选)")
 @click.option("--model", "-m", default=None, help="覆盖聚类模型(默认 qwen3.6-plus)")
+@click.option("--submit", is_flag=True, help="把规则候选登记进内部候选流水线(信号入口②)")
 @external_or_controller
-def cmd_decisions_consolidate(project, tag, model) -> None:
+def cmd_decisions_consolidate(project, tag, model, submit) -> None:
     """反向固化器 v0:已拍板高权威裁决 → 规则候选报告(L3,禁自动写规则文档,须人裁)。"""
     from omnicompany.packages.domains.decisions import consolidate
 
-    res = consolidate.run(project=project, tag=tag, model=model)
+    res = consolidate.run(project=project, tag=tag, model=model, submit=submit)
     if res.get("skipped"):
         click.echo(f"(未生成报告){res['reason']}")
         return
     click.echo(f"✓ 规则候选报告: {res['report_path']}")
     click.echo(f"  候选裁决 {res['eligible_count']} 条 → 规则候选 {res['candidate_count']} 条")
+    if submit:
+        n_new = sum(1 for s in res.get("submitted") or [] if s.get("material_id"))
+        n_dup = sum(1 for s in res.get("submitted") or [] if s.get("skipped_duplicate"))
+        click.echo(f"  已登记内部候选 {n_new} 条(去重跳过 {n_dup});确认后由 candidate-apply 写回。")
     click.echo("  规则候选=L3 级,禁自动写进规则文档,须人裁。")
 
 
+@cmd_decisions.command("candidate")
+@click.option("--title", required=True, help="候选标题")
+@click.option("--body", default="", help="markdown 草案正文(与 --file 二选一)")
+@click.option("--file", "body_file", default="", help="从文件读正文")
+@click.option("--source", type=click.Choice(["memory", "human"]), default="human",
+              show_default=True, help="发起来源(自动信号走 candidates-scan/consolidate --submit)")
+@click.option("--action", type=click.Choice(["new", "revise", "retire"]), required=True)
+@click.option("--target", "targets", multiple=True, help="目标记录 id(revise/retire 必填,可多次)")
+@click.option("--statement", default="", help="提议的新陈述(action=new/revise 时写回用)")
+@click.option("--project", "-p", default="omnicompany", show_default=True)
+@click.option("--plan-id", default="", help="来源计划 id；缺省读取当前会话绑定")
+@click.option("--by", default="", help="发起者")
+@any_caller
+def cmd_decisions_candidate(title, body, body_file, source, action, targets, statement,
+                            project, plan_id, by) -> None:
+    """登记一条改陈述库的内部候选(入口④人工/AI记忆)；不混入普通审阅队列。"""
+    from pathlib import Path as _P
+
+    from omnicompany.packages.domains.decisions import candidates
+    from omnicompany.packages.domains.decisions.brief import read_session_binding
+
+    if body_file:
+        body = _P(body_file).read_text(encoding="utf-8")
+    if not body.strip():
+        body = f"## 候选\n\n{title}\n\n(正文未附;裁决意见写在评论区)"
+    proposed = {"statement": statement} if statement.strip() else {}
+    source_plan_id = plan_id.strip() or read_session_binding()["plan"]
+    try:
+        res = candidates.submit_candidate(
+            title=title, body_md=body, source=source, action=action,
+            target_ids=list(targets), proposed=proposed, project=project, by=by,
+            source_plan_id=source_plan_id)
+    except ValueError as e:
+        click.echo(f"✗ {e}")
+        raise SystemExit(1)
+    if res.get("skipped_duplicate"):
+        click.echo(f"(已有同类 pending 候选 {res['skipped_duplicate']},未重复进队)")
+    else:
+        bound = f" · plan={source_plan_id}" if source_plan_id else ""
+        click.echo(f"✓ 内部候选已登记(普通审阅队列不可见): {res['material_id']}{bound}")
+
+
+@cmd_decisions.command("candidates-scan")
+@click.option("--deviation-min", default=2, show_default=True, help="偏离聚集阈值(同一陈述≥N笔)")
+@click.option("--expiry-max", default=10, show_default=True, help="到期复核单轮上限(单边化)")
+@any_caller
+def cmd_decisions_candidates_scan(deviation_min, expiry_max) -> None:
+    """跑自动信号入口:①偏离聚集 ③到期复核 → 登记内部候选(幂等去重)。"""
+    from omnicompany.packages.domains.decisions import candidates
+
+    dev = candidates.scan_deviations(min_count=deviation_min)
+    exp = candidates.scan_expiry(max_candidates=expiry_max)
+    click.echo(f"✓ 偏离聚集候选 {len(dev)} 条 / 到期复核候选 {len(exp)} 条")
+    for it in dev + exp:
+        mark = it.get("material_id") or f"dup:{it.get('skipped_duplicate')}"
+        click.echo(f"    {it.get('ref')}  → {mark}")
+    st = candidates.queue_status()
+    click.echo(f"  队列现状: {st['by_status']} 来源分布 {st['by_source']}")
+
+
+@cmd_decisions.command("candidate-apply")
+@click.option("--verified", "verified_note", default="",
+              help="验证说明:目标带验证件时必须写明跑过什么(改版先过验证件)")
+@click.option("--by", default="", help="执行者")
+@any_caller
+def cmd_decisions_candidate_apply(verified_note, by) -> None:
+    """把审阅台已 accept 的候选写回陈述库(新版本+取代链;retire=状态置换,永不删除)。"""
+    from omnicompany.packages.domains.decisions import candidates, catalog
+
+    results = candidates.apply_accepted(verified_note=verified_note, by=by)
+    if not results:
+        click.echo("(无已 accept 待写回的候选)")
+        return
+    wrote = False
+    for r in results:
+        if r.get("skipped"):
+            click.echo(f"  ⚠ {r['material_id']}: {r['reason']}")
+        else:
+            wrote = True
+            click.echo(f"  ✓ {r['material_id']} action={r['action']} "
+                       f"→ {r.get('applied_record_id') or (r.get('targets') or '')}")
+    if wrote:
+        catalog.rebuild_index()
+
+
 @cmd_decisions.command("narrative")
-@click.option("--mode", type=click.Choice(["project", "period"]), default="project",
-              help="project=A 单领域聚焦 / period=B 时期全景")
+@click.option("--mode", type=click.Choice(["project", "scope", "period"]), default="project",
+              help="project=单领域 / scope=命名跨项目作用域 / period=时期全景")
 @click.option("--project", "-p", default=None, help="A 模式的领域(如 aigc)")
+@click.option("--scope", default=None, help="命名跨项目作用域(如 outward-publishing)")
 @click.option("--model", default=None, help="覆盖模型(默认 gpt-5.5)")
 @click.option("--max-sessions", "max_sessions", default=4, type=int, help="取料会话上限")
 @click.option("--force", is_flag=True, help="忽略缓存重抽")
+@click.option("--deterministic", is_flag=True, help="零模型:按真实时间和 project 生成可重建快照")
 @external_or_controller
-def cmd_decisions_narrative(mode, project, model, max_sessions, force) -> None:
+def cmd_decisions_narrative(mode, project, scope, model, max_sessions, force, deterministic) -> None:
     """提炼探索历程(连续操作流 + 主题泳道,独立 agent/gpt-5.5,带缓存)。"""
     from omnicompany.packages.domains.decisions.exploration import narrative
 
-    res = narrative.extract_narrative(mode=mode, project=project, model=model,
-                                      force=force, max_sessions=max_sessions)
-    click.echo(f"探索历程 · {mode}{('/' + project) if project else ''}:"
+    res = narrative.extract_narrative(mode=mode, project=project, scope=scope, model=model,
+                                      force=force, max_sessions=max_sessions,
+                                      deterministic=deterministic)
+    label = project or scope or ""
+    click.echo(f"探索历程 · {mode}{('/' + label) if label else ''}:"
                f"{len(res.get('lanes', []))} 泳道 · {len(res.get('events', []))} 事件")
     for ln in res.get("lanes", []):
         click.echo(f"  [{ln.get('theme')}]")
     if res.get("note"):
         click.echo(f"  ⚠ {res['note']}")
-    click.echo(f"  缓存: {narrative.cache_path(mode, project)}")
+    click.echo(f"  缓存: {narrative.cache_path(mode, project, scope)}")
 
 
 # ── 标准化动词层(计划第三期,BLF-2026-07-04-001)────────────────────────────────

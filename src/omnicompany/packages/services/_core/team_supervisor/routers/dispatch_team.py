@@ -85,7 +85,7 @@ class DispatchTeamRouter(SingleToolRouter):
     DESCRIPTION: ClassVar[str] = (
         "Dispatch a target team via subprocess and return its verdict + output. "
         "Used by team_supervisor's TestExecutor to actually run target teams "
-        "(e.g. 'repo-absorption') and collect real outputs for hypothesis evaluation. "
+        "(e.g. 'csv-to-md') and collect real outputs for hypothesis evaluation. "
         "Subprocess isolation avoids async loop conflicts and SQLiteBus state pollution."
     )
     INPUT_SCHEMA: ClassVar[dict] = {
@@ -93,7 +93,7 @@ class DispatchTeamRouter(SingleToolRouter):
         "properties": {
             "target_team_id": {
                 "type": "string",
-                "description": "Target team's registered id (e.g. 'repo-absorption')",
+                "description": "Target team's registered id (e.g. 'csv-to-md')",
                 "minLength": 1,
             },
             "input_data": {

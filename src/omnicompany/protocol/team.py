@@ -28,7 +28,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from omnicompany.protocol.anchor import (
     AnchorSpec,
@@ -123,6 +123,102 @@ class NodeKind(str, Enum):
     """
 
 
+class TeamPositionActivation(str, Enum):
+    """岗位在当前 TeamSpec 版本中的编制状态。
+
+    这是 Team 的声明元数据，不是运行会话状态。运行中的执行者仍由
+    Task.assignee、session binding 与 trace 记录，避免另造一份 lease 真源。
+    """
+
+    ACTIVE = "active"
+    """当前 TeamSpec 中已有 Worker 节点承接该岗位。"""
+
+    ON_DEMAND = "on_demand"
+    """岗位已定义，但当前 TeamSpec 不要求存在对应 Worker 节点。"""
+
+
+class TeamPositionSpec(BaseModel):
+    """Team 内的岗位边界。
+
+    岗位只描述组织职责，不复制 AgentSpec 的模型、prompt、工具、权限和运行预算。
+    当前激活的岗位由 ``TeamNode.position_id`` 单向引用；一个岗位可覆盖多个 Worker
+    节点，未激活岗位可以暂时没有节点。
+    """
+
+    id: str
+    """Team 内唯一岗位 ID。"""
+
+    name: str
+    """人类可读岗位名。"""
+
+    responsibilities: list[str] = Field(min_length=1)
+    """该岗位必须承担的职责。"""
+
+    non_responsibilities: list[str] = Field(min_length=1)
+    """该岗位明确不承担的职责，用于阻止职责漂移。"""
+
+    activation: TeamPositionActivation = TeamPositionActivation.ON_DEMAND
+    """当前 TeamSpec 版本中的编制状态。"""
+
+    activation_evidence_refs: list[str] = Field(default_factory=list)
+    """激活该岗位所依据的任务、benchmark、incident 或裁决引用。"""
+
+    context_refs: list[str] = Field(default_factory=list)
+    """岗位需要按需装载的外部上下文引用；不把长期记忆复制进 TeamSpec。"""
+
+    benchmark_refs: list[str] = Field(default_factory=list)
+    """验证该岗位是否值得长期保留的 benchmark 引用。"""
+
+    exit_conditions: list[str] = Field(default_factory=list)
+    """岗位休眠、合并或退役的可判定条件。"""
+
+    @model_validator(mode="after")
+    def _active_position_requires_evidence(self) -> "TeamPositionSpec":
+        if self.activation == TeamPositionActivation.ACTIVE and not self.activation_evidence_refs:
+            raise ValueError(
+                f"active position '{self.id}' requires activation_evidence_refs"
+            )
+        return self
+
+
+class TeamGenerationMethod(str, Enum):
+    """TeamSpec 的产生方式；无论方式如何，产物仍是同一个 TeamSpec。"""
+
+    DECLARED = "declared"
+    """由维护者直接声明的 TeamSpec。"""
+
+    TEAM_BUILDER = "team_builder"
+    """由唯一 Team Builder 设施生成的 TeamSpec。"""
+
+
+class TeamGenerationSpec(BaseModel):
+    """TeamSpec 的生成溯源，不是另一种 Team 类型。"""
+
+    method: TeamGenerationMethod
+    builder_id: str | None = None
+    """生成器 ID。``method=team_builder`` 时必须是现有 ``team-builder``。"""
+
+    request_ref: str | None = None
+    """生成请求或原始需求 material 的引用。"""
+
+    source_refs: list[str] = Field(default_factory=list)
+    """生成时读取的标准、计划、相似 Team 等来源引用。"""
+
+    parent_team_id: str | None = None
+    """由父 Team 拆解生成时，记录父 TeamSpec.id；它不表示新的 Team 类。"""
+
+    @model_validator(mode="after")
+    def _team_builder_is_the_only_generator(self) -> "TeamGenerationSpec":
+        if self.method == TeamGenerationMethod.TEAM_BUILDER:
+            if self.builder_id != "team-builder":
+                raise ValueError(
+                    "method=team_builder requires builder_id='team-builder'"
+                )
+        elif self.builder_id is not None:
+            raise ValueError("builder_id is only valid for method=team_builder")
+        return self
+
+
 class ScatterSpec(BaseModel):
     """分发节点规约 (Map-Reduce 原语)"""
 
@@ -182,6 +278,9 @@ class TeamNode(BaseModel):
     """子 Team 出口 Format ID（kind=SUB_PIPELINE 时使用）。
     若不提供，由 format_out property 从 sub_pipeline 终端节点推断。
     """
+
+    position_id: str | None = None
+    """承接的 TeamPositionSpec.id。只做 Team 内映射，不表示运行会话或 assignee。"""
 
     maturity: NodeMaturity = NodeMaturity.MATURE
     """节点成熟度。默认 MATURE 保持向后兼容。"""
@@ -295,7 +394,7 @@ class TeamSpec(BaseModel):
     purpose: str = ""
     """Team 业务目标（一两句话，面向 LLM 补全工具和自动修复系统）。
     回答：这条 Team 要完成什么业务价值？输入是什么，输出是什么？
-    示例: '从 demogame CSV diff 自动发现字段规律，产出 process_*.py 配置脚本'
+    示例: '从 my_domain CSV diff 自动发现字段规律，产出 process_*.py 配置脚本'
     """
 
     nodes: list[TeamNode]
@@ -309,11 +408,11 @@ class TeamSpec(BaseModel):
 
     group: str | None = None
     """Team 所属组。同组 Team 共享事件空间，组外消费者不消费。
-    例: "demogame-benchmark"。"""
+    例: "example-domain-benchmark"。"""
 
     tags: list[str] = Field(default_factory=list)
     """Team 的语义标签。发射的事件会自动继承这些标签。
-    例: ["demogame.benchmark.battle", "unity.lua"]"""
+    例: ["example_domain.benchmark.battle", "unity.lua"]"""
 
     min_core_version: str | None = None
     """声明此 Team 所需的最低核心版本。
@@ -323,6 +422,46 @@ class TeamSpec(BaseModel):
     parallel_groups: list[list[str]] = Field(default_factory=list)
     """可并行执行的节点组。每个组内的节点无数据依赖，可用 asyncio.gather 并行。
     例: [["pain_classify", "reward_compute", "route_accumulate"]]"""
+
+    positions: list[TeamPositionSpec] = Field(default_factory=list)
+    """可选岗位目录。它是 TeamSpec 的组成部分，不是 ProjectTeam/AgentTeam 新类型。"""
+
+    generation: TeamGenerationSpec | None = None
+    """可选生成溯源。手写和生成的 Team 都使用同一个 TeamSpec。"""
+
+    @model_validator(mode="after")
+    def _validate_position_mapping(self) -> "TeamSpec":
+        position_ids = [position.id for position in self.positions]
+        if len(position_ids) != len(set(position_ids)):
+            raise ValueError("duplicate TeamPositionSpec.id")
+
+        known_positions = set(position_ids)
+        mapped_positions: set[str] = set()
+        for node in self.nodes:
+            if node.position_id is None:
+                continue
+            if node.position_id not in known_positions:
+                raise ValueError(
+                    f"node '{node.id}' references unknown position_id "
+                    f"'{node.position_id}'"
+                )
+            mapped_positions.add(node.position_id)
+
+        active_without_node = [
+            position.id
+            for position in self.positions
+            if position.activation == TeamPositionActivation.ACTIVE
+            and position.id not in mapped_positions
+        ]
+        if active_without_node:
+            raise ValueError(
+                "active positions require at least one TeamNode mapping: "
+                f"{active_without_node}"
+            )
+
+        if self.generation and self.generation.parent_team_id == self.id:
+            raise ValueError("generation.parent_team_id cannot equal TeamSpec.id")
+        return self
 
 
 # 类型检查结果

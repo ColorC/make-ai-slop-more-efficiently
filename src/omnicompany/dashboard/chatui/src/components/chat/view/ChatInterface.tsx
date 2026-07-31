@@ -75,6 +75,8 @@ function ChatInterface({
     setGeminiModel,
     opencodeModel,
     setOpenCodeModel,
+    kimiModel,
+    setKimiModel,
     omniAgentModel,
     setOmniAgentModel,
     controllerModel,
@@ -204,6 +206,7 @@ function ChatInterface({
     codexModel,
     geminiModel,
     opencodeModel,
+    kimiModel,
     omniAgentModel,
     controllerModel,
     isLoading: isProcessing,
@@ -297,8 +300,10 @@ function ChatInterface({
             ? t('messageTypes.gemini')
             : provider === 'opencode'
               ? t('messageTypes.opencode', { defaultValue: 'OpenCode' })
-              : provider === 'omni_agent'
-                ? t('messageTypes.omni_agent', { defaultValue: 'Omni Agent' })
+              : provider === 'kimi'
+                ? t('messageTypes.kimi', { defaultValue: 'Kimi' })
+                : provider === 'omni_agent'
+                  ? t('messageTypes.omni_agent', { defaultValue: 'Omni Agent' })
             : t('messageTypes.claude');
 
     return (
@@ -340,6 +345,8 @@ function ChatInterface({
           setGeminiModel={setGeminiModel}
           opencodeModel={opencodeModel}
           setOpenCodeModel={setOpenCodeModel}
+          kimiModel={kimiModel}
+          setKimiModel={setKimiModel}
           omniAgentModel={omniAgentModel}
           setOmniAgentModel={setOmniAgentModel}
           controllerModel={controllerModel}
@@ -434,8 +441,10 @@ function ChatInterface({
                     ? t('messageTypes.gemini')
                     : provider === 'opencode'
                       ? t('messageTypes.opencode', { defaultValue: 'OpenCode' })
-                      : provider === 'omni_agent'
-                        ? t('messageTypes.omni_agent', { defaultValue: 'Omni Agent' })
+                      : provider === 'kimi'
+                        ? t('messageTypes.kimi', { defaultValue: 'Kimi' })
+                        : provider === 'omni_agent'
+                          ? t('messageTypes.omni_agent', { defaultValue: 'Omni Agent' })
                     : t('messageTypes.claude'),
           })}
           isTextareaExpanded={isTextareaExpanded}

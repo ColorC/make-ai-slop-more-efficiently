@@ -124,7 +124,7 @@ def _classify_changed_files(
 
     Returns:
         router_targets: [{"router_class": str, "source_file": str, "entity_id": str}]
-        format_ids:     [format_id_str, ...]  (e.g. "demogame.table_schema")
+        format_ids:     [format_id_str, ...]  (e.g. "example_domain.example_schema")
     """
     from .scanner import scan_file
     from . import get_registry

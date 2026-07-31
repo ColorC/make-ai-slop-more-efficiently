@@ -33,23 +33,50 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, ClassVar
+from typing import Any, Callable, ClassVar, Mapping
 
 from omnicompany.packages.services._core.omnicompany.formats import REVIEW_MATERIAL
 from omnicompany.packages.services._core.omnicompany.material_events import publish_material_event
 from omnicompany.protocol.format import FormatRegistry
 
+from .capabilities import (
+    ReminderSeverity,
+    ReviewContext,
+    ReviewSubmissionIntent,
+    is_structured_aigc_candidate_registration,
+    resolve_review_submission,
+)
 from .content_validators import TEXT_KINDS, validate_kind_file_compat, validate_material_structure
 from .material_types import (
+    ATTACHMENT_ONLY_REVIEW_KINDS,
     normalize_review_kind,
     normalize_review_project,
     normalize_review_tier,
     project_domains,
     project_registered_tracks,
+    project_subject_types,
     review_material_tags,
 )
 
 _log = logging.getLogger(__name__)
+_REMOTE_PREFLIGHT_WRITERS = frozenset({
+    "review-submit-remote-preflight",
+    "review-push-remote-preflight",
+    "remote-verification-service",
+})
+_REMOTE_VERIFICATION_WRITERS = frozenset({"remote-verification-service"})
+
+
+def _load_review_context(value: Any) -> ReviewContext | None:
+    """Read persisted review metadata without making legacy files unloadable."""
+
+    if value is None:
+        return None
+    try:
+        return ReviewContext.from_value(value)
+    except (TypeError, ValueError):
+        _log.warning("MaterialStore: ignored invalid persisted review_context", exc_info=True)
+        return None
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -175,11 +202,19 @@ class Material:
     archived: bool = False
     # extra: 留给元编程 phase B
     extra: dict[str, Any] = field(default_factory=dict)
+    # 审阅场景是一等字段；profile/schema/references 可由生产者声明，
+    # resolution/reminders 由统一解析器生成，不能藏进 extra 形成第二真源。
+    review_context: ReviewContext | None = None
     # ── Material 契约链(第二期): 项目上下文画布用它做投影(A1) ──
     project: str = ""            # 复用 decisions 库项目名录; "unfiled"=未分组
     track: str = ""              # 阶段/轨道名(如 信息审阅稿/交互审阅稿/工作报告)
     version: int | None = None   # 版本号(同 version_family 内递增)
     version_family: str = ""     # 版本族(同一份稿的多版本共 family; 默认=title)
+    # 内容资产身份: project → subject(如 EP0) → revision(整期修改版) → track → material。
+    # version 仍是某一材料族自身版本；revision 是跨台本/写稿/成片共享的整期版本。
+    subject_id: str = ""
+    subject_type: str = ""
+    revision: int | None = None
     links: dict[str, Any] = field(default_factory=dict)  # {parent?, supersedes?: [], related?: []} 值=material id
 
     def to_dict(self) -> dict[str, Any]:
@@ -204,10 +239,18 @@ class Material:
             "pushed_at": self.pushed_at,
             "archived": self.archived,
             "extra": dict(self.extra),
+            "review_context": (
+                self.review_context.to_dict()
+                if self.review_context is not None
+                else None
+            ),
             "project": self.project,
             "track": self.track,
             "version": self.version,
             "version_family": self.version_family,
+            "subject_id": self.subject_id,
+            "subject_type": self.subject_type,
+            "revision": self.revision,
             "links": dict(self.links),
         }
         return d
@@ -258,12 +301,30 @@ class Material:
             pushed_at=d.get("pushed_at"),
             archived=bool(d.get("archived", False)),
             extra=dict(d.get("extra") or {}),
+            review_context=_load_review_context(d.get("review_context")),
             project=d.get("project", "") or "",
             track=d.get("track", "") or "",
             version=d.get("version", None),
             version_family=d.get("version_family", "") or "",
+            subject_id=d.get("subject_id", "") or "",
+            subject_type=d.get("subject_type", "") or "",
+            revision=d.get("revision", None),
             links=dict(d.get("links") or {}),
         )
+
+
+# 决策候选等治理记录，以及图片附件，复用 MaterialStore 做持久化，但不是给用户逐件
+# 查看的一等工作报告/对照稿。默认审阅列表隐藏；专用治理命令可用
+# include_internal=True 显式读取。
+_INTERNAL_REVIEW_KINDS = frozenset({"decision-candidate"}) | ATTACHMENT_ONLY_REVIEW_KINDS
+
+
+def is_internal_review_material(material: Material) -> bool:
+    """普通审阅队列不应直接展示的内部记录或附件。"""
+
+    kind = material.kind.value if isinstance(material.kind, MaterialKind) else material.kind
+    visibility = str((material.extra or {}).get("reviewstage_visibility") or "").strip().lower()
+    return kind in _INTERNAL_REVIEW_KINDS or visibility == "internal"
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -277,6 +338,41 @@ def _now_iso() -> str:
 
 def _new_id(prefix: str = "mat") -> str:
     return f"{prefix}_{uuid.uuid4().hex[:16]}"
+
+
+def _normalize_subject_identity(
+    subject_id: Any,
+    subject_type: Any,
+    revision: Any,
+    *,
+    required_types: set[str] | None = None,
+) -> tuple[str, str, int | None]:
+    """校验跨阶段内容身份；空集合表示项目未声明强制主体类型。"""
+    sid = str(subject_id or "").strip()
+    stype = str(subject_type or "").strip().lower()
+    required = set(required_types or ())
+    any_value = bool(sid or stype or revision is not None)
+    if not any_value and not required:
+        return "", "", None
+    if not sid:
+        raise ValueError("subject_id is required — 例如视频分期使用 `--subject-id EP0`。")
+    if not stype:
+        raise ValueError("subject_type is required — 例如视频分期使用 `--subject-type episode`。")
+    if len(sid) > 80 or len(stype) > 40:
+        raise ValueError("subject_id/subject_type too long")
+    if required and stype not in required:
+        raise ValueError(
+            f"subject_type {stype!r} 不符合项目主体类型登记；允许值: {', '.join(sorted(required))}。"
+        )
+    if revision is None:
+        raise ValueError("revision is required — 这是跨台本/写稿/成片共享的整期修改版本。")
+    try:
+        rev = int(revision)
+    except (TypeError, ValueError):
+        raise ValueError(f"revision must be a positive integer, got {revision!r}")
+    if rev <= 0:
+        raise ValueError(f"revision must be a positive integer, got {rev}")
+    return sid, stype, rev
 
 
 def _atomic_write(path: Path, data: str) -> None:
@@ -353,6 +449,12 @@ class MaterialStore:
         self.format_registry = format_registry
         self._lock = threading.RLock()
         self._cache: dict[str, Material] | None = None
+        # 文件级签名台账: name → ((mtime_ns, size), material_id|None)。
+        # reload() 靠它做增量加载 — 签名没变的文件复用已解析对象, 不全量重读
+        # (733 个 JSON 全量重解析实测 0.17s, 是 review-canvas/domain-tree 每次全刷的主因)。
+        # CLI 会从进程外直写这些文件, 不能用进程内 dirty token; Windows 目录 mtime
+        # 不可靠, 必须文件级签名 (2026-07 P0 批)。
+        self._file_sigs: dict[str, tuple[tuple[int, int], str | None]] = {}
         self._subscribers: list[Callable[[str, Material], None]] = []
         self.root.mkdir(parents=True, exist_ok=True)
         self.files_dir.mkdir(parents=True, exist_ok=True)
@@ -375,22 +477,134 @@ class MaterialStore:
 
     # ── cache / load ─────────────────────────────────────────────────
 
+    def _scan_file_sigs(self) -> dict[str, tuple[int, int]] | None:
+        """os.scandir 取每个 material JSON 的 (mtime_ns, size) 签名 (毫秒级)。
+
+        None = 扫盘失败(权限/临时 IO 错), 调用方保守保持现状; 空 dict = 目录不存在/无文件。
+        """
+        sigs: dict[str, tuple[int, int]] = {}
+        try:
+            with os.scandir(self.root) as it:
+                for entry in it:
+                    try:
+                        if not entry.is_file() or not entry.name.lower().endswith(".json"):
+                            continue
+                        st = entry.stat()
+                    except OSError:
+                        continue
+                    sigs[entry.name] = (st.st_mtime_ns, st.st_size)
+        except FileNotFoundError:
+            return {}
+        except OSError:
+            return None
+        return sigs
+
+    def _drop_id_if_orphaned(self, material_id: str | None) -> None:
+        """摘除缓存里的 material_id — 但仅当没有其它在册文件还提供同一 id
+        (病态但可能的场景: 同 id 多文件, 删/坏/改一个不应误摘另一个的内容)。"""
+        if not material_id:
+            return
+        if any(v[1] == material_id for v in self._file_sigs.values()):
+            return
+        self._cache.pop(material_id, None)
+
+    def _refresh_locked(self) -> None:
+        """签名增量刷新 (须已持 self._lock 且 self._cache 非 None):
+        签名没变的文件复用已解析对象; 只重读变化的、补读新增的、删除消失的。"""
+        assert self._cache is not None
+        sigs = self._scan_file_sigs()
+        if sigs is None:
+            return
+        for name, sig in sigs.items():
+            prev = self._file_sigs.get(name)
+            # 未变 — 复用缓存对象, 不重读 (prev[1] 为 None = 坏文件, 没变之前同样不重读;
+            # 缓存里必须真有该对象才算命中, 防孤签名挡掉首载)
+            if prev is not None and prev[0] == sig and (prev[1] is None or prev[1] in self._cache):
+                continue
+            old_id = prev[1] if prev else None
+            try:
+                data = json.loads((self.root / name).read_text(encoding="utf-8"))
+                m = Material.from_dict(data)
+            except (OSError, json.JSONDecodeError, KeyError):
+                _log.exception("MaterialStore: skip corrupt %s", name)
+                # 坏文件也记签名 — 没变之前不再反复重读/刷 log
+                self._file_sigs[name] = (sig, None)
+                self._drop_id_if_orphaned(old_id)
+                continue
+            self._file_sigs[name] = (sig, m.id)
+            if old_id and old_id != m.id:
+                self._drop_id_if_orphaned(old_id)
+            self._cache[m.id] = m
+        # 盘上消失的文件 → 缓存同步摘除
+        for name in list(self._file_sigs):
+            if name not in sigs:
+                old_id = self._file_sigs.pop(name)[1]
+                self._drop_id_if_orphaned(old_id)
+
+    def _refresh_material_locked(self, material_id: str) -> None:
+        """Refresh one canonical material file before an ID-scoped read/write.
+
+        Reviewstage is used by the daemon, CLI processes, and multiple HTTP
+        workers at the same time. A worker that already has an ID cached must
+        still notice when another process records a remote-verification receipt;
+        otherwise its next mutation can overwrite that receipt with stale data.
+        """
+        assert self._cache is not None
+        name = f"{material_id}.json"
+        if Path(name).name != name:
+            return
+        path = self.root / name
+        previous = self._file_sigs.get(name)
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
+            if previous is not None:
+                old_id = self._file_sigs.pop(name)[1]
+                self._drop_id_if_orphaned(old_id)
+            return
+        except OSError:
+            return
+
+        signature = (stat.st_mtime_ns, stat.st_size)
+        if (
+            previous is not None
+            and previous[0] == signature
+            and (previous[1] is None or previous[1] in self._cache)
+        ):
+            return
+
+        old_id = previous[1] if previous else None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            material = Material.from_dict(data)
+        except (OSError, json.JSONDecodeError, KeyError):
+            _log.exception("MaterialStore: skip corrupt %s", name)
+            self._file_sigs[name] = (signature, None)
+            self._drop_id_if_orphaned(old_id)
+            return
+
+        self._file_sigs[name] = (signature, material.id)
+        if old_id and old_id != material.id:
+            self._drop_id_if_orphaned(old_id)
+        self._cache[material.id] = material
+
     def _ensure_loaded(self) -> dict[str, Material]:
         if self._cache is None:
-            self._cache = {}
-            for p in self.root.glob("*.json"):
-                try:
-                    data = json.loads(p.read_text(encoding="utf-8"))
-                    m = Material.from_dict(data)
-                    self._cache[m.id] = m
-                except (OSError, json.JSONDecodeError, KeyError):
-                    _log.exception("MaterialStore: skip corrupt %s", p)
+            with self._lock:
+                if self._cache is None:
+                    self._cache = {}
+                    self._refresh_locked()
         return self._cache
 
     def reload(self) -> None:
-        """强制清缓存, 下次 _ensure_loaded 真重新读盘. 测试/外部修改时用."""
+        """重新扫盘, 保证调用后看到盘上最新内容 (CLI 会进程外直写, 测试/外部修改时用)。
+
+        增量实现: 文件级 (mtime_ns, size) 签名比对, 未变文件不重读 — 对外语义不变。
+        """
         with self._lock:
-            self._cache = None
+            if self._cache is None:
+                return  # 尚未加载 — 下次 _ensure_loaded 首载即全量, 无需先扫一遍
+            self._refresh_locked()
 
     # ── CRUD ─────────────────────────────────────────────────────────
 
@@ -398,6 +612,12 @@ class MaterialStore:
         m.updated_at = _now_iso()
         path = self.root / f"{m.id}.json"
         _atomic_write(path, json.dumps(m.to_dict(), ensure_ascii=False, indent=2))
+        # 自己写的文件同步签名台账, 下次 reload 不会把自己刚写的盘当"外部变更"重读
+        try:
+            st = path.stat()
+            self._file_sigs[path.name] = ((st.st_mtime_ns, st.st_size), m.id)
+        except OSError:
+            self._file_sigs.pop(path.name, None)
 
     # ── 评论文件(每材料一个 markdown) ─────────────────────────────────
     # 用户 2026-06-13: 评论不进 Comment 数组、不自动发总控; 落一个 .md, 追加式,
@@ -457,13 +677,73 @@ class MaterialStore:
             raise ValueError("inline_content cannot write to absolute file_relpath")
         _atomic_write(path, inline_content)
 
-    def _read_declared_file_text(self, file_relpath: str, *, cap: int = 120_000) -> str | None:
+    def _read_declared_file_text(self, file_relpath: str, *, cap: int = 8_000_000) -> str | None:
+        """Read text material for structural checks, including self-contained HTML reports.
+
+        The former 120 KB cap routinely stopped inside the first embedded base64 image,
+        hiding later localhost or sibling-file dependencies from submit-time validation.
+        Eight MB covers normal review reports while keeping malformed/huge inputs bounded.
+        """
         path = self._resolve_declared_file_path(file_relpath)
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return None
         return text[:cap]
+
+    def validate_attachment_policy(
+        self,
+        *,
+        kind: MaterialKind | str,
+        links: Mapping[str, Any] | None,
+        extra: Mapping[str, Any] | None = None,
+        review_context: ReviewContext | Mapping[str, Any] | None = None,
+    ) -> Material | None:
+        """Validate internal image nodes without allowing naked image reviews.
+
+        A structured ``aigc-image`` candidate may be registered before its
+        comparison report because the report needs canonical candidate IDs.
+        It remains internal and is related from the report immediately after
+        registration.  Every ordinary image still requires an existing parent.
+        """
+
+        kind_text = normalize_review_kind(kind, self.format_registry)
+        if kind_text not in ATTACHMENT_ONLY_REVIEW_KINDS:
+            return None
+
+        parent_id = (links or {}).get("parent")
+        if not isinstance(parent_id, str) or not parent_id.strip():
+            if is_structured_aigc_candidate_registration(
+                kind=kind_text,
+                extra=extra,
+                review_context=review_context,
+            ):
+                return None
+            raise ValueError(
+                f"{kind_text} 仅可作为报告附件，不允许顶层单图送审。"
+                "请先提交含文字说明和对照关系的报告，再用 "
+                "`--attachment-of <report_material_id>`（或 links.parent）挂载；"
+                "能做成自包含 HTML 时，优先直接把图片嵌入报告。"
+            )
+        parent_id = parent_id.strip()
+        with self._lock:
+            parent = self._ensure_loaded().get(parent_id)
+        if parent is None:
+            raise ValueError(
+                f"{kind_text} 的父报告 {parent_id!r} 不存在；"
+                "必须先提交报告，再挂载图片附件。"
+            )
+        if getattr(parent, "archived", False):
+            raise ValueError(
+                f"{kind_text} 的父报告 {parent_id!r} 已归档；"
+                "请挂到当前有效的报告版本。"
+            )
+        if is_internal_review_material(parent):
+            raise ValueError(
+                f"{kind_text} 的 parent 必须是一份可审阅报告，"
+                f"不能挂到内部记录或图片附件 {parent_id!r}。"
+            )
+        return parent
 
     def create(
         self,
@@ -481,7 +761,11 @@ class MaterialStore:
         track: str | None = None,
         version: int | None = None,
         version_family: str | None = None,
+        subject_id: str | None = None,
+        subject_type: str | None = None,
+        revision: int | None = None,
         links: dict[str, Any] | None = None,
+        review_context: ReviewContext | Mapping[str, Any] | None = None,
     ) -> Material:
         """新建 material 落盘 + emit 'created'.
 
@@ -532,6 +816,18 @@ class MaterialStore:
 
         version_family_text = (version_family or "").strip() or title.strip()
 
+        registered_tracks = project_registered_tracks(project_v, self.format_registry)
+        required_subject_types = (
+            project_subject_types(project_v, self.format_registry)
+            if track_text in registered_tracks else set()
+        )
+        subject_id_text, subject_type_text, revision_int = _normalize_subject_identity(
+            subject_id,
+            subject_type,
+            revision,
+            required_types=required_subject_types,
+        )
+
         links_v: dict[str, Any] = dict(links or {})
         allowed_link_keys = {"parent", "supersedes", "related"}
         for key, value in links_v.items():
@@ -547,12 +843,37 @@ class MaterialStore:
                 f"links[{key!r}] 的值必须是字符串或字符串列表(material id), 收到 {type(value).__name__}。"
             )
 
+        extra_v = dict(extra or {})
+        structured_aigc_candidate = is_structured_aigc_candidate_registration(
+            kind=kind_text,
+            extra=extra_v,
+            review_context=review_context,
+        )
+        self.validate_attachment_policy(
+            kind=kind_text,
+            links=links_v,
+            extra=extra_v,
+            review_context=review_context,
+        )
+
         if file_relpath is not None:
             self._prepare_declared_file(file_relpath, inline_content)
-        extra_v = dict(extra or {})
+        if kind_text in ATTACHMENT_ONLY_REVIEW_KINDS:
+            extra_v["reviewstage_visibility"] = "internal"
+            extra_v["reviewstage_role"] = (
+                "aigc_candidate"
+                if structured_aigc_candidate
+                else "report_attachment"
+            )
         # 双权威禁令(A1): extra 里不许塞 project/track/version/version_family —— 这些是
         # 正式字段, 塞进 extra 会造成"两套真源"(一处走 store 校验, 一处绕过)。
-        reserved_extra_keys = {"project", "track", "version", "version_family"}
+        reserved_extra_keys = {
+            "project", "track", "version", "version_family",
+            "subject_id", "subject_type", "revision", "review_context",
+            # Server-derived trust records. Accepting either from producer/Agent
+            # input would let a submit payload fabricate its own push proof.
+            "remote_preflight", "remote_verification",
+        }
         leaked = reserved_extra_keys & set(extra_v.keys())
         if leaked:
             raise ValueError(
@@ -588,6 +909,48 @@ class MaterialStore:
         if structure_warnings:
             extra_v["structure_warnings"] = structure_warnings
 
+        review_resolution = resolve_review_submission(
+            ReviewSubmissionIntent(
+                kind=kind_text,
+                tier=tier_text,
+                title=title.strip(),
+                source_plan_id=source_plan_id or "",
+                source_subagent_id=source_subagent_id or "",
+                file_path=file_relpath or "",
+                # File-backed Markdown/HTML already has one validated read above;
+                # pass that exact body into submission preflight so canonical
+                # embed placeholders can be checked against typed references.
+                inline_content=validation_content or "",
+                data_schema_id=str(extra_v.get("data_schema_id") or ""),
+                extra=extra_v,
+                project=project_v,
+                track=track_text,
+                version=version_int,
+                version_family=version_family_text,
+                subject_id=subject_id_text,
+                subject_type=subject_type_text,
+                revision=revision_int,
+                links=links_v,
+                review_context=review_context,
+            ),
+            registry=self.format_registry,
+        )
+        if review_resolution.blocked:
+            blocking_messages = [
+                item.message
+                for item in review_resolution.context.reminders
+                if (
+                    item.severity.value
+                    if isinstance(item.severity, ReminderSeverity)
+                    else str(item.severity)
+                )
+                == ReminderSeverity.blocking.value
+            ]
+            raise ValueError(
+                "review submission preflight blocked: "
+                + " | ".join(blocking_messages)
+            )
+
         with self._lock:
             self._ensure_loaded()
             mid = _new_id("mat")
@@ -615,10 +978,14 @@ class MaterialStore:
                 updated_at=now,
                 history=history,
                 extra=extra_v,
+                review_context=review_resolution.context,
                 project=project_v,
                 track=track_text,
                 version=version_int,
                 version_family=version_family_text,
+                subject_id=subject_id_text,
+                subject_type=subject_type_text,
+                revision=revision_int,
                 links=links_v,
             )
             self._cache[mid] = m
@@ -632,11 +999,22 @@ class MaterialStore:
             source="boss_sight.reviewstage",
             tags=review_material_tags(kind_text, tier_text),
         )
+        # 封面生成不能占用提交请求，也不能因 Playwright/网络暂不可用而让材料
+        # 提交失败。这里只写一个可恢复、按材料版本去重的持久任务；Dashboard
+        # 后台 worker 异步消费。
+        try:
+            from .preview_queue import enqueue_preview
+
+            enqueue_preview(m, self.root)
+        except Exception:  # noqa: BLE001
+            _log.exception("Failed to enqueue preview for material %s", m.id)
         return m
 
     def get(self, material_id: str) -> Material | None:
         with self._lock:
-            return self._ensure_loaded().get(material_id)
+            cache = self._ensure_loaded()
+            self._refresh_material_locked(material_id)
+            return cache.get(material_id)
 
     def list(
         self,
@@ -647,14 +1025,21 @@ class MaterialStore:
         subagent_id: str | None = None,
         pushed_only: bool = False,
         include_archived: bool = False,
+        include_internal: bool = False,
         project: str | None = None,
         track: str | None = None,
+        subject_id: str | None = None,
+        revision: int | None = None,
     ) -> list[Material]:
         with self._lock:
             items = list(self._ensure_loaded().values())
         # 默认不返回已软归档的材料; 只有"已归档"视图显式 include_archived 才带上。
         if not include_archived:
             items = [m for m in items if not getattr(m, "archived", False)]
+        # 内部治理件不是普通审阅交付物。避免决策账、自动巡检记录混入用户审阅队列；
+        # 专用治理流水线仍可显式 include_internal=True 读取并处理。
+        if not include_internal:
+            items = [m for m in items if not is_internal_review_material(m)]
         if status is not None:
             sv = status.value if isinstance(status, MaterialStatus) else status
             items = [m for m in items if (m.status.value if isinstance(m.status, MaterialStatus) else m.status) == sv]
@@ -671,6 +1056,10 @@ class MaterialStore:
             items = [m for m in items if getattr(m, "project", "") == project]
         if track is not None:
             items = [m for m in items if getattr(m, "track", "") == track]
+        if subject_id is not None:
+            items = [m for m in items if getattr(m, "subject_id", "") == subject_id]
+        if revision is not None:
+            items = [m for m in items if getattr(m, "revision", None) == revision]
         items.sort(key=lambda m: m.created_at, reverse=True)
         return items
 
@@ -702,16 +1091,105 @@ class MaterialStore:
             self._notify("verdict_changed", m)
             return m
 
-    def set_archived(self, material_id: str, archived: bool, *, by: str = "user") -> Material:
-        """软归档/还原。不删文件; 仅置 archived 标志, 默认 list 不再返回。"""
+    def patch_extra(self, material_id: str, patch: dict[str, Any], *, by: str = "system") -> Material:
+        """浅合并更新 extra(如候选流水线写回后盖 applied 标记)。history 记 audit。"""
+        patch_keys = set((patch or {}).keys())
+        if "remote_preflight" in patch_keys and by not in _REMOTE_PREFLIGHT_WRITERS:
+            raise PermissionError(
+                "remote_preflight is server-derived and cannot be patched by "
+                f"{by!r}"
+            )
+        if "remote_verification" in patch_keys and by not in _REMOTE_VERIFICATION_WRITERS:
+            raise PermissionError(
+                "remote_verification requires the independent remote verification service"
+            )
         with self._lock:
             m = self.get(material_id)
             if m is None:
                 raise KeyError(material_id)
+            m.extra = {**(m.extra or {}), **(patch or {})}
+            m.history.append({
+                "event": "extra_patched",
+                "keys": sorted((patch or {}).keys()),
+                "by": by, "at": _now_iso(),
+            })
+            self._persist(m)
+            self._notify("updated", m)
+            return m
+
+    def set_structure(
+        self,
+        material_id: str,
+        *,
+        subject_id: str,
+        subject_type: str,
+        revision: int,
+        track: str | None = None,
+        by: str = "system",
+    ) -> Material:
+        """登记或修正内容资产层级；用于存量迁移，保留材料 id、评论与裁决历史。"""
+        with self._lock:
+            m = self.get(material_id)
+            if m is None:
+                raise KeyError(material_id)
+            next_track = (track or m.track or "").strip()
+            registered_tracks = project_registered_tracks(m.project, self.format_registry)
+            required_types = (
+                project_subject_types(m.project, self.format_registry)
+                if next_track in registered_tracks else set()
+            )
+            sid, stype, rev = _normalize_subject_identity(
+                subject_id, subject_type, revision, required_types=required_types,
+            )
+            before = {
+                "subject_id": m.subject_id,
+                "subject_type": m.subject_type,
+                "revision": m.revision,
+                "track": m.track,
+            }
+            m.subject_id = sid
+            m.subject_type = stype
+            m.revision = rev
+            if track is not None:
+                m.track = next_track
+            m.updated_at = _now_iso()
+            m.history.append({
+                "event": "structure_registered",
+                "before": before,
+                "after": {
+                    "subject_id": sid,
+                    "subject_type": stype,
+                    "revision": rev,
+                    "track": m.track,
+                },
+                "by": by,
+                "at": m.updated_at,
+            })
+            self._persist(m)
+            self._notify("updated", m)
+            return m
+
+    def set_archived(self, material_id: str, archived: bool, *, by: str = "user") -> Material:
+        """软归档/还原，不删文件；归档会撤销当前推送状态。
+
+        还原材料不能复活一个旧的、可能已失效的远端推送证明；如需再次推送，必须
+        重新经过实时远端门禁。
+        """
+        with self._lock:
+            m = self.get(material_id)
+            if m is None:
+                raise KeyError(material_id)
+            cleared_push = bool(archived and m.pushed_to_user)
+            if cleared_push:
+                m.pushed_to_user = False
+                m.pushed_reason = None
+                m.pushed_at = None
             m.archived = bool(archived)
             m.history.append({
                 "event": "archived" if archived else "unarchived",
-                "by": by, "at": _now_iso(),
+                "by": by,
+                "at": _now_iso(),
+                "cleared_push": cleared_push,
             })
             self._persist(m)
             self._notify("updated", m)
@@ -865,15 +1343,38 @@ class MaterialStore:
             return a
 
     def mark_pushed(self, material_id: str, *, reason: str) -> Material:
-        """块 4 R7: 总控调 push_material_to_user 时打标记 + emit 'pushed'."""
+        """块 4 R7: 打推送标记 + emit ``pushed``。
+
+        2026-07-25 用户裁定：远端验证硬门禁去除，降级为 advisory。预检/回执
+        blocker 仍计算并记入 history（``push_gate_advisory``），但不再阻止推送。
+        """
         with self._lock:
             m = self.get(material_id)
             if m is None:
                 raise KeyError(material_id)
+            # Push is a state transition, not a read receipt. Repeating it must
+            # not rewrite history or emit another ``pushed`` WS event; otherwise
+            # a client refresh can create an event/reload feedback loop.
+            if m.pushed_to_user:
+                return m
+            from .remote_preflight import remote_push_blockers
+
+            advisory_blockers = remote_push_blockers(
+                material_id=m.id,
+                remote_preflight=(m.extra or {}).get("remote_preflight"),
+                remote_verification=(m.extra or {}).get("remote_verification"),
+            )
             m.pushed_to_user = True
             m.pushed_reason = reason
             m.pushed_at = _now_iso()
             m.history.append({"event": "pushed", "reason": reason, "at": m.pushed_at})
+            if advisory_blockers:
+                m.history.append({
+                    "event": "push_gate_advisory",
+                    "blockers": advisory_blockers,
+                    "note": "远程验证未通过；按 2026-07-25 裁定门禁为提示级，仍已推送",
+                    "at": m.pushed_at,
+                })
             self._persist(m)
             self._notify("pushed", m)
             return m
@@ -907,6 +1408,7 @@ class MaterialStore:
             if m is None:
                 return False
             (self.root / f"{material_id}.json").unlink(missing_ok=True)
+            self._file_sigs.pop(f"{material_id}.json", None)
             # 也删 file 内容
             if m.file_relpath:
                 f = self.resolve_file_path(m)

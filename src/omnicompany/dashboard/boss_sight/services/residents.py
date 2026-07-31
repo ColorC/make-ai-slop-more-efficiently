@@ -71,6 +71,28 @@ def _enrich_digest(rec: dict[str, Any], get_digest: Callable[[str, str], dict[st
     return rec
 
 
+def _enrich_binding(rec: dict[str, Any], binds: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """叠加会话自己声明的权威绑定(plan/project/task),优先于 Rust/digest 推测。
+
+    见 docs/plans/dashboard/[2026-07-09]SESSION-SELF-BINDING/plan.md (4.1/4.5)。
+    """
+    key = rec.get("key") or f"{rec.get('provider')}:{rec.get('session_id')}"
+    bd = binds.get(key) or {}
+    if not bd:
+        return rec
+    if bd.get("active_plan"):
+        rec["active_plan"] = bd["active_plan"]
+    if bd.get("project"):
+        rec["project"] = bd["project"]
+    if bd.get("task_id"):
+        rec["task_id"] = bd["task_id"]
+    if bd.get("topic"):  # 会话自述主题盖过 digest 推测的 title
+        rec["title"] = bd["topic"]
+        rec["topic"] = bd["topic"]
+    rec["authoritative"] = True  # 有会话自己声明的绑定(vs 纯推测)
+    return rec
+
+
 def build_residents(
     now: float | None = None,
     *,
@@ -92,9 +114,21 @@ def build_residents(
     if rust_fetch is None:
         rust_fetch = rust_scanner_client.residents
     if get_digest is None:
-        from .agent_digest import get_digest as _gd
+        from .agent_digest import load_digests
 
-        get_digest = _gd
+        # One residents refresh may enrich dozens of sessions. Loading and
+        # parsing the complete digest JSON once per resident caused repeated
+        # GIL-heavy work every few seconds.
+        digest_store = load_digests()
+
+        def get_digest(provider: str, session_id: str) -> dict[str, Any] | None:
+            digest = digest_store.get(f"{provider}:{session_id}")
+            if not digest:
+                return None
+            return {
+                key: digest.get(key, "")
+                for key in ("project", "plan", "title", "last_step")
+            }
     if get_attention is None:
         from . import agent_attention
 
@@ -118,12 +152,23 @@ def build_residents(
     except Exception:  # noqa: BLE001 — 举手取数失败不该挡住整列表
         attn = {}
 
+    try:
+        from omnicompany.packages.services._core.identity import bindings_by_session_key
+
+        binds = bindings_by_session_key() or {}
+    except Exception:  # noqa: BLE001 — 台账读失败不该挡住整列表
+        binds = {}
+
     enriched: list[dict[str, Any]] = []
     for rec in residents:
         rec = dict(rec)
         try:
             rec = _enrich_digest(rec, get_digest)
         except Exception:  # noqa: BLE001 — 摘要回填失败不该挡住整列表
+            pass
+        try:
+            rec = _enrich_binding(rec, binds)
+        except Exception:  # noqa: BLE001 — 权威绑定叠加失败不该挡住整列表
             pass
         a = attn.get(rec.get("session_id", "")) or attn.get(rec.get("key", ""))
         if a:

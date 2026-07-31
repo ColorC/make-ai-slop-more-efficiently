@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 
 from .. import library
+from .._paths import _OMNI_ROOT
 from ..sources import conversation as cv
 from . import causal_extract
 from . import projection
@@ -21,12 +22,13 @@ from ._paths import EXPLORATION_ROOT, ensure_dirs
 
 DEFAULT_MODEL = "gpt-5.5"
 NARRATIVE_DIR = EXPLORATION_ROOT / "narratives"
+SCOPE_CONFIG = _OMNI_ROOT / "config" / "decisions" / "narrative_scopes.yaml"
 
 # 项目注册表 id → 决策库 project 字段(单一真源映射;前端只传注册表 id,后端归一)。
-# 两套分类对不齐:aigc-image≠aigc、demogame 一对多、omni-* 归 omnicompany。
+# 两套分类对不齐:aigc-image≠aigc、业务域一对多、omni-* 归 omnicompany。
 REGISTRY_TO_DECISIONS = {
     "aigc-image": "aigc", "aigc-music": "aigc",
-    "demogame-config": "demogame", "demogame-unity": "demogame", "demogame-prefab": "demogame", "demogame-demo": "demogame",
+    "example-config": "example_domain", "example-unity": "example_domain", "example-prefab": "example_domain", "example-demo": "example_domain",
     "omnidashboard": "omnicompany", "omni-guard": "omnicompany", "omni-productization": "omnicompany",
     "omni-sw-engineering": "omnicompany", "omni-learning": "omnicompany",
     "omni-teambuilder-doctor": "omnicompany", "omni-remote": "omnicompany", "decisions": "omnicompany",
@@ -146,6 +148,7 @@ def _build_corpus(refs: list[str], per_session: int, max_sessions: int) -> tuple
 def _skeleton(project: str) -> list[dict]:
     """library-first:以 projection 投影(决策/信念/指正/物料 + 否决 + 版本链)为骨架,事实真本体。"""
     g = projection.build_graph(project=project, include_deleted=True)
+    records = library.fold()
     rejects: dict[str, list[str]] = {}
     for n in g["nodes"]:
         if n.get("record_kind") == "rejected":
@@ -159,6 +162,7 @@ def _skeleton(project: str) -> list[dict]:
         is_gap = bool(n.get("is_gap"))   # 物料缺口:台账登记但磁盘未定位/已丢失 —— 只有这种才该灰显
         skel.append({
             "id": n["id"], "kind": n.get("kind") or "", "record_kind": n.get("record_kind"),
+            "project": n.get("project") or project,
             "statement": n.get("statement") or n.get("label") or "",
             "status": n.get("status") or "",
             "gap": is_gap, "gap_reason": (n.get("status") or "") if is_gap else "",
@@ -168,6 +172,8 @@ def _skeleton(project: str) -> list[dict]:
             "rejected": rejects.get(n["id"], []),
             "version": n.get("version"), "version_family": n.get("version_family"),
             "is_root": bool(n.get("is_root")),
+            "created_at": (records.get(n["id"]) or {}).get("created_at") or "",
+            "updated_at": (records.get(n["id"]) or {}).get("updated_at") or "",
         })
     # 真实结构边(汇入/分出/跨主题交互):产出/依据/立足/版本链/因果精化 —— 去掉否决边(已并入 rejected 字段)
     skel_ids = {s["id"] for s in skel}
@@ -175,6 +181,76 @@ def _skeleton(project: str) -> list[dict]:
              for e in g["edges"]
              if e.get("rel") != "rejected" and e["source"] in skel_ids and e["target"] in skel_ids]
     return skel, edges
+
+
+def _scope_definition(scope: str) -> dict:
+    """读取命名叙事作用域。作用域只选记录,不复制事实。"""
+    try:
+        import yaml
+        raw = yaml.safe_load(SCOPE_CONFIG.read_text(encoding="utf-8")) or {}
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"无法读取叙事作用域配置: {SCOPE_CONFIG}: {exc}") from exc
+    definition = (raw.get("scopes") or {}).get(scope)
+    if not isinstance(definition, dict):
+        known = ", ".join(sorted((raw.get("scopes") or {}).keys())) or "无"
+        raise ValueError(f"未知叙事作用域 {scope!r}; 已注册: {known}")
+    return definition
+
+
+def _scope_record_ids(definition: dict) -> set[str]:
+    projects = {str(x) for x in definition.get("projects") or []}
+    anchor_terms = [str(x).lower().replace("\\", "/") for x in definition.get("anchor_contains") or []]
+    wanted_tags = {str(x).lower() for x in definition.get("tags") or []}
+    selected: set[str] = set()
+    for rid, record in library.fold().items():
+        anchor = str((record.get("anchor") or {}).get("ref") or "").lower().replace("\\", "/")
+        tags = {str(x).lower() for x in record.get("tags") or []}
+        if (record.get("project") in projects
+                or any(term in anchor for term in anchor_terms)
+                or bool(tags & wanted_tags)):
+            selected.add(rid)
+    return selected
+
+
+def _skeleton_scope(scope: str) -> tuple[list[dict], list[dict], dict]:
+    """从统一图投影中筛出命名作用域,保留同一节点/边契约。"""
+    definition = _scope_definition(scope)
+    selected = _scope_record_ids(definition)
+    records = library.fold()
+    graph = projection.build_graph(project=None, include_deleted=True)
+    rejects: dict[str, list[str]] = {}
+    for node in graph["nodes"]:
+        if node.get("record_kind") == "rejected" and node.get("of_decision") in selected:
+            rejects.setdefault(node.get("of_decision"), []).append(node.get("statement") or "")
+
+    skeleton: list[dict] = []
+    for node in graph["nodes"]:
+        if node.get("record_kind") == "rejected" or node.get("id") not in selected:
+            continue
+        if node.get("status") == "superseded":
+            continue
+        is_gap = bool(node.get("is_gap"))
+        skeleton.append({
+            "id": node["id"], "kind": node.get("kind") or "", "record_kind": node.get("record_kind"),
+            "project": node.get("project") or (records.get(node["id"]) or {}).get("project") or "unassigned",
+            "statement": node.get("statement") or node.get("label") or "",
+            "status": node.get("status") or "", "gap": is_gap,
+            "gap_reason": (node.get("status") or "") if is_gap else "",
+            "verification_status": node.get("verification_status") or "",
+            "session_ref": node.get("session_ref") or "",
+            "excerpt": (node.get("anchor") or {}).get("excerpt") or "",
+            "rejected": rejects.get(node["id"], []),
+            "version": node.get("version"), "version_family": node.get("version_family"),
+            "is_root": bool(node.get("is_root")),
+            "created_at": (records.get(node["id"]) or {}).get("created_at") or "",
+            "updated_at": (records.get(node["id"]) or {}).get("updated_at") or "",
+        })
+    ids = {node["id"] for node in skeleton}
+    edges = [{"source": edge["source"], "target": edge["target"], "rel": edge["rel"],
+              "note": edge.get("note", "")}
+             for edge in graph["edges"]
+             if edge.get("rel") != "rejected" and edge["source"] in ids and edge["target"] in ids]
+    return skeleton, edges, definition
 
 
 def _anchor_corpus(skel: list[dict], win: int = 1400, max_total: int = 52000) -> str:
@@ -233,6 +309,9 @@ def _event(seq: int, s: dict, o: dict) -> dict:
     full = s["statement"] or ""
     return {
         "seq": seq, "lane": o.get("lane") or s.get("version_family") or "主线",
+        "project": s.get("project") or "",
+        "created_at": s.get("created_at") or "",
+        "updated_at": s.get("updated_at") or "",
         "kind": kind,
         "summary": (o.get("summary") or "").strip() or _brief(full, 44),   # 卡片正文:说清发生了什么
         "statement": full,                                                 # 完整陈述进下钻
@@ -242,6 +321,26 @@ def _event(seq: int, s: dict, o: dict) -> dict:
         "version": s.get("version"), "version_family": s.get("version_family"),
         "gap": s.get("gap", False), "gap_reason": s.get("gap_reason", ""),
         "is_root": s.get("is_root", False), "node_id": s["id"],
+    }
+
+
+def _deterministic_order(skeleton: list[dict]) -> dict:
+    """零模型投影:真实时间排序 + project 泳道;完整陈述不做摘要压缩。"""
+    ordered = sorted(
+        skeleton,
+        key=lambda node: (node.get("created_at") or node.get("updated_at") or "", node.get("id") or ""),
+    )
+    projects = []
+    for node in ordered:
+        project = node.get("project") or "unassigned"
+        if project not in projects:
+            projects.append(project)
+    lanes = [{"id": f"project:{project}", "theme": project,
+              "summary": f"{project} 发布决策与纠正"} for project in projects]
+    return {
+        "lanes": lanes,
+        "ordering": [{"node_id": node["id"], "lane": f"project:{node.get('project') or 'unassigned'}",
+                      "summary": node.get("statement") or ""} for node in ordered],
     }
 
 
@@ -265,16 +364,21 @@ def _assemble(skel: list[dict], res: dict) -> list[dict]:
     return events
 
 
-def _scope_key(mode: str, project: str | None) -> str:
-    return f"project_{project}" if mode == "project" else "period_recent"
+def _scope_key(mode: str, project: str | None, scope: str | None = None) -> str:
+    if mode == "project":
+        return f"project_{project}"
+    if mode == "scope":
+        return f"scope_{scope}"
+    return "period_recent"
 
 
-def cache_path(mode: str, project: str | None):
-    return NARRATIVE_DIR / f"{_scope_key(mode, project)}.json"
+def cache_path(mode: str, project: str | None = None, scope: str | None = None):
+    return NARRATIVE_DIR / f"{_scope_key(mode, project, scope)}.json"
 
 
-def read_narrative(mode: str = "project", project: str | None = None) -> dict | None:
-    p = cache_path(mode, canon_project(project))
+def read_narrative(mode: str = "project", project: str | None = None,
+                   scope: str | None = None) -> dict | None:
+    p = cache_path(mode, canon_project(project), scope)
     if p.is_file():
         try:
             return json.loads(p.read_text(encoding="utf-8"))
@@ -295,17 +399,19 @@ def list_narratives() -> list[dict]:
             continue
         meta = d.get("_meta") or {}
         out.append({"key": f.stem, "mode": meta.get("mode"), "project": meta.get("project"),
+                    "scope": meta.get("scope"),
                     "registry_id": to_registry_id(meta.get("project")),
                     "lanes": len(d.get("lanes", [])), "events": len(d.get("events", []))})
     return out
 
 
-def extract_narrative(mode: str = "project", project: str | None = None, *,
+def extract_narrative(mode: str = "project", project: str | None = None, *, scope: str | None = None,
                       model: str | None = None, force: bool = False,
-                      max_sessions: int = 4, per_session: int = 22000) -> dict:
+                      max_sessions: int = 4, per_session: int = 22000,
+                      deterministic: bool = False) -> dict:
     """提炼一条探索历程(带缓存)。mode=project(A,单领域聚焦)/ period(B,时期全景)。"""
     project = canon_project(project)   # 注册表 id → 决策库 project,前后端统一
-    cached = read_narrative(mode, project)
+    cached = read_narrative(mode, project, scope)
     if cached is not None and not force:
         return cached
 
@@ -314,10 +420,18 @@ def extract_narrative(mode: str = "project", project: str | None = None, *,
     # mode=project:library-first —— 决策库投影骨架为锚 + 有向取材 + LLM 只排序增益 + 全覆盖回填。
     # 这复用 projection.build_graph 已稳定产出的 44 节点骨架(决策/信念/指正/物料/否决/版本链),
     # 不再从原始对话头部定长截断从零重抽(那会丢掉落在对话尾部 85% 处的核心决策段)。
-    if mode == "project":
-        if not project:
-            raise ValueError("mode=project 需要 project")
-        skel, sk_edges = _skeleton(project)
+    if mode in ("project", "scope"):
+        definition: dict = {}
+        if mode == "project":
+            if not project:
+                raise ValueError("mode=project 需要 project")
+            skel, sk_edges = _skeleton(project)
+            focus_name = project
+        else:
+            if not scope:
+                raise ValueError("mode=scope 需要 scope")
+            skel, sk_edges, definition = _skeleton_scope(scope)
+            focus_name = definition.get("display_name") or scope
         if skel:
             corpus = _anchor_corpus(skel)
             listing = [{
@@ -327,20 +441,29 @@ def extract_narrative(mode: str = "project", project: str | None = None, *,
                 **({"状态": s["status"]} if s["status"] in ("deleted", "untested") else {}),
                 "引文": (s["excerpt"] or "")[:160],
             } for s in skel]
-            user = ("【已确认的真实节点(骨架:按此排序+分泳道+补叙事,不增不漏)】\n"
-                    + json.dumps(listing, ensure_ascii=False, indent=1)
-                    + "\n\n【定位到的对话原文窗口(写 product_change 用)】\n"
-                    + (corpus or "(无定位窗口,凭陈述写)"))
-            res = call_json(system=_SYS_ORDER, user=user, schema=ORDER_SCHEMA,
-                            model=model or DEFAULT_MODEL, caller="decisions.narrative",
-                            max_tokens=8000) or {"ordering": []}
+            if deterministic:
+                res = _deterministic_order(skel)
+            else:
+                user = ("【已确认的真实节点(骨架:按此排序+分泳道+补叙事,不增不漏)】\n"
+                        + json.dumps(listing, ensure_ascii=False, indent=1)
+                        + "\n\n【定位到的对话原文窗口(写 product_change 用)】\n"
+                        + (corpus or "(无定位窗口,凭陈述写)"))
+                res = call_json(system=_SYS_ORDER, user=user, schema=ORDER_SCHEMA,
+                                model=model or DEFAULT_MODEL, caller="decisions.narrative",
+                                max_tokens=8000) or {"ordering": []}
             out = {"lanes": res.get("lanes", []), "events": _assemble(skel, res),
                    "edges": sk_edges, "narrative": res.get("narrative", ""),
-                   "_meta": {"mode": mode, "project": project, "model": model or DEFAULT_MODEL,
-                             "skeleton": len(skel), "edges": len(sk_edges), "from": "library-first"}}
+                   "_meta": {"mode": mode, "project": project, "scope": scope,
+                             "display_name": focus_name,
+                             "model": "deterministic" if deterministic else (model or DEFAULT_MODEL),
+                             "skeleton": len(skel), "edges": len(sk_edges),
+                             "from": "library-first-deterministic" if deterministic else "library-first"}}
             ensure_dirs(); NARRATIVE_DIR.mkdir(parents=True, exist_ok=True)
-            cache_path(mode, project).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+            cache_path(mode, project, scope).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
             return out
+        if mode == "scope":
+            return {"lanes": [], "events": [], "narrative": "", "note": "作用域内没有决策记录",
+                    "_meta": {"mode": mode, "scope": scope, "sessions": []}}
         refs = _session_refs_for_project(project)   # 决策库该领域为空 → 退化到原文重抽
         focus = project
     else:
@@ -360,7 +483,7 @@ def extract_narrative(mode: str = "project", project: str | None = None, *,
 
     ensure_dirs()
     NARRATIVE_DIR.mkdir(parents=True, exist_ok=True)
-    cache_path(mode, project).write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
+    cache_path(mode, project, scope).write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")
     return res
 
 
@@ -381,17 +504,20 @@ def _main(argv: list[str] | None = None) -> int:
         pass
 
     ap = argparse.ArgumentParser(description="提炼探索历程(连续操作流+主题泳道)")
-    ap.add_argument("--mode", choices=["project", "period"], default="project")
+    ap.add_argument("--mode", choices=["project", "scope", "period"], default="project")
     ap.add_argument("--project", default=None, help="A 模式:领域/项目(如 aigc)")
+    ap.add_argument("--scope", default=None, help="命名跨项目作用域(如 outward-publishing)")
     ap.add_argument("--model", default=None)
     ap.add_argument("--max-sessions", type=int, default=4)
     ap.add_argument("--force", action="store_true", help="忽略缓存重抽")
+    ap.add_argument("--deterministic", action="store_true", help="零模型:按真实时间和 project 生成可重建快照")
     args = ap.parse_args(argv)
-    res = extract_narrative(mode=args.mode, project=args.project, model=args.model,
-                            force=args.force, max_sessions=args.max_sessions)
+    res = extract_narrative(mode=args.mode, project=args.project, scope=args.scope, model=args.model,
+                            force=args.force, max_sessions=args.max_sessions,
+                            deterministic=args.deterministic)
     print(json.dumps({"lanes": len(res.get("lanes", [])), "events": len(res.get("events", [])),
                       "themes": [l.get("theme") for l in res.get("lanes", [])],
-                      "cache": str(cache_path(args.mode, args.project))}, ensure_ascii=False, indent=2))
+                      "cache": str(cache_path(args.mode, args.project, args.scope))}, ensure_ascii=False, indent=2))
     return 0
 
 

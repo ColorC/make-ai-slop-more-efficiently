@@ -1,0 +1,6 @@
+interface:
+  display_name: "游戏证据记录"
+  short_description: "完整记录可在原图复建点击位置的前后动作证据"
+  default_prompt: "Use $game-evidence-recorder to capture and close a source-pixel-reconstructable Before-Action-After step."
+policy:
+  allow_implicit_invocation: true

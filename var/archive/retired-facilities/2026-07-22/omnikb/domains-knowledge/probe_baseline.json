@@ -1,0 +1,33 @@
+{
+  "ts": 1784296736.0273535,
+  "pipeline": "omnikb.audit",
+  "per_node": {
+    "audit_all": {
+      "sufficiency": "partial",
+      "confidence_self": 0.6,
+      "missing_info": [
+        {
+          "description": "kb.audit_request 和 kb.audit_report 的具体 Schema/字段定义缺失，无法确认输入是否携带执行 5 类审计所需的完整元数据（如路由拓扑、锚点版本、时间戳、格式清单等）",
+          "critical": true,
+          "suggested_source": "LAP Router 类型定义库 / 上下游接口文档",
+          "confidence": 0.5
+        }
+      ],
+      "concerns": [
+        "仅凭类型名称无法验证输入字段粒度是否满足 5 类审计的判定条件",
+        "PASS/PARTIAL/FAIL 的业务逻辑清晰，但强依赖输入数据的完整性与准确性，且未提供本次运行的真实 Prompt/Output 供交叉验证"
+      ],
+      "attention_focus": "需核实 kb.audit_request 中是否完整包含路由定义、状态快照、时间序列及格式覆盖基准，以支撑 validation/anchor drift/orphan/staleness/coverage 的计算",
+      "format_in": "kb.audit_request",
+      "format_out": "kb.audit_report",
+      "kind": "ANCHOR"
+    }
+  },
+  "summary": {
+    "total": 1,
+    "sufficient": 0,
+    "partial": 1,
+    "insufficient": 0,
+    "unknown": 0
+  }
+}

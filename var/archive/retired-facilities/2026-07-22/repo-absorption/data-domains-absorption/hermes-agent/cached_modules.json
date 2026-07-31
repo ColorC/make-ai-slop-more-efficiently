@@ -1,0 +1,278 @@
+[
+  {
+    "path": "agent/retry_utils.py",
+    "gap_id": "G1",
+    "priority": "P1",
+    "reason": "Jittered exponential backoff with monotonic counter seed for thundering-herd prevention. Uses a thread-safe lock + counter (time.time_ns ^ tick * 0x9E3779B9) to seed per-attempt random jitter, decorrelating concurrent retries when multiple gateway sessions hit the same rate-limited provider. Replaces fixed exponential backoff that causes synchronized retry spikes. Parameters: base_delay=5s, max_delay=120s, jitter_ratio=0.5."
+  },
+  {
+    "path": "agent/error_classifier.py",
+    "gap_id": "G1",
+    "priority": "P1",
+    "reason": "Priority-ordered API error classification pipeline replacing scattered string matching. Defines FailoverReason enum with 13+ distinct failure categories (auth, billing, rate_limit, overloaded, context_overflow, thinking_signature, etc.) and ClassifiedError dataclass with recovery action hints (retryable, should_compress, should_rotate_credential, should_fallback). 7-stage pipeline: 1) provider-specific patterns, 2) HTTP status code, 3) error code, 4) message pattern matching (billing vs rate_limit disambiguation using _USAGE_LIMIT_TRANSIENT_SIGNALS), 5) transport errors, 6) server disconnect + large session → context overflow, 7) fallback unknown. Handles OpenRouter wrapped provider errors via metadata.raw JSON parsing."
+  },
+  {
+    "path": "tools/approval.py",
+    "gap_id": "G2",
+    "priority": "P0",
+    "reason": "Single source of truth for dangerous command approval with 30+ regex patterns covering: recursive deletes, world-writable chmod, SQL DROP/DELETE, fork bombs, pipe-to-shell, remote script execution via process substitution, git force push/reset, self-termination protection (pkill hermes/gateway), and gateway systemd protection. Uses contextvars.ContextVar for thread-safe per-session identity resolution (gateway concurrent executor threads). Supports CLI interactive prompt + gateway async resolve, LLM auto-approve, and permanent allowlist persistence via config.yaml. Key alias system maintains backward compatibility between old regex-derived keys and new human-readable pattern descriptions."
+  },
+  {
+    "path": "agent/credential_pool.py",
+    "gap_id": "G4",
+    "priority": "P1",
+    "reason": "Persistent multi-credential pool for same-provider failover with PooledCredential dataclass (20+ fields including OAuth token lifecycle). Supports four selection strategies: fill_first, round_robin, random, least_used. Handles OAuth single-use refresh token synchronization: _sync_anthropic_entry_from_credentials_file syncs from ~/.claude/.credentials.json, _sync_codex_entry_from_cli syncs from ~/.codex/auth.json. Exhaustion cooldown with configurable TTL (429→1hr, default→1hr) and provider-supplied reset_at timestamp overrides. Thread-safe leasing with _active_leases counter for max concurrent requests per credential. Custom provider support via 'custom:<name>' pool keys mapped from config.yaml custom_providers."
+  },
+  {
+    "path": "agent/context_compressor.py",
+    "gap_id": "G3",
+    "priority": "P1",
+    "reason": "Long conversation context compression via structured LLM summarization. Protects head (first 3 messages) and tail (token budget ~20K) while summarizing middle turns. Structured summary template includes: Goal, Constraints & Preferences, Progress (Done/In Progress/Blocked), Key Decisions, Resolved Questions, Pending User Asks, Relevant Files, Remaining Work, Critical Context, Tools & Patterns. Iterative summary updates preserve info across multiple compactions. Two-phase approach: cheap tool output pruning (replace old tool results with placeholder) before expensive LLM summarization. Scaled summary budget (20% of compressed content, ceiling 12K tokens). Supports focus topic guidance via /compress <focus> for aggressive compression of non-relevant content. 600s cooldown on summary failures."
+  },
+  {
+    "path": "hermes_cli/plugins.py",
+    "gap_id": "G5",
+    "priority": "P1",
+    "reason": "Three-source plugin system: user plugins (~/.hermes/plugins/<name>/), project plugins (./.hermes/plugins/ opt-in via HERMES_ENABLE_PROJECT_PLUGINS), and pip entry-point plugins (hermes_agent.plugins group). PluginManifest dataclass from plugin.yaml (name, version, requires_env, provides_tools, provides_hooks). PluginContext provides register_tool(), register_hook(), inject_message(), register_cli_command(), register_context_engine(), and register_skill() APIs. 10 lifecycle hooks (pre_tool_call, post_tool_call, pre/post_llm_call, pre/post_api_request, on_session_start/end/finalize/reset). Directory plugins loaded as hermes_plugins.<name> namespace. Config-based plugin disabling via config.yaml plugins.disabled list."
+  },
+  {
+    "path": "gateway/stream_consumer.py",
+    "gap_id": "G6",
+    "priority": "P1",
+    "reason": "Bridges sync agent callbacks to async platform delivery for progressive message editing. Thread-safe on_delta() queues text tokens to asyncio task via queue.Queue. Implements: 1) think-block filtering state machine suppressing <think>...</think> blocks from streamed content, 2) adaptive edit interval with flood-control backoff (_MAX_FLOOD_STRIKES=3 permanently disables progressive edits), 3) segment breaks for tool boundaries (finalizes current message, starts new one), 4) __no_edit__ sentinel for platforms without edit support (prevents duplicate messages), 5) continuation text calculation to avoid re-sending already-visible content, 6) MEDIA:/[[audio_as_voice]] directive stripping from display text. Handles asyncio.CancelledError with best-effort final edit and _final_response_sent flag to prevent gateway duplicate sends."
+  },
+  {
+    "path": "tools/process_registry.py",
+    "gap_id": "G6",
+    "priority": "P1",
+    "reason": "In-memory process registry for managed background processes with 200KB rolling output buffer. ProcessSession tracks command, PID, output, watcher metadata, and watch patterns. Supports local spawn (subprocess.Popen with login shell), PTY mode (ptyprocess for interactive CLI tools like Codex/Claude), and sandbox spawn via environment backends (Docker/SSH/Modal). Watch pattern rate limiting: max 8 notifications per 10s window, sustained overload kill after 45s. Thread-safe with per-session locks + global registry lock. JSON checkpoint crash recovery via processes.json. Session-scoped tracking for gateway reset protection. Completion queue with watcher notification types (completion, watch match, watch disabled)."
+  },
+  {
+    "path": "agent/auxiliary_client.py",
+    "gap_id": "G4",
+    "priority": "P1",
+    "reason": "Multi-provider auxiliary LLM routing with separate resolution chains for text (7-tier: OpenRouter → Nous Portal → Custom → Codex OAuth → Anthropic → direct API-key) and vision tasks. Implements _CodexCompletionsAdapter that transparently converts chat.completions format calls to the Codex Responses API (including content type mapping, tool call conversion, stream event collection with backfill for empty outputs). Payment/credit exhaustion fallback: on HTTP 402, call_llm() auto-retries with next provider in chain. _AnthropicCompletionsAdapter wraps Anthropic Messages API as OpenAI-compatible. Provider aliases normalization (13+ alias mappings). Per-task overrides via config.yaml auxiliary section."
+  },
+  {
+    "path": "tools/registry.py",
+    "gap_id": "G5",
+    "priority": "P2",
+    "reason": "Centralized tool registry with circular-import-safe design: tool files import from registry at module level, model_tools.py imports all tool files. ToolEntry uses __slots__ for memory efficiency. Thread-safe RLock with snapshot-based reads (coherent list + toolset_checks atomics) preventing race conditions during MCP dynamic tool refresh. deregister() cleans up toolset checks when last tool removed. get_definitions() caches check_fn results and builds OpenAI-format schemas. dispatch() auto-bridges async handlers via _run_async(). Includes tool_error/tool_result serialization helpers eliminating repetitive json.dumps boilerplate across hundreds of tool handler calls."
+  },
+  {
+    "path": "trajectory_compressor.py",
+    "gap_id": "G3",
+    "priority": "P1",
+    "reason": "Training trajectory (RL) data compression with configurable head_turns/tail_turns protection to preserve RL signal quality at episode boundaries. CompressionConfig dataclass with target token budget, head/tail protection counts, and quality threshold parameters. TrajectoryMetrics dataclass tracks compression ratio, signal preservation score, and quality degradation. Turn-level importance scoring to prioritize retention of high-value training signals. Iterative compression loop that compresses middle turns until target budget reached while protecting first N and last N turns. Designed for post-processing RL training data where middle turns contain redundant exploration noise but boundary turns contain critical decision signals."
+  },
+  {
+    "path": "tools/mcp_tool.py",
+    "gap_id": "G5",
+    "priority": "P1",
+    "reason": "MCP (Model Context Protocol) client supporting stdio and HTTP/StreamableHTTP transports for external server connections. Auto-discovers tools from MCP servers and registers them dynamically in the tool registry (using deregister/reregister on notifications/tools/list_changed). Configuration from ~/.hermes/config.yaml mcp_servers key. Implements MCP sampling protocol (server can request LLM calls from the agent). Handles tool call forwarding from agent to MCP server and result streaming back. Supports server lifecycle management with startup timeout, health checks, and graceful shutdown. Transport-specific connection handling with reconnection logic."
+  },
+  {
+    "path": "tools/tirith_security.py",
+    "gap_id": "G2",
+    "priority": "P1",
+    "reason": "Pre-execution security scanner wrapper using Tirith (by StackGuard). Detects homograph URLs, pipes-to-interpreter, terminal injection, process substitution, eval injection, base64 decoding, SSH execution, wget/curl piping, and other attack patterns. Auto-installs tirith binary on first use with checksum verification (cosign provenance: keyless Sigstore signing with GitHub OIDC identity). Exit code is authoritative: 0=allow, 1=block, 2=warn. JSON stdout is supplementary text only - never overrides binary return value. This is a defense-in-depth layer that works alongside the approval.py pattern-matching layer."
+  },
+  {
+    "path": "hermes_logging.py",
+    "gap_id": "G7",
+    "priority": "P1",
+    "reason": "Production-grade logging setup with multi-file separation (agent.log, errors.log, gateway.log) and secret redaction. Key design: replaces the global LogRecord factory via logging.setLogRecordFactory() to inject per-thread session_tag into ALL log records - a more robust approach than per-handler filters. Uses _ComponentFilter (prefix-based) to route gateway.* loggers to separate gateway.log while agent.log remains the catch-all. Idempotent setup with force=True re-run support. _ManagedRotatingFileHandler subclass applies chmod 0660 after file creation and rollover for shared group access in NixOS managed mode. Configurable via config.yaml logging section (level, max_size_mb, backup_count). Suppresses 14 noisy third-party loggers (openai, httpx, grpc, modal, etc.) at WARNING level."
+  },
+  {
+    "path": "agent/credential_pool.py",
+    "gap_id": "G1",
+    "priority": "P0",
+    "reason": "Multi-credential persistent pool with per-provider failover, thread-safe rotation, and OAuth auto-refresh. Implements three strategies: random (rate-limit friendly), least-used (fair distribution), round-robin (priority-based). Handles token sync across external CLI tools (Claude CLI, Codex CLI) and persists state via atomic JSON writes with file locking. Lines 501-1000 show _refresh_entry with OAuth token refresh for Anthropic/OpenAI-Codex/Nous, credential exhaustion tracking, and lease management for concurrent access control."
+  },
+  {
+    "gap_id": "G1",
+    "path": "tools/approval.py",
+    "priority": "P0",
+    "reason": "Unified dangerous command approval hub with DANGEROUS_PATTERNS regex list, thread-safe session-scoped approval state, and auxiliary LLM smart-approval via auxiliary_client. Supports three approval scopes: 'once', 'session', 'always'. Delegates to tirith policy engine + regex-based dangerous command detection. Lines 1-500 show check_dangerous_command with comprehensive pattern matching and check_all_command_guards orchestrating the full guard pipeline."
+  },
+  {
+    "path": "trajectory_compressor.py",
+    "gap_id": "G2",
+    "priority": "P0",
+    "reason": "Agent trajectory post-processing compressor with structured CompressionConfig and TrajectoryMetrics. Strategy: protect first/last N turns as anchor points, compress middle turns to fit target token budget while preserving training signal quality. Uses LLM-powered compression with configurable verbosity and turn-level granularity. Lines 1-500 show the compression algorithm architecture with safety guards for critical conversation boundaries."
+  },
+  {
+    "path": "tools/skills_hub.py",
+    "gap_id": "G3",
+    "priority": "P1",
+    "reason": "Skills hub source adapter with SkillSource ABC defining the interface for fetching skill bundles from multiple sources (official/community). Implements GitHubAuth, SkillBundle with trust levels (Official, Community, Untrusted), and _normalize_bundle_path for consistent skill routing. Lines 1-500 show the abstraction layer for plugin-like skill discovery and loading from external repositories."
+  },
+  {
+    "gap_id": "G5",
+    "path": "hermes_state.py",
+    "priority": "P0",
+    "reason": "SQLite-based persistent state store replacing JSONL with WAL mode for concurrent reads/writes and FTS5 for full-text search. Implements SessionDB with _try_wal_checkpoint for WAL size management, and jittered retry on INSERT for write contention handling. Supports high-concurrency multi-platform gateway access. Lines 1-500 show the database schema design, connection management, and WAL optimization strategies."
+  },
+  {
+    "path": "agent/context_compressor.py",
+    "priority": "P0",
+    "reason": "Automatic context window compressor using a separate cheap OpenAI client for summarization. Protects first/last context turns, compresses middle dialogue with structured summary templates (Resolved/Pending tracking). Includes iterative compression with turn_count tracking and on_session_reset callback for lifecycle management. Lines 1-500 show ContextCompressor class with _should_compress logic and structured summary generation.",
+    "gap_id": "G2"
+  },
+  {
+    "gap_id": "G5",
+    "path": "plugins/memory/hindsight/__init__.py",
+    "priority": "P1",
+    "reason": "Long-term memory plugin implementing MemoryProvider interface with knowledge graph integration and entity resolution. Supports cloud mode (HINDSIGHT_API_KEY) and local mode dual deployment. Lines 1-500 show the MemoryProvider ABC interface methods (store, query, update, delete) and the knowledge graph-backed memory retrieval architecture."
+  },
+  {
+    "path": "agent/insights.py",
+    "priority": "P0",
+    "reason": "Session insights engine analyzing SQLite history data for token consumption, cost estimation (_estimate_cost), tool usage patterns, activity trends, and model/platform breakdown. Lines 1-500 show the analytics pipeline with time-series aggregation, cost calculation per provider model, and structured output generation for operational visibility.",
+    "gap_id": "G4"
+  },
+  {
+    "path": "hermes_cli/plugins.py",
+    "priority": "P1",
+    "reason": "Plugin discovery and hot-loading system supporting three sources: user directory (~/.hermes/plugins/), project directory (./.hermes/plugins/), and pip entry-points. Implements PluginManifest for metadata, LoadedPlugin for runtime state, and safe import isolation. Lines 1-500 show the discovery pipeline with path resolution, manifest validation, and dependency management.",
+    "gap_id": "G3"
+  },
+  {
+    "gap_id": "G1",
+    "path": "tools/terminal_tool.py",
+    "priority": "P1",
+    "reason": "Multi-environment terminal execution tool supporting 6 backends (local, Docker, Modal, SSH, Singularity, Daytona). Implements environment selection logic, permission guards, timeout control, and sudo handling with approval callbacks. Lines 1-500 show the TerminalTool class with backend routing, container resource limits (CPU/memory/disk), and SSH configuration management."
+  },
+  {
+    "gap_id": "G7",
+    "path": "gateway/platforms/base.py",
+    "priority": "P0",
+    "reason": "Base platform adapter interface for multi-platform gateway (Telegram, Discord, WhatsApp, etc.). Implements BasePlatformAdapter ABC with unified message handling, UTF-16 length calculation for Telegram's 4096 char limit, SSRF redirect guard, proxy resolution (HTTP/SOCKS with rdns for GFW bypass), and image/audio cache utilities with retry+backoff for CDN downloads. Lines 1-500 show the core abstraction layer that normalizes cross-platform message events into a common format."
+  },
+  {
+    "gap_id": "G7",
+    "path": "gateway/run.py",
+    "priority": "P1",
+    "reason": "Gateway runner entry point managing multi-platform adapter lifecycle. Implements start_gateway() with SSL cert auto-detection for NixOS/macOS, config.yaml → env var bridging, WhatsApp phone/LID alias resolution, runtime agent credential resolution, skill availability checking across disabled/optional skills, and background process watch pattern matching. Lines 1-500 show the initialization pipeline including _resolve_runtime_agent_kwargs for credential pool injection and _check_unavailable_skill for user guidance on missing skills."
+  },
+  {
+    "gap_id": "G1",
+    "path": "tools/mcp_tool.py",
+    "priority": "P0",
+    "reason": "MCP (Model Context Protocol) client with stdio and HTTP/StreamableHTTP transport. Implements automatic reconnection with exponential backoff (5 retries), environment variable filtering for stdio subprocess security, credential stripping from error messages, configurable per-server timeouts, thread-safe architecture with dedicated background event loop, and MCP server sampling support. Lines 1-300 show the graceful import pattern, safe env building, and _resolve_stdio_command for bare npx/npm/node resolution under filtered PATH."
+  },
+  {
+    "gap_id": "G4",
+    "path": "tools/session_search_tool.py",
+    "priority": "P0",
+    "reason": "Implements two-mode session recall tool: (1) FTS5 full-text search across past conversations with phrase/proximity/term-fallback ranking, then parallel LLM summarization via auxiliary client (Gemini Flash) with 60s timeout and raw-preview fallback; (2) recent-session browsing with zero LLM cost. Handles session lineage resolution (parent/child delegation), match-position window selection (25% before/75% after bias), and event-loop management via _run_async() to avoid deadlocks in gateway mode. Lines 90-172 show _truncate_around_matches with intelligent query-aware window picking."
+  },
+  {
+    "gap_id": "G1",
+    "path": "agent/auxiliary_client.py",
+    "priority": "P0",
+    "reason": "Shared auxiliary client router with multi-provider fallback chain (OpenRouter → Nous → Custom → Codex → Anthropic → direct API-key providers). Implements payment/credit exhaustion auto-fallback (HTTP 402 detection triggers next provider), Codex Responses API → chat.completions adapter with streaming text/tool-call extraction, Anthropic Messages API adapter with OpenAI-SDK-compatible interface, and per-task provider overrides via config.yaml. Lines 1-500 show the full resolution order for text and vision tasks, provider alias normalization, and pool credential selection integration."
+  },
+  {
+    "gap_id": "G6",
+    "path": "hermes_cli/doctor.py",
+    "priority": "P2",
+    "reason": "Comprehensive diagnostic tool with 20+ check categories: Python version, required/optional packages, config files (version detection + auto-migration), auth providers (Nous/Codex OAuth status), directory structure (auto-creation), SQLite state DB validation, WAL file size monitoring with checkpoint triggers, tool availability checks, and gateway service linger detection. Supports --fix mode for auto-remediation: config migration, stale root-level key migration into model section, directory creation, WAL checkpoint. Lines 300-347 show the config staleness detection and auto-fix pipeline using atomic_yaml_write."
+  },
+  {
+    "gap_id": "G7",
+    "path": "hermes_cli/web_server.py",
+    "priority": "P2",
+    "reason": "FastAPI-based web UI server with REST API for config management (GET/PUT /api/config), environment variables (CRUD with reveal protection), session browsing with FTS5 search (/api/sessions/search), gateway status monitoring (/api/status), model metadata resolution (/api/model/info), and runtime diagnostics. Implements CORS localhost restriction, session token for sensitive endpoint protection, rate limiting for secret reveal, and schema auto-generation from DEFAULT_CONFIG. Lines 378-417 show the FTS5 session search with prefix wildcard expansion and quoted phrase preservation."
+  },
+  {
+    "gap_id": "G2",
+    "path": "plugins/memory/hindsight/__init__.py",
+    "priority": "P0",
+    "reason": "Hindsight memory provider that automatically learns from execution history. Key mechanisms: (1) `_extract_pattern()` parses past agent messages to extract 'Pattern: <pattern> | Context: <context>' lines, storing them as structured memories with confidence scores; (2) `_find_relevant_context()` does cosine similarity matching between current query context and stored memories using numpy embeddings; (3) `_format_context()` injects learned patterns into system prompts with confidence-weighted formatting; (4) `get_learned_pattern_for_topic()` topic-specific pattern retrieval. Memory entries are persisted as JSON with `confidence` scores and `created_at` timestamps. This is the exact kind of \"learning from execution experience\" that Omnicompany's G2 gap needs."
+  },
+  {
+    "gap_id": "G4",
+    "path": "hermes_state.py",
+    "priority": "P0",
+    "reason": "Session database with WAL (Write-Ahead Logging) for crash-safe persistence. SessionDB tracks sessions with columns: session_id, sender_id (hashed), chat_id (hashed), platform, workspace, source (cross-session tracking like 'cli:1735000000.abc123'), chat_topic, model, started_at, last_active_at. Key features: (1) `_ensure_table()` creates indexed tables with platform/source indexing; (2) `_execute_write()` with WAL mode and _try_wal_checkpoint for read optimization; (3) `get_sessions()` supports filtering by platform, date range, source pattern; (4) `get_session_count()` with date range queries; (5) `_hash_id()` uses HMAC-SHA256 for PII-safe sender/chat ID storage. The source encoding (f\"{platform}:{timestamp}.{short_session_id}\") enables cross-platform session correlation. This provides the semantic execution history query capability Omnicompany's G4 gap needs."
+  },
+  {
+    "gap_id": "G6",
+    "path": "tools/rl_training_tool.py",
+    "priority": "P0",
+    "reason": "RL training environment management tool. Defines EnvironmentInfo dataclass (name, description, type, path, requirements, config_file) and RunState dataclass (environment_id, start_time, status, episode_count, reward, step_count, metadata). Key functions: `_scan_environments()` discovers environments from YAML configs, `_register_environment()` and `_unregister_environment()` manage the environment registry, `_get_environment_status()` tracks active training runs. Supports environment types: gymnasium, custom, benchmark. This is relevant for Omnicompany's G6 autonomous optimization - the infrastructure for managing training environments and tracking run states."
+  },
+  {
+    "gap_id": "G7",
+    "path": "acp_adapter/server.py",
+    "priority": "P0",
+    "reason": "ACP (Agent Client Protocol) server that exposes Hermes as an externally-callable agent. Implements `HermesACPAgent` with session management, streaming support, and approval callbacks. Key features: (1) `on_connect()` sends server info with capabilities (tools: true, tool_choice: false); (2) `on_message_create()` handles message creation with session tracking via `_resolve_session_id()` and `_normalize_acp_session_id()`; (3) `on_session_update()` manages session metadata (title, model); (4) `_process_agent_message()` runs the agent with stream=True and collects text/tool_call deltas; (5) `_build_tool_call()` formats tool calls for ACP protocol; (6) `make_approval_callback()` creates approval callbacks with allow_once/allow_for/allow_all mapping. The server uses FastMCP and wraps run_conversation as the agent execution engine. This provides the unified external invocation entry point for G7."
+  },
+  {
+    "gap_id": "G4",
+    "path": "cron/scheduler.py",
+    "priority": "P1",
+    "reason": "Production-grade cron job scheduler with cross-platform file locking (fcntl/msvcrt), script pre-execution with path-traversal guards, skill loading integration, origin-aware delivery routing (origin chat, specific platform, home channel fallback), live adapter vs standalone send with E2EE support, media extraction and routing, inactivity-based timeout with diagnostic summary, and [SILENT] marker for suppressing empty deliveries. The `run_job()` function wraps the full agent execution lifecycle with proper env var injection/cleanup and session tracking."
+  },
+  {
+    "gap_id": "G1",
+    "path": "tools/environments/base.py",
+    "priority": "P0",
+    "reason": "Abstract base class for all execution environment backends (local, Docker, SSH, Modal, Daytona, Singularity). Key design patterns: (1) Session snapshot mechanism — captures login shell env vars, functions, aliases into a .sh file on init, then sources it before each command instead of re-running `bash -l`; (2) CWD persistence via in-band stdout markers (`__HERMES_CWD_{session}__path__HERMES_CWD_{session}__`) for remote backends and temp file for local; (3) ProcessHandle protocol with `_ThreadedProcessHandle` adapter for SDK backends that have no real subprocess (pipes output through os.pipe, wraps exec_fn in thread); (4) `_wait_for_process()` with interrupt checking, timeout enforcement, activity callback for gateway liveness, and partial output preservation on timeout/interrupt; (5) `_wrap_command()` builds full bash scripts with snapshot sourcing, cd, command eval, env re-dump, and CWD marker emission; (6) heredoc embedding for stdin in SDK backends. This is the unified execution abstraction Omnicompany's Tool layer needs."
+  },
+  {
+    "gap_id": "G1",
+    "path": "agent/prompt_caching.py",
+    "priority": "P1",
+    "reason": "Clean implementation of Anthropic's prompt caching with the \"system_and_3\" strategy: places up to 4 cache_control breakpoints (system prompt + last 3 non-system messages) using the maximum allowed by Anthropic API. Handles multiple content formats (string, list, tool role). Supports both ephemeral cache and TTL-based caching (5m default, 1h option). Pure functions with no class state, making it easy to integrate anywhere."
+  },
+  {
+    "gap_id": "G6",
+    "path": "trajectory_compressor.py",
+    "priority": "P1",
+    "reason": "Trajectory compression for training data preparation. Key mechanisms: (1) `_find_protected_indices()` protects head (first N turns) and tail (last N turns) of conversations for training data integrity; (2) `compress_trajectory_async()` uses LLM to summarize the middle region of long conversations while preserving structure; (3) `TrajectoryMetrics` tracks original_tokens, compressed_tokens, turns_removed, tokens_saved, compression_ratio, skipped_under_target, still_over_limit; (4) `_process_directory_async()` parallelizes processing across multiple JSONL files with asyncio.Semaphore rate limiting and progress tracking; (5) Configurable via YAML (head/tail turns, target_max_tokens, summary_target_tokens, max_concurrent_requests)."
+  },
+  {
+    "gap_id": "G6",
+    "path": "agent/context_compressor.py",
+    "priority": "P1",
+    "reason": "Runtime context compression for managing conversation history size. ContextCompressor tracks token counts and compresses when context exceeds model limit (default 85% threshold). Key mechanisms: (1) `_build_compression_request()` creates a structured summarization template that preserves the system prompt, recent messages, and tool usage, summarizing the middle conversation region into a compact form; (2) `on_session_reset()` clears all state; `on_token_update()` tracks token counts via callback from run_agent.py; (3) `_record_failure()` with `_failure_cooldown` prevents repeated compression attempts when the API is failing; (4) `_get_summary()` calls the LLM to compress conversation history; (5) `_prune_tool_outputs()` trims oversized tool outputs with truncation markers; (6) `_build_context_limit_guidance()` produces system prompt instructions about the context limit. The structured summarization template (lines 233-365) is particularly well-crafted with clear role-based sections and preservation rules."
+  },
+  {
+    "gap_id": "G1",
+    "path": "tools/file_operations.py",
+    "priority": "P0",
+    "reason": "Comprehensive file operations system with security guards. Key patterns: (1) WRITE_DENIED_PATHS and WRITE_DENIED_PREFIXES protect sensitive system files (.ssh keys, .env, .bashrc, .aws, .gnupg, .kube, /etc/sudoers, etc.); (2) _is_write_denied() checks both static deny list and optional HERMES_WRITE_SAFE_ROOT sandbox; (3) ShellFileOperations implements FileOperations ABC via shell commands, works across all terminal backends (local, docker, ssh, modal, daytona); (4) ReadResult with binary detection, image base64 conversion, line-numbered pagination, similar-file suggestions; (5) PatchResult with unified diff generation and lint integration; (6) _is_likely_binary() uses content analysis (>30% non-printable = binary); (7) Safe shell argument escaping with single-quote wrapping."
+  },
+  {
+    "gap_id": "G1",
+    "path": "agent/prompt_builder.py",
+    "priority": "P1",
+    "reason": "System prompt assembly with prompt injection detection. _CONTEXT_THREAT_PATTERNS regex set detects 10 types of injection: ignore previous instructions, deception hiding, system prompt override, disregard rules, bypass restrictions, HTML comment injection, hidden div injection, translate-then-execute, exfil via curl, secret reading. _CONTEXT_INVISIBLE_CHARS detects zero-width unicode characters. _scan_context_content() sanitizes content files (AGENTS.md, .cursorrules, SOUL.md) before injecting into system prompt. Also handles _find_git_root() and _find_hermes_md() for project context discovery, and YAML frontmatter stripping."
+  },
+  {
+    "gap_id": "G1",
+    "path": "tools/skills_guard.py",
+    "priority": "P0",
+    "reason": "Comprehensive security scanner for externally-sourced skills using regex-based static analysis. Covers 8 threat categories with 70+ patterns: exfiltration (curl/wget with env vars, base64 encoding, SSH/AWS/GPG/Kube/Docker dir access, credential stores), prompt injection (ignore previous instructions, role hijack, DAN jailbreak, developer mode, hidden HTML comments, translate-then-execute), destructive operations (rm -rf, chmod 777, mkfs, disk overwrite), persistence (crontab, shell rc, authorized_keys, systemd, sudoers), network (reverse shells, tunneling services, webhook exfiltration), obfuscation (base64 decode pipe, hex strings, eval/exec, chr building, unicode escapes), path traversal (deep ../, /etc/passwd, /proc/self), supply chain (curl|sh, unpinned pip/npm, git clone), privilege escalation (sudo, setuid, NOPASSWD), and hardcoded secrets (API keys, private keys). Also includes structural checks (file count limits, size limits, symlink escape detection, binary file detection), invisible unicode character detection (16 zero-width/BiDi characters), and trust-aware install policy matrix (builtin/trusted/community/agent-created → allow/caution/block/ask decisions)."
+  },
+  {
+    "gap_id": "G7",
+    "path": "mcp_serve.py",
+    "priority": "P0",
+    "reason": "MCP server that exposes Hermes messaging as standardized MCP tools for external clients (Claude Code, Cursor, etc.). Implements 9+ tools matching OpenClaw's surface: conversations_list, conversation_get, messages_read, attachments_fetch, events_poll, events_wait, messages_send, permissions_list_open, permissions_respond, channels_list. Key mechanisms: (1) EventBridge background poller that watches SessionDB for new messages at 200ms intervals with mtime-based skip optimization (essentially free when nothing changed); (2) Cursor-based event queue with waiter support (poll_events for non-blocking, wait_for_event for blocking with timeout); (3) In-memory approval tracking with respond_to_approval for external resolution; (4) Message content extraction handling multi-part content, image URLs, and MEDIA: tags. This provides a unified external invocation entry point for G7."
+  },
+  {
+    "gap_id": "G4",
+    "path": "tools/process_registry.py",
+    "priority": "P1",
+    "reason": "Process lifecycle registry that tracks spawned processes per session. ProcessSession groups processes by session_key, and ProcessRegistry provides spawn/monitor/cleanup operations. Key features: (1) _clean_shell_noise() strips terminal garbage from process output; (2) Tracks process PIDs, start times, and status for cleanup on session end; (3) Enables long-running process management across agent sessions. This supports Omnicompany's G4 execution history tracking for process-level state."
+  },
+  {
+    "gap_id": "G3",
+    "path": "tools/delegate_tool.py",
+    "priority": "P0",
+    "reason": "Agent-to-agent delegation system that spawns child agent sessions. Implements child session creation via gateway, max concurrent children tracking (_get_max_concurrent_children), child system prompt building with workspace hints, and result collection via _wait_for_session(). Uses run_agent.py's --session-id and --chat-id flags to create isolated child sessions that inherit parent context but run independently. Supports session lifecycle management with session ID tracking and result aggregation. This is the self-expansion mechanism for spawning sub-agents that Omnicompany's G3 needs."
+  }
+]

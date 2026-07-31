@@ -23,6 +23,7 @@ export const sessionSynchronizerService = {
       cursor: 0,
       gemini: 0,
       opencode: 0,
+      kimi: 0,
       omni_agent: 0,
       controller: 0,
     };

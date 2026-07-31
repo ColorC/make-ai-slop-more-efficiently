@@ -25,6 +25,19 @@ TI_TASK = Format(
             "trace_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
             "domain": {"type": "string"},
             "db_path": {"type": "string"},
+            "source": {"type": "string", "enum": ["auto", "intent", "external"]},
+            "provider": {"type": "string", "enum": ["", "codex", "claude", "kimi"]},
+            "sync": {"type": "boolean"},
+            "external_index_path": {"type": "string"},
+            "omni_event_db_paths": {"type": "array", "items": {"type": "string"}},
+            "external_roots": {
+                "type": "object",
+                "properties": {
+                    "codex_home": {"type": "string"},
+                    "claude_home": {"type": "string"},
+                    "kimi_home": {"type": "string"},
+                },
+            },
         },
         "required": ["purpose", "trace_ids"],
     },
@@ -53,6 +66,11 @@ TI_TRACE_DATA = Format(
             "trace_count": {"type": "integer", "minimum": 1},
             "domain": {"type": "string"},
             "db_path": {"type": "string"},
+            "source": {"type": "string"},
+            "provider": {"type": "string"},
+            "external_index_path": {"type": "string"},
+            "external_sync": {"type": ["object", "null"]},
+            "warnings": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["traces", "purpose", "trace_count"],
     },
@@ -136,10 +154,10 @@ TI_REQUIREMENT = Format(
     id="ti.requirement",
     name="需求文档",
     description=(
-        "Workflow Factory 可消费的 Markdown 格式需求文档，"
+        "可供人工审阅和后续真实任务消费的 Markdown 需求候选，"
         "包含目标、触发场景、操作流程、数据流、错误处理、验证标准、约束。"
         "验证标准：非空 Markdown 字符串，长度 >= 100 字符。"
-        "下游用途：传入 workflow-factory 管线的 wf.requirement_raw 入口。"
+        "下游用途：作为本次按需归纳的终端产物；不会自动生成或注册工作流。"
     ),
     parent="requirement",
     json_schema={
@@ -153,7 +171,7 @@ TI_REQUIREMENT = Format(
         },
         "required": ["requirement_doc", "purpose"],
     },
-    tags=["domain.trace_induction", "stage.design", "kind.internal"],
+    tags=["domain.trace_induction", "stage.design", "kind.sink"],
 )
 
 TI_WF_RESULT = Format(
@@ -206,7 +224,7 @@ TI_DONE = Format(
 
 ALL_FORMATS = [
     TI_TASK, TI_TRACE_DATA, TI_ESSENTIAL, TI_SOP,
-    TI_REQUIREMENT, TI_WF_RESULT, TI_DONE,
+    TI_REQUIREMENT,
 ]
 
 

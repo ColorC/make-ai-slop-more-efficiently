@@ -31,6 +31,14 @@ logger = logging.getLogger(__name__)
 _PAYLOAD_WARN_BYTES = 64 * 1024  # 64KB
 
 
+def _material_tags(*tags: str) -> list[str]:
+    out = ["omni.material", "agent.material"]
+    for tag in tags:
+        if tag and tag not in out:
+            out.append(tag)
+    return out
+
+
 def _safe_serialize(data: Any) -> Any:
     """把 payload 转成 JSON-safe 形态。
 
@@ -89,6 +97,7 @@ async def emit_router_input(
             event_type=f"router.{router_name}.input",
             source=f"agent.{router_name}",
             payload=payload,
+            tags=_material_tags("agent.router.input", f"format:{format_id}"),
         )
         return await bus.publish(event)
     except Exception as exc:
@@ -126,6 +135,7 @@ async def emit_router_output(
             event_type=f"router.{router_name}.output",
             source=f"agent.{router_name}",
             payload=payload,
+            tags=_material_tags("agent.router.output", f"format:{format_id}"),
         )
         return await bus.publish(event)
     except Exception as exc:
@@ -141,6 +151,7 @@ async def emit_agent_signal(
     source: str,
     payload: dict,
     parent_id: str | None = None,
+    tags: list[str] | None = None,
 ) -> str | None:
     """发通用 agent 信号事件（非 Router input/output）。
 
@@ -157,6 +168,7 @@ async def emit_agent_signal(
             event_type=event_type,
             source=source,
             payload=_safe_serialize(payload) if not isinstance(payload, dict) else payload,
+            tags=_material_tags(*(tags or [])),
         )
         return await bus.publish(event)
     except Exception as exc:

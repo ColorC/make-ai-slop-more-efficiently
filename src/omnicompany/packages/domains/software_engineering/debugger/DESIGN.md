@@ -1,15 +1,20 @@
-<!-- [OMNI] origin=claude-code domain=domains/software_engineering/debugger ts=2026-04-25T00:00:00Z type=doc status=active -->
+<!-- [OMNI] origin=codex domain=domains/software_engineering/debugger ts=2026-07-22T16:45:00+08:00 type=doc status=evolving -->
 <!-- [OMNI] material_id="material:domains.software_engineering.debugger.design_specification.md" -->
 
-# debugger · 设计文档
+# debugger · 仍在进化的实验组件（活跃入口已退役）
 
 ## 状态
-- **版本**: V1 (2026-04-25 · 填充核心接口/架构决策/数据流，固化假设驱动调试拓扑)
-- **成熟度**: active
-- **下一步**: 将 Router 内部硬编码的 Prompt/工具绑定迁移至动态模型路由协议，接入真实多模型降级策略以完成端到端自动化调试管线验证。
+- **版本**: V1-retired (2026-07-22)
+- **成熟度**: evolving / experimental；不是通用调试能力，不可作为生产默认入口
+- **活跃入口**: `debug-loop` skill 与 `omni run debug` pipeline 均已退役
+- **保留原因**: `lang_rewrite_verifier` 仍复用其中若干 Router；保留的是组件代码，不代表整条调试闭环可用
+- **重新入场门槛**: 至少覆盖三类真实项目故障；探针执行、证实/证否、修复回归和中断恢复均有端到端证据；通过独立裁判审阅后才能重新申请命名和注册
 
 ## 核心目的
-提供跨语言的“假设-证据-修正”循环调试工作流。将非线性的调试过程（读错→根因分析→生成假设→设计探测→执行验证→修复复测）结构化为声明式 DAG 管线，通过累积 `debug-context` 避免探索过程中的状态断裂与信息丢失。
+本包探索“假设—证据—修正”组件能否在部分软件工程任务中复用。现阶段只能作为受控实验部件，不能把视觉锚点、运行时状态机、配置错误、跨语言改写等不同问题统一收进同一条流程，也不得再使用“通用跨语言调试管线”描述它。
+
+历史 DAG 设计与接口保留供实验和兼容消费；任何调用方都必须自行声明适用域、真实探针、失败退出条件与验证责任，不得因复用 Router 就宣称拥有完整调试闭环。
+
 本包**不解决**：不提供底层语言级单步执行/寄存器查看能力（属传统调试器职责）；不处理编译/构建系统的配置修复；不替代静态语法检查（仅消费其输出的 `ErrorReport`）；不负责最终补丁的 Git 提交操作（由兄弟包 implement 接管）。
 
 ## 核心接口

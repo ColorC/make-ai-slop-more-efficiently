@@ -7,13 +7,35 @@ stored in material.extra.structure_warnings and history.
 from __future__ import annotations
 
 import json
+import ipaddress
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
-TEXT_KINDS = {"markdown", "html", "key_question", "custom_web_template", "webgame-spec"}
+TEXT_KINDS = {
+    "markdown",
+    "plan",
+    "agent-workflow-report",
+    "html",
+    "static-report",
+    "demo",
+    "key_question",
+    "custom_web_template",
+    "webgame-spec",
+}
+WEB_KINDS = {"html", "static-report", "demo"}
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+
+_HTML_URL_RE = re.compile(
+    r"(?is)\b(?:src|href|poster|action)\s*=\s*(['\"])(.*?)\1"
+)
+_CSS_URL_RE = re.compile(r"(?is)\burl\(\s*(['\"]?)(.*?)\1\s*\)")
+_RUNTIME_URL_RE = re.compile(
+    r"(?is)\b(?:fetch|EventSource|WebSocket)\s*\(\s*(['\"])(.*?)\1"
+)
+_WINDOWS_ABS_RE = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 def _warning(code: str, message: str, *, path: str | None = None) -> dict[str, Any]:
@@ -34,6 +56,119 @@ def _parse_json(content: str | None) -> tuple[Any | None, str | None]:
         return json.loads(content), None
     except json.JSONDecodeError as exc:
         return None, f"invalid JSON: {exc.msg}"
+
+
+def _is_loopback_reference(value: str) -> bool:
+    candidate = value.strip()
+    if candidate.startswith("//"):
+        candidate = "http:" + candidate
+    try:
+        host = (urlparse(candidate).hostname or "").lower()
+    except ValueError:
+        return False
+    if host in {"localhost", "0.0.0.0", "::1"}:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _web_references(content: str) -> list[str]:
+    refs: list[str] = []
+    for pattern in (_HTML_URL_RE, _CSS_URL_RE, _RUNTIME_URL_RE):
+        refs.extend(match.group(2).strip() for match in pattern.finditer(content))
+    return refs
+
+
+def _remote_dependency_warnings(
+    *, kind: str, content: str, extra: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Detect dependencies that commonly work locally and fail in a remote browser."""
+
+    warnings: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(code: str, message: str, path: str, value: str) -> None:
+        key = (code, value)
+        if key in seen:
+            return
+        seen.add(key)
+        warnings.append(_warning(code, message, path=path))
+
+    live_url = str(extra.get("live_url") or "").strip()
+    if live_url:
+        if live_url.lower().startswith("file:") or _WINDOWS_ABS_RE.match(live_url):
+            add(
+                "remote_local_file_dependency",
+                f"live_url 指向提交机本地文件，远程浏览器无法访问：{live_url[:180]}",
+                "extra.live_url",
+                live_url,
+            )
+        elif _is_loopback_reference(live_url):
+            add(
+                "remote_loopback_dependency",
+                f"live_url 指向 localhost/回环地址，远程设备会访问它自己：{live_url[:180]}",
+                "extra.live_url",
+                live_url,
+            )
+        elif not live_url.startswith(("/", "http://", "https://")):
+            add(
+                "remote_relative_live_url",
+                f"live_url 不是根相对路径，嵌入审阅台后可能解析到错误目录：{live_url[:180]}",
+                "extra.live_url",
+                live_url,
+            )
+
+    aigc_lab_url = str(extra.get("aigc_lab_url") or "").strip()
+    same_origin_aigc_proxy = aigc_lab_url.startswith("/api/local/aigc-review/")
+    if kind == "aigc-image" and not same_origin_aigc_proxy and (
+        aigc_lab_url or str(extra.get("card_id") or "").strip()
+    ):
+        add(
+            "remote_aigc_lab_pointer",
+            "aigc-image 是本地 AIGC Lab 指针，壳页面可打开不代表其根路径 API/静态资源可远程访问；"
+            "跨设备审阅优先提交资源内嵌的 static-report。",
+            "extra.aigc_lab_url",
+            str(aigc_lab_url or extra.get("card_id") or "aigc-image"),
+        )
+
+    if kind not in WEB_KINDS or not content.strip():
+        return warnings
+
+    for ref in _web_references(content):
+        lower = ref.lower()
+        if not ref or lower.startswith(("#", "data:", "blob:", "mailto:", "javascript:")):
+            continue
+        if lower.startswith("file:") or _WINDOWS_ABS_RE.match(ref):
+            add(
+                "remote_local_file_dependency",
+                f"HTML 引用了提交机本地文件，远程浏览器无法访问：{ref[:180]}",
+                "inline_content",
+                ref,
+            )
+        elif _is_loopback_reference(ref):
+            add(
+                "remote_loopback_dependency",
+                f"HTML 引用了 localhost/回环服务，远程设备会访问它自己：{ref[:180]}",
+                "inline_content",
+                ref,
+            )
+        elif ref.startswith("/"):
+            add(
+                "remote_same_origin_dependency",
+                f"HTML 依赖审阅台同源路由，提交时需确认网关也提供该路径：{ref[:180]}",
+                "inline_content",
+                ref,
+            )
+        elif not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", ref):
+            add(
+                "remote_unstaged_relative_dependency",
+                f"HTML 引用了相对资源，但单文件送审不会自动复制兄弟文件：{ref[:180]}",
+                "inline_content",
+                ref,
+            )
+    return warnings
 
 
 def validate_material_structure(
@@ -124,6 +259,8 @@ def validate_material_structure(
         if suffix and suffix not in IMAGE_EXTS:
             warnings.append(_warning("image_unusual_extension", f"image file extension is unusual: {suffix}", path="file_relpath"))
 
+    warnings.extend(_remote_dependency_warnings(kind=kind, content=content, extra=extra))
+
     return warnings
 
 
@@ -186,4 +323,10 @@ def validate_kind_file_compat(
     return None
 
 
-__all__ = ["TEXT_KINDS", "KIND_FILE_EXTS", "validate_material_structure", "validate_kind_file_compat"]
+__all__ = [
+    "TEXT_KINDS",
+    "WEB_KINDS",
+    "KIND_FILE_EXTS",
+    "validate_material_structure",
+    "validate_kind_file_compat",
+]

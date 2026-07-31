@@ -9,6 +9,7 @@ const AGENT_NAMES: Record<AgentProvider, string> = {
   codex: 'Codex',
   gemini: 'Gemini',
   opencode: 'OpenCode',
+  kimi: 'Kimi',
   omni_agent: 'Omni Agent',
   controller: '总控',
 };
@@ -28,6 +29,7 @@ export default function AgentSelectorSection({
             agent === 'cursor' ? 'bg-purple-500' :
             agent === 'gemini' ? 'bg-indigo-500' :
             agent === 'opencode' ? 'bg-zinc-500' :
+            agent === 'kimi' ? 'bg-zinc-500' :
             agent === 'omni_agent' ? 'bg-zinc-500' : 'bg-foreground/60';
 
           return (

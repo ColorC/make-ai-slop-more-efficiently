@@ -566,6 +566,7 @@ def build_team_agent_first() -> TeamSpec:
             [
                 "team_builder.material.code_package",
                 "team_builder.material.code_review_report",
+                "team_builder.material.scale_assessment",
             ],
             "team_builder.material.registration_plan",
             vkind=ValidatorKind.HARD,
@@ -654,6 +655,8 @@ def build_team_agent_first() -> TeamSpec:
         TeamEdge(source="code_aggregator", target="registrar", condition=VerdictKind.PASS),
         TeamEdge(source="code_aggregator", target="registrar", condition=VerdictKind.PARTIAL),
         TeamEdge(source="code_reviewer", target="registrar", condition=VerdictKind.PASS),
+        # Registrar 是终点；必须等规模研判结束，避免 task.finish 早于仍在运行的分支。
+        TeamEdge(source="scale_assessor", target="registrar", condition=VerdictKind.PASS),
     ]
 
     return TeamSpec(

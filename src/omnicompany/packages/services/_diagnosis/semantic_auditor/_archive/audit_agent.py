@@ -1,5 +1,6 @@
 # [OMNI] origin=claude-code domain=services/semantic_auditor ts=2026-04-18T00:00:00Z
 # [OMNI] material_id="material:diagnosis.semantic_auditor.audit_agent_loop.python"
+# OMNI-024 ALLOW: 归档冻结留档(legacy 快照), 仅历史参考不再演进, 迁移无意义(同仓内其它 _archive ALLOW 先例)
 """SemanticAuditor · AuditAgent — 单次审计的 AgentNodeLoop 子类。
 
 一次 run 处理一个 (artifact, standard, excerpt) 三元组：

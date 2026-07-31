@@ -105,7 +105,7 @@ class FactoryEvent(BaseModel):
     # 语义标签
     tags: list[str] = Field(default_factory=list)
     """语义标签，点分层级命名。用于细粒度路由过滤。
-    例: ["demogame.benchmark.battle", "unity.lua", "hero.greed"]"""
+    例: ["example_domain.benchmark.battle", "unity.lua", "hero.greed"]"""
 
     # 元数据
     metadata: EventMetadata | None = None

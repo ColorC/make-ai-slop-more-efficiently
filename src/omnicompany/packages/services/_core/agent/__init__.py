@@ -69,6 +69,7 @@ from omnicompany.packages.services._core.agent.spawn_surface import (
     AGENT_SPAWN_SURFACE_VERSION,
     ENTRY_AGENT_TOOL,
     ENTRY_CONTROLLER_SPAWN,
+    ENTRY_CONTEXT_FORK,
     ENTRY_EXTERNAL_WORKER_AS_AGENT,
     ENTRY_EXTERNAL_WORKER_RUN,
     ENTRY_INTERNAL_LOOP,
@@ -80,6 +81,15 @@ from omnicompany.packages.services._core.agent.spawn_surface import (
     ensure_agent_spawn_metadata,
     get_agent_spawn_entry,
     list_agent_spawn_entries,
+)
+from omnicompany.packages.services._core.agent.context_fork import (
+    AgentContextCheckpoint,
+    ContextForkBudget,
+    ContextForkReceipt,
+    ContextForkRequest,
+    ContextForkStatus,
+    capture_context_checkpoint,
+    run_context_fork,
 )
 
 __all__ = [
@@ -114,6 +124,7 @@ __all__ = [
     "AGENT_SPAWN_SURFACE_VERSION",
     "ENTRY_AGENT_TOOL",
     "ENTRY_CONTROLLER_SPAWN",
+    "ENTRY_CONTEXT_FORK",
     "ENTRY_EXTERNAL_WORKER_AS_AGENT",
     "ENTRY_EXTERNAL_WORKER_RUN",
     "ENTRY_INTERNAL_LOOP",
@@ -125,4 +136,11 @@ __all__ = [
     "ensure_agent_spawn_metadata",
     "get_agent_spawn_entry",
     "list_agent_spawn_entries",
+    "AgentContextCheckpoint",
+    "ContextForkBudget",
+    "ContextForkReceipt",
+    "ContextForkRequest",
+    "ContextForkStatus",
+    "capture_context_checkpoint",
+    "run_context_fork",
 ]

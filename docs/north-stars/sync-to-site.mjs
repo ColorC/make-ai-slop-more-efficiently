@@ -6,7 +6,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SRC = path.join(HERE, "north-stars.json");
+// 权威源 2026-07-26 迁出 docs/ (OMNI-035h): 数据产物落 data/domains/personal_site/
+const SRC =
+  process.env.OMNI_NORTH_STARS_JSON ||
+  path.resolve(HERE, "../../data/domains/personal_site/north-stars.json");
 const HOMEPAGE =
   process.env.OMNI_HOMEPAGE_ROOT ||
   "e:/WindowsWorkspace/webworks/apps/personal-homepage";

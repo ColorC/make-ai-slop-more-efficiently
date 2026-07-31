@@ -1,5 +1,5 @@
 # [OMNI] origin=ai-ide ts=2026-06-28 type=infra
-"""controlplane/lofa_proxy.py — 把 LOFA 对外要用的两个本地工具反代到 dashboard(8210)下。
+"""把本机媒体工具反代到 dashboard(8210) 的局域网同源入口。
 
 对外只暴露 8210 一个口:手机/平板用 app 连的同一个地址就能看「实机操作台」镜像,
 不必再各自暴露 8770/8781,也不必各开防火墙。
@@ -7,6 +7,8 @@
     /lofa/devview/*  → 127.0.0.1:8770/*   (HTTP: 控制台页 / 切分辨率 /dev/size 等)
     /lofa/scrcpy/*   → 127.0.0.1:8781/*   (HTTP: ws-scrcpy SPA 与静态资源)
     /lofa/scrcpy/*   → 127.0.0.1:8781/*   (WebSocket: H264 实时流 / 设备追踪)
+    /game-observatory/live-media/webrtc/* → 127.0.0.1:8889/*
+    /game-observatory/live-media/hls/*    → 127.0.0.1:8888/*
 
 ws-scrcpy 用相对资源(bundle.js/main.css)且按 location 构造 ws,所以挂在子路径下可用。
 """
@@ -21,7 +23,12 @@ from fastapi.responses import Response
 
 lofa_proxy_router = APIRouter(tags=["lofa-proxy"])
 
-_UPSTREAM = {"devview": "127.0.0.1:8770", "scrcpy": "127.0.0.1:8781"}
+_UPSTREAM = {
+    "devview": "127.0.0.1:8770",
+    "scrcpy": "127.0.0.1:8781",
+    "game-live-webrtc": "127.0.0.1:8889",
+    "game-live-hls": "127.0.0.1:8888",
+}
 _HOP = {"connection", "keep-alive", "transfer-encoding", "upgrade", "proxy-authenticate",
         "proxy-authorization", "te", "trailers", "content-encoding", "content-length"}
 
@@ -39,6 +46,10 @@ async def _http_proxy(which: str, path: str, request: Request) -> Response:
     except Exception as e:  # noqa: BLE001
         return Response(content=f"lofa-proxy upstream error: {e}".encode(), status_code=502)
     resp_headers = {k: v for k, v in r.headers.items() if k.lower() not in _HOP}
+    location = resp_headers.get("location")
+    if location and location.startswith("/") and which.startswith("game-live-"):
+        mode = "webrtc" if which == "game-live-webrtc" else "hls"
+        resp_headers["location"] = f"/game-observatory/live-media/{mode}{location}"
     return Response(content=r.content, status_code=r.status_code, headers=resp_headers,
                     media_type=r.headers.get("content-type"))
 
@@ -53,6 +64,22 @@ async def _devview_http(path: str, request: Request):
                              methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 async def _scrcpy_http(path: str, request: Request):
     return await _http_proxy("scrcpy", path, request)
+
+
+@lofa_proxy_router.api_route(
+    "/game-observatory/live-media/webrtc/{path:path}",
+    methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+)
+async def _game_live_webrtc_http(path: str, request: Request):
+    return await _http_proxy("game-live-webrtc", path, request)
+
+
+@lofa_proxy_router.api_route(
+    "/game-observatory/live-media/hls/{path:path}",
+    methods=["GET", "HEAD", "OPTIONS"],
+)
+async def _game_live_hls_http(path: str, request: Request):
+    return await _http_proxy("game-live-hls", path, request)
 
 
 async def _ws_proxy(which: str, path: str, ws: WebSocket) -> None:

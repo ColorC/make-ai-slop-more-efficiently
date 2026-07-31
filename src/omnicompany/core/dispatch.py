@@ -87,9 +87,11 @@ async def _run_event_pipeline(
     返回: {"sinks": [sink material payload...], "sink_types": [...], "entry_material": str, "events": [...]}。
     sink = 被某 worker 以 FORMAT_OUT 产出、却无任何 worker 以 FORMAT_IN 消费的 material。
 
-    注(E1 范围): 当前用 MaterialDispatcher 默认的内存总线跑(与已验证的 WS0 原型一致);
-    把事件流持久化到 SQLiteBus 是后续硬化(E2)的事, 不在 E1。
+    E2(决策本体阶段二): 事件流持久化到 SQLiteBus(与 teamrunner 同一 events.db 体系),
+    运行原语的唯一真源=事件流,event 引擎不再用易失内存总线。
     """
+    from omnicompany.bus.sqlite import SQLiteBus
+    from omnicompany.core.config import resolve_db_path
     from omnicompany.packages.services._core.omnicompany.material_dispatcher import (
         MaterialDispatcher,
         _format_in_set,
@@ -128,7 +130,11 @@ async def _run_event_pipeline(
         entry.name, entry_material, sink_types, len(workers),
     )
 
-    dispatcher = MaterialDispatcher(workers, max_iterations=max_iterations)
+    # E2: 事件流持久化 —— event 引擎与 teamrunner 共用 SQLiteBus/events.db 体系。
+    resolved_db = resolve_db_path(entry.domain)
+    resolved_db.parent.mkdir(parents=True, exist_ok=True)
+    bus = SQLiteBus(resolved_db)
+    dispatcher = MaterialDispatcher(workers, bus, max_iterations=max_iterations)
     events = await dispatcher.run_job(entry_material, input_dict)
 
     sinks = [ev.payload for ev in events if ev.event_type in set(sink_types)]
@@ -169,7 +175,7 @@ async def dispatch(
 
     entry = get_or_raise(pipeline_name)
 
-    # ── 运行级上下文钩子 (阶段一 1-5): 如 voxelcraft 的 eternal-war worktree 隔离 ──
+    # ── 运行级上下文钩子 (阶段一 1-5): 如业务域的 worktree 隔离 ──
     from contextlib import ExitStack
 
     with ExitStack() as _run_stack:

@@ -58,15 +58,16 @@ _验证来源: [code] `llm.py::RateLimiter`（令牌桶 + `min_interval` 双约�
 
 ### D3 — 流式双 deadline
 
-Anthropic / OpenAI 的 SDK timeout 只管 connection + initial byte。流式长输出时，若代理 keep-alive 发空 chunk，客户端可能无限等。
+Anthropic / OpenAI 的流式返回可以持续很久。推理文字、正文、工具参数或其他 stream event 仍在增长时，调用就在正常工作。
 
-本地加两层 deadline：
-- `_STREAM_WALL_CLOCK_DEADLINE = 600`（单次流式最长 10 分钟）
-- `_STREAM_IDLE_CHUNK_DEADLINE = 60`（两次非空 chunk 之间最长 60 秒）
+默认策略：
+- 不设累计 wall-clock 上限，不会仅因运行超过 60 秒或 10 分钟而中断。
+- 真正没有传输数据时，由 SDK request/read timeout 捕获。
+- 有明确有界要求的管线可显式设置 `stream_wall_clock_deadline_sec` 或 `stream_idle_chunk_deadline_sec`；它们不得作为所有 Agent 的默认切分依据。
 
-触发任一 → TimeoutError（不 retry，上层决定怎么办）。
+调用期间通过 `request_started` / `stream_opened` / `first_chunk` / `stream_progress` / `stream_completed` 事件暴露 chunk、reasoning、text 和 tool args 计数。上层据此识别进展停滞、连接断开、进程退出或重复空转。
 
-_验证来源: [code] `llm.py::_STREAM_WALL_CLOCK_DEADLINE` + `_STREAM_IDLE_CHUNK_DEADLINE` 常量 + 流式消费 loop_
+_验证来源: [code] `llm.py` 的可选 deadline + 流式进展事件 + 流式消费 loop_
 
 ### D4 — Piggyback：tool 注入 + 三路豁免（M1 改造，2026-04-15）
 
@@ -174,10 +175,13 @@ Router.run(input_data) 内部
 ## T4 Structured JSON Authority
 
 `runtime/llm/structured.py::call_json` is the only single-call structured JSON
-surface. It reuses `LLMClient` for transport, disables `info_audit` for strict
-JSON calls, extracts JSON from plain/fenced output, validates the requested
-schema subset, and performs one correction retry. Its default model slot is
-`OMNI_STRUCTURED_LLM_MODEL`, falling back to `deepseek-v4-pro`.
+surface. It reuses `LLMClient` for transport, binds one native output tool,
+accepts only that tool's arguments, disables `info_audit`, and validates the
+requested schema subset locally. Prompt-shaped JSON, fenced-JSON extraction,
+repair, and JSON correction retries are forbidden. If the first response does
+not call the tool, the runtime preserves its text and reasoning in the same
+conversation and asks it to submit through the single output tool. Its default model slot is
+`OMNI_STRUCTURED_LLM_MODEL`, falling back to `qwen3.7-max`.
 
 ## T5 Batch Execution Authority
 

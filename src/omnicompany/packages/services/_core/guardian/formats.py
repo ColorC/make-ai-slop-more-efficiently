@@ -16,7 +16,7 @@ FORMAT_CHECK_REQUEST = Format(
     parent="requirement",
     tags=["guardian", "input", "service", "kind.source"],
     examples=[
-        {"project_root": "e:/WindowsWorkspace/omnicompany"},
+        {"project_root": "/path/to/your/project"},
     ],
 )
 
@@ -32,7 +32,7 @@ FORMAT_FS_REPORT = Format(
     tags=["guardian", "report", "filesystem", "kind.internal"],
     examples=[
         {
-            "project_root": "e:/WindowsWorkspace/omnicompany",
+            "project_root": "/path/to/your/project",
             "fs_issues": [
                 {
                     "category": "root_contamination",
@@ -59,7 +59,7 @@ FORMAT_ARCH_REPORT = Format(
     tags=["guardian", "report", "architecture", "kind.internal"],
     examples=[
         {
-            "project_root": "e:/WindowsWorkspace/omnicompany",
+            "project_root": "/path/to/your/project",
             "fs_issues": [],
             "fs_issue_count": 0,
             "arch_issues": [
@@ -136,7 +136,7 @@ FORMAT_HYGIENE_REQUEST = Format(
     ),
     parent="requirement",
     tags=["guardian", "hygiene", "input", "kind.source"],
-    examples=[{}, {"project_root": "e:/WindowsWorkspace/omnicompany"}],
+    examples=[{}, {"project_root": "/path/to/your/project"}],
 )
 
 FORMAT_HYGIENE_REPORT = Format(
@@ -153,7 +153,7 @@ FORMAT_HYGIENE_REPORT = Format(
     tags=["guardian", "hygiene", "report", "kind.sink"],
     examples=[
         {
-            "project_root": "e:/WindowsWorkspace/omnicompany",
+            "project_root": "/path/to/your/project",
             "scan_ts": "2026-04-23T10:00:00Z",
             "violations": [
                 {
@@ -200,7 +200,7 @@ GUARDIAN_SCAN_REQUEST = Format(
     examples=[
         {
             "scan_mode": "diff",
-            "project_root": "e:/WindowsWorkspace/omnicompany",
+            "project_root": "/path/to/your/project",
             "committed": True,
             "uncommitted": True,
             "n_commits": 1,
@@ -226,7 +226,7 @@ GUARDIAN_FILE_CONTEXT_SET = Format(
             "files": [
                 {
                     "path": "src/omnicompany/example.py",
-                    "abs_path": "e:/WindowsWorkspace/omnicompany/src/omnicompany/example.py",
+                    "abs_path": "/path/to/your/project/src/omnicompany/example.py",
                     "change_type": "M",
                     "content": "...",
                     "omnimark": None,
@@ -375,7 +375,7 @@ ALL_FORMATS = [
                 "prompts_cached": 0,
                 "prompts_total": 3,
                 "audit_records_appended": 9,
-                "scan_root": "e:/WindowsWorkspace/omnicompany/src/omnicompany/packages/services",
+                "scan_root": "/path/to/your/project/src/omnicompany/packages/services",
                 "report_path": "data/services/guardian/prompt-scan/prompt-scan-2026-04-28T18-30-00.md",
                 "report_md": "# Guardian Prompt Anti-Pattern Scan · 2026-04-28T18:30:00\n...",
             }

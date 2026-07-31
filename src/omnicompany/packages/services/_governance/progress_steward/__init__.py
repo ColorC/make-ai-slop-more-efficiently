@@ -7,5 +7,5 @@
 
 两层(对齐 doc_steward 与 governance_semantic_first.md):
   1. 确定性探针(probe.py, 无 LLM): 进度型措辞词表 + 引用存活, 圈候选只标不改。
-  2. 语义精判(review.py, 性价比模型): 三态分类(进度型/决策设计/误报), 进 human-inbox。
+  2. 语义精判(review.py, 性价比模型): 三态分类后合并进 Reviewstage。
 """

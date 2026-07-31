@@ -119,6 +119,12 @@ def lookup_by_topic(topic_norm: str) -> dict | None:
     rec = fold().get(rid)
     if rec and rec.get("status") != "deleted":
         return rec
+    # 合并重复记录时会把旧题目写成主记录的 alias。查重与后续 save 都应召回
+    # 这个 canonical record，避免同一主题换一种标题后再次分叉。
+    norm = normalize_topic(topic_norm)
+    for candidate in active_records():
+        if any(normalize_topic(alias) == norm for alias in (candidate.get("aliases") or [])):
+            return candidate
     return None
 
 
@@ -238,6 +244,10 @@ def save_research_record(
 
     topic = (topic or "").strip()
     topic_norm = normalize_topic(topic)
+    canonical = lookup_by_topic(topic_norm)
+    if canonical:
+        topic = canonical.get("topic") or topic
+        topic_norm = canonical.get("topic_norm") or topic_norm
     synthesis = synthesis or {}
     sources = [dict(s) for s in (sources or [])]
 
@@ -285,6 +295,80 @@ def save_research_record(
     report_path = REPORTS_ROOT / f"{saved['record_id'].replace(':', '_')}.md"
     report_path.write_text(report_md, encoding="utf-8")
     return saved, is_dup, str(report_path)
+
+
+def merge_records(primary_id: str, duplicate_id: str) -> tuple[dict, dict, str]:
+    """把语义重复记录并入主记录，并给重复记录追加墓碑。
+
+    这是人工确认后的确定性合并；不会自行做语义判断。旧 topic 会成为主记录 alias，
+    因而之后用旧题目 check/save 也会命中主记录。
+    """
+    if primary_id == duplicate_id:
+        raise LibraryWriteError("primary 与 duplicate 不能相同")
+    records = fold()
+    primary = records.get(primary_id)
+    duplicate = records.get(duplicate_id)
+    if not primary or primary.get("status") == "deleted":
+        raise LibraryWriteError(f"主记录不存在或已删除: {primary_id}")
+    if not duplicate or duplicate.get("status") == "deleted":
+        raise LibraryWriteError(f"重复记录不存在或已删除: {duplicate_id}")
+
+    merged = dict(primary)
+    merged["findings"] = _union_findings(primary.get("findings") or [], duplicate.get("findings") or [])
+    merged["sources"] = _union_sources(primary.get("sources") or [], duplicate.get("sources") or [])
+    merged["keywords"] = _union_strs(primary.get("keywords") or [], duplicate.get("keywords") or [])
+    merged["aliases"] = _union_strs(
+        primary.get("aliases") or [],
+        [duplicate.get("topic", ""), *(duplicate.get("aliases") or [])],
+    )
+    merged["perspectives_covered"] = _union_strs(
+        primary.get("perspectives_covered") or [], duplicate.get("perspectives_covered") or []
+    )
+    merged["perspectives_open"] = _union_strs(
+        primary.get("perspectives_open") or [], duplicate.get("perspectives_open") or []
+    )
+    merged["run_ids"] = _union_strs(primary.get("run_ids") or [], duplicate.get("run_ids") or [])
+    merged["status"] = "active"
+    merged["updated_at"] = now_iso()
+    merged["richness"] = richness(merged)
+    issues = validate_record(merged)
+    merged["validation"] = {"ok": not issues, "issues": issues, "checked_at": now_iso()}
+
+    tombstone = dict(duplicate)
+    tombstone["status"] = "deleted"
+    tombstone["merged_into"] = primary_id
+    tombstone["updated_at"] = now_iso()
+
+    ensure_dirs()
+    with RECORDS_PATH.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(merged, ensure_ascii=False) + "\n")
+        handle.write(json.dumps(tombstone, ensure_ascii=False) + "\n")
+
+    from ._paths import REPORTS_ROOT
+    report_path = REPORTS_ROOT / f"{primary_id.replace(':', '_')}.md"
+    report_path.write_text(render_report(merged), encoding="utf-8")
+    duplicate_report = REPORTS_ROOT / f"{duplicate_id.replace(':', '_')}.md"
+    duplicate_report.write_text(
+        f"# 已合并的调研记录\n\n本记录已并入 `{primary_id}`。\n", encoding="utf-8"
+    )
+
+    try:
+        from . import catalog
+
+        catalog.upsert_item({
+            "id": primary_id, "kind": "research_record", "name": merged.get("topic", ""),
+            "path": "", "description": (merged.get("summary") or "")[:300],
+            "aliases": sorted(set((merged.get("aliases") or []) + (merged.get("keywords") or []))),
+            "source_url": "", "tags": ["research_record"], "status": "active",
+        })
+        catalog.upsert_item({
+            "id": duplicate_id, "kind": "research_record", "name": duplicate.get("topic", ""),
+            "path": "", "description": f"merged into {primary_id}", "aliases": [],
+            "source_url": "", "tags": ["research_record"], "status": "deleted",
+        })
+    except Exception:
+        pass
+    return merged, tombstone, str(report_path)
 
 
 def render_report(record: dict) -> str:

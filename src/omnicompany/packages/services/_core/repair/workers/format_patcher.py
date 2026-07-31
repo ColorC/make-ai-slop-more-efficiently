@@ -16,12 +16,13 @@ import re
 from pathlib import Path
 from typing import Any
 
+from omnicompany.core.config import omni_workspace_root
 from omnicompany.packages.services._core.omnicompany import Worker
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SOURCE_ROOT = Path("e:/WindowsWorkspace/omnicompany/src/omnicompany")
+_DEFAULT_SOURCE_ROOT = omni_workspace_root() / "src" / "omnicompany"
 
 
 # ════════════════════════════════════════════════════════════════
