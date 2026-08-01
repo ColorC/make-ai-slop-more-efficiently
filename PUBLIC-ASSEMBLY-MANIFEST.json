@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "policy_version": "2026-08-01.1",
-  "created_at": "2026-08-01T10:15:06.876037+00:00",
+  "created_at": "2026-08-01T11:20:12.453277+00:00",
   "source": {
     "path": ".",
-    "head": "461548bc373bd57056f13f32781688222a72414d",
+    "head": "eed8dab96634ca3161fa85147a040832a19aecda",
     "dirty": true,
-    "tracked_considered": 14201,
+    "tracked_considered": 14230,
     "missing_tracked": []
   },
   "additional_sources": [
@@ -23,15 +23,15 @@
   ],
   "selection": {
     "input": "git ls-files -z --cached",
-    "included_tracked": 3170,
-    "excluded_tracked": 11059,
+    "included_tracked": 3168,
+    "excluded_tracked": 11090,
     "scrubbed_tracked": 293,
     "excluded_by_rule": {
       "unsafe_path_part": 5711,
       "private_product_path": 2459,
-      "not_allowlisted": 2103,
+      "not_allowlisted": 2125,
       "non_source_runtime_evidence": 362,
-      "service_not_allowlisted": 252,
+      "service_not_allowlisted": 261,
       "generated_static_only": 75,
       "domain_not_allowlisted": 52,
       "standard_not_allowlisted": 33,
@@ -48,7 +48,7 @@
       "rewritten_text_files": 1673,
       "naming": "logical_identity_sha256_8",
       "stable_chunk_file_names": true,
-      "mapping_sha256": "f7b1346a5677a3715f3732bc2612e8e48075aacdc3efdce62f01ba48eac42c14"
+      "mapping_sha256": "ad484124c3bd53b46cac78222e2ce5ef2d4167dd504249aee3d5c1aa480d594b"
     },
     "second_asset_canonicalization": {
       "assets": 1843,
@@ -56,11 +56,11 @@
       "rewritten_text_files": 1673,
       "naming": "logical_identity_sha256_8",
       "stable_chunk_file_names": true,
-      "mapping_sha256": "f7b1346a5677a3715f3732bc2612e8e48075aacdc3efdce62f01ba48eac42c14"
+      "mapping_sha256": "ad484124c3bd53b46cac78222e2ce5ef2d4167dd504249aee3d5c1aa480d594b"
     },
     "package_lock_sha256": "72ea7aad443057b49810ad4a22d56e8fa157bb7632fbad32bf269bbb82b2ed40",
     "files": 1859,
-    "bytes": 16143213,
+    "bytes": 16144319,
     "commands": [
       {
         "cwd": "packages/wiki-core",
@@ -93,8 +93,8 @@
     ]
   },
   "output": {
-    "files_excluding_manifest_and_audit": 5032,
-    "bytes_excluding_manifest_and_audit": 52637949
+    "files_excluding_manifest_and_audit": 5030,
+    "bytes_excluding_manifest_and_audit": 52622377
   },
   "files": [
     {
@@ -268,8 +268,8 @@
     {
       "path": "docs/standards/_global/llm_first.md",
       "origin": "git_tracked_source",
-      "bytes": 23791,
-      "sha256": "ea1f7c72b4d367df1b4eb85cb8afbfd3c5541e66b93f6cc24426d8122a78b37a"
+      "bytes": 23997,
+      "sha256": "c5ce4ceaf3a82aecafb1c82a72e032d3aa3e8537b8d3d65b9d4b3290bc8d030b"
     },
     {
       "path": "docs/standards/_global/single_source_thin_wrap.md",
@@ -346,14 +346,14 @@
     {
       "path": "docs/standards/concepts/agent_first.md",
       "origin": "git_tracked_source",
-      "bytes": 9424,
-      "sha256": "808a5669b4ad8d86fa9848b351450403f2aeb6c9790e7340cbb3148665550b29"
+      "bytes": 9505,
+      "sha256": "99be621c7117b75f5c1ab96a0007ae98dcb324c973fccc728bee9dfb5d02ab7f"
     },
     {
       "path": "docs/standards/concepts/agent_tools.md",
       "origin": "git_tracked_source",
-      "bytes": 9305,
-      "sha256": "34ad0337a366f4438d3a9b357a5b08c22ffb2b8ff8afc795318307496baeec78"
+      "bytes": 9445,
+      "sha256": "a5db1796e5dd64c802ac7ef029111076706fc5f1b4e241b1cf5809a36345f637"
     },
     {
       "path": "docs/standards/concepts/material.md",
@@ -3100,8 +3100,8 @@
     {
       "path": "src/omnicompany/dashboard/chatui/server/scripts/verify-browser-facility.ts",
       "origin": "git_tracked_source",
-      "bytes": 3528,
-      "sha256": "9453570da49372e84304a0bb6a6cad6bb9393b66266cf31e737f068b6dae3d33"
+      "bytes": 4011,
+      "sha256": "f019948ac8670fbca22cb5a52ec24a826a5f9c80596eb50175a0e76f8be659e1"
     },
     {
       "path": "src/omnicompany/dashboard/chatui/server/services/notification-orchestrator.js",
@@ -6034,8 +6034,8 @@
     {
       "path": "src/omnicompany/dashboard/DESIGN.md",
       "origin": "git_tracked_source",
-      "bytes": 9713,
-      "sha256": "7b897219c1040c048f5990990453bc89186e4e272b9714169d294a7ee2f1299f"
+      "bytes": 9870,
+      "sha256": "f965bb59eca8c748499a13012a91c4c8a0e8a31e17a1e93ccc51e224e1400069"
     },
     {
       "path": "src/omnicompany/dashboard/extensions/vscode-chat-sidebar/.vscodeignore",
@@ -7374,18 +7374,6 @@
       "origin": "git_tracked_source",
       "bytes": 3236,
       "sha256": "a7e5764343128a636cf78ee94d2cdcd4299c3b33c42b06890998912441bb1848"
-    },
-    {
-      "path": "src/omnicompany/dashboard/frontend/src/entities/material-graph/graph-logic.ts",
-      "origin": "git_tracked_source",
-      "bytes": 3743,
-      "sha256": "28b96154f067016fd51db3766c6b20cba3a583890671fe1b3657c0e31207d4f2"
-    },
-    {
-      "path": "src/omnicompany/dashboard/frontend/src/entities/material-graph/StructureView.tsx",
-      "origin": "git_tracked_source",
-      "bytes": 15256,
-      "sha256": "124d880f660bfa276e42d938d5d604eb248c61e95742226de49c8cb7c262de27"
     },
     {
       "path": "src/omnicompany/dashboard/frontend/src/entities/material_registry/index.tsx",
@@ -9208,8 +9196,8 @@
     {
       "path": "src/omnicompany/dashboard/frontend/testmap.yaml",
       "origin": "git_tracked_source",
-      "bytes": 68597,
-      "sha256": "9893239b4849a6678ce494ec97d486ebbdfead036ac1e664198c3c40f642d768"
+      "bytes": 69747,
+      "sha256": "7f2a92d2d4c5cc4987104e5a4a2c3f3be1f2a30d78a54697051439f9461c27b0"
     },
     {
       "path": "src/omnicompany/dashboard/frontend/tests/e2e/audit_404_sweep.spec.ts",
@@ -9959,7 +9947,7 @@
       "path": "src/omnicompany/dashboard/static/assets/architectureDiagram-Q4EWVU46-ec4428a3.js",
       "origin": "generated_dashboard_static",
       "bytes": 224727,
-      "sha256": "486ef9060b6ec2a5dcd6a648064625277f645a8bd922ed3ba152598bccc4f550"
+      "sha256": "6f23ad9353381177e814ab0cd928b2aab743f3ba5991b2d73ae79a354c45dc71"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/archive-x-4f8804b7.js",
@@ -12761,25 +12749,25 @@
       "path": "src/omnicompany/dashboard/static/assets/diagram-5BDNPKRD-2eb11053.js",
       "origin": "generated_dashboard_static",
       "bytes": 4498,
-      "sha256": "008d91e6fa58ce3806ae822613fce6fa6acc1cfb770ebe99b1c053d3527f772d"
+      "sha256": "a1e2673727c5376350ebb2ac3e409077f2c5354e0b7ffb356ec6dabda0cc8148"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/diagram-G4DWMVQ6-434753d4.js",
       "origin": "generated_dashboard_static",
       "bytes": 23034,
-      "sha256": "4a40f855ec4ad76e4f8f0a7b94ce45f45b34afb273b77a93d952ef64118fc9d4"
+      "sha256": "f3f17cd98e77886f03317c3fe21a1c4cf61430015488760d8acfaa33711c7ed5"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/diagram-MMDJMWI5-0e7182f4.js",
       "origin": "generated_dashboard_static",
       "bytes": 9175,
-      "sha256": "00160e78d17848a476b4cfd79e380fcc88588e75638b2a1c70ce11724fafa8a3"
+      "sha256": "1511c2b17b7b925aa886d95964f1df88e5f4d2a26f983db01c449f465b8c8323"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/diagram-TYMM5635-b94b9a23.js",
       "origin": "generated_dashboard_static",
       "bytes": 6241,
-      "sha256": "330aabbbed092a86292082cde786a008af0c5ddac395208d478a7f226d329fad"
+      "sha256": "117baa2464ffa0c49ed8d6a79de064c3519c3d4943bba925147289e8c0831023"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/diameter-896b90db.js",
@@ -14075,7 +14063,7 @@
       "path": "src/omnicompany/dashboard/static/assets/gitGraphDiagram-UUTBAWPF-7f235947.js",
       "origin": "generated_dashboard_static",
       "bytes": 45499,
-      "sha256": "8bfad2e0d8e5c43376aa0cff237db7b9f38b89901b374603deadda0275c68f4c"
+      "sha256": "6a9e1c608e6c04d616f1a8cba0ac3931b051cb7fe10e5b17daf76c394379f7cc"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/glass-water-bae105d4.js",
@@ -14612,10 +14600,10 @@
       "sha256": "4c67c1eec728b6776d04f785e43e1a0e83f052bdaca551790ac975ae44f488ef"
     },
     {
-      "path": "src/omnicompany/dashboard/static/assets/index-f18564eb.css",
+      "path": "src/omnicompany/dashboard/static/assets/index-fe1f673c.css",
       "origin": "generated_dashboard_static",
-      "bytes": 337424,
-      "sha256": "7bd86355be0636b148fb42a74813e5847b2a64027aaf2a2907a7eab81617d019"
+      "bytes": 337342,
+      "sha256": "3249710f0e9e7532cd3fb6867e1575354af43d829504290fc37eface1cba9500"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/indian-rupee-e55a4026.js",
@@ -14633,7 +14621,7 @@
       "path": "src/omnicompany/dashboard/static/assets/infoDiagram-42DDH7IO-a8b284b5.js",
       "origin": "generated_dashboard_static",
       "bytes": 903,
-      "sha256": "0018b82304066d2b1bf6193e81f6cf2721347fba3b5053e26d0ac2ca45d5844b"
+      "sha256": "949e53a423cf370d50fa8cc7c46c3e2fe3e49eff1b89da749c8ad726af96a167"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/init-2ced1028.js",
@@ -16373,7 +16361,7 @@
       "path": "src/omnicompany/dashboard/static/assets/mermaid.core-7730ce2e.js",
       "origin": "generated_dashboard_static",
       "bytes": 755838,
-      "sha256": "bb22a8cbdfdc4dad14740a9634510da62d57f83abde18b57ed015db49973c05f"
+      "sha256": "76cf945619758ea142d3f7d031db2c9540eb5e3f4d4064cc19ee7995701159f6"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/message-circle-255afa2b.js",
@@ -17405,7 +17393,7 @@
       "path": "src/omnicompany/dashboard/static/assets/pieDiagram-DEJITSTG-9e6e6705.js",
       "origin": "generated_dashboard_static",
       "bytes": 7635,
-      "sha256": "461e6c90699ff9caa6eb0c3229ab6edeb46c8f6323629e4ceef0b3123aa39c9c"
+      "sha256": "266ae9cd7e8adbb0010ffc671ef392141cea4a410ddab43818f753c1a9319b68"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/piggy-bank-463c5208.js",
@@ -18293,7 +18281,7 @@
       "path": "src/omnicompany/dashboard/static/assets/SessionCompanion-4535e278.js",
       "origin": "generated_dashboard_static",
       "bytes": 23433,
-      "sha256": "ab019663f25b993c6895b7f4e3ad3a52470f9224a8e08bf3d796d58acb129c8f"
+      "sha256": "9574dc6ab9f6cc073a94ef60a4e3df16362dbb734e78df8b0986bb523d0cd215"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/SessionCompanion-df3ca35b.css",
@@ -20348,16 +20336,16 @@
       "sha256": "19eb4590d398fdab0a1e9030517b3687f3bcbc20739cb29edcacea7bcca00194"
     },
     {
-      "path": "src/omnicompany/dashboard/static/assets/wardley-RL74JXVD-c26c89e3.js",
+      "path": "src/omnicompany/dashboard/static/assets/wardley-RL74JXVD-542bc812.js",
       "origin": "generated_dashboard_static",
-      "bytes": 697809,
-      "sha256": "f52b9d56d12819700bdffa30139fa5bb46e62077b98779797507388ca2c1b6bc"
+      "bytes": 698997,
+      "sha256": "6a0e512709c7e73d1d6be6eab6c5e69b7fd85378b8d87f2fbc825cea6e546963"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/wardleyDiagram-NUSXRM2D-5c8a5867.js",
       "origin": "generated_dashboard_static",
       "bytes": 35226,
-      "sha256": "b6684efc5c519970c4a75cc7352fc5bf0ee845b5bda7d664cbb90347b66b3139"
+      "sha256": "9bc6e4e2ddb91daf3034a1569b6f77728224cfa6168c518b406701e1fd4d8ba1"
     },
     {
       "path": "src/omnicompany/dashboard/static/assets/warehouse-c66f552f.js",
@@ -20777,7 +20765,7 @@
       "path": "src/omnicompany/dashboard/static/index.html",
       "origin": "generated_dashboard_static",
       "bytes": 2742,
-      "sha256": "447af1d409ce4a8aee8e6bc35c78315d8cfacc082fb5f0bf939ffe27da77f9b8"
+      "sha256": "2d6f722da795e2adde62a863bf794a45cff1aee50f1fa89c2ec8233da6b16dcc"
     },
     {
       "path": "src/omnicompany/dashboard/static/omni-capture-beacon.js",
@@ -23254,8 +23242,8 @@
     {
       "path": "src/omnicompany/packages/domains/publish/object_backup_queue.py",
       "origin": "git_tracked_source",
-      "bytes": 41898,
-      "sha256": "286810a6291d272d38e3fd346e55db691b5548abecae9a0afbe19555f422cd87"
+      "bytes": 41921,
+      "sha256": "1f41ac8ad06efef4241336e9fb8cede6e0990d0c568198a67ec60cc288737887"
     },
     {
       "path": "src/omnicompany/packages/domains/publish/routers/__init__.py",
@@ -25672,8 +25660,8 @@
     {
       "path": "src/omnicompany/packages/services/_core/registry/README.md",
       "origin": "git_tracked_source",
-      "bytes": 4364,
-      "sha256": "8c0f455c1ca2cbf2d357039b893d3935ddeb8865b2e9161544810fe287a29eff"
+      "bytes": 4381,
+      "sha256": "88d0435667114c3569c6c72af6a89de28a69cf6d14511963a93c11ee1a6f61d4"
     },
     {
       "path": "src/omnicompany/packages/services/_core/registry/resolver.py",
@@ -25690,8 +25678,8 @@
     {
       "path": "src/omnicompany/packages/services/_core/registry/SKILL.md",
       "origin": "git_tracked_source",
-      "bytes": 6485,
-      "sha256": "562473b0635a39cdf0197ccf9aedf35900f6519afcb1991054c7e2b8123f3d58"
+      "bytes": 6502,
+      "sha256": "fdd8058c209e4a63e3ae9155cb1567d65505435d70e1e8cec57aa38d8542938c"
     },
     {
       "path": "src/omnicompany/packages/services/_core/registry/testmap.yaml",
@@ -29794,8 +29782,8 @@
     {
       "path": "src/omnicompany/runtime/nodes/DESIGN.md",
       "origin": "git_tracked_source",
-      "bytes": 10414,
-      "sha256": "639604be5c3cbed74d60931bbb42f1fbd01425245f97d49e9f9a4612eed54eeb"
+      "bytes": 10461,
+      "sha256": "54a50461e377e2d8bee96a594127ebd350fbcb054272ae77d419dbf0e4f5efcc"
     },
     {
       "path": "src/omnicompany/runtime/nodes/guardian.py",

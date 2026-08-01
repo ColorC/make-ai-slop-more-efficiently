@@ -873,7 +873,7 @@ def _run_backup_locked(
     remaining = max(0, limit)
     results: list[dict[str, Any]] = []
     try:
-        publish_catalog(config, state, logger, dry_run=dry_run)
+        publish_catalog(config, state, logger, dry_run=dry_run, required=catalog_only)
         if catalog_only:
             return {"run_id": run_id, "catalog_only": True, "dry_run": dry_run}
         queue = selected_items(config, state, phase=phase, item_ids=item_ids)

@@ -30,7 +30,7 @@
 
 ### 正向替代
 
-**提供受限的结构化工具集**（对标 Claude Code 的 GrepTool/GlobTool/FileReadTool）：
+**提供受限的结构化工具集**（对标 Claude Code 的 [GrepTool/GlobTool/FileReadTool](../../../../参考项目/claude-code-analysis/src/tools/)）：
 - Glob / Grep / Read / Ls / （其他领域特定 readonly 工具）
 - 每工具 `path` **必填**（schema required），Agent **无法缺省到全盘搜索**
 - 底层用经过验证的高性能二进制（ripgrep）
@@ -62,7 +62,7 @@
 
 ### 证据
 
-Claude Code 的 GrepTool.ts schema：`pattern` required，`path` optional（默认 cwd —— 但 CC 有明确 cwd 上下文）。在**无明确 cwd** 的 AgentNodeLoop 场景下（我们的场景），`path` 应升级为 required。
+Claude Code 的 [GrepTool.ts](../../../../参考项目/claude-code-analysis/src/tools/GrepTool/GrepTool.ts) schema：`pattern` required，`path` optional（默认 cwd —— 但 CC 有明确 cwd 上下文）。在**无明确 cwd** 的 AgentNodeLoop 场景下（我们的场景），`path` 应升级为 required。
 
 ## 原则 3 · 底层用经过验证的高性能二进制
 

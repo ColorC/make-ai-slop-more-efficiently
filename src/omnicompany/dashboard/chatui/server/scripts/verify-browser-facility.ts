@@ -7,6 +7,10 @@ const purpose = process.env.BROWSER_FACILITY_VERIFY_PURPOSE
   || 'Browser Test Facility live verification';
 const exerciseDebugHandoff = process.env.BROWSER_FACILITY_VERIFY_DEBUG === '1';
 const exercisePlayback = process.env.BROWSER_FACILITY_VERIFY_PLAYBACK === '1';
+const clickSelector = process.env.BROWSER_FACILITY_VERIFY_CLICK_SELECTOR;
+const clickSelectors = process.env.BROWSER_FACILITY_VERIFY_CLICK_SELECTORS
+  ? JSON.parse(process.env.BROWSER_FACILITY_VERIFY_CLICK_SELECTORS) as string[]
+  : clickSelector ? [clickSelector] : [];
 const selectors = process.env.BROWSER_FACILITY_VERIFY_SELECTORS
   ? JSON.parse(process.env.BROWSER_FACILITY_VERIFY_SELECTORS) as string[]
   : ['.office-scene', '.factory-playback-status', '.factory-timeline-dock'];
@@ -25,6 +29,12 @@ async function main() {
     }
     await browserUseService.agentNavigate(session.id, targetUrl);
     await browserUseService.agentWaitFor(session.id, { timeoutMs: 6_000 });
+    for (const selector of clickSelectors) {
+      await browserUseService.agentClick(session.id, {
+        selector,
+      });
+      await browserUseService.agentWaitFor(session.id, { timeoutMs: 2_000 });
+    }
     if (exercisePlayback) {
       await browserUseService.agentClick(session.id, {
         selector: '.factory-timeline-play',

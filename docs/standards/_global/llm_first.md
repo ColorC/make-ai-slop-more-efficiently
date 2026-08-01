@@ -87,7 +87,7 @@ LLM 调用层的设施缺位常被绕开成 band-aid. 下面 4 条都是反模�
 
 **手解必失败**: LLM 偶尔输出 narrative + JSON / 单引号 / unescaped 特殊字符, regex 接不住. function call 走 API schema 强校验, 不可能撞这些.
 
-**正修参考**: [`design_validator.py`](../../../src/omnicompany/packages/services/_core/team_builder/workers/design_validator.py) `SubmitDesignReportRouter` + `_DesignValidatorExtractResult`. 跟 `material_id_agent.py` `SubmitMaterialIdProposalsRouter` 同模式.
+**正修参考**: [`design_validator.py`](../../../src/omnicompany/packages/services/_core/team_builder/workers/design_validator.py) `SubmitDesignReportRouter` + `_DesignValidatorExtractResult`. 跟 [`material_id_agent.py`](../../../src/omnicompany/packages/services/_authoring/mass_materialization/agents/material_id_agent.py) `SubmitMaterialIdProposalsRouter` 同模式.
 
 **实施清单**:
 1. 立 `SubmitXxxRouter(SingleToolRouter)`, 含 `TOOL_NAME / DESCRIPTION / INPUT_SCHEMA`
@@ -345,7 +345,7 @@ SUBMIT_DRAFT_TOOL = {
 
 ### AgentNodeLoop 集成
 
-按 `packages/services/publishing_commons/submit_artifact_tool.py` 范式:
+按 [`packages/services/publishing_commons/submit_artifact_tool.py`](../../../src/omnicompany/packages/services/_authoring/publishing_commons/submit_artifact_tool.py) 范式:
 - TOOL_NAME = "finish" (覆盖默认 FinishRouter, AgentNodeLoop 主循环识别 finish 退出)
 - INPUT_SCHEMA 顶层 wrap `{reason, result: object {产物字段}}`
 - AgentNodeLoop `tool_args.get("result", text)` 拿到产物 dict

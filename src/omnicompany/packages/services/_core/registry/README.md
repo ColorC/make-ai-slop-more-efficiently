@@ -28,7 +28,7 @@ registry 是 omnicompany 的**户籍系统**. 它定期扫描 src/ 源码, 把�
 **不解决**:
 - 运行时调度 (那是 [runtime/exec/](../../../../runtime/exec/) 的 PipelineRunner 职责)
 - Material 的 stock 存储 (那是 [bus/](../../../../bus/) 职责)
-- Team / Worker 行为正确性 (那是 doctor service 职责)
+- Team / Worker 行为正确性 (那是 [doctor service](../../doctor/) 职责)
 - 写入注册 (那是 [register CLI](../../../../../../docs/standards/cli/registration.md) 跟 registration service 职责 — registry 是查, register 是写)
 
 ## 设计目的与最终目标

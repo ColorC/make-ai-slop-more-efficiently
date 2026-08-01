@@ -10,7 +10,7 @@
 # home_recent.conversation_row_kebab_copy_sid / quest_board.task_pin, 后者仍是故意留空的 gap)。
 
 app: omnidashboard-frontend
-doc: TESTING.md
+doc: ../../../../docs/projects/omnidashboard/frontend-TESTING.md
 gates:
   - id: e2e
     cmd: npx playwright test
@@ -179,28 +179,28 @@ features:
     status: covered
 
   - id: shell.cockpit_shell_entry_points
-    what: 驾驶舱壳(CockpitShell)v2-11 版渲染含 workflow 摘要数据, 页内快照按钮、材料台账入口、通知引用打开均接到工作面
+    what: CockpitShell 采用零顶栏左 rail 与 Dockview 工作面；快照和元素选择收进更多菜单，核心目的地、命令面板和通知引用仍能进入工作面，并取消全局评论 rail
     should:
-      - "unit: CockpitShell 渲染时带上 workflow 摘要数据"
-      - "unit: 页内快照按钮恢复可用(不再只是 poof 提示)"
-      - "unit: material registry 与当前活跃计划入口接到工作面, 点开材料台账搜索结果能落进工作面(默认或显式右侧)"
-      - "unit: 点通知引用能在工作面打开对应内容"
+      - "unit: 零顶栏驾驶舱将主要入口收进左 rail"
+      - "unit: 页内快照与元素选择相邻放在更多菜单中"
+      - "unit: 不在活跃 tab 上方挂载驾驶舱全局评论 rail"
+      - "unit: rail 目的地、命令面板与通知引用均能进入工作面"
     tests:
       - file: src/shell/CockpitShell.test.tsx
-        cases: ["renders the v2-11 cockpit shell with workflow summary data", "restores the in-page page-snapshot button (no longer just a poof hint)", "keeps material registry and active plan entry points wired to the work surface", "opens material registry search results in the work surface", "opens search results to the right side when explicitly requested", "opens notification refs in the work surface"]
+        cases: ["renders the zero-topbar cockpit shell with everything tucked into the rail", "keeps page snapshot and element selection adjacent inside the more menu", "does not mount a cockpit-global comments rail above the active tab content", "keeps spine destinations wired to the work surface via the rail", "opens the command palette via the ⌘K hint button (window event bridge)", "opens notification refs in the work surface"]
     status: covered
 
   - id: shell.panels_store_tab_lifecycle
-    what: 面板状态仓(panelsStore)固定 tab(工作板/任务/总控)不可被普通关闭动作误关, 布局恢复/拆分放置请求均能正确合并
+    what: 新窗口默认打开项目、任务、总控，但三者均不固定且可关闭；已有快照严格恢复用户留下的页签并允许空工作区；split placement、review material 多实例和 review queue 单例语义保持
     should:
-      - "unit: 初始状态固定含工作板首页 + 任务 + 总控三个 tab"
-      - "unit: 关闭动作不会关掉固定的总控 tab, 但能关掉普通 tab"
-      - "unit: 从存档恢复布局时固定 tab 会被正确合并进恢复结果"
+      - "unit: 新窗口默认含项目、任务、总控三个 tab，但均不固定且可关闭"
+      - "unit: 允许有意保留空工作区"
+      - "unit: 从存档恢复时严格采用存档页签，不重新插入默认页签"
       - "unit: 显式 split 停靠请求在恢复后仍被保留"
       - "unit: review_material 是多实例 tab(每条材料一个页签, 重开同材料只聚焦), review_queue 是单例 tab(不同材料公用一个 tab 并更新聚焦 id)"
     tests:
       - file: src/stores/panelsStore.test.ts
-        cases: ["starts with the fixed project board (homepage) + quest + controller tabs", "does not close the fixed controller tab but closes normal tabs", "merges the fixed tabs into restored layouts", "keeps explicit dock placement requests for split monitoring", "review_material 是多实例 tab", "review_queue 是单例 tab"]
+        cases: ["starts with project, quests, and controller but does not pin them", "allows closing %s", "allows an intentionally empty workspace", "restores exactly the supplied tabs instead of reinserting defaults", "keeps explicit dock placement requests for split monitoring", "keeps review materials multi-instance and re-focuses an existing material", "keeps review queue single-instance while updating its focused material"]
     status: covered
 
   - id: shell.tab_maximize_and_context_menu
@@ -536,18 +536,6 @@ features:
         cases: ["renders material counts, detail, and opens existing entity tabs", "sends role filter queries and shows selected material detail"]
     status: covered
 
-  - id: material_graph.decision_tree_traversal_logic
-    what: 材料决策图的上下游遍历逻辑——收集选中节点的上下游、不吸入无关子图、沿 rests_on 边可传递地传播到被依赖的决策、非 rests_on 边不参与证伪传播、每个节点产出稳定坐标、supersedes 版本链横向排开
-    should:
-      - "unit: 能收集选中节点的上游与下游, 且不含无关子图"
-      - "unit: 沿 rests_on 边可传递地传播到被依赖的决策"
-      - "unit: 非 rests_on 边不参与传播(产出边不算证伪传播路径)"
-      - "unit: 每个节点都产出数值坐标; LR 布局下带 supersedes 边的版本节点沿 x 轴递增排开"
-    tests:
-      - file: src/entities/material-graph/graph-logic.test.ts
-        cases: ["收集选中节点的上游与下游", "不含无关子图", "沿 rests_on 传播到依赖的决策(可传递)", "不走非 rests_on 边(产出不算证伪传播)", "给每个节点产出数值坐标", "LR 下有 supersedes 边的版本节点横向排开(x 递增)"]
-    status: covered
-
   # ── Agent 会话 / Claude Code 集成 ────────────────────────────────────────
   - id: session.agent_session_create_modal
     what: Agent 会话组入口可见, 点"+"弹出创建 modal, modal 可用 Esc/取消按钮关闭, 输入为空时创建按钮保持禁用(不允许发起空会话)
@@ -608,25 +596,29 @@ features:
     status: covered
 
   - id: multiagent.thread_monitor_panel
-    what: ThreadMonitorPanel 展示 chat 与 pty 两类会话, 点击能作为 cc_session tab 打开
+    what: ThreadMonitorPanel 统一展示 Dashboard 管理、远端与历史原生会话；打开动作创建或 resume 真实 provider CLI 并进入 cc_session tab，同时保留后台保活、搜索、分页、清理和完整 SID 可见性
     should:
-      - "unit: 面板同时展示 chat 与 pty 会话, 点击后作为 cc_session tab 打开"
+      - "unit: legacy web chat 通过真实 CLI resume 后进入 cc_session tab"
+      - "unit: 支持创建远端 Codex 与普通手动 CLI，并只自动打开可确认的 live/detached 会话"
+      - "unit: 支持远端 OpenCode、历史原生会话搜索与 provider resume"
+      - "unit: 仅清理确认的普通后台 CLI，不误杀 agent 会话"
+      - "unit: 卡片支持分页、可读标题、完整 SID 与 live 状态提示"
     tests:
       - file: src/entities/controller/ThreadMonitorPanel.test.tsx
-        cases: ["shows chat and pty sessions and opens them as cc_session tabs"]
+        cases: ["opens a legacy web chat as a real resumed CLI tab", "creates and opens a remote Codex CLI session inside the dashboard", "creates a plain CLI shell that waits for a manually entered agent command", "opens only detached live CLI processes and never resumes historical records", "surfaces contentful remote OpenCode sessions and opens both on a fresh device", "cleans up only confirmed plain background CLIs and leaves agent sessions alive", "highlights a detached live CLI and shows full recent messages on hover", "opens an unmanaged transcript by starting its provider CLI with resume", "marks a working session not owned by the dashboard as running elsewhere", "searches historical native sessions and resumes the match as CLI", "renders sessions in bounded batches until the user asks for more", "keeps a readable title and the full session id permanently visible on every card"]
     status: covered
 
   - id: multiagent.view_grouping_and_selection
-    what: Multiagent 总览视图——按 run_status 映射到展示分组, 总控置顶其余按状态分组, 卡片点击只选中不跳转, 只有详情里显式 ↗ 按钮才真正导航, fetch 失败有明确错误展示
+    what: Multiagent 总览只列真实存活且由 Dashboard 保持的会话，按已打开页签顺序展示；行点击切换原生 cc_session 页签，并覆盖 Full/Token、异步标题、刷新、provider 名称和无活 runtime 空态
     should:
-      - "unit: run_status 正确映射到对应展示分组"
-      - "unit: 总控(controller)置顶, 其余按状态分组"
-      - "unit: 卡片点击只选中, 不发生导航"
-      - "unit: 只有详情里显式 ↗ 打开按钮才触发导航"
-      - "unit(负路径): fetch 失败时展示明确错误提示"
+      - "unit: 只列真实活 runtime，过滤死页签并保持已打开页签顺序"
+      - "unit: 不重复厚标题栏，工具区保留新会话、Full 与刷新"
+      - "unit: 异步标题能覆盖占位标题，行点击切到对应会话页签"
+      - "unit: Full mode 显示 provider Token；无活 runtime 时显示空态"
+      - "unit: provider id 映射为友好名称并有安全回退"
     tests:
       - file: src/entities/multiagent/MultiagentView.test.tsx
-        cases: ["maps run_status to display group", "pins the controller and groups others by state", "selects on card click WITHOUT navigating", "navigates only via the explicit ↗ open button in detail", "shows an error when fetch fails"]
+        cases: ["只列真实活 runtime，过滤已死页签，并保持已打开页签顺序", "没有重复厚标题栏，工具区保留新会话、Full 和刷新", "小模型标题到达后覆盖页签创建时的占位标题", "点一行切到该会话页签", "Full mode 拉高行并显示 provider 回传的 Token", "后端没有活 runtime 时给出空态", "maps provider ids to friendly names with a safe fallback"]
     status: covered
 
   # ── 审阅链路(boss sight / review stage) ─────────────────────────────────
@@ -645,16 +637,18 @@ features:
     status: covered
 
   - id: review.overview_ranking_and_preview
-    what: 审阅总览列表——markdown 摘要做截断处理, 按材料 kind 展示对应预览类型, importance 与视觉 kind 映射到卡片尺寸, 列表按时间倒序且尺寸按重要度排布, fetch 失败有明确错误态
+    what: 审阅总览——markdown 摘要去标记并截断，按 kind 渲染预览；排队中的封面失败后由卡片重试且不触发总览生成；tier 与视觉 kind 决定卡片尺寸；所有 tier 紧密铺进单条瀑布且 mandatory 不再占满整行；用单个紧凑按钮返回审阅；取数失败显示明确错误态
     should:
       - "unit: markdown 内容被去除标记并截断展示摘要"
       - "unit: 按材料 kind 渲染对应类型的预览"
-      - "unit: importance 与视觉 kind 映射到卡片尺寸"
-      - "unit: 列表按时间倒序排列, 且尺寸按重要度分布"
+      - "unit: 排队中的封面加载失败后卡片自行重试，不要求总览触发生成"
+      - "unit: tier 与视觉 kind 映射到卡片尺寸"
+      - "unit: 所有 tier 共用一条紧密瀑布，mandatory 卡不再全宽"
+      - "unit: 用一个紧凑按钮返回审阅"
       - "unit(负路径): fetch 失败时展示错误提示"
     tests:
       - file: src/entities/review/ReviewOverview.test.tsx
-        cases: ["strips markdown and truncates", "renders the right preview per kind", "maps importance and visual kind to size", "orders by time desc and sizes by importance", "shows error on fetch failure"]
+        cases: ["strips markdown and truncates", "renders the right preview per kind", "retries a queued cover without asking the overview to generate it", "maps importance and visual kind to size", "packs every tier into one waterfall without a full-width mandatory card", "uses one compact button to return to review", "shows error on fetch failure"]
     status: covered
 
   - id: review.material_video_preview_fallback
