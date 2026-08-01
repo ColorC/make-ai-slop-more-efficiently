@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "policy_version": "2026-08-01.2",
-  "created_at": "2026-08-01T12:42:28.738755+00:00",
+  "created_at": "2026-08-01T12:54:06.535542+00:00",
   "source": {
     "path": ".",
-    "head": "e317f97b672b21478f89b913db418fa4f57a0e96",
+    "head": "8a5195c6f21bfe405cae650e7f0b4a9bbc9fd9f2",
     "dirty": false,
-    "tracked_considered": 14248,
+    "tracked_considered": 14336,
     "missing_tracked": []
   },
   "additional_sources": [
@@ -24,18 +24,18 @@
   "selection": {
     "input": "git ls-files -z --cached",
     "included_tracked": 3196,
-    "excluded_tracked": 11080,
-    "scrubbed_tracked": 298,
+    "excluded_tracked": 11168,
+    "scrubbed_tracked": 299,
     "excluded_by_rule": {
-      "unsafe_path_part": 5711,
-      "private_product_path": 2475,
-      "not_allowlisted": 2109,
+      "unsafe_path_part": 5716,
+      "private_product_path": 2498,
+      "not_allowlisted": 2164,
       "non_source_runtime_evidence": 362,
       "service_not_allowlisted": 252,
       "generated_static_only": 75,
-      "domain_not_allowlisted": 52,
-      "standard_not_allowlisted": 33,
-      "source_file_too_large": 9,
+      "domain_not_allowlisted": 55,
+      "standard_not_allowlisted": 34,
+      "source_file_too_large": 10,
       "internal_release_machinery": 2
     }
   },
@@ -94,7 +94,7 @@
   },
   "output": {
     "files_excluding_manifest_and_audit": 5058,
-    "bytes_excluding_manifest_and_audit": 52949256
+    "bytes_excluding_manifest_and_audit": 52949677
   },
   "files": [
     {
@@ -670,8 +670,8 @@
     {
       "path": "pyproject.toml",
       "origin": "git_tracked_source",
-      "bytes": 2807,
-      "sha256": "09c04861965e1d7f721fcb993ff58191fea8fa9f7f42605daea09099c0208993"
+      "bytes": 2825,
+      "sha256": "80eabe404a83740fc46823c225d15ef48184e5510f6ed9af5b3adbb73a4e8f26"
     },
     {
       "path": "README.md",
@@ -1240,8 +1240,8 @@
     {
       "path": "src/omnicompany/cli/main.py",
       "origin": "git_tracked_source",
-      "bytes": 13689,
-      "sha256": "e57a4aa65674eee6211df66f62736e9010c2fc4ec82ab7ea88c4352d149dab8b"
+      "bytes": 14092,
+      "sha256": "d48f1043d1642de89caef6b9521c43427a2757bcc3aeac5ec66f1451a9cc5525"
     },
     {
       "path": "src/omnicompany/cli/unified.py",

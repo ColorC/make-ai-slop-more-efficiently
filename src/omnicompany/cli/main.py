@@ -59,7 +59,6 @@ from .commands.cron import cmd_cron
 from .commands.testmap import cmd_testmap
 from .commands.plan_gate import cmd_plan_complete_gate
 from .commands.semantic import cmd_semantic
-from .commands.vilo import cmd_vilo
 from .commands.research import cmd_research
 from .commands.decisions import cmd_decisions
 from .commands.notify import cmd_notify
@@ -72,7 +71,27 @@ from .commands.atlas import cmd_atlas
 from .commands.ledger import cmd_ledger
 from .commands.resolve import cmd_resolve
 from .commands.token_ledger import cmd_token_ledger
-from .commands.game import cmd_game
+
+try:
+    from .commands.game import cmd_game
+except ModuleNotFoundError as _game_import_error:
+    _game_optional_modules = {
+        "PIL",
+        "cv2",
+        "numpy",
+        "onnxruntime",
+        "rapidocr_onnxruntime",
+    }
+    if _game_import_error.name not in _game_optional_modules:
+        raise
+
+    @click.group("game")
+    def cmd_game() -> None:
+        """Game Observatory commands (requires the game-observatory extra)."""
+        raise click.ClickException(
+            'Game Observatory dependencies are not installed. '
+            'Run: pip install "omnicompany[game-observatory]"'
+        )
 
 # 统一命令组（执行 + 观测 + 管理）
 from .unified import (
@@ -323,8 +342,6 @@ cli.add_command(cmd_cron)  # 统一定时调度面(心跳 tick + 任务管理)·
 cli.add_command(cmd_testmap)  # 功能点-测试台账查询面(list/show/verify/gaps)· 2026-07-03
 cli.add_command(cmd_plan_complete_gate)  # 计划完成硬闸查询面(allow/refuse, whatnow patch_task 消费)· 2026-07-04
 
-# Vilo 内容管线 (2026-06-13 内化): 管线代码进 domains/vilo, 产物进 data/domains/vilo, 走 omni 调用
-cli.add_command(cmd_vilo)
 
 # BOSS SIGHT cli subcommands (2026-05-25): 把 17 个总控 function call tool 迁移到 omni cli.
 # 新增 / 扩展:
