@@ -52,7 +52,7 @@ selftest = [
   "playwright>=1.40.0",
 ]
 game-observatory = [
-  "numpy<2",
+  "numpy<3",
   "pillow>=10.0",
   "opencv-python<4.12",
   "rapidocr-onnxruntime>=1.4.4",
