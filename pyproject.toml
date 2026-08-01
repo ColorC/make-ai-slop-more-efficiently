@@ -54,7 +54,7 @@ selftest = [
 game-observatory = [
   "numpy<2",
   "pillow>=10.0",
-  "opencv-python<4.12",
+  "opencv-python<5.1",
   "rapidocr-onnxruntime>=1.4.4",
 ]
 dev = [
