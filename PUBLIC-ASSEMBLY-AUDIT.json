@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_version": "2026-08-01.2",
-  "created_at": "2026-08-01T12:54:06.932214+00:00",
+  "created_at": "2026-08-01T13:01:59.322450+00:00",
   "scope": "published_git_tree",
   "passed": true,
   "publish_ready": true,

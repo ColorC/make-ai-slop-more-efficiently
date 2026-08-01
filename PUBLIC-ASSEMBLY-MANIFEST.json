@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "policy_version": "2026-08-01.2",
-  "created_at": "2026-08-01T12:54:06.535542+00:00",
+  "created_at": "2026-08-01T13:01:58.939940+00:00",
   "source": {
     "path": ".",
-    "head": "8a5195c6f21bfe405cae650e7f0b4a9bbc9fd9f2",
+    "head": "10f3d1ca2542e3d6ae1fa1025b42545dd612b174",
     "dirty": false,
     "tracked_considered": 14336,
     "missing_tracked": []
@@ -23,13 +23,13 @@
   ],
   "selection": {
     "input": "git ls-files -z --cached",
-    "included_tracked": 3196,
-    "excluded_tracked": 11168,
+    "included_tracked": 3197,
+    "excluded_tracked": 11167,
     "scrubbed_tracked": 299,
     "excluded_by_rule": {
       "unsafe_path_part": 5716,
       "private_product_path": 2498,
-      "not_allowlisted": 2164,
+      "not_allowlisted": 2163,
       "non_source_runtime_evidence": 362,
       "service_not_allowlisted": 252,
       "generated_static_only": 75,
@@ -93,8 +93,8 @@
     ]
   },
   "output": {
-    "files_excluding_manifest_and_audit": 5058,
-    "bytes_excluding_manifest_and_audit": 52949677
+    "files_excluding_manifest_and_audit": 5059,
+    "bytes_excluding_manifest_and_audit": 52949967
   },
   "files": [
     {
@@ -714,6 +714,12 @@
       "origin": "git_tracked_source",
       "bytes": 382,
       "sha256": "039a5a3fc7391b1dd0f87fb3147e676a1318852712e599aa8ae4c70dcf8c9994"
+    },
+    {
+      "path": "scripts/recover.py",
+      "origin": "git_tracked_source",
+      "bytes": 197,
+      "sha256": "9b5406bc1cb7925a7bb9bc7c953b896f077f079033fd711aa7bb53b0e6bb0630"
     },
     {
       "path": "scripts/recovery_baseline_cli.py",
@@ -30442,8 +30448,8 @@
     {
       "path": "tests/scripts/test_recovery_baseline_cli.py",
       "origin": "git_tracked_source",
-      "bytes": 29835,
-      "sha256": "7bb951b99a1795afceb004b3a6fe6c464b324a9847948f8dc3869a1ccd19277d"
+      "bytes": 29928,
+      "sha256": "cea2fbb7a7362e0747eb6481cfcd14cd244d3be4e75a6f10996c95ded6c68c78"
     }
   ]
 }

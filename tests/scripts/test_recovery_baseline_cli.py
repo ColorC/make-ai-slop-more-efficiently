@@ -7,6 +7,8 @@ import subprocess
 import sys
 import time
 
+import pytest
+
 
 CLI = Path(__file__).parents[2] / "scripts" / "session_recovery_cli.py"
 
@@ -172,6 +174,7 @@ def test_git_clean_filter_converges_crlf_worktree_with_lf_git_blob(tmp_path: Pat
     assert plan["inventories"]["git_worktree_comparison"]["changed_tracked_paths"] == 0
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows path identity contract")
 def test_windows_case_aliases_collapse_onto_git_path(tmp_path: Path) -> None:
     workspace, snapshots, sessions = _fixture(tmp_path)
     artifact = tmp_path / "case-a.py"
