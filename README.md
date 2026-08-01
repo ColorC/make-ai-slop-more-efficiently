@@ -100,6 +100,34 @@ Dashboard 的 ccdaemon 内置了 7 个外部 AI coding agent 的适配器：
 
 装了哪个 CLI 就能用哪个，没装的优雅降级。
 
+## Dashboard
+
+仓库包含 Dashboard 的 FastAPI 后端、React/Vite 前端、ccdaemon 会话守护进程和已构建的静态资源。
+
+```bash
+pip install -e ".[dashboard]"
+python scripts/start_dashboard_dev.py --no-reload
+# open http://127.0.0.1:8200/
+```
+
+Dashboard 与 ccdaemon 是两个独立进程：重启 Dashboard 不会故意终止已打开的 CLI 会话。
+详见 [`src/omnicompany/dashboard/PROJECT_INDEX.md`](src/omnicompany/dashboard/PROJECT_INDEX.md)。
+
+## omni-recover（Alpha）
+
+`omni-recover` 可以从 Codex、Claude Code、Kimi Code 和 OpenCode 的本机会话证据中，
+按时序查找并恢复可验证的文件候选：
+
+```bash
+omni-recover sources
+omni-recover providers
+omni-recover plan --help
+```
+
+它是技术预览，不是云备份替代品。归档内容可能包含源码、提示词、路径和工具输出，
+默认内容寻址但不由 omni-recover 加密。使用前请阅读
+[`packages/omni-recover/README.md`](packages/omni-recover/README.md)。
+
 ## 实验性模块（标注：不成熟）
 
 以下模块处于早期设计阶段，正在朝**全云办公 → 持续学习 → 形成稳定复杂决策管线 → 复用决策形成决策方法**的路线演进：

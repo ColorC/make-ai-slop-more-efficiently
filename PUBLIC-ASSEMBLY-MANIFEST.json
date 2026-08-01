@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "policy_version": "2026-08-01.1",
-  "created_at": "2026-08-01T11:20:12.453277+00:00",
+  "policy_version": "2026-08-01.2",
+  "created_at": "2026-08-01T12:42:28.738755+00:00",
   "source": {
     "path": ".",
-    "head": "eed8dab96634ca3161fa85147a040832a19aecda",
-    "dirty": true,
-    "tracked_considered": 14230,
+    "head": "e317f97b672b21478f89b913db418fa4f57a0e96",
+    "dirty": false,
+    "tracked_considered": 14248,
     "missing_tracked": []
   },
   "additional_sources": [
@@ -23,20 +23,20 @@
   ],
   "selection": {
     "input": "git ls-files -z --cached",
-    "included_tracked": 3168,
-    "excluded_tracked": 11090,
-    "scrubbed_tracked": 293,
+    "included_tracked": 3196,
+    "excluded_tracked": 11080,
+    "scrubbed_tracked": 298,
     "excluded_by_rule": {
       "unsafe_path_part": 5711,
-      "private_product_path": 2459,
-      "not_allowlisted": 2125,
+      "private_product_path": 2475,
+      "not_allowlisted": 2109,
       "non_source_runtime_evidence": 362,
-      "service_not_allowlisted": 261,
+      "service_not_allowlisted": 252,
       "generated_static_only": 75,
       "domain_not_allowlisted": 52,
       "standard_not_allowlisted": 33,
       "source_file_too_large": 9,
-      "internal_release_machinery": 3
+      "internal_release_machinery": 2
     }
   },
   "dashboard_static_build": {
@@ -93,8 +93,8 @@
     ]
   },
   "output": {
-    "files_excluding_manifest_and_audit": 5030,
-    "bytes_excluding_manifest_and_audit": 52622377
+    "files_excluding_manifest_and_audit": 5058,
+    "bytes_excluding_manifest_and_audit": 52949256
   },
   "files": [
     {
@@ -200,6 +200,36 @@
       "sha256": "eed536c36c695c430598b93a8db58bfdd42333181f9078c8680849a0e20c565a"
     },
     {
+      "path": "config/recovery/baseline-discovery.example.json",
+      "origin": "git_tracked_source",
+      "bytes": 514,
+      "sha256": "a38f20df4cba14e551fab9ffdbfa842ffe32ccbc1971a4329a435699c0773dbb"
+    },
+    {
+      "path": "config/recovery/baseline-discovery.schema.json",
+      "origin": "git_tracked_source",
+      "bytes": 1005,
+      "sha256": "2c765be8fce36a1f12f77a3766ce325148a12a55ab16f00ec47d90e37b319c98"
+    },
+    {
+      "path": "config/recovery/probes/example.yaml",
+      "origin": "git_tracked_source",
+      "bytes": 358,
+      "sha256": "64f930e988ec8190305878f8f31b9b9bbf17211a682166fb54676bd4e7079e56"
+    },
+    {
+      "path": "config/recovery/providers.d/provider.schema.json",
+      "origin": "git_tracked_source",
+      "bytes": 639,
+      "sha256": "78c34603789bb1ecee17c6cdffdbbe614e74ea59fe0d066e78b33425ee22ca28"
+    },
+    {
+      "path": "config/recovery/providers.d/README.md",
+      "origin": "git_tracked_source",
+      "bytes": 706,
+      "sha256": "1bdbbdfb8f76c04c33e1352c8934f7b5513eb4e75375ea64403e925dc2ada33c"
+    },
+    {
       "path": "CONTRIBUTING.md",
       "origin": "git_tracked_source",
       "bytes": 1414,
@@ -216,6 +246,24 @@
       "origin": "injected_public_release_file",
       "bytes": 1126,
       "sha256": "f70670f76eed28ed85d8d8ce7dd7bbb34d56bb14c2aa39cd65876ffc8e80a386"
+    },
+    {
+      "path": "docs/recovery/automatic-baseline-discovery.md",
+      "origin": "git_tracked_source",
+      "bytes": 7232,
+      "sha256": "64995febd438695329695c6819bd79dcecf61df5116e1bba0f29c1fa331f55ec"
+    },
+    {
+      "path": "docs/recovery/LIVE-CLI-RECOVERY-CONTRACT-2026-08-01.md",
+      "origin": "git_tracked_source",
+      "bytes": 4939,
+      "sha256": "5ac94cc208051bacfbf24b350939671234851cf9bd900fb3b7bd98df5b257dfb"
+    },
+    {
+      "path": "docs/recovery/UNIFIED-EVIDENCE-CONTRACT.md",
+      "origin": "git_tracked_source",
+      "bytes": 3795,
+      "sha256": "b9f599c0c23e0ca004b0263cc8071cdafd5f987da60805bc14df424cac6b54df"
     },
     {
       "path": "docs/standards/_global/agent_prompt_design.md",
@@ -268,8 +316,8 @@
     {
       "path": "docs/standards/_global/llm_first.md",
       "origin": "git_tracked_source",
-      "bytes": 23997,
-      "sha256": "c5ce4ceaf3a82aecafb1c82a72e032d3aa3e8537b8d3d65b9d4b3290bc8d030b"
+      "bytes": 23791,
+      "sha256": "ea1f7c72b4d367df1b4eb85cb8afbfd3c5541e66b93f6cc24426d8122a78b37a"
     },
     {
       "path": "docs/standards/_global/single_source_thin_wrap.md",
@@ -346,14 +394,14 @@
     {
       "path": "docs/standards/concepts/agent_first.md",
       "origin": "git_tracked_source",
-      "bytes": 9505,
-      "sha256": "99be621c7117b75f5c1ab96a0007ae98dcb324c973fccc728bee9dfb5d02ab7f"
+      "bytes": 9424,
+      "sha256": "808a5669b4ad8d86fa9848b351450403f2aeb6c9790e7340cbb3148665550b29"
     },
     {
       "path": "docs/standards/concepts/agent_tools.md",
       "origin": "git_tracked_source",
-      "bytes": 9445,
-      "sha256": "a5db1796e5dd64c802ac7ef029111076706fc5f1b4e241b1cf5809a36345f637"
+      "bytes": 9305,
+      "sha256": "34ad0337a366f4438d3a9b357a5b08c22ffb2b8ff8afc795318307496baeec78"
     },
     {
       "path": "docs/standards/concepts/material.md",
@@ -418,14 +466,38 @@
     {
       "path": "LICENSE",
       "origin": "git_tracked_source",
-      "bytes": 1063,
-      "sha256": "35b09b1b666b977efc8f055395461de36c908fa473cea0df1845ad7b7d66585c"
+      "bytes": 1084,
+      "sha256": "b1392ab92c54c5a322c968def35a06a681853336d2b51a8af3b286e077281422"
     },
     {
       "path": "mkdocs.yml",
       "origin": "git_tracked_source",
       "bytes": 650,
       "sha256": "cdf4837359d3980c73292d26f8e6b6fa6d22c06afb0a67d17801fec74a7f3731"
+    },
+    {
+      "path": "packages/omni-recover/hatch_build.py",
+      "origin": "git_tracked_source",
+      "bytes": 2067,
+      "sha256": "3cf276176c7a36b5b7a74d8267e7b3d4df03fd8edd7c96ead4f96047eb698195"
+    },
+    {
+      "path": "packages/omni-recover/LICENSE",
+      "origin": "git_tracked_source",
+      "bytes": 1084,
+      "sha256": "b1392ab92c54c5a322c968def35a06a681853336d2b51a8af3b286e077281422"
+    },
+    {
+      "path": "packages/omni-recover/pyproject.toml",
+      "origin": "git_tracked_source",
+      "bytes": 952,
+      "sha256": "e0117b989d2205478317cfc04e42261817171e82770eaa3c2401a1104342f108"
+    },
+    {
+      "path": "packages/omni-recover/README.md",
+      "origin": "git_tracked_source",
+      "bytes": 1888,
+      "sha256": "941555cb899ccb4a3dd30ff5c5de043f6b60333f9dd937f43d8ece8011f4a53a"
     },
     {
       "path": "packages/wiki-core/comments.d.ts",
@@ -598,14 +670,14 @@
     {
       "path": "pyproject.toml",
       "origin": "git_tracked_source",
-      "bytes": 2340,
-      "sha256": "d2e1d5826472229ce7b1f2e265626dbf2d52a792ac7d1a7ac896b4c5c118b45a"
+      "bytes": 2807,
+      "sha256": "09c04861965e1d7f721fcb993ff58191fea8fa9f7f42605daea09099c0208993"
     },
     {
       "path": "README.md",
       "origin": "git_tracked_source",
-      "bytes": 6823,
-      "sha256": "2ca829b6baa4e582a603635cb56b9f14c2b3a2e1ec988bb622bf0e0042577c63"
+      "bytes": 7815,
+      "sha256": "b288987c527a0e07cb0567e9df990d53d3dc6424eaf206a97593ebb2e2a456d5"
     },
     {
       "path": "requirements-game-observatory-optional.txt",
@@ -644,10 +716,28 @@
       "sha256": "039a5a3fc7391b1dd0f87fb3147e676a1318852712e599aa8ae4c70dcf8c9994"
     },
     {
+      "path": "scripts/recovery_baseline_cli.py",
+      "origin": "git_tracked_source",
+      "bytes": 93680,
+      "sha256": "7157363a26de0aef0d277d478b0186719954aa3e5a3ca4e2afe5b6b9b2ab72e1"
+    },
+    {
       "path": "scripts/release_check.py",
       "origin": "git_tracked_source",
       "bytes": 7595,
       "sha256": "5c0d92a7c2f20f2368e07464285ca86a2726ec05d85ab1f1b074400c19ac8197"
+    },
+    {
+      "path": "scripts/session_recovery_cli.py",
+      "origin": "git_tracked_source",
+      "bytes": 45889,
+      "sha256": "b68680cec2195d2e1f7099751fbe8d1e5be4afdd4b9af975a9f558033581e044"
+    },
+    {
+      "path": "scripts/start_dashboard_dev.py",
+      "origin": "git_tracked_source",
+      "bytes": 8030,
+      "sha256": "0aee622ae640d0aaf5697d03484ca667187883cc9e8824668b47aa6a6cc4eb5e"
     },
     {
       "path": "scripts/validate_domains.py",
@@ -670,8 +760,8 @@
     {
       "path": "services/_progress/progress_service/Cargo.lock",
       "origin": "git_tracked_source",
-      "bytes": 15291,
-      "sha256": "834455a87fc67e82798c76d61494ff7b2d06168a1f60fedc954464bc3a35daf0"
+      "bytes": 15905,
+      "sha256": "41acb4f8af6a10cd94bbbf48ab96e6cb119ca70df56d6ad13cb3101b10c5daca"
     },
     {
       "path": "services/_progress/progress_service/Cargo.toml",
@@ -712,14 +802,20 @@
     {
       "path": "services/_progress/progress_service/src/main.rs",
       "origin": "git_tracked_source",
-      "bytes": 65222,
-      "sha256": "df20316fb3fd22d9a0c52d6ed4c037959745cc3ed538350c97896c5660087e77"
+      "bytes": 66751,
+      "sha256": "53731e20e3e5859edb27e994fe04248f41b815c65da989bcfdaf085e96bb2373"
     },
     {
       "path": "services/_progress/progress_service/start-progress-service.cmd",
       "origin": "git_tracked_source",
       "bytes": 658,
       "sha256": "a73fb90202e0e8ab3384c564e89398982a432d811d86fbc783966448839d4912"
+    },
+    {
+      "path": "skills/recover-session-files/SKILL.md",
+      "origin": "git_tracked_source",
+      "bytes": 2552,
+      "sha256": "a65658b8eaeee58d00a46df12bbff85cbafec7d681b6101dc2da860125ef58db"
     },
     {
       "path": "src/omnicompany/__init__.py",
@@ -6034,14 +6130,14 @@
     {
       "path": "src/omnicompany/dashboard/DESIGN.md",
       "origin": "git_tracked_source",
-      "bytes": 9870,
-      "sha256": "f965bb59eca8c748499a13012a91c4c8a0e8a31e17a1e93ccc51e224e1400069"
+      "bytes": 9756,
+      "sha256": "e4234a08052f4bc2ff19dc814b1c953d0f006ffa51cbd9ea67ed0e9bf82d086a"
     },
     {
       "path": "src/omnicompany/dashboard/extensions/vscode-chat-sidebar/.vscodeignore",
       "origin": "git_tracked_source",
-      "bytes": 100,
-      "sha256": "c84e60a6c3f0d2b677c11cc08da69ac5630be52d7163a806d36dbe415822fdfb"
+      "bytes": 109,
+      "sha256": "722df906f4140ab77da55efa06b40000f59668ac62e5f3dec0433b6b797f9b8b"
     },
     {
       "path": "src/omnicompany/dashboard/extensions/vscode-chat-sidebar/package-lock.json",
@@ -25660,8 +25756,8 @@
     {
       "path": "src/omnicompany/packages/services/_core/registry/README.md",
       "origin": "git_tracked_source",
-      "bytes": 4381,
-      "sha256": "88d0435667114c3569c6c72af6a89de28a69cf6d14511963a93c11ee1a6f61d4"
+      "bytes": 4364,
+      "sha256": "8c0f455c1ca2cbf2d357039b893d3935ddeb8865b2e9161544810fe287a29eff"
     },
     {
       "path": "src/omnicompany/packages/services/_core/registry/resolver.py",
@@ -25678,8 +25774,8 @@
     {
       "path": "src/omnicompany/packages/services/_core/registry/SKILL.md",
       "origin": "git_tracked_source",
-      "bytes": 6502,
-      "sha256": "fdd8058c209e4a63e3ae9155cb1567d65505435d70e1e8cec57aa38d8542938c"
+      "bytes": 6485,
+      "sha256": "562473b0635a39cdf0197ccf9aedf35900f6519afcb1991054c7e2b8123f3d58"
     },
     {
       "path": "src/omnicompany/packages/services/_core/registry/testmap.yaml",
@@ -29240,6 +29336,60 @@
       "sha256": "97add513a123c7cea1d1752de72466fd0a7868d506623bb1e4c7fe996f91b3fc"
     },
     {
+      "path": "src/omnicompany/packages/services/recovery/__init__.py",
+      "origin": "git_tracked_source",
+      "bytes": 635,
+      "sha256": "bb52464f6d8f0954b1f8aed5c18f2bd83e8643c2198d5505ab4139f23af3df81"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/_legacy/__init__.py",
+      "origin": "git_tracked_source",
+      "bytes": 70,
+      "sha256": "d1045a15b923b80c49a558e9399b0ce6ce5dec2b38ee4dcb2b5343d41603e460"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/adapters.py",
+      "origin": "git_tracked_source",
+      "bytes": 26912,
+      "sha256": "f2d6c5f9c2616b1844a8c9fa23b352126f9696c6feebdb0b5d3c58a5b2320150"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/commands.py",
+      "origin": "git_tracked_source",
+      "bytes": 8809,
+      "sha256": "3439715de65abf5018f540792017b9c0fd86ae544bf1a5f16be8b0afc5463759"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/entrypoint.py",
+      "origin": "git_tracked_source",
+      "bytes": 1571,
+      "sha256": "2e3fafa82cee0b8b58a1be7e3554d6b1ab52b55397e2edb42bcfe573a0d97e86"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/evidence.py",
+      "origin": "git_tracked_source",
+      "bytes": 16175,
+      "sha256": "5c91c6f8394d247c23846a59af683dd663844ad2983ef2c3dc0c3158f58e1d7f"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/evidence_index.py",
+      "origin": "git_tracked_source",
+      "bytes": 5818,
+      "sha256": "74a4239ad573e7e507d772cda159a5bd25907a49f038a04528849a17da446b4f"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/providers.py",
+      "origin": "git_tracked_source",
+      "bytes": 7160,
+      "sha256": "467dba305f2cab95ab820d142d997b6825aac45e585613417a6ad24fa6a57a8b"
+    },
+    {
+      "path": "src/omnicompany/packages/services/recovery/runtime.py",
+      "origin": "git_tracked_source",
+      "bytes": 15419,
+      "sha256": "35507eb635a61aeb87b55301cfbb4b087bad7ab5342732766785323f8135245f"
+    },
+    {
       "path": "src/omnicompany/packages/vendors/__init__.py",
       "origin": "git_tracked_source",
       "bytes": 236,
@@ -29782,8 +29932,8 @@
     {
       "path": "src/omnicompany/runtime/nodes/DESIGN.md",
       "origin": "git_tracked_source",
-      "bytes": 10461,
-      "sha256": "54a50461e377e2d8bee96a594127ebd350fbcb054272ae77d419dbf0e4f5efcc"
+      "bytes": 10414,
+      "sha256": "639604be5c3cbed74d60931bbb42f1fbd01425245f97d49e9f9a4612eed54eeb"
     },
     {
       "path": "src/omnicompany/runtime/nodes/guardian.py",
@@ -30034,26 +30184,26 @@
     {
       "path": "tests/fixtures/p1-agent-parity/AH-006/catalog/archive/old.route",
       "origin": "git_tracked_source",
-      "bytes": 34,
-      "sha256": "d268322bfd5a3963739c97006af83e4600cd21a51aa4aca488bb1abf462c8298"
+      "bytes": 36,
+      "sha256": "c0fbb767a50e959ec5f22bfac611fe8f4dc36d38186efe772a2b2b9b1daccc55"
     },
     {
       "path": "tests/fixtures/p1-agent-parity/AH-006/catalog/current/team-a/alpha.route",
       "origin": "git_tracked_source",
-      "bytes": 33,
-      "sha256": "fabf7a5da0f9dd3b16a0c8260a9153ca2f1ed78077cf313b1f786ef064f65e0a"
+      "bytes": 35,
+      "sha256": "7ea2c1ee64fdb27fc7d2faab26e7c570594853e42ba9c3cfa98324a282e60089"
     },
     {
       "path": "tests/fixtures/p1-agent-parity/AH-006/catalog/current/team-b/release.route",
       "origin": "git_tracked_source",
-      "bytes": 38,
-      "sha256": "679d4166b979e2d53d5eaff365a9f4e678f5df57cfbb68541e3c30bed825e160"
+      "bytes": 40,
+      "sha256": "bb89dec47fdec2e5dd8ba29c7c6897458da1c68c471158ecc9b8befeae225166"
     },
     {
       "path": "tests/fixtures/p1-agent-parity/AH-006/outside-scope/winner.route",
       "origin": "git_tracked_source",
-      "bytes": 38,
-      "sha256": "6b03db9c20069c507de011cd750f9541c189244057b111f58ca0d84fe4de426b"
+      "bytes": 40,
+      "sha256": "e561acef74c78da1cb62e2595fbe467c2cb095c799f0784a65eadb8c5eb42668"
     },
     {
       "path": "tests/fixtures/p1-agent-parity/AH-006/search-contract.txt",
@@ -30076,8 +30226,8 @@
     {
       "path": "tests/fixtures/p1-agent-parity/AH-009-omni-native/config/route.env",
       "origin": "git_tracked_source",
-      "bytes": 13,
-      "sha256": "5c32349b48dd52faa1483031e06272ef8f7bdccbeb63717d013e432063ec25f7"
+      "bytes": 14,
+      "sha256": "d928b8b63d37f02c7c996dfdf05649dfe9afc06eee315575a4c6ac5377e4d0fe"
     },
     {
       "path": "tests/fixtures/p1-agent-parity/AH-009-omni-native/verify_route.py",
@@ -30088,8 +30238,8 @@
     {
       "path": "tests/fixtures/p1-agent-parity/AH-009-opencode/config/route.env",
       "origin": "git_tracked_source",
-      "bytes": 13,
-      "sha256": "5c32349b48dd52faa1483031e06272ef8f7bdccbeb63717d013e432063ec25f7"
+      "bytes": 14,
+      "sha256": "d928b8b63d37f02c7c996dfdf05649dfe9afc06eee315575a4c6ac5377e4d0fe"
     },
     {
       "path": "tests/fixtures/p1-agent-parity/AH-009-opencode/verify_route.py",
@@ -30154,8 +30304,8 @@
     {
       "path": "tests/fixtures/reasoning_ledger/cases/explicit_fail_edge_requirement_falsified/arguments/map.argdown",
       "origin": "git_tracked_source",
-      "bytes": 713,
-      "sha256": "ebbc75c70744e0f54eafa303af7df78cd368428764dade046ff5ceecd3445e03"
+      "bytes": 728,
+      "sha256": "0c11b1f7d9126bbf140b814c65b7f0742873851fe771b0ebd2eaf47d4f40483a"
     },
     {
       "path": "tests/fixtures/reasoning_ledger/cases/explicit_fail_edge_requirement_falsified/claims/H-034.yaml",
@@ -30236,6 +30386,12 @@
       "sha256": "759b0fa198dbc3963e95c70dec2846cadd3cc9d5ec4d6212588d0aae99689496"
     },
     {
+      "path": "tests/platform/test_session_recovery_cli.py",
+      "origin": "git_tracked_source",
+      "bytes": 17323,
+      "sha256": "4328952b7c8e70f5f906ff556e5b0cedac7556d6b347bd06fedb00722f2bf0a1"
+    },
+    {
       "path": "tests/protocol/test_bus_memory.py",
       "origin": "git_tracked_source",
       "bytes": 9648,
@@ -30276,6 +30432,18 @@
       "origin": "git_tracked_source",
       "bytes": 4296,
       "sha256": "5c5be093b4ba8531236ca80bc71d493d23b538b6ac5e8467e750005ab21a9e62"
+    },
+    {
+      "path": "tests/recovery/test_universal_recovery_pipeline.py",
+      "origin": "git_tracked_source",
+      "bytes": 18787,
+      "sha256": "665bd3efb22e91f4a1964df3f940bd9630559a06ac876d3e8e8101a20769e1e8"
+    },
+    {
+      "path": "tests/scripts/test_recovery_baseline_cli.py",
+      "origin": "git_tracked_source",
+      "bytes": 29835,
+      "sha256": "7bb951b99a1795afceb004b3a6fe6c464b324a9847948f8dc3869a1ccd19277d"
     }
   ]
 }

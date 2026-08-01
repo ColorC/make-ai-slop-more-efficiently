@@ -69,8 +69,16 @@ Repository = "https://github.com/ColorC/make-ai-slop-more-efficiently"
 [tool.hatch.build.targets.wheel]
 packages = ["src/omnicompany"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"scripts/session_recovery_cli.py" = "omnicompany/packages/services/recovery/_legacy/session_recovery_cli.py"
+"scripts/recovery_baseline_cli.py" = "omnicompany/packages/services/recovery/_legacy/recovery_baseline_cli.py"
+
 [project.scripts]
 omni = "omnicompany.cli.bootstrap:main"
+omni-recover = "omnicompany.packages.services.recovery.entrypoint:main"
+
+[project.entry-points."omni_recover.providers"]
+# Third-party packages may register provider adapter factories in this group.
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"

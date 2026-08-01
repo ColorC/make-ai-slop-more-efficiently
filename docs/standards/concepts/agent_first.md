@@ -195,7 +195,7 @@ prompt 含:
 
 | 规范条款 | ConfigurableAgent / AgentSpec 实施 |
 |---|---|
-| 工具集 ≤ 10 (§8.5 第 1 条) | `AgentSpec.tools` 字段是 tuple[str, ...], `len() ≤ 10` 由 [agent 注册件.yaml](../../../templates/agent/注册件.yaml) check `agent-006` 强制 |
+| 工具集 ≤ 10 (§8.5 第 1 条) | `AgentSpec.tools` 字段是 tuple[str, ...], `len() ≤ 10` 由 agent 注册件.yaml check `agent-006` 强制 |
 | bash 占主 (§8.5 第 2 条) | `tools` 含 `"bash"` 字符串 (走 TOOL_REGISTRY 注册的 BashRouter / DevBashRouter) |
 | 没按外部信号源分类的 ToolWorker (§8.1 反模式) | 业务工具走 `TOOL_REGISTRY` 注册 + 字符串名引用, 不在 SPEC.tools 里 import 类 |
 | prompt 走外部 .md (§2.1 workspace 一部分) | `AgentSpec.prompt_path` 指向 .md 文件, 启动时加载 (跟单源 + 薄包装铁律对齐) |
@@ -204,4 +204,4 @@ prompt 含:
 
 业务侧立新 agent **优先走 ConfigurableAgent** (一行 SPEC 全配置驱动, 不写 Python 业务代码), 例外才直接继承 `AgentNodeLoop` (复杂自定义 PromptBuilder / ExtractResult 等场景, `SPEC.allow_custom_code=True` 显式标).
 
-详见本规范（agent 概念）+ [ConfigurableAgent 范本](../../../templates/agent/范本.py) + [单源 + 薄包装](../_global/single_source_thin_wrap.md).
+详见本规范（agent 概念）+ ConfigurableAgent 范本 + [单源 + 薄包装](../_global/single_source_thin_wrap.md).

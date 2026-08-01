@@ -1,0 +1,19 @@
+{
+  "$schema": "./baseline-discovery.schema.json",
+  "snapshot_roots": [
+    "C:/workspace/omnicompany/data/domains/game_observatory/explore_dispatch_runs/runtime_snapshots"
+  ],
+  "session_roots": [
+    "%USERPROFILE%/.codex",
+    "%USERPROFILE%/.claude",
+    "%USERPROFILE%/.kimi-code",
+    "%USERPROFILE%/.local/share/opencode",
+    "C:/workspace/omnicompany-recovery-evidence"
+  ],
+  "candidate_roots": [
+    {
+      "path": "C:/workspace/发布/omnifactory-public",
+      "source": "publish-tree"
+    }
+  ]
+}
