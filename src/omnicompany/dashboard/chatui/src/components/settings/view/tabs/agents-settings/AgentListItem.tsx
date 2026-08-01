@@ -32,6 +32,10 @@ const agentConfig: Record<AgentProvider, AgentConfig> = {
     name: 'Gemini',
     color: 'indigo',
   },
+  kimi: {
+    name: 'Kimi',
+    color: 'blue',
+  },
   opencode: {
     name: 'OpenCode',
     color: 'zinc',

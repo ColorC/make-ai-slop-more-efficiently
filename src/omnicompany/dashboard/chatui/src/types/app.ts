@@ -1,4 +1,4 @@
-export type LLMProvider = 'claude' | 'cursor' | 'codex' | 'gemini' | 'opencode' | 'omni_agent' | 'controller';
+export type LLMProvider = 'claude' | 'cursor' | 'codex' | 'gemini' | 'kimi' | 'opencode' | 'omni_agent' | 'controller';
 
 export type ProviderModelOption = {
   value: string;

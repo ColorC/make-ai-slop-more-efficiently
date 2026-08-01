@@ -10,10 +10,13 @@ import argparse
 import hashlib
 import json
 import os
+import queue
 import re
 import sqlite3
 import subprocess
 import sys
+import threading
+import time
 from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -344,14 +347,32 @@ def resolve_included_files(item: QueueItem) -> list[Path]:
         return any(relative.match(pattern) for pattern in item.excludes)
 
     files: set[Path] = set()
+    recursive_roots: set[Path] = set()
     for pattern in item.includes:
+        normalized = pattern.replace("\\", "/").rstrip("/")
+        if normalized == "**" or normalized.endswith("/**"):
+            prefix = normalized[:-3].rstrip("/")
+            root = item.source / prefix if prefix else item.source
+            if root.is_file() and not is_excluded(root):
+                files.add(root.resolve())
+            elif root.is_dir():
+                recursive_roots.add(root)
+            continue
         for match in item.source.glob(pattern):
             if match.is_file() and not is_excluded(match):
                 files.add(match.resolve())
             elif match.is_dir():
-                for child in match.rglob("*"):
-                    if child.is_file() and not is_excluded(child):
-                        files.add(child.resolve())
+                recursive_roots.add(match)
+
+    compact_roots: list[Path] = []
+    for root in sorted(recursive_roots, key=lambda path: (len(path.parts), str(path))):
+        if any(parent == root or parent in root.parents for parent in compact_roots):
+            continue
+        compact_roots.append(root)
+    for root in compact_roots:
+        for child in root.rglob("*"):
+            if child.is_file() and not is_excluded(child):
+                files.add(child.resolve())
     return sorted(files)
 
 
@@ -629,6 +650,7 @@ def run_text_command(
     logger: RunLogger,
     *,
     environment: dict[str, str] | None = None,
+    timeout_seconds: float | None = None,
 ) -> tuple[int, str]:
     logger.write("RUN " + subprocess.list2cmdline(command))
     process = subprocess.Popen(
@@ -641,14 +663,68 @@ def run_text_command(
         env=environment,
     )
     lines: list[str] = []
-    assert process.stdout is not None
-    for raw_line in process.stdout:
+    for raw_line in _process_output_lines(process, timeout_seconds=timeout_seconds):
         line = raw_line.rstrip()
         if not line:
             continue
         lines.append(line)
         logger.write(line)
     return process.wait(), "\n".join(lines)
+
+
+def _process_output_lines(
+    process: subprocess.Popen[str], *, timeout_seconds: float | None = None
+) -> Iterable[str]:
+    """Yield a child process's output without waiting on grandchildren.
+
+    Restic starts ``rclone serve restic --stdio``.  If restic exits early, an
+    orphaned rclone can retain its inherited stdout handle; iterating that pipe
+    directly then waits forever for EOF even though the command has exited.
+    A daemon pump lets the caller stop as soon as the actual child exits while
+    retaining every line already received.
+    """
+    assert process.stdout is not None
+    received: queue.Queue[str | None] = queue.Queue()
+
+    def pump() -> None:
+        try:
+            for raw_line in process.stdout:
+                received.put(raw_line)
+        finally:
+            received.put(None)
+
+    deadline = time.monotonic() + timeout_seconds if timeout_seconds is not None else None
+    reader = threading.Thread(target=pump, name="omni-backup-output", daemon=True)
+    reader.start()
+    while process.poll() is None:
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                try:
+                    process.terminate()
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+                raise TimeoutError(f"command timed out after {timeout_seconds:g}s")
+        try:
+            raw_line = received.get(timeout=min(0.2, remaining) if deadline is not None else 0.2)
+        except queue.Empty:
+            continue
+        if raw_line is None:
+            continue
+        yield raw_line
+
+    # Normal commands close stdout immediately.  Bound the join so an orphaned
+    # rclone cannot turn a failed backup into a permanently running queue.
+    reader.join(timeout=0.25)
+    while True:
+        try:
+            raw_line = received.get_nowait()
+        except queue.Empty:
+            return
+        if raw_line is not None:
+            yield raw_line
 
 
 def run_restic_json(
@@ -667,8 +743,7 @@ def run_restic_json(
         env=restic_environment(config),
     )
     summary: dict[str, Any] = {}
-    assert process.stdout is not None
-    for raw_line in process.stdout:
+    for raw_line in _process_output_lines(process):
         line = raw_line.rstrip()
         if not line:
             continue
@@ -706,18 +781,46 @@ def build_catalog_copy_command(config: BackupConfig, catalog_root: Path) -> list
         "--checkers",
         "2",
         "--ignore-times",
+        "--contimeout",
+        "10s",
+        "--timeout",
+        "20s",
+        "--retries",
+        "1",
+        "--low-level-retries",
+        "1",
     ]
 
 
-def publish_catalog(config: BackupConfig, state: dict[str, Any], logger: RunLogger, *, dry_run: bool) -> None:
+def publish_catalog(
+    config: BackupConfig,
+    state: dict[str, Any],
+    logger: RunLogger,
+    *,
+    dry_run: bool,
+    required: bool = False,
+) -> bool:
     if dry_run:
         logger.write("DRY catalog unchanged")
-        return
+        return True
     catalog_root = write_catalog(config, state)
     command = build_catalog_copy_command(config, catalog_root)
-    return_code, _ = run_text_command(command, logger)
+    # This is only the small plaintext catalog.  A stuck remote must not block
+    # all real recovery-point uploads before restic has a chance to start.
+    try:
+        return_code, _ = run_text_command(command, logger, timeout_seconds=60)
+    except TimeoutError as exc:
+        logger.write(f"WARN catalog upload deferred: {exc}")
+        if required:
+            raise RuntimeError("catalog upload timed out") from exc
+        return False
     if return_code != 0:
-        raise RuntimeError(f"catalog upload failed with exit code {return_code}")
+        message = f"catalog upload failed with exit code {return_code}"
+        logger.write(f"WARN catalog upload deferred: {message}")
+        if required:
+            raise RuntimeError(message)
+        return False
+    return True
 
 
 def assert_repository_ready(config: BackupConfig, logger: RunLogger) -> None:
@@ -933,7 +1036,7 @@ def _run_backup_locked(
             return run_result
         state["last_run"] = run_result
         save_state(config, state)
-        publish_catalog(config, state, logger, dry_run=dry_run)
+        publish_catalog(config, state, logger, dry_run=dry_run, required=catalog_only)
         return run_result
     finally:
         logger.close()

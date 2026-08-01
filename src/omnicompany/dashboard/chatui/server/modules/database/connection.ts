@@ -50,7 +50,13 @@ function resolveLegacyDatabasePath(): string {
 // Directory & migration helpers
 // ---------------------------------------------------------------------------
 
+function isInMemoryDatabase(dbPath: string): boolean {
+  return dbPath === ':memory:'
+    || (dbPath.startsWith('file:') && dbPath.includes('mode=memory'));
+}
+
 function ensureDatabaseDirectory(dbPath: string): void {
+  if (isInMemoryDatabase(dbPath)) return;
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -64,6 +70,7 @@ function ensureDatabaseDirectory(dbPath: string): void {
  * copy it to the new location as a one-time migration.
  */
 function migrateLegacyDatabase(targetPath: string): void {
+  if (isInMemoryDatabase(targetPath)) return;
   const legacyPath = resolveLegacyDatabasePath();
 
   if (targetPath === legacyPath) return;

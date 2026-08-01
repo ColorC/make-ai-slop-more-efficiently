@@ -101,7 +101,7 @@ const mapSkillToSlashCommand = (skill: ProviderSkill): SlashCommand => ({
   },
 });
 
-const filterSlashCommands = (
+export const filterSlashCommands = (
   commands: SlashCommand[],
   query: string,
 ): SlashCommand[] => {

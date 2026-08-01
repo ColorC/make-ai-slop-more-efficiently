@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { browserUseService } from '@/modules/browser-use/browser-use.service.js';
+process.env.DATABASE_PATH = ':memory:';
 
-test('browser monitor list starts empty without agent sessions', async () => {
+const { browserUseService } = await import('@/modules/browser-use/browser-use.service.js');
+
+test('browser monitor returns managed sessions without leaking owner ids', async () => {
   const sessions = await browserUseService.listSessions();
 
-  assert.deepEqual(sessions, []);
+  assert.ok(Array.isArray(sessions));
+  assert.equal(sessions.some((session) => 'ownerId' in session), false);
 });

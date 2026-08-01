@@ -74,6 +74,7 @@ const tools: ToolDefinition[] = [
       type: 'object',
       properties: {
         profileName: { type: 'string', description: 'Optional background profile name for persistent browser storage.' },
+        purpose: { type: 'string', description: 'Short test purpose shown in the shared Browser facility.' },
       },
     },
   },
@@ -91,6 +92,30 @@ const tools: ToolDefinition[] = [
     name: 'browser_take_screenshot',
     description: 'Capture the latest screenshot for a Browser session.',
     inputSchema: sessionIdSchema,
+  },
+  {
+    name: 'browser_inspect',
+    description: 'Read text and semantic data/aria attributes from selected page elements without executing arbitrary page code.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sessionId: { type: 'string' },
+        selectors: { type: 'array', items: { type: 'string' }, maxItems: 50 },
+      },
+      required: ['sessionId', 'selectors'],
+    },
+  },
+  {
+    name: 'browser_measure_performance',
+    description: 'Measure requestAnimationFrame cadence, DOM size, canvases, and browser heap for a managed Browser session.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sessionId: { type: 'string' },
+        durationMs: { type: 'number', minimum: 1000, maximum: 10000 },
+      },
+      required: ['sessionId'],
+    },
   },
   {
     name: 'browser_navigate',
@@ -220,6 +245,7 @@ async function callTool(name: string, args: Record<string, unknown>) {
     case 'browser_create_session':
       return jsonResponse(await callBrowserUseApi(name, {
         profileName: readOptionalString(args.profileName),
+        purpose: readOptionalString(args.purpose),
       }));
     case 'browser_list_sessions':
       return jsonResponse(await callBrowserUseApi(name, {}));
@@ -228,6 +254,18 @@ async function callTool(name: string, args: Record<string, unknown>) {
     case 'browser_take_screenshot': {
       return jsonResponse(await callBrowserUseApi(name, { sessionId: readString(args.sessionId, 'sessionId') }));
     }
+    case 'browser_inspect':
+      return jsonResponse(await callBrowserUseApi(name, {
+        sessionId: readString(args.sessionId, 'sessionId'),
+        selectors: Array.isArray(args.selectors)
+          ? args.selectors.filter((selector): selector is string => typeof selector === 'string')
+          : [],
+      }));
+    case 'browser_measure_performance':
+      return jsonResponse(await callBrowserUseApi(name, {
+        sessionId: readString(args.sessionId, 'sessionId'),
+        durationMs: readNumber(args.durationMs),
+      }));
     case 'browser_navigate':
       return jsonResponse(await callBrowserUseApi(name, {
         sessionId: readString(args.sessionId, 'sessionId'),

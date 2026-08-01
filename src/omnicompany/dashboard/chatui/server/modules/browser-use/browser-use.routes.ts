@@ -69,6 +69,33 @@ router.get('/sessions', async (_req, res) => {
   }
 });
 
+router.get('/runs', async (req, res) => {
+  try {
+    const requested = Number.parseInt(String(req.query.limit || '100'), 10);
+    const limit = Number.isFinite(requested) ? requested : 100;
+    res.json({ success: true, data: { runs: await browserUseService.listRuns(limit) } });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to list browser test runs.',
+    });
+  }
+});
+
+router.get('/runs/:runId', async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      data: await browserUseService.getRunDetails(readParam(req.params.runId)),
+    });
+  } catch (error) {
+    res.status(404).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Browser test run not found.',
+    });
+  }
+});
+
 router.post('/sessions/:sessionId/stop', async (req, res) => {
   try {
     const result = await browserUseService.stopSession(readParam(req.params.sessionId));

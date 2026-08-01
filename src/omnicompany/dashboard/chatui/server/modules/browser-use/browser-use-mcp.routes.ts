@@ -33,6 +33,7 @@ router.post('/tools/:toolName', async (req, res) => {
       case 'browser_create_session':
         result = await browserUseService.createAgentSession({
           profileName: typeof input.profileName === 'string' ? input.profileName : null,
+          purpose: typeof input.purpose === 'string' ? input.purpose : null,
         });
         break;
       case 'browser_list_sessions':
@@ -41,6 +42,20 @@ router.post('/tools/:toolName', async (req, res) => {
       case 'browser_snapshot':
       case 'browser_take_screenshot':
         result = await browserUseService.agentSnapshot(sessionId);
+        break;
+      case 'browser_inspect':
+        result = await browserUseService.agentInspect(
+          sessionId,
+          Array.isArray(input.selectors)
+            ? input.selectors.filter((selector): selector is string => typeof selector === 'string')
+            : [],
+        );
+        break;
+      case 'browser_measure_performance':
+        result = await browserUseService.agentMeasurePerformance(
+          sessionId,
+          typeof input.durationMs === 'number' ? input.durationMs : undefined,
+        );
         break;
       case 'browser_navigate':
         result = await browserUseService.agentNavigate(sessionId, String(input.url || ''));
@@ -110,6 +125,11 @@ router.post('/tools/:toolName', async (req, res) => {
 
     res.json({ success: true, data: result });
   } catch (error) {
+    const input = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
+    const sessionId = typeof input.sessionId === 'string' ? input.sessionId : '';
+    if (sessionId) {
+      browserUseService.recordAgentToolFailure(sessionId, req.params.toolName, error);
+    }
     res.status(400).json({
       success: false,
       error: error instanceof Error ? error.message : 'Browser MCP tool failed.',

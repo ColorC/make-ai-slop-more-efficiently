@@ -73,6 +73,8 @@ function ChatInterface({
     setCodexModel,
     geminiModel,
     setGeminiModel,
+    kimiModel,
+    setKimiModel,
     opencodeModel,
     setOpenCodeModel,
     omniAgentModel,
@@ -203,6 +205,7 @@ function ChatInterface({
     claudeModel,
     codexModel,
     geminiModel,
+    kimiModel,
     opencodeModel,
     omniAgentModel,
     controllerModel,
@@ -338,6 +341,8 @@ function ChatInterface({
           setCodexModel={setCodexModel}
           geminiModel={geminiModel}
           setGeminiModel={setGeminiModel}
+          kimiModel={kimiModel}
+          setKimiModel={setKimiModel}
           opencodeModel={opencodeModel}
           setOpenCodeModel={setOpenCodeModel}
           omniAgentModel={omniAgentModel}

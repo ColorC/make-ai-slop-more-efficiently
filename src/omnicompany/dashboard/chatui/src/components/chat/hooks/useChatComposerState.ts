@@ -38,6 +38,7 @@ interface UseChatComposerStateArgs {
   claudeModel: string;
   codexModel: string;
   geminiModel: string;
+  kimiModel: string;
   opencodeModel: string;
   omniAgentModel: string;
   controllerModel: string;
@@ -174,6 +175,7 @@ export function useChatComposerState({
   claudeModel,
   codexModel,
   geminiModel,
+  kimiModel,
   opencodeModel,
   omniAgentModel,
   controllerModel,
@@ -336,6 +338,8 @@ export function useChatComposerState({
               ? codexModel
               : provider === 'gemini'
                 ? geminiModel
+                : provider === 'kimi'
+                  ? kimiModel
                 : provider === 'opencode'
                   ? opencodeModel
                   : provider === 'omni_agent'
@@ -396,6 +400,7 @@ export function useChatComposerState({
       currentSessionId,
       cursorModel,
       geminiModel,
+      kimiModel,
       opencodeModel,
       omniAgentModel,
       controllerModel,
@@ -721,9 +726,11 @@ export function useChatComposerState({
           ? cursorModel
           : provider === 'codex'
             ? codexModel
-            : provider === 'gemini'
-              ? geminiModel
-              : provider === 'opencode'
+                : provider === 'gemini'
+                  ? geminiModel
+                  : provider === 'kimi'
+                    ? kimiModel
+                  : provider === 'opencode'
                 ? opencodeModel
                 : provider === 'omni_agent'
                   ? omniAgentModel
@@ -773,6 +780,7 @@ export function useChatComposerState({
       cursorModel,
       executeCommand,
       geminiModel,
+      kimiModel,
       opencodeModel,
       omniAgentModel,
       controllerModel,

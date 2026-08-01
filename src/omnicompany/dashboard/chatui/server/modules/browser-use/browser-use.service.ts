@@ -6,6 +6,12 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { appConfigDb } from '@/modules/database/index.js';
+import {
+  getBrowserRunLedger,
+  type BrowserCleanupStatus,
+  type BrowserRunRecord,
+  type BrowserRunStatus,
+} from '@/modules/browser-use/browser-run-ledger.js';
 import { providerMcpService } from '@/modules/providers/index.js';
 import { getModuleDir } from '@/utils/runtime-paths.js';
 
@@ -34,6 +40,14 @@ type BrowserUseSession = {
   lastAction: string | null;
   message: string | null;
   profileName: string | null;
+  purpose: string;
+  runStatus: BrowserRunStatus;
+  leaseExpiresAt: string;
+  actionCount: number;
+  artifactCount: number;
+  cleanupStatus: BrowserCleanupStatus;
+  lastError: string | null;
+  debugCommand: string | null;
   viewport: {
     width: number;
     height: number;
@@ -48,9 +62,15 @@ type BrowserUseSession = {
 type PublicBrowserUseSession = Omit<BrowserUseSession, 'ownerId'>;
 
 type RuntimeHandle = {
+  browserServer?: any;
   browser?: any;
   context?: any;
   page?: any;
+  browserPid: number | null;
+  tracePath: string;
+  harPath: string;
+  screenshotPath: string;
+  tracingStarted: boolean;
 };
 
 type BrowserUseSettings = {
@@ -79,9 +99,184 @@ const DEFAULT_SETTINGS: BrowserUseSettings = {
 };
 const AGENT_OWNER_ID = 'agent';
 const PROFILE_ROOT = path.join(os.homedir(), '.cloudcli', 'browser-use', 'profiles');
+const RUN_ROOT = path.join(os.homedir(), '.cloudcli', 'browser-use', 'runs');
 const MCP_SERVER_NAME = 'cloudcli-browser';
 const LEGACY_MCP_SERVER_NAMES = ['cloudcli-browser-use'];
 const RUNTIME_READINESS_CACHE_TTL_MS = 30_000;
+const SESSION_SWEEP_INTERVAL_MS = Math.max(
+  5_000,
+  Math.min(
+    30_000,
+    Number.parseInt(
+      process.env.CLOUDCLI_BROWSER_USE_SWEEP_INTERVAL_MS || '30000',
+      10,
+    ),
+  ),
+);
+
+function runPaths(runId: string) {
+  const directory = path.join(RUN_ROOT, runId);
+  return {
+    directory,
+    tracePath: path.join(directory, 'trace.zip'),
+    harPath: path.join(directory, 'network.har'),
+    screenshotPath: path.join(directory, 'latest.jpg'),
+    debugInputPath: path.join(directory, 'debug-input.json'),
+  };
+}
+
+function ensureRunDirectory(runId: string) {
+  const paths = runPaths(runId);
+  fs.mkdirSync(paths.directory, { recursive: true });
+  return paths;
+}
+
+function leaseExpiry(now = Date.now()) {
+  return new Date(now + SESSION_TTL_MS).toISOString();
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function browserProcessId(
+  browserServer: any,
+  browser: any,
+  context: any,
+): number | null {
+  try {
+    return browserServer?.process?.()?.pid
+      || browser?.process?.()?.pid
+      || context?.browser?.()?.process?.()?.pid
+      || null;
+  } catch {
+    return null;
+  }
+}
+
+function syncSessionFacilityState(session: BrowserUseSession) {
+  const run = getBrowserRunLedger().getRun(session.id);
+  if (!run) return;
+  session.runStatus = run.status;
+  session.leaseExpiresAt = run.leaseExpiresAt;
+  session.actionCount = run.actionCount;
+  session.artifactCount = run.artifactCount;
+  session.cleanupStatus = run.cleanupStatus;
+  session.lastError = run.failureReason;
+  const debugInputPath = runPaths(run.id).debugInputPath;
+  session.debugCommand = run.failureReason && fs.existsSync(debugInputPath)
+    ? `omni run debug --json-file "${debugInputPath}"`
+    : null;
+}
+
+function historicalSession(run: BrowserRunRecord): PublicBrowserUseSession {
+  const status: BrowserUseSessionStatus = run.status === 'ready'
+    ? 'unavailable'
+    : run.status === 'failed'
+      ? 'unavailable'
+      : 'stopped';
+  return {
+    id: run.id,
+    createdBy: 'agent',
+    runtime: run.runtime === 'cloud' ? 'cloud' : 'local',
+    status,
+    url: run.url,
+    title: run.title,
+    screenshotDataUrl: null,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt,
+    lastAction: run.lastAction,
+    message: run.failureReason || run.cleanupReason,
+    profileName: run.profileName,
+    purpose: run.purpose,
+    runStatus: run.status,
+    leaseExpiresAt: run.leaseExpiresAt,
+    actionCount: run.actionCount,
+    artifactCount: run.artifactCount,
+    cleanupStatus: run.cleanupStatus,
+    lastError: run.failureReason,
+    debugCommand: run.failureReason && fs.existsSync(runPaths(run.id).debugInputPath)
+      ? `omni run debug --json-file "${runPaths(run.id).debugInputPath}"`
+      : null,
+    viewport: null,
+    cursor: null,
+  };
+}
+
+function writeDebugInput(runId: string, failureReason: string) {
+  const paths = ensureRunDirectory(runId);
+  const run = getBrowserRunLedger().getRun(runId);
+  const recentActions = getBrowserRunLedger().listActions(runId).slice(-12);
+  const payload = {
+    error_output: [
+      `Browser test run: ${runId}`,
+      `Purpose: ${run?.purpose || 'Browser verification'}`,
+      `URL: ${run?.url || 'not loaded'}`,
+      `Failure: ${failureReason}`,
+      `Actions: ${JSON.stringify(recentActions)}`,
+    ].join('\n'),
+    language: 'typescript',
+    work_dir: process.cwd(),
+  };
+  fs.writeFileSync(paths.debugInputPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  getBrowserRunLedger().recordArtifact(runId, {
+    kind: 'debug-input',
+    path: paths.debugInputPath,
+    now: new Date().toISOString(),
+  });
+  return {
+    inputPath: paths.debugInputPath,
+    command: `omni run debug --json-file "${paths.debugInputPath}"`,
+  };
+}
+
+function recordSessionAction(
+  session: BrowserUseSession,
+  action: string,
+  details: Record<string, unknown> = {},
+) {
+  const now = new Date().toISOString();
+  session.lastAction = action;
+  session.updatedAt = now;
+  getBrowserRunLedger().recordAction(session.id, {
+    action,
+    outcome: 'ok',
+    details,
+    now,
+    leaseExpiresAt: leaseExpiry(Date.parse(now)),
+  });
+  getBrowserRunLedger().heartbeat(session.id, {
+    now,
+    leaseExpiresAt: leaseExpiry(Date.parse(now)),
+    url: session.url,
+    title: session.title,
+    lastAction: action,
+  });
+  syncSessionFacilityState(session);
+}
+
+function recordSessionFailure(
+  session: BrowserUseSession,
+  action: string,
+  error: unknown,
+) {
+  const message = errorMessage(error);
+  const now = new Date().toISOString();
+  session.lastAction = `${action}:failed`;
+  session.updatedAt = now;
+  session.message = message;
+  session.lastError = message;
+  getBrowserRunLedger().recordAction(session.id, {
+    action,
+    outcome: 'failed',
+    details: { error: message },
+    now,
+    leaseExpiresAt: leaseExpiry(Date.parse(now)),
+    failureReason: message,
+  });
+  writeDebugInput(session.id, message);
+  syncSessionFacilityState(session);
+}
 
 function getRuntime(): BrowserUseRuntime {
   return IS_PLATFORM ? 'cloud' : 'local';
@@ -346,6 +541,7 @@ function normalizeUrl(rawUrl: string): string {
 }
 
 function publicSession(session: BrowserUseSession): PublicBrowserUseSession {
+  syncSessionFacilityState(session);
   const { ownerId: _ownerId, ...publicFields } = session;
   return publicFields;
 }
@@ -354,11 +550,63 @@ function ownerSessions(ownerId: string): BrowserUseSession[] {
   return [...sessions.values()].filter((session) => session.ownerId === ownerId);
 }
 
-async function closeHandle(sessionId: string): Promise<void> {
+async function closeHandle(
+  sessionId: string,
+  reason: string,
+): Promise<BrowserCleanupStatus> {
   const handle = handles.get(sessionId);
   handles.delete(sessionId);
-  await handle?.context?.close?.().catch(() => undefined);
-  await handle?.browser?.close().catch(() => undefined);
+  if (!handle) {
+    getBrowserRunLedger().recordCleanup(sessionId, {
+      reason,
+      status: 'not-started',
+      browserPid: null,
+      details: 'No live browser handle was registered.',
+      now: new Date().toISOString(),
+    });
+    return 'not-started';
+  }
+
+  const failures: string[] = [];
+  if (handle.tracingStarted) {
+    await handle.context?.tracing?.stop?.({ path: handle.tracePath })
+      .catch((error: unknown) => failures.push(`trace: ${errorMessage(error)}`));
+  }
+  await handle.context?.close?.()
+    .catch((error: unknown) => failures.push(`context: ${errorMessage(error)}`));
+  if (handle.browserServer) {
+    await handle.browserServer.close?.()
+      .catch((error: unknown) => failures.push(`browser-server: ${errorMessage(error)}`));
+  } else {
+    await handle.browser?.close?.()
+      .catch((error: unknown) => failures.push(`browser: ${errorMessage(error)}`));
+  }
+
+  const now = new Date().toISOString();
+  for (const [kind, artifactPath] of [
+    ['trace', handle.tracePath],
+    ['har', handle.harPath],
+    ['screenshot', handle.screenshotPath],
+  ] as const) {
+    if (fs.existsSync(artifactPath)) {
+      getBrowserRunLedger().recordArtifact(sessionId, {
+        kind,
+        path: artifactPath,
+        now,
+      });
+    }
+  }
+  const status: BrowserCleanupStatus = failures.length > 0
+    ? 'unconfirmed'
+    : 'reclaimed';
+  getBrowserRunLedger().recordCleanup(sessionId, {
+    reason,
+    status,
+    browserPid: handle.browserPid,
+    details: failures.length ? failures.join('; ') : 'Context and browser closed.',
+    now,
+  });
+  return status;
 }
 
 async function expireStaleSessions(now = Date.now()): Promise<void> {
@@ -372,21 +620,68 @@ async function expireStaleSessions(now = Date.now()): Promise<void> {
       return;
     }
 
-    await closeHandle(session.id);
+    await closeHandle(session.id, 'lease-expired');
     session.status = 'stopped';
+    session.runStatus = 'expired';
     session.updatedAt = new Date(now).toISOString();
     session.lastAction = 'expire';
     session.message = 'Browser session expired after inactivity.';
+    getBrowserRunLedger().finishRun(session.id, {
+      status: 'expired',
+      now: session.updatedAt,
+      reason: session.message,
+    });
+    syncSessionFacilityState(session);
   }));
+
+  const nowIso = new Date(now).toISOString();
+  for (const run of getBrowserRunLedger().listExpiredReadyRuns(nowIso)) {
+    if (sessions.has(run.id)) continue;
+    getBrowserRunLedger().finishRun(run.id, {
+      status: 'interrupted',
+      now: nowIso,
+      reason: 'Lease expired after the owning server stopped reporting.',
+    });
+    getBrowserRunLedger().recordCleanup(run.id, {
+      reason: 'orphaned-lease',
+      status: 'unconfirmed',
+      browserPid: run.browserPid,
+      details: 'No in-memory Playwright handle remained; process ownership requires host reconciliation.',
+      now: nowIso,
+    });
+  }
 }
 
-async function captureSession(session: BrowserUseSession, page: any): Promise<void> {
+async function captureSession(
+  session: BrowserUseSession,
+  page: any,
+  action?: { name: string; details?: Record<string, unknown> },
+): Promise<void> {
   const screenshot = await page.screenshot({ type: 'jpeg', quality: 72, fullPage: false });
   session.screenshotDataUrl = `data:image/jpeg;base64,${Buffer.from(screenshot).toString('base64')}`;
   session.title = await page.title().catch(() => null);
   session.url = page.url() || session.url;
   session.viewport = page.viewportSize?.() || session.viewport;
   session.updatedAt = new Date().toISOString();
+  const paths = ensureRunDirectory(session.id);
+  fs.writeFileSync(paths.screenshotPath, screenshot);
+  getBrowserRunLedger().recordArtifact(session.id, {
+    kind: 'screenshot',
+    path: paths.screenshotPath,
+    now: session.updatedAt,
+  });
+  if (action) {
+    recordSessionAction(session, action.name, action.details);
+  } else {
+    getBrowserRunLedger().heartbeat(session.id, {
+      now: session.updatedAt,
+      leaseExpiresAt: leaseExpiry(Date.parse(session.updatedAt)),
+      url: session.url,
+      title: session.title,
+      lastAction: session.lastAction,
+    });
+    syncSessionFacilityState(session);
+  }
 }
 
 async function getActionPoint(page: any, input: { selector?: string; text?: string; x?: number; y?: number }) {
@@ -441,6 +736,7 @@ export const browserUseService = {
     const readiness = getRuntimeReadiness();
     const available = settings.enabled && readiness.playwrightInstalled && readiness.chromiumInstalled;
 
+    const runs = getBrowserRunLedger().listRuns(500);
     return {
       enabled: settings.enabled,
       runtime: getRuntime(),
@@ -449,6 +745,10 @@ export const browserUseService = {
       chromiumInstalled: readiness.chromiumInstalled,
       installInProgress: readiness.installInProgress,
       sessionCount: sessions.size,
+      managedRunCount: runs.length,
+      activeLeaseCount: runs.filter((run) => run.status === 'ready').length,
+      reclaimedRunCount: runs.filter((run) => run.cleanupStatus === 'reclaimed').length,
+      unconfirmedCleanupCount: runs.filter((run) => run.cleanupStatus === 'unconfirmed').length,
       message: available
         ? 'Browser runtime is available.'
         : getSetupMessage(settings, readiness),
@@ -493,12 +793,22 @@ export const browserUseService = {
 
   async listSessions() {
     await expireStaleSessions();
-    return [...sessions.values()]
+    const live = [...sessions.values()]
       .filter((session) => session.ownerId === AGENT_OWNER_ID)
       .map(publicSession);
+    const liveIds = new Set(live.map((session) => session.id));
+    const history = getBrowserRunLedger().listRuns(50)
+      .filter((run) => run.ownerId === AGENT_OWNER_ID && !liveIds.has(run.id))
+      .map(historicalSession);
+    return [...live, ...history].sort((left, right) => (
+      Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+    ));
   },
 
-  async createAgentSession(options?: { profileName?: string | null }) {
+  async createAgentSession(options?: {
+    profileName?: string | null;
+    purpose?: string | null;
+  }) {
     const settings = readSettings();
     if (!settings.enabled) {
       throw new Error('Browser agent tools are disabled.');
@@ -506,6 +816,9 @@ export const browserUseService = {
 
     await expireStaleSessions();
     const profileName = normalizeProfileName(options?.profileName);
+    const purpose = String(options?.purpose || 'Agent browser verification')
+      .trim()
+      .slice(0, 240) || 'Agent browser verification';
 
     const now = new Date().toISOString();
     const session: BrowserUseSession = {
@@ -522,6 +835,14 @@ export const browserUseService = {
       lastAction: 'create',
       message: null,
       profileName,
+      purpose,
+      runStatus: 'starting',
+      leaseExpiresAt: leaseExpiry(Date.parse(now)),
+      actionCount: 0,
+      artifactCount: 0,
+      cleanupStatus: 'pending',
+      lastError: null,
+      debugCommand: null,
       viewport: { width: 1440, height: 900 },
       cursor: null,
     };
@@ -531,43 +852,127 @@ export const browserUseService = {
       throw new Error(`Browser is limited to ${MAX_SESSIONS_PER_OWNER} active agent sessions.`);
     }
 
+    getBrowserRunLedger().createRun({
+      id: session.id,
+      ownerId: session.ownerId,
+      createdBy: session.createdBy,
+      purpose,
+      runtime: session.runtime,
+      profileName,
+      createdAt: now,
+      leaseExpiresAt: session.leaseExpiresAt,
+    });
+    sessions.set(session.id, session);
+
     const readiness = getRuntimeReadiness();
     if (!settings.enabled || !readiness.playwrightInstalled || !readiness.chromiumInstalled || !readiness.playwright) {
       session.message = getSetupMessage(settings, readiness);
-      sessions.set(session.id, session);
+      session.runStatus = 'failed';
+      getBrowserRunLedger().finishRun(session.id, {
+        status: 'failed',
+        now,
+        reason: session.message,
+      });
+      getBrowserRunLedger().recordCleanup(session.id, {
+        reason: 'runtime-unavailable',
+        status: 'not-started',
+        browserPid: null,
+        details: session.message,
+        now,
+      });
       return publicSession(session);
     }
 
     let browser: any | undefined;
+    let browserServer: any | undefined;
     let context: any | undefined;
     let page: any;
     const launchOptions = {
       headless: true,
-      args: ['--disable-dev-shm-usage'],
+      args: [
+        '--disable-dev-shm-usage',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+      ],
     };
+    const paths = ensureRunDirectory(session.id);
     const contextOptions = {
       viewport: { width: 1440, height: 900 },
       serviceWorkers: 'block',
+      recordHar: {
+        path: paths.harPath,
+        content: 'omit',
+        mode: 'minimal',
+      },
     };
 
-    if (profileName) {
-      fs.mkdirSync(PROFILE_ROOT, { recursive: true });
-      context = await readiness.playwright.chromium.launchPersistentContext(getProfilePath(profileName), {
-        ...launchOptions,
-        ...contextOptions,
+    try {
+      if (profileName) {
+        fs.mkdirSync(PROFILE_ROOT, { recursive: true });
+        context = await readiness.playwright.chromium.launchPersistentContext(getProfilePath(profileName), {
+          ...launchOptions,
+          ...contextOptions,
+        });
+        page = context.pages()[0] || await context.newPage();
+      } else {
+        browserServer = await readiness.playwright.chromium.launchServer(launchOptions);
+        browser = await readiness.playwright.chromium.connect(browserServer.wsEndpoint());
+        context = await browser.newContext(contextOptions);
+        page = await context.newPage();
+      }
+      await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+      const browserPid = browserProcessId(browserServer, browser, context);
+      session.status = 'ready';
+      session.runStatus = 'ready';
+      session.message = 'Browser session is ready.';
+      handles.set(session.id, {
+        browserServer,
+        browser,
+        context,
+        page,
+        browserPid,
+        tracePath: paths.tracePath,
+        harPath: paths.harPath,
+        screenshotPath: paths.screenshotPath,
+        tracingStarted: true,
       });
-      page = context.pages()[0] || await context.newPage();
-    } else {
-      browser = await readiness.playwright.chromium.launch(launchOptions);
-      context = await browser.newContext(contextOptions);
-      page = await context.newPage();
+      getBrowserRunLedger().markReady(session.id, {
+        now: new Date().toISOString(),
+        leaseExpiresAt: leaseExpiry(),
+        browserPid,
+      });
+      await captureSession(session, page, {
+        name: 'create',
+        details: { profileName, purpose },
+      });
+      return publicSession(session);
+    } catch (error) {
+      if ((context || browser || browserServer) && !handles.has(session.id)) {
+        handles.set(session.id, {
+          browserServer,
+          browser,
+          context,
+          page,
+          browserPid: browserProcessId(browserServer, browser, context),
+          tracePath: paths.tracePath,
+          harPath: paths.harPath,
+          screenshotPath: paths.screenshotPath,
+          tracingStarted: false,
+        });
+      }
+      recordSessionFailure(session, 'create', error);
+      await closeHandle(session.id, 'launch-failed');
+      session.status = 'unavailable';
+      session.runStatus = 'failed';
+      getBrowserRunLedger().finishRun(session.id, {
+        status: 'failed',
+        now: new Date().toISOString(),
+        reason: errorMessage(error),
+      });
+      syncSessionFacilityState(session);
+      throw error;
     }
-    session.status = 'ready';
-    session.message = 'Browser session is ready.';
-    sessions.set(session.id, session);
-    handles.set(session.id, { browser, context, page });
-    await captureSession(session, page);
-    return publicSession(session);
   },
 
   async listAgentSessions() {
@@ -576,9 +981,7 @@ export const browserUseService = {
       return [];
     }
     await expireStaleSessions();
-    return [...sessions.values()]
-      .filter((session) => session.ownerId === AGENT_OWNER_ID)
-      .map(publicSession);
+    return this.listSessions();
   },
 
   async getAgentSession(sessionId: string) {
@@ -591,6 +994,36 @@ export const browserUseService = {
       throw new Error('Browser session not found.');
     }
     return session;
+  },
+
+  async listRuns(limit = 100) {
+    await expireStaleSessions();
+    return getBrowserRunLedger().listRuns(limit);
+  },
+
+  async getRunDetails(runId: string) {
+    await expireStaleSessions();
+    const run = getBrowserRunLedger().getRun(runId);
+    if (!run) throw new Error('Browser test run not found.');
+    return {
+      run,
+      actions: getBrowserRunLedger().listActions(runId),
+      artifacts: getBrowserRunLedger().listArtifacts(runId),
+      cleanupReceipts: getBrowserRunLedger().listCleanupReceipts(runId),
+      debug: run.failureReason && fs.existsSync(runPaths(runId).debugInputPath)
+        ? {
+            pipeline: 'debug',
+            inputPath: runPaths(runId).debugInputPath,
+            command: `omni run debug --json-file "${runPaths(runId).debugInputPath}"`,
+          }
+        : null,
+    };
+  },
+
+  recordAgentToolFailure(sessionId: string, action: string, error: unknown) {
+    const session = sessions.get(sessionId);
+    if (!session || session.ownerId !== AGENT_OWNER_ID) return;
+    recordSessionFailure(session, action, error);
   },
 
   async agentNavigate(sessionId: string, rawUrl: string) {
@@ -613,9 +1046,11 @@ export const browserUseService = {
 
     const url = normalizeUrl(rawUrl);
     await handle.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-    session.lastAction = `navigate:${url}`;
     session.cursor = null;
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, {
+      name: 'navigate',
+      details: { url },
+    });
     return publicSession(session);
   },
 
@@ -625,12 +1060,99 @@ export const browserUseService = {
     if (!handle?.page) {
       throw new Error('Browser runtime handle is not available.');
     }
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, { name: 'snapshot' });
     const text = await handle.page.locator('body').innerText({ timeout: 5_000 }).catch(() => '');
     return {
       session: publicSession(session),
       text: text.slice(0, 30_000),
     };
+  },
+
+  async agentInspect(sessionId: string, selectors: string[]) {
+    const session = await this.getAgentSession(sessionId);
+    const handle = handles.get(sessionId);
+    if (!handle?.page) {
+      throw new Error('Browser runtime handle is not available.');
+    }
+    const normalizedSelectors = selectors
+      .map((selector) => String(selector || '').trim())
+      .filter(Boolean)
+      .slice(0, 50);
+    const results = await handle.page.evaluate((requestedSelectors: string[]) => {
+      const documentRef = (globalThis as any).document;
+      return requestedSelectors.map((selector) => {
+        const element = documentRef.querySelector(selector);
+        if (!element) return { selector, found: false, text: '', attributes: {} };
+        const attributes = Object.fromEntries(
+          [...element.attributes]
+            .filter((attribute: any) => (
+              attribute.name.startsWith('data-')
+              || attribute.name.startsWith('aria-')
+              || attribute.name === 'title'
+              || attribute.name === 'class'
+            ))
+            .slice(0, 80)
+            .map((attribute: any) => [attribute.name, attribute.value.slice(0, 2_000)]),
+        );
+        return {
+          selector,
+          found: true,
+          text: (element.textContent || '').trim().slice(0, 10_000),
+          attributes,
+        };
+      });
+    }, normalizedSelectors);
+    recordSessionAction(session, 'inspect', {
+      selectors: normalizedSelectors,
+      foundCount: results.filter((result: { found: boolean }) => result.found).length,
+    });
+    return { session: publicSession(session), results };
+  },
+
+  async agentMeasurePerformance(sessionId: string, durationMs = 3_000) {
+    const session = await this.getAgentSession(sessionId);
+    const handle = handles.get(sessionId);
+    if (!handle?.page) {
+      throw new Error('Browser runtime handle is not available.');
+    }
+    const boundedDuration = Math.max(1_000, Math.min(durationMs, 10_000));
+    const metrics = await handle.page.evaluate(async (sampleDurationMs: number) => {
+      const browserGlobal = globalThis as any;
+      const performanceRef = browserGlobal.performance;
+      const documentRef = browserGlobal.document;
+      const frameIntervals: number[] = [];
+      const startedAt = performanceRef.now();
+      let previousFrame = startedAt;
+      let frameCount = 0;
+      while (performanceRef.now() - startedAt < sampleDurationMs) {
+        const timestamp = await new Promise<number>((resolve) => {
+          browserGlobal.requestAnimationFrame(resolve);
+        });
+        if (frameCount > 0) frameIntervals.push(timestamp - previousFrame);
+        previousFrame = timestamp;
+        frameCount += 1;
+      }
+      const endedAt = performanceRef.now();
+      const ordered = [...frameIntervals].sort((left, right) => left - right);
+      const p95Index = Math.min(
+        Math.max(0, Math.ceil(ordered.length * 0.95) - 1),
+        Math.max(0, ordered.length - 1),
+      );
+      const memory = performanceRef.memory;
+      return {
+        sampleDurationMs: Math.round(endedAt - startedAt),
+        frameCount,
+        averageFps: Number((frameCount * 1_000 / Math.max(1, endedAt - startedAt)).toFixed(2)),
+        p95FrameMs: Number((ordered[p95Index] || 0).toFixed(2)),
+        maxFrameMs: Number((ordered.at(-1) || 0).toFixed(2)),
+        domElementCount: documentRef.querySelectorAll('*').length,
+        canvasCount: documentRef.querySelectorAll('canvas').length,
+        usedJSHeapBytes: memory?.usedJSHeapSize || null,
+        totalJSHeapBytes: memory?.totalJSHeapSize || null,
+      };
+    }, boundedDuration);
+    recordSessionAction(session, 'measure_performance', metrics);
+    return { session: publicSession(session), metrics };
   },
 
   async agentClick(sessionId: string, input: { selector?: string; text?: string; x?: number; y?: number }) {
@@ -651,9 +1173,15 @@ export const browserUseService = {
       throw new Error('Provide selector, text, or x/y coordinates.');
     }
 
-    session.lastAction = 'click';
     session.cursor = point ? { ...point, actor: 'agent' } : null;
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, {
+      name: 'click',
+      details: {
+        selector: input.selector || null,
+        textLength: input.text?.length || 0,
+        point,
+      },
+    });
     return publicSession(session);
   },
 
@@ -676,8 +1204,14 @@ export const browserUseService = {
       await handle.page.keyboard.press('Enter');
     }
 
-    session.lastAction = 'type';
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, {
+      name: 'type',
+      details: {
+        selector: input.selector || null,
+        textLength: input.text.length,
+        submit: input.submit === true,
+      },
+    });
     return publicSession(session);
   },
 
@@ -690,13 +1224,20 @@ export const browserUseService = {
     for (const field of fields) {
       await handle.page.locator(field.selector).first().fill(field.value, { timeout: 10_000 });
     }
-    session.lastAction = 'fill_form';
     if (fields[0]) {
       session.cursor = await getActionPoint(handle.page, { selector: fields[0].selector }).then((point) => (
         point ? { ...point, actor: 'agent' as const } : null
       ));
     }
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, {
+      name: 'fill_form',
+      details: {
+        fields: fields.map((field) => ({
+          selector: field.selector,
+          valueLength: field.value.length,
+        })),
+      },
+    });
     return publicSession(session);
   },
 
@@ -707,8 +1248,10 @@ export const browserUseService = {
       throw new Error('Browser runtime handle is not available.');
     }
     await handle.page.keyboard.press(key);
-    session.lastAction = `press_key:${key}`;
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, {
+      name: 'press_key',
+      details: { key },
+    });
     return publicSession(session);
   },
 
@@ -719,11 +1262,13 @@ export const browserUseService = {
       throw new Error('Browser runtime handle is not available.');
     }
     await handle.page.locator(selector).first().selectOption(values, { timeout: 10_000 });
-    session.lastAction = 'select_option';
     session.cursor = await getActionPoint(handle.page, { selector }).then((point) => (
       point ? { ...point, actor: 'agent' as const } : null
     ));
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, {
+      name: 'select_option',
+      details: { selector, valueCount: values.length },
+    });
     return publicSession(session);
   },
 
@@ -741,8 +1286,14 @@ export const browserUseService = {
     } else {
       await handle.page.waitForTimeout(timeout);
     }
-    session.lastAction = 'wait_for';
-    await captureSession(session, handle.page);
+    await captureSession(session, handle.page, {
+      name: 'wait_for',
+      details: {
+        textLength: input.text?.length || 0,
+        url: input.url || null,
+        timeout,
+      },
+    });
     return publicSession(session);
   },
 
@@ -775,7 +1326,10 @@ export const browserUseService = {
       handles.set(sessionId, { ...handle, page: handle.context.pages()[0] || await handle.context.newPage() });
     }
     const updatedHandle = handles.get(sessionId);
-    await captureSession(session, updatedHandle?.page || handle.page);
+    await captureSession(session, updatedHandle?.page || handle.page, {
+      name: `tabs:${action}`,
+      details: { index: input.index ?? null, hasUrl: Boolean(input.url) },
+    });
     return {
       session: publicSession(session),
       tabs: handle.context.pages().map((page: any, index: number) => ({
@@ -791,13 +1345,22 @@ export const browserUseService = {
     if (!session || session.ownerId !== AGENT_OWNER_ID) {
       return { stopped: false };
     }
+    if (session.status !== 'ready') {
+      return { stopped: false, session: publicSession(session) };
+    }
 
-    await closeHandle(sessionId);
-
+    recordSessionAction(session, 'stop');
+    await closeHandle(sessionId, 'manual-stop');
     session.status = 'stopped';
+    session.runStatus = 'stopped';
     session.updatedAt = new Date().toISOString();
-    session.lastAction = 'stop';
     session.message = 'Browser session stopped. Create a new session to continue browsing.';
+    getBrowserRunLedger().finishRun(sessionId, {
+      status: 'stopped',
+      now: session.updatedAt,
+      reason: 'manual-stop',
+    });
+    syncSessionFacilityState(session);
     return { stopped: true, session: publicSession(session) };
   },
 
@@ -807,7 +1370,13 @@ export const browserUseService = {
       return { deleted: false };
     }
 
-    await closeHandle(sessionId);
+    recordSessionAction(session, 'delete');
+    await closeHandle(sessionId, 'manual-delete');
+    getBrowserRunLedger().finishRun(sessionId, {
+      status: 'deleted',
+      now: new Date().toISOString(),
+      reason: 'manual-delete',
+    });
     sessions.delete(sessionId);
     return { deleted: true, sessionId };
   },
@@ -819,17 +1388,30 @@ export const browserUseService = {
 
   async stopAllSessions() {
     await Promise.all([...sessions.keys()].map(async (sessionId) => {
-      await closeHandle(sessionId);
       const session = sessions.get(sessionId);
-      if (session) {
-        session.status = 'stopped';
-        session.updatedAt = new Date().toISOString();
-        session.lastAction = 'shutdown';
-        session.message = 'Browser session stopped during server shutdown.';
-      }
+      if (!session || session.status !== 'ready') return;
+      recordSessionAction(session, 'shutdown');
+      await closeHandle(sessionId, 'server-shutdown');
+      session.status = 'stopped';
+      session.runStatus = 'stopped';
+      session.updatedAt = new Date().toISOString();
+      session.message = 'Browser session stopped during server shutdown.';
+      getBrowserRunLedger().finishRun(sessionId, {
+        status: 'stopped',
+        now: session.updatedAt,
+        reason: 'server-shutdown',
+      });
+      syncSessionFacilityState(session);
     }));
   },
 };
+
+const sessionSweeper = setInterval(() => {
+  void expireStaleSessions().catch((error) => {
+    console.warn('[Browser] Session sweeper failed:', errorMessage(error));
+  });
+}, SESSION_SWEEP_INTERVAL_MS);
+sessionSweeper.unref?.();
 
 process.once('beforeExit', () => {
   void browserUseService.stopAllSessions();

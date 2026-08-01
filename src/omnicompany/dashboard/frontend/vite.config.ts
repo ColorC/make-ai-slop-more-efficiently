@@ -77,7 +77,11 @@ export default defineConfig({
     // frequencies.  Vite's multi-worker scheduling made that ranking and the
     // resulting content hashes drift between otherwise identical builds on
     // this large graph.  A single worker keeps public/source builds byte-stable.
-    terserOptions: { maxWorkers: 1 },
+    // Terser's character-frequency name ranking can still drift between
+    // identical builds of Mermaid's lazy chunks.  Keep compression, but do
+    // not rename local symbols: reproducible public builds are a stronger
+    // requirement than this small minification saving.
+    terserOptions: { maxWorkers: 1, mangle: false },
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {

@@ -22,6 +22,7 @@ export const sessionSynchronizerService = {
       codex: 0,
       cursor: 0,
       gemini: 0,
+      kimi: 0,
       opencode: 0,
       omni_agent: 0,
       controller: 0,

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bot,
+  Bug,
   Clock3,
+  Copy,
   Download,
   Expand,
   ExternalLink,
@@ -26,6 +28,10 @@ type BrowserUseStatus = {
   chromiumInstalled: boolean;
   installInProgress: boolean;
   sessionCount: number;
+  managedRunCount: number;
+  activeLeaseCount: number;
+  reclaimedRunCount: number;
+  unconfirmedCleanupCount: number;
   message: string;
 };
 
@@ -41,6 +47,14 @@ type BrowserUseSession = {
   message: string | null;
   createdBy: 'agent';
   profileName: string | null;
+  purpose: string;
+  runStatus: 'starting' | 'ready' | 'stopped' | 'expired' | 'failed' | 'interrupted' | 'deleted';
+  leaseExpiresAt: string;
+  actionCount: number;
+  artifactCount: number;
+  cleanupStatus: 'pending' | 'reclaimed' | 'unconfirmed' | 'not-started';
+  lastError: string | null;
+  debugCommand: string | null;
   viewport: {
     width: number;
     height: number;
@@ -242,10 +256,10 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
               <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', getStatusDot(session.status))} />
               <div className="truncate text-sm font-medium">{session.title || getDomain(session.url)}</div>
             </div>
-            <div className="mt-1 truncate pl-3.5 text-xs text-muted-foreground">{getDomain(session.url)}</div>
+            <div className="mt-1 truncate pl-3.5 text-xs text-muted-foreground">{session.purpose}</div>
           </div>
           <Badge variant="outline" className="shrink-0 border-border bg-background text-[10px] text-muted-foreground">
-            {session.status}
+            {session.runStatus}
           </Badge>
         </div>
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -346,12 +360,12 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <MonitorPlay className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Browser</h3>
+            <h3 className="text-sm font-semibold text-foreground">Browser Test Facility</h3>
             <Badge variant="outline" className={cn('text-[10px]', getRuntimeTone(status, isInstalling))}>
               {runtimeLabel}
             </Badge>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">Monitor browser sessions opened by AI agents.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Managed browser runs, evidence, leases, and cleanup.</p>
         </div>
         <div className="flex items-center gap-1.5">
           {onShowSettings && (
@@ -417,7 +431,9 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
             <div className="min-w-0 truncate">
               {activeSessions.length} active
               <span className="px-1.5">/</span>
-              {sessions.length} total
+              {status?.managedRunCount ?? sessions.length} managed
+              <span className="px-1.5">/</span>
+              {status?.reclaimedRunCount ?? 0} reclaimed
             </div>
             <div className="min-w-0 truncate">
               Updated {formatRelativeTime(selectedSession?.updatedAt || null)}
@@ -431,7 +447,7 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
               <div className="mx-auto flex min-h-[500px] max-w-7xl flex-col overflow-hidden rounded-md border border-border bg-background shadow-sm">
                 <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-3 py-2">
                   <Badge variant="outline" className={selectedSession ? cn('text-[10px]', getStatusTone(selectedSession.status)) : 'text-[10px]'}>
-                    {selectedSession?.status || 'empty'}
+                    {selectedSession?.runStatus || 'empty'}
                   </Badge>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-foreground">
@@ -491,17 +507,51 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
               <div className="mt-3 space-y-2 text-xs text-muted-foreground">
                 <div className="flex items-center justify-between gap-3">
                   <span>Status</span>
-                  <span className="font-medium text-foreground">{selectedSession?.status || 'None'}</span>
+                  <span className="font-medium text-foreground">{selectedSession?.runStatus || 'None'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Purpose</span>
+                  <span className="truncate font-medium text-foreground">{selectedSession?.purpose || 'None'}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span>Last action</span>
                   <span className="truncate font-medium text-foreground">{formatAction(selectedSession?.lastAction || null)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
+                  <span>Evidence</span>
+                  <span className="font-medium text-foreground">
+                    {selectedSession?.actionCount || 0} actions / {selectedSession?.artifactCount || 0} artifacts
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span>Cleanup</span>
+                  <span className="font-medium text-foreground">{selectedSession?.cleanupStatus || 'None'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
                   <span>Profile</span>
                   <span className="truncate font-medium text-foreground">{selectedSession?.profileName || 'Temporary'}</span>
                 </div>
               </div>
+              {selectedSession?.lastError && (
+                <div className="mt-3 rounded-md border border-destructive/25 bg-destructive/5 p-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-destructive">
+                    <Bug className="h-3.5 w-3.5" />
+                    Debug handoff ready
+                  </div>
+                  <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{selectedSession.lastError}</p>
+                  {selectedSession.debugCommand && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-full"
+                      onClick={() => void navigator.clipboard.writeText(selectedSession.debugCommand!)}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy omni debug command
+                    </Button>
+                  )}
+                </div>
+              )}
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <Button variant="outline" size="sm" onClick={stopSession} disabled={isBusy || !selectedSession || selectedSession.status !== 'ready'}>
                   <Square className="h-4 w-4" />
