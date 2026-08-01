@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "policy_version": "2026-08-01.1",
-  "created_at": "2026-08-01T08:00:16.667597+00:00",
+  "created_at": "2026-08-01T08:47:36.268217+00:00",
   "source": {
     "path": ".",
-    "head": "3e435cb15800d9b66559c2521795aa52b30659c0",
+    "head": "ca2a5894aa318827e79e1453415ff64cf1ae48f4",
     "dirty": false,
-    "tracked_considered": 14471,
+    "tracked_considered": 12911,
     "missing_tracked": []
   },
   "additional_sources": [
@@ -24,19 +24,19 @@
   "selection": {
     "input": "git ls-files -z --cached",
     "included_tracked": 3167,
-    "excluded_tracked": 11332,
+    "excluded_tracked": 9772,
     "scrubbed_tracked": 293,
     "excluded_by_rule": {
-      "unsafe_path_part": 5751,
-      "private_product_path": 2489,
-      "not_allowlisted": 2211,
-      "non_source_runtime_evidence": 454,
-      "service_not_allowlisted": 252,
+      "unsafe_path_part": 5710,
+      "not_allowlisted": 1885,
+      "private_product_path": 1416,
+      "non_source_runtime_evidence": 362,
+      "service_not_allowlisted": 250,
       "generated_static_only": 75,
-      "domain_not_allowlisted": 55,
       "standard_not_allowlisted": 33,
+      "domain_not_allowlisted": 31,
       "source_file_too_large": 9,
-      "internal_release_machinery": 3
+      "internal_release_machinery": 1
     }
   },
   "dashboard_static_build": {
@@ -94,7 +94,7 @@
   },
   "output": {
     "files_excluding_manifest_and_audit": 5029,
-    "bytes_excluding_manifest_and_audit": 50352592
+    "bytes_excluding_manifest_and_audit": 50372122
   },
   "files": [
     {
@@ -280,8 +280,8 @@
     {
       "path": "docs/standards/_global/terminology.md",
       "origin": "git_tracked_source",
-      "bytes": 33183,
-      "sha256": "6b4f637102afb22f311888635d999b810f772bef075fd35d60aef401faf5f947"
+      "bytes": 33276,
+      "sha256": "00bea002a68c3d28525ed9555c8735fee970c1b9f06ff1b97bc42f15f818a929"
     },
     {
       "path": "docs/standards/_global/test-pyramid.md",
@@ -376,8 +376,8 @@
     {
       "path": "docs/standards/concepts/team.md",
       "origin": "git_tracked_source",
-      "bytes": 13898,
-      "sha256": "068f71863c397da3fbac7263a219f0e5f81e30e9a857639b732f636a23bdf9e9"
+      "bytes": 13947,
+      "sha256": "2ba9c06c969cc158b8216d76199af3ee9483041f704b8536e1dfae9ae4763343"
     },
     {
       "path": "docs/standards/concepts/template.md",
@@ -400,8 +400,8 @@
     {
       "path": "docs/standards/protocol/plan_template.md",
       "origin": "git_tracked_source",
-      "bytes": 11235,
-      "sha256": "e170fcb79f7ccb130245de48b9ab0916363e8362dc45e75dbae63c4e35c63e9e"
+      "bytes": 11483,
+      "sha256": "33200201af5b38d54e8c89e2bff111a6bb6d7b65125ed92b5d831b3e9c1c189a"
     },
     {
       "path": "docs/standards/protocol/progressive_context.md",
@@ -712,8 +712,8 @@
     {
       "path": "services/_progress/progress_service/src/main.rs",
       "origin": "git_tracked_source",
-      "bytes": 49357,
-      "sha256": "216c0b00e3ea42c1a6c7ac003a5e842b78524131c4cf2616bedd03300c75332d"
+      "bytes": 66751,
+      "sha256": "53731e20e3e5859edb27e994fe04248f41b815c65da989bcfdaf085e96bb2373"
     },
     {
       "path": "services/_progress/progress_service/start-progress-service.cmd",
@@ -23236,8 +23236,8 @@
     {
       "path": "src/omnicompany/packages/domains/publish/object_backup_queue.py",
       "origin": "git_tracked_source",
-      "bytes": 36435,
-      "sha256": "7770cedd061b88b29a374febea11a7497a612a7716954a01b5fd90dfffe51032"
+      "bytes": 38181,
+      "sha256": "a50975fba1ca20969d35e1302f5a309af7dd3d672b97e5ca3cdb8a92cf2abdca"
     },
     {
       "path": "src/omnicompany/packages/domains/publish/routers/__init__.py",

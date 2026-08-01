@@ -710,10 +710,10 @@ def build_catalog_copy_command(config: BackupConfig, catalog_root: Path) -> list
 
 
 def publish_catalog(config: BackupConfig, state: dict[str, Any], logger: RunLogger, *, dry_run: bool) -> None:
-    catalog_root = write_catalog(config, state)
     if dry_run:
-        logger.write(f"DRY catalog prepared at {catalog_root}")
+        logger.write("DRY catalog unchanged")
         return
+    catalog_root = write_catalog(config, state)
     command = build_catalog_copy_command(config, catalog_root)
     return_code, _ = run_text_command(command, logger)
     if return_code != 0:
@@ -803,6 +803,8 @@ def _run_backup_locked(
             item_status = state["items"].setdefault(item.id, {})
             item_status.update({"last_attempt_at": utc_now(), "status": "running"})
             chunk_states = item_status.setdefault("chunks", {})
+            deferred_count = 0
+            item_failed = False
             save_state(config, state)
             prepared_source = prepare_source(item, config.state_root)
             for unit in due_units:
@@ -828,9 +830,21 @@ def _run_backup_locked(
                     }
                     results.append(result)
                     item_status.update({"status": "failed", "last_error": "restic dry-run failed"})
+                    item_failed = True
                     break
                 estimated = data_added(estimate_summary)
                 if estimated > remaining:
+                    chunk_status = chunk_states.setdefault(unit_state_key(unit), {})
+                    chunk_status.update(
+                        {
+                            "key": unit.key,
+                            "label": unit.label,
+                            "status": "deferred_quota",
+                            "estimated_bytes": estimated,
+                            "last_error": "",
+                        }
+                    )
+                    deferred_count += 1
                     results.append(
                         {
                             "id": item.id,
@@ -877,22 +891,50 @@ def _run_backup_locked(
                 save_state(config, state)
                 if return_code != 0:
                     item_status.update({"status": "failed", "last_error": f"restic exit={return_code}"})
+                    item_failed = True
                     break
             update_item_completion(item, item_status, units)
+            if deferred_count and not item_failed:
+                item_status.update(
+                    {
+                        "status": "partial",
+                        "deferred": True,
+                        "deferred_count": deferred_count,
+                        "last_error": "",
+                    }
+                )
+            elif not item_failed:
+                item_status.pop("deferred", None)
+                item_status.pop("deferred_count", None)
             save_state(config, state)
-        state["last_run"] = {
+        result_statuses = {str(result.get("status", "")) for result in results}
+        if dry_run:
+            run_status = "dry_run"
+        elif result_statuses & {"failed", "source_missing", "estimate_failed"}:
+            run_status = "failed"
+        elif "deferred_quota" in result_statuses:
+            run_status = "partial"
+        else:
+            run_status = "complete"
+        run_result = {
             "run_id": run_id,
             "started_at": run_started,
             "finished_at": utc_now(),
             "dry_run": dry_run,
+            "status": run_status,
+            "deferred": "deferred_quota" in result_statuses,
+            "deferred_count": sum(result.get("status") == "deferred_quota" for result in results),
             "limit_bytes": limit,
             "transferred_bytes": sum(int(result.get("bytes", 0)) for result in results),
             "remaining_bytes": remaining,
             "results": results,
         }
+        if dry_run:
+            return run_result
+        state["last_run"] = run_result
         save_state(config, state)
         publish_catalog(config, state, logger, dry_run=dry_run)
-        return state["last_run"]
+        return run_result
     finally:
         logger.close()
 
