@@ -70,14 +70,16 @@ class RouteReplaySuiteAssessmentV1(BaseModel):
     benchmark_id: str
     acceptance_manifest_sha256: str = Field(min_length=64, max_length=64)
     candidate_manifest_sha256: str = Field(min_length=64, max_length=64)
+    trusted_candidate_manifest_sha256: str = Field(min_length=64, max_length=64)
     suite_input_sha256: str = Field(min_length=64, max_length=64)
+    candidate_route_count: int = Field(ge=0)
     execution_evidence_pass: bool
     results: tuple[RouteReplaySuiteResultV1, ...]
     issues: tuple[str, ...]
 
     @computed_field(return_type=int)
     @property
-    def candidate_route_count(self) -> int:
+    def result_count(self) -> int:
         return len(self.results)
 
     @computed_field(return_type=Literal["execution_evidence_only"])
@@ -92,7 +94,7 @@ class RouteReplaySuiteAssessmentV1(BaseModel):
 
     @computed_field(return_type=Literal[False])
     @property
-    def replay_suite_can_be_frozen(self) -> Literal[False]:
+    def replay_can_be_frozen(self) -> Literal[False]:
         return False
 
 
@@ -106,10 +108,14 @@ def assess_route_replay_suite_from_acceptance(
     expected_build_scope_id: str | None = None,
 ) -> RouteReplaySuiteAssessmentV1:
     workspace_root = workspace_root.resolve()
+    store_root = Path(store.root).resolve()
+    if not store_root.is_relative_to(workspace_root):
+        raise ValueError("route replay store root escapes workspace root")
     suite_input_path = suite_input_path.resolve()
     acceptance_manifest_path = acceptance_manifest_path.resolve()
     if not suite_input_path.is_relative_to(workspace_root):
         raise ValueError("route replay suite input escapes workspace root")
+    suite_input_sha = _sha256(suite_input_path)
     suite_input = RouteReplaySuiteInputV1.model_validate_json(
         suite_input_path.read_text(encoding="utf-8")
     )
@@ -121,11 +127,14 @@ def assess_route_replay_suite_from_acceptance(
         )
     )
     candidate_manifest = json.loads(candidate_manifest_path.read_text(encoding="utf-8"))
+    candidate_manifest_sha = _sha256(candidate_manifest_path)
     route_refs = list(candidate_manifest.get("collections", {}).get("routes", []))
     expected_route_ids = [str(item.get("id") or "") for item in route_refs]
     supplied = {item.route_id: item for item in suite_input.items}
     supplied_route_ids = list(supplied)
     issues: list[str] = []
+    if candidate_manifest_sha != trusted_candidate_sha:
+        issues.append("candidate manifest does not match acceptance trust root")
     if len(expected_route_ids) != len(set(expected_route_ids)):
         issues.append("candidate manifest contains duplicate route ids")
     missing = sorted(set(expected_route_ids) - set(supplied_route_ids))
@@ -179,7 +188,7 @@ def assess_route_replay_suite_from_acceptance(
                 expected_game_id=expected_game_id,
                 expected_build_scope_id=expected_build_scope_id,
             )
-        except (OSError, ValueError, json.JSONDecodeError) as error:
+        except Exception as error:
             message = f"{type(error).__name__}: {error}"
             issues.append(f"{route_id}: {message}")
             results.append(
@@ -193,6 +202,10 @@ def assess_route_replay_suite_from_acceptance(
             continue
         if not assessment.execution_evidence_pass:
             issues.append(f"{route_id}: execution evidence failed")
+        if assessment.acceptance_manifest_sha256 != acceptance_sha:
+            issues.append(f"{route_id}: acceptance trust root changed during suite assessment")
+        if assessment.candidate_manifest_sha256 != candidate_manifest_sha:
+            issues.append(f"{route_id}: candidate manifest changed during suite assessment")
         results.append(
             RouteReplaySuiteResultV1(
                 route_id=route_id,
@@ -208,6 +221,12 @@ def assess_route_replay_suite_from_acceptance(
         if result.assessment is not None
         for run_id in result.assessment.evidence_run_ids
     ]
+    manifest_ids = [
+        manifest_id
+        for result in results
+        if result.assessment is not None
+        for manifest_id in result.assessment.evidence_manifest_ids
+    ]
     step_ids = [
         step_id
         for result in results
@@ -216,8 +235,39 @@ def assess_route_replay_suite_from_acceptance(
     ]
     if len(run_ids) != len(set(run_ids)):
         issues.append("route replay suite reuses an evidence run across routes")
+    if len(manifest_ids) != len(set(manifest_ids)):
+        issues.append("route replay suite reuses an evidence manifest across routes")
     if len(step_ids) != len(set(step_ids)):
         issues.append("route replay suite reuses an evidence step across routes")
+
+    try:
+        if _sha256(suite_input_path) != suite_input_sha:
+            issues.append("suite input changed during suite assessment")
+    except OSError as error:
+        issues.append(f"suite input unavailable after suite assessment: {error}")
+    try:
+        if _sha256(acceptance_manifest_path) != acceptance_sha:
+            issues.append("acceptance trust root changed after suite assessment")
+    except OSError as error:
+        issues.append(f"acceptance trust root unavailable after suite assessment: {error}")
+    try:
+        if _sha256(candidate_manifest_path) != candidate_manifest_sha:
+            issues.append("candidate manifest changed after suite assessment")
+    except OSError as error:
+        issues.append(f"candidate manifest unavailable after suite assessment: {error}")
+    for result in results:
+        if result.assessment is None:
+            continue
+        try:
+            if _sha256(Path(result.candidate_route_path)) != result.assessment.candidate_route_sha256:
+                issues.append(f"{result.route_id}: candidate route changed after assessment")
+        except OSError as error:
+            issues.append(f"{result.route_id}: candidate route unavailable after assessment: {error}")
+        try:
+            if _sha256(Path(result.verification_path)) != result.assessment.verification_sha256:
+                issues.append(f"{result.route_id}: verification changed after assessment")
+        except OSError as error:
+            issues.append(f"{result.route_id}: verification unavailable after assessment: {error}")
     issues = list(dict.fromkeys(issues))
     complete = len(results) == len(route_refs) == len(suite_input.items)
     passed = complete and not issues and all(
@@ -227,8 +277,10 @@ def assess_route_replay_suite_from_acceptance(
     return RouteReplaySuiteAssessmentV1(
         benchmark_id=suite_input.benchmark_id,
         acceptance_manifest_sha256=acceptance_sha,
-        candidate_manifest_sha256=trusted_candidate_sha,
-        suite_input_sha256=_sha256(suite_input_path),
+        candidate_manifest_sha256=candidate_manifest_sha,
+        trusted_candidate_manifest_sha256=trusted_candidate_sha,
+        suite_input_sha256=suite_input_sha,
+        candidate_route_count=len(route_refs),
         execution_evidence_pass=passed,
         results=results,
         issues=issues,
@@ -245,6 +297,13 @@ def write_route_replay_suite_assessment(
     expected_game_id: str | None = None,
     expected_build_scope_id: str | None = None,
 ) -> RouteReplaySuiteAssessmentV1:
+    workspace_root = workspace_root.resolve()
+    store_root = store_root.resolve()
+    output_path = output_path.resolve()
+    if not store_root.is_relative_to(workspace_root):
+        raise ValueError("route replay store root escapes workspace root")
+    if not output_path.is_relative_to(workspace_root):
+        raise ValueError("route replay suite output escapes workspace root")
     assessment = assess_route_replay_suite_from_acceptance(
         suite_input_path,
         acceptance_manifest_path,
@@ -260,8 +319,7 @@ def write_route_replay_suite_assessment(
             ensure_ascii=False,
             indent=2,
         )
-        + "\
-",
+        + "\n",
         encoding="utf-8",
     )
     return assessment

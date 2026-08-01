@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One proven entry into a child surface in the current live session.",
+  "properties": {
+    "caller_state_id": {
+      "minLength": 1,
+      "title": "Caller State Id",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "entered_state_id": {
+      "minLength": 1,
+      "title": "Entered State Id",
+      "type": "string"
+    },
+    "forward_skill_version_id": {
+      "minLength": 1,
+      "title": "Forward Skill Version Id",
+      "type": "string"
+    },
+    "return_skill_version_id": {
+      "minLength": 1,
+      "title": "Return Skill Version Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.navigation-frame.v1",
+      "default": "game-observatory.ai-player.navigation-frame.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_evidence_step_id": {
+      "minLength": 1,
+      "title": "Source Evidence Step Id",
+      "type": "string"
+    },
+    "terminal_evidence_step_id": {
+      "minLength": 1,
+      "title": "Terminal Evidence Step Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "caller_state_id",
+    "entered_state_id",
+    "forward_skill_version_id",
+    "return_skill_version_id",
+    "source_evidence_step_id",
+    "terminal_evidence_step_id"
+  ],
+  "title": "NavigationFrameV1",
+  "type": "object"
+}

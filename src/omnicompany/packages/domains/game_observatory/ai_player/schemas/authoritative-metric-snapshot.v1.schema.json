@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "AuthoritativeMetricValueV1": {
+      "additionalProperties": false,
+      "properties": {
+        "metric_key": {
+          "minLength": 1,
+          "title": "Metric Key",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric_key",
+        "unit",
+        "value"
+      ],
+      "title": "AuthoritativeMetricValueV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "captured_at": {
+      "minLength": 1,
+      "title": "Captured At",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_step_id": {
+      "minLength": 1,
+      "title": "Evidence Step Id",
+      "type": "string"
+    },
+    "frame_role": {
+      "enum": [
+        "before",
+        "after"
+      ],
+      "title": "Frame Role",
+      "type": "string"
+    },
+    "metrics": {
+      "items": {
+        "$ref": "#/$defs/AuthoritativeMetricValueV1"
+      },
+      "minItems": 1,
+      "title": "Metrics",
+      "type": "array"
+    },
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "provider_version": {
+      "minLength": 1,
+      "title": "Provider Version",
+      "type": "string"
+    },
+    "record_locator": {
+      "minLength": 1,
+      "title": "Record Locator",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.authoritative-metric-snapshot.v1",
+      "default": "game-observatory.ai-player.authoritative-metric-snapshot.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_step_id",
+    "frame_role",
+    "provider",
+    "provider_version",
+    "record_locator",
+    "captured_at",
+    "metrics"
+  ],
+  "title": "AuthoritativeMetricSnapshotPayloadV1",
+  "type": "object"
+}

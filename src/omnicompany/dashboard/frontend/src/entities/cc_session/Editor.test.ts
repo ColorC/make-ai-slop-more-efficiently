@@ -79,6 +79,11 @@ describe('remote CLI keyboard shortcuts', () => {
     expect(resolveTerminalShortcut(key('c', { ctrlKey: true }), false, true)).toBe('terminal')
   })
 
+  it('cuts a visible selection as copy plus selection clear without stealing Ctrl+X otherwise', () => {
+    expect(resolveTerminalShortcut(key('x', { ctrlKey: true }), true, true)).toBe('cut-copy')
+    expect(resolveTerminalShortcut(key('x', { ctrlKey: true }), false, true)).toBe('terminal')
+  })
+
   it('provides Windows select-all/paste while terminal mode preserves readline keys', () => {
     expect(resolveTerminalShortcut(key('a', { ctrlKey: true }), false, true)).toBe('select-all')
     expect(resolveTerminalShortcut(key('v', { ctrlKey: true }), false, true)).toBe('paste')

@@ -1,0 +1,281 @@
+{
+  "$defs": {
+    "ExternalAgentBenchmarkCandidateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_effort_required": {
+          "default": true,
+          "title": "Actual Effort Required",
+          "type": "boolean"
+        },
+        "cli_model_selector": {
+          "minLength": 1,
+          "title": "Cli Model Selector",
+          "type": "string"
+        },
+        "expected_model_family": {
+          "minLength": 1,
+          "title": "Expected Model Family",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z0-9.-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "codex-cli",
+            "claude-code-cli"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "requested_effort": {
+          "const": "medium",
+          "default": "medium",
+          "title": "Requested Effort",
+          "type": "string"
+        },
+        "requested_model_label": {
+          "minLength": 1,
+          "title": "Requested Model Label",
+          "type": "string"
+        },
+        "resolved_model_id_required": {
+          "default": true,
+          "title": "Resolved Model Id Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "requested_model_label",
+        "cli_model_selector",
+        "expected_model_family"
+      ],
+      "title": "ExternalAgentBenchmarkCandidateV1",
+      "type": "object"
+    },
+    "ExternalAgentBenchmarkTaskV1": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_focus": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Acceptance Focus",
+          "type": "array"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "id": {
+          "enum": [
+            "B0",
+            "B1",
+            "B2",
+            "B3",
+            "B4",
+            "B5"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "same_session_required": {
+          "title": "Same Session Required",
+          "type": "boolean"
+        },
+        "sample_count": {
+          "minimum": 1,
+          "title": "Sample Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sample_count",
+        "description",
+        "acceptance_focus",
+        "same_session_required"
+      ],
+      "title": "ExternalAgentBenchmarkTaskV1",
+      "type": "object"
+    },
+    "ExternalAgentBenchmarkThresholdV1": {
+      "additionalProperties": false,
+      "properties": {
+        "a1_warm_decision_p50_seconds_max": {
+          "default": 15,
+          "exclusiveMinimum": 0,
+          "title": "A1 Warm Decision P50 Seconds Max",
+          "type": "number"
+        },
+        "a1_warm_decision_p95_seconds_max": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "A1 Warm Decision P95 Seconds Max",
+          "type": "number"
+        },
+        "a2_continuous_semantic_actions_min": {
+          "default": 30,
+          "minimum": 1,
+          "title": "A2 Continuous Semantic Actions Min",
+          "type": "integer"
+        },
+        "a2_warm_decision_p50_seconds_max": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "A2 Warm Decision P50 Seconds Max",
+          "type": "number"
+        },
+        "a2_warm_decision_p95_seconds_max": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "title": "A2 Warm Decision P95 Seconds Max",
+          "type": "number"
+        },
+        "evidence_completeness_min": {
+          "default": 1.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Evidence Completeness Min",
+          "type": "number"
+        },
+        "interruption_recovery_min": {
+          "default": 1.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Interruption Recovery Min",
+          "type": "number"
+        },
+        "known_target_accuracy_min": {
+          "default": 0.95,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Known Target Accuracy Min",
+          "type": "number"
+        },
+        "overlay_lower_layer_misclick_max": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Overlay Lower Layer Misclick Max",
+          "type": "integer"
+        }
+      },
+      "title": "ExternalAgentBenchmarkThresholdV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "benchmark_id": {
+      "const": "afkj_external_agent_continuity_v1",
+      "default": "afkj_external_agent_continuity_v1",
+      "title": "Benchmark Id",
+      "type": "string"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/ExternalAgentBenchmarkCandidateV1"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "facility_contract_path": {
+      "minLength": 1,
+      "title": "Facility Contract Path",
+      "type": "string"
+    },
+    "facility_contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Facility Contract Sha256",
+      "type": "string"
+    },
+    "fairness_controls": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Fairness Controls",
+      "type": "array"
+    },
+    "game_id": {
+      "const": "afk-journey",
+      "default": "afk-journey",
+      "title": "Game Id",
+      "type": "string"
+    },
+    "measured_fields": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Measured Fields",
+      "type": "array"
+    },
+    "purpose": {
+      "minLength": 1,
+      "title": "Purpose",
+      "type": "string"
+    },
+    "required_artifacts": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Required Artifacts",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.afkj-external-agent-continuity-manifest.v1",
+      "default": "game-observatory.ai-player.afkj-external-agent-continuity-manifest.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "selection_rule": {
+      "minLength": 1,
+      "title": "Selection Rule",
+      "type": "string"
+    },
+    "tasks": {
+      "items": {
+        "$ref": "#/$defs/ExternalAgentBenchmarkTaskV1"
+      },
+      "maxItems": 6,
+      "minItems": 6,
+      "title": "Tasks",
+      "type": "array"
+    },
+    "thresholds": {
+      "$ref": "#/$defs/ExternalAgentBenchmarkThresholdV1"
+    }
+  },
+  "required": [
+    "purpose",
+    "facility_contract_path",
+    "facility_contract_sha256",
+    "candidates",
+    "tasks",
+    "fairness_controls",
+    "measured_fields",
+    "thresholds",
+    "selection_rule",
+    "required_artifacts"
+  ],
+  "title": "AFKJExternalAgentContinuityManifestV1",
+  "type": "object"
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "critical_conflicts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Critical Conflicts",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-match.v1",
+      "default": "game-observatory.ai-player.state-match.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "score": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Score",
+      "type": "number"
+    },
+    "state_id": {
+      "minLength": 1,
+      "title": "State Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "state_id",
+    "score"
+  ],
+  "title": "StateMatchV1",
+  "type": "object"
+}

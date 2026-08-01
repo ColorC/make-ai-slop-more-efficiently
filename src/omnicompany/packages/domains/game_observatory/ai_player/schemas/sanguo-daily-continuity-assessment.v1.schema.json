@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "reasons": {
+            "minItems": 1
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "continuity_component_passed": {
+            "const": true
+          }
+        },
+        "required": [
+          "continuity_component_passed"
+        ]
+      },
+      "then": {
+        "properties": {
+          "reasons": {
+            "maxItems": 0
+          },
+          "recorded_natural_days": {
+            "const": 7
+          },
+          "sealed_natural_days": {
+            "const": 7
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "continuity_component_passed": {
+      "title": "Continuity Component Passed",
+      "type": "boolean"
+    },
+    "continuity_run_id": {
+      "title": "Continuity Run Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evaluated_at": {
+      "title": "Evaluated At",
+      "type": "string"
+    },
+    "g12_decision": {
+      "const": "not_decided_by_this_facility",
+      "default": "not_decided_by_this_facility",
+      "title": "G12 Decision",
+      "type": "string"
+    },
+    "reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+    },
+    "recorded_natural_days": {
+      "minimum": 0,
+      "title": "Recorded Natural Days",
+      "type": "integer"
+    },
+    "required_natural_days": {
+      "const": 7,
+      "default": 7,
+      "title": "Required Natural Days",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.sanguo-daily-continuity-assessment.v1",
+      "default": "game-observatory.ai-player.sanguo-daily-continuity-assessment.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "sealed_natural_days": {
+      "minimum": 0,
+      "title": "Sealed Natural Days",
+      "type": "integer"
+    },
+    "timezone_name": {
+      "const": "Asia/Shanghai",
+      "default": "Asia/Shanghai",
+      "title": "Timezone Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "continuity_run_id",
+    "recorded_natural_days",
+    "sealed_natural_days",
+    "continuity_component_passed",
+    "reasons",
+    "evaluated_at"
+  ],
+  "title": "SanguoDailyContinuityAssessmentV1",
+  "type": "object"
+}

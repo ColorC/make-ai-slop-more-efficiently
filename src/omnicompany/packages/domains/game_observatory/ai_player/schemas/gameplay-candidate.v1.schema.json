@@ -1,0 +1,222 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adjacent_gameplay_candidate_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Adjacent Gameplay Candidate Ids",
+      "type": "array"
+    },
+    "adjacent_gameplay_labels": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Adjacent Gameplay Labels",
+      "type": "array"
+    },
+    "boundary_summary": {
+      "minLength": 1,
+      "title": "Boundary Summary",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "entry_state_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Entry State Ids",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "exit_state_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exit State Ids",
+      "type": "array"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "interface_family_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Interface Family Ids",
+      "type": "array"
+    },
+    "main_state_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Main State Ids",
+      "type": "array"
+    },
+    "resource_or_progression_clues": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Resource Or Progression Clues",
+      "type": "array"
+    },
+    "rule_clues": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Rule Clues",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.gameplay-candidate.v1",
+      "default": "game-observatory.ai-player.gameplay-candidate.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "status": {
+      "default": "candidate",
+      "enum": [
+        "candidate",
+        "scope_review",
+        "closed",
+        "invalidated"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "transition_edge_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Transition Edge Ids",
+      "type": "array"
+    },
+    "triggering_task_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Triggering Task Ids",
+      "type": "array"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "game_id",
+    "title",
+    "triggering_task_ids",
+    "entry_state_ids",
+    "main_state_ids",
+    "transition_edge_ids",
+    "rule_clues",
+    "resource_or_progression_clues",
+    "boundary_summary"
+  ],
+  "title": "GameplayCandidateV1",
+  "type": "object"
+}

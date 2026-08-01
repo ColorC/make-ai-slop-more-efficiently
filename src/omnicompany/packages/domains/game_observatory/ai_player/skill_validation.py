@@ -34,6 +34,8 @@ def derive_skill_validation(
         raise ValueError("skill validation runs crossed environments")
     if any(run.skill_version_id != skill_version_id for run in runs):
         raise ValueError("skill validation mixes different skill versions")
+    if any(run.validator_id != evaluator for run in runs):
+        raise ValueError("skill validation evaluator must match every immutable run validator")
 
     successful = sum(run.validation_passed for run in runs)
     false_successes = sum(run.false_success for run in runs)
@@ -65,8 +67,18 @@ def derive_skill_validation(
         evidence_reuse_count += len(run_ids.intersection(seen_evidence_ids))
         seen_evidence_ids.update(run_ids)
 
-    token_reduction = 1 - (actual_tokens / baseline_tokens) if baseline_tokens else -1.0
-    latency_reduction = 1 - (actual_latency / baseline_latency) if baseline_latency else -1.0
+    # A missing or badly underestimated baseline can make the raw reduction
+    # ratio arbitrarily negative.  The public contract intentionally represents
+    # "100% worse or more" as -1; keep the exact totals in immutable SkillRuns
+    # and bound only the aggregate score used by the acceptance gate.
+    token_reduction = max(
+        -1.0,
+        min(1.0, 1 - (actual_tokens / baseline_tokens)),
+    ) if baseline_tokens else -1.0
+    latency_reduction = max(
+        -1.0,
+        min(1.0, 1 - (actual_latency / baseline_latency)),
+    ) if baseline_latency else -1.0
     success_rate = successful / len(runs)
     checks = (
         (len(runs) >= 20, "独立回放少于 20 次"),

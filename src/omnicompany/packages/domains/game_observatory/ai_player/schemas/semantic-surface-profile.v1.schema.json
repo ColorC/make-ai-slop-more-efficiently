@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Reusable stable semantics for recognizing and operating one UI surface.",
+  "properties": {
+    "dynamic_field_names": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Dynamic Field Names",
+      "type": "array"
+    },
+    "interaction_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Interaction Roles",
+      "type": "array"
+    },
+    "page_identity_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Page Identity Tokens",
+      "type": "array"
+    },
+    "risk_boundary_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Risk Boundary Tokens",
+      "type": "array"
+    },
+    "safe_exit_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Safe Exit Tokens",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.semantic-surface-profile.v1",
+      "default": "game-observatory.ai-player.semantic-surface-profile.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "page_identity_tokens"
+  ],
+  "title": "SemanticSurfaceProfileV1",
+  "type": "object"
+}

@@ -1,0 +1,252 @@
+{
+  "$defs": {
+    "DailyTerminalEvidenceReferenceV1": {
+      "additionalProperties": false,
+      "description": "Environment-free terminal evidence; the containing day supplies its environment.",
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Step Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "artifact_ids",
+        "evidence_run_ids",
+        "evidence_step_ids"
+      ],
+      "title": "DailyTerminalEvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "event_type": {
+              "const": "duty_recorded"
+            },
+            "operation": {
+              "const": "record_duty"
+            }
+          },
+          "required": [
+            "operation",
+            "event_type"
+          ]
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "interrupted"
+            },
+            "operation": {
+              "const": "interrupt"
+            }
+          },
+          "required": [
+            "operation",
+            "event_type"
+          ]
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "resumed"
+            },
+            "operation": {
+              "const": "resume"
+            }
+          },
+          "required": [
+            "operation",
+            "event_type"
+          ]
+        },
+        {
+          "properties": {
+            "event_type": {
+              "const": "sealed"
+            },
+            "operation": {
+              "const": "seal"
+            }
+          },
+          "required": [
+            "operation",
+            "event_type"
+          ]
+        }
+      ]
+    },
+    {
+      "else": {
+        "properties": {
+          "evidence_refs": {
+            "minItems": 1
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "seal"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_refs": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "actor": {
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "title": "Actor",
+      "type": "string"
+    },
+    "command_id": {
+      "minLength": 1,
+      "title": "Command Id",
+      "type": "string"
+    },
+    "continuity_run_id": {
+      "minLength": 1,
+      "title": "Continuity Run Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "event_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Event Sha256",
+      "type": "string"
+    },
+    "event_type": {
+      "enum": [
+        "duty_recorded",
+        "interrupted",
+        "resumed",
+        "sealed"
+      ],
+      "title": "Event Type",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/DailyTerminalEvidenceReferenceV1"
+      },
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "natural_day": {
+      "format": "date",
+      "title": "Natural Day",
+      "type": "string"
+    },
+    "new_version": {
+      "minimum": 1,
+      "title": "New Version",
+      "type": "integer"
+    },
+    "operation": {
+      "enum": [
+        "record_duty",
+        "interrupt",
+        "resume",
+        "seal"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "previous_event_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Previous Event Sha256",
+      "type": "string"
+    },
+    "previous_version": {
+      "minimum": 0,
+      "title": "Previous Version",
+      "type": "integer"
+    },
+    "reason": {
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "title": "Reason",
+      "type": "string"
+    },
+    "request_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Request Sha256",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.sanguo-daily-continuity-event.v1",
+      "default": "game-observatory.ai-player.sanguo-daily-continuity-event.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "timestamp": {
+      "minLength": 1,
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "environment_id",
+    "continuity_run_id",
+    "natural_day",
+    "event_type",
+    "operation",
+    "command_id",
+    "request_sha256",
+    "previous_event_sha256",
+    "event_sha256",
+    "actor",
+    "reason",
+    "previous_version",
+    "new_version",
+    "timestamp"
+  ],
+  "title": "SanguoDailyContinuityEventV1",
+  "type": "object"
+}

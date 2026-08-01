@@ -1,0 +1,159 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action_run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Action Run Id"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "evidence_step_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Step Id"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.speech-event.v1",
+      "default": "game-observatory.ai-player.speech-event.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "speech_intent_id": {
+      "minLength": 1,
+      "title": "Speech Intent Id",
+      "type": "string"
+    },
+    "speech_intent_version": {
+      "minimum": 1,
+      "title": "Speech Intent Version",
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "sent",
+        "failed",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "system_response": {
+      "minLength": 1,
+      "title": "System Response",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "speech_intent_id",
+    "speech_intent_version",
+    "status",
+    "system_response"
+  ],
+  "title": "SpeechEventV1",
+  "type": "object"
+}

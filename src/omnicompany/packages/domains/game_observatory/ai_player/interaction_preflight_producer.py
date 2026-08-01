@@ -186,6 +186,32 @@ class InteractionPreflightProducer:
         source = self.store.get_artifact(request.source_artifact_id)
         if source is None or not _artifact_is_current(source, request.environment_id):
             return self._rejected(request, ["当前原图不存在、环境不符或文件哈希失效。"])
+        observation = self.player_store.get_state_observation(
+            request.environment_id,
+            request.recognition_observation_id,
+        )
+        observations = self.player_store.list_state_observations(request.environment_id)
+        if observation is None:
+            return self._rejected(request, ["交互候选没有绑定 canonical 状态观测。"])
+        if not observations or observations[-1].id != observation.id:
+            return self._rejected(request, ["交互候选绑定的不是当前最新状态观测。"])
+        observation_artifact_ids = {
+            artifact_id
+            for reference in observation.evidence_refs
+            for artifact_id in reference.artifact_ids
+        }
+        if source.id not in observation_artifact_ids:
+            return self._rejected(request, ["当前原图不属于交互候选绑定的状态观测证据。"])
+        current_assignment = self.player_store.get_current_state_assignment(
+            request.environment_id,
+            request.recognition_observation_id,
+        )
+        if (
+            current_assignment is None
+            or current_assignment.status != "active"
+            or current_assignment.state_id != request.captured_state_id
+        ):
+            return self._rejected(request, ["状态观测没有有效绑定当前语义状态。"])
         image_info = request.locator_result.get("image")
         elements = request.locator_result.get("elements")
         if not isinstance(image_info, dict) or not isinstance(elements, list):
@@ -201,6 +227,8 @@ class InteractionPreflightProducer:
             height = int(image_info["height"])
         except (TypeError, ValueError):
             return self._rejected(request, ["视觉定位结果的原图尺寸无效。"])
+        if (observation.viewport_width, observation.viewport_height) != (width, height):
+            return self._rejected(request, ["状态观测视口与视觉定位结果不一致。"])
         candidate = next(
             (
                 item
@@ -258,7 +286,8 @@ class InteractionPreflightProducer:
         ):
             signals.append("template_match")
 
-        for edge in self.player_store.list_transition_edges(request.environment_id):
+        transition_edges = self.player_store.list_transition_edges(request.environment_id)
+        for edge in transition_edges:
             if (
                 edge.from_state_id == request.captured_state_id
                 and edge.outcome == "verified_transition"
@@ -267,6 +296,15 @@ class InteractionPreflightProducer:
             ):
                 signals.append("verified_transition")
                 break
+        derived_no_change_count = sum(
+            edge.from_state_id == request.captured_state_id
+            and edge.outcome in {"failed", "verified_no_change", "forbidden"}
+            and edge.target_bounds is not None
+            and _iou(edge.target_bounds, bounds) >= 0.5
+            for edge in transition_edges
+        )
+        if request.consecutive_no_change_count != derived_no_change_count:
+            reasons.append("连续无变化次数与 canonical 动作历史不一致。")
 
         signals = list(dict.fromkeys(signals))
         structural = any(
@@ -279,6 +317,11 @@ class InteractionPreflightProducer:
         if not (structural or two_source_visual):
             reasons.append("候选缺少结构证据，且没有两种独立视觉证据互相确认。")
 
+        canonical_overlay_state = (
+            "active" if observation.features.overlay_tokens else "none"
+        )
+        if request.overlay_state != "unknown" and request.overlay_state != canonical_overlay_state:
+            reasons.append("请求中的遮罩状态与 canonical 状态观测不一致。")
         if request.overlay_state == "unknown":
             layer_state = "unknown"
             reasons.append("当前遮罩层状态未知。")
@@ -313,6 +356,11 @@ class InteractionPreflightProducer:
             "layer_state": layer_state,
             "recognition_observation_id": request.recognition_observation_id,
             "captured_state_id": request.captured_state_id,
+            "expected_change": request.expected_change.model_dump(mode="json"),
+            "consecutive_no_change_count": derived_no_change_count,
+            "max_consecutive_no_change_before_rerecognition": (
+                request.max_consecutive_no_change_before_rerecognition
+            ),
         }
         local = self._save_local_evidence(
             request=request,
@@ -342,7 +390,7 @@ class InteractionPreflightProducer:
             recognition_observation_id=request.recognition_observation_id,
             captured_state_id=request.captured_state_id,
             expected_change=request.expected_change,
-            consecutive_no_change_count=request.consecutive_no_change_count,
+            consecutive_no_change_count=derived_no_change_count,
             max_consecutive_no_change_before_rerecognition=(
                 request.max_consecutive_no_change_before_rerecognition
             ),

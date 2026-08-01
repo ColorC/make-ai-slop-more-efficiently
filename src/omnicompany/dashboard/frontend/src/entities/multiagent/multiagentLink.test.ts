@@ -141,6 +141,13 @@ describe('Multiagent window link', () => {
     expect(third.useMultiagentLink.getState().connected).toBe(false)
     expect(third.useMultiagentLink.getState().peerWindowId).toBeNull()
 
+    // Background tabs are commonly throttled beyond the liveness timeout.
+    // The third window still must not steal the existing one-to-one claim.
+    vi.advanceTimersByTime(6_000)
+    expect(owner.useMultiagentLink.getState().peerWindowId).toBeTruthy()
+    expect(third.useMultiagentLink.getState().connected).toBe(false)
+    expect(third.useMultiagentLink.getState().peerWindowId).toBeNull()
+
     owner.useMultiagentLink.getState().publishSelection('pty-session-7')
     expect(viewer.useMultiagentLink.getState().selectedSessionId).toBe('pty-session-7')
     expect(third.useMultiagentLink.getState().selectedSessionId).toBeNull()

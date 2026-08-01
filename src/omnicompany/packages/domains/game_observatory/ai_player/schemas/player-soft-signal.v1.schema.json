@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Evidence-bound reviewer judgement that can trigger work but never pass a hard gate.",
+  "properties": {
+    "evidence_step_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence Step Ids",
+      "type": "array"
+    },
+    "rationale": {
+      "minLength": 1,
+      "title": "Rationale",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.player-soft-signal.v1",
+      "default": "game-observatory.ai-player.player-soft-signal.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "score": {
+      "maximum": 5,
+      "minimum": 1,
+      "title": "Score",
+      "type": "integer"
+    },
+    "signal": {
+      "enum": [
+        "tutorial_comprehension",
+        "intent_coherence",
+        "opportunity_awareness",
+        "strategic_continuity",
+        "curiosity_quality",
+        "loop_avoidance",
+        "player_naturalness"
+      ],
+      "title": "Signal",
+      "type": "string"
+    }
+  },
+  "required": [
+    "signal",
+    "score",
+    "rationale",
+    "evidence_step_ids"
+  ],
+  "title": "PlayerSoftSignalV1",
+  "type": "object"
+}

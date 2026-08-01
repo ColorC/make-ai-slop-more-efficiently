@@ -5,6 +5,8 @@
   "additionalProperties": false,
   "required": [
     "surface_summary",
+    "safe_to_act",
+    "risk_flags",
     "action_type",
     "x",
     "y",
@@ -22,6 +24,14 @@
   ],
   "properties": {
     "surface_summary": {"type": "string"},
+    "safe_to_act": {"type": "boolean"},
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["payment", "purchase", "chat", "account", "consent", "deletion", "competitive", "social"]
+      }
+    },
     "action_type": {
       "type": "string",
       "enum": ["tap", "swipe", "text", "key", "launch", "wait", "back", "home", "stop"]

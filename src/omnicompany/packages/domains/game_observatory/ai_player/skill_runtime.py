@@ -117,6 +117,50 @@ def _evidence_union(
     return list(unique.values())
 
 
+def _action_evidence_matches_skill_step(
+    skill: SkillVersionV1,
+    step: SkillStepV1,
+    evidence_step: Any,
+) -> bool:
+    if evidence_step.action == step.action:
+        return True
+    locator = next(
+        (item for item in skill.locators if item.id == step.locator_id),
+        None,
+    )
+    if (
+        locator is None
+        or locator.strategy != "template"
+        or locator.mobility != "dynamic_world_object"
+        or locator.reference_artifact_id is None
+        or locator.match_threshold is None
+        or step.action is None
+    ):
+        return False
+    resolution = evidence_step.metadata.get("locator_resolution")
+    if not isinstance(resolution, dict):
+        return False
+    try:
+        score = float(resolution.get("score"))
+    except (TypeError, ValueError):
+        return False
+    return bool(
+        resolution.get("strategy") == "template"
+        and resolution.get("mobility") == "dynamic_world_object"
+        and resolution.get("skill_version_id") == skill.id
+        and resolution.get("skill_step_id") == step.id
+        and resolution.get("locator_id") == locator.id
+        and resolution.get("reference_artifact_id") == locator.reference_artifact_id
+        and resolution.get("recorded_action") == step.action.model_dump(mode="json")
+        and resolution.get("resolved_action")
+        == evidence_step.action.model_dump(mode="json")
+        and evidence_step.target_bounds is not None
+        and resolution.get("resolved_bounds")
+        == evidence_step.target_bounds.model_dump(mode="json")
+        and score >= locator.match_threshold
+    )
+
+
 class SkillRuntime:
     """Execute preferred skills in production and explicit candidates in validation mode."""
 

@@ -1,0 +1,433 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "Tier1RemediationAttestationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "gate_id": {
+          "const": "tier1.perception-executor-regression.v1",
+          "default": "tier1.perception-executor-regression.v1",
+          "title": "Gate Id",
+          "type": "string"
+        },
+        "key_id": {
+          "minLength": 1,
+          "title": "Key Id",
+          "type": "string"
+        },
+        "payload_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Payload Sha256",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.tier1-remediation-attestation.v1",
+          "default": "game-observatory.ai-player.tier1-remediation-attestation.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "signature_base64": {
+          "minLength": 1,
+          "title": "Signature Base64",
+          "type": "string"
+        },
+        "verifier_id": {
+          "minLength": 1,
+          "title": "Verifier Id",
+          "type": "string"
+        },
+        "verifier_run_id": {
+          "minLength": 1,
+          "title": "Verifier Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verifier_id",
+        "verifier_run_id",
+        "key_id",
+        "payload_sha256",
+        "signature_base64"
+      ],
+      "title": "Tier1RemediationAttestationV1",
+      "type": "object"
+    },
+    "Tier1RemediationCaseMetricsV1": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_change_match_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Expected Change Match Rate",
+          "type": "number"
+        },
+        "incomplete_evidence_count": {
+          "minimum": 0,
+          "title": "Incomplete Evidence Count",
+          "type": "integer"
+        },
+        "invalid_target_execution_count": {
+          "minimum": 0,
+          "title": "Invalid Target Execution Count",
+          "type": "integer"
+        },
+        "latency_telemetry_coverage_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Latency Telemetry Coverage Rate",
+          "type": "number"
+        },
+        "missing_skill_latency_baseline_count": {
+          "minimum": 0,
+          "title": "Missing Skill Latency Baseline Count",
+          "type": "integer"
+        },
+        "missing_skill_token_baseline_count": {
+          "minimum": 0,
+          "title": "Missing Skill Token Baseline Count",
+          "type": "integer"
+        },
+        "policy_violation_count": {
+          "minimum": 0,
+          "title": "Policy Violation Count",
+          "type": "integer"
+        },
+        "sample_count": {
+          "minimum": 1,
+          "title": "Sample Count",
+          "type": "integer"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.tier1-remediation-case-metrics.v1",
+          "default": "game-observatory.ai-player.tier1-remediation-case-metrics.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "skill_latency_reduction_rate": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -10,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skill Latency Reduction Rate"
+        },
+        "skill_replay_count": {
+          "minimum": 0,
+          "title": "Skill Replay Count",
+          "type": "integer"
+        },
+        "skill_token_reduction_rate": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -10,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skill Token Reduction Rate"
+        },
+        "token_telemetry_coverage_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Token Telemetry Coverage Rate",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sample_count",
+        "policy_violation_count",
+        "invalid_target_execution_count",
+        "incomplete_evidence_count",
+        "expected_change_match_rate",
+        "token_telemetry_coverage_rate",
+        "latency_telemetry_coverage_rate",
+        "skill_replay_count",
+        "missing_skill_token_baseline_count",
+        "missing_skill_latency_baseline_count"
+      ],
+      "title": "Tier1RemediationCaseMetricsV1",
+      "type": "object"
+    },
+    "Tier1RemediationRegressionCaseV1": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_run_id": {
+          "minLength": 1,
+          "title": "Evidence Run Id",
+          "type": "string"
+        },
+        "evidence_step_id": {
+          "minLength": 1,
+          "title": "Evidence Step Id",
+          "type": "string"
+        },
+        "fixture_artifact_id": {
+          "minLength": 1,
+          "title": "Fixture Artifact Id",
+          "type": "string"
+        },
+        "fixture_id": {
+          "minLength": 1,
+          "title": "Fixture Id",
+          "type": "string"
+        },
+        "fixture_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Fixture Sha256",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "metrics": {
+          "$ref": "#/$defs/Tier1RemediationCaseMetricsV1"
+        },
+        "partition": {
+          "enum": [
+            "failed_fixture",
+            "holdout"
+          ],
+          "title": "Partition",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "result_artifact_id": {
+          "minLength": 1,
+          "title": "Result Artifact Id",
+          "type": "string"
+        },
+        "result_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Result Sha256",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.tier1-remediation-case.v1",
+          "default": "game-observatory.ai-player.tier1-remediation-case.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_sample_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Sample Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "partition",
+        "fixture_id",
+        "fixture_artifact_id",
+        "fixture_sha256",
+        "result_artifact_id",
+        "result_sha256",
+        "evidence_run_id",
+        "evidence_step_id",
+        "metrics",
+        "passed"
+      ],
+      "title": "Tier1RemediationRegressionCaseV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attestation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Tier1RemediationAttestationV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "decision": {
+      "enum": [
+        "allow_physical_execution",
+        "remain_blocked"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "failed_assessment_id": {
+      "minLength": 1,
+      "title": "Failed Assessment Id",
+      "type": "string"
+    },
+    "failed_assessment_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Failed Assessment Sha256",
+      "type": "string"
+    },
+    "gate_id": {
+      "const": "tier1.perception-executor-regression.v1",
+      "default": "tier1.perception-executor-regression.v1",
+      "title": "Gate Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "policy_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Policy Sha256",
+      "type": "string"
+    },
+    "policy_version": {
+      "const": "player-iteration.v1",
+      "default": "player-iteration.v1",
+      "title": "Policy Version",
+      "type": "string"
+    },
+    "regression_cases": {
+      "items": {
+        "$ref": "#/$defs/Tier1RemediationRegressionCaseV1"
+      },
+      "minItems": 3,
+      "title": "Regression Cases",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.tier1-remediation-verification.v1",
+      "default": "game-observatory.ai-player.tier1-remediation-verification.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "verification_evidence_run_id": {
+      "minLength": 1,
+      "title": "Verification Evidence Run Id",
+      "type": "string"
+    },
+    "verification_evidence_step_id": {
+      "minLength": 1,
+      "title": "Verification Evidence Step Id",
+      "type": "string"
+    },
+    "verified_at": {
+      "title": "Verified At",
+      "type": "string"
+    },
+    "verifier_id": {
+      "minLength": 1,
+      "title": "Verifier Id",
+      "type": "string"
+    },
+    "verifier_session_id": {
+      "minLength": 1,
+      "title": "Verifier Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "environment_id",
+    "evidence_refs",
+    "failed_assessment_id",
+    "failed_assessment_sha256",
+    "policy_sha256",
+    "verifier_id",
+    "verifier_session_id",
+    "verification_evidence_run_id",
+    "verification_evidence_step_id",
+    "regression_cases",
+    "decision"
+  ],
+  "title": "Tier1RemediationVerificationV1",
+  "type": "object"
+}

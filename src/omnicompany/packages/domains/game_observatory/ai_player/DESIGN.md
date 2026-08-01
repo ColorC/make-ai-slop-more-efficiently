@@ -39,7 +39,9 @@
 
 ## 5. 环境隔离
 
-环境身份至少包含：`game_id`、`build_id`、`account_id`、`device_target_id`。服务器、赛季、语言、分辨率和存档在适用时参与 identity hash。任何关键字段变化都会阻止旧会话胶囊直接恢复；技能可以按自身适用域降级为待复验。
+环境身份至少包含：`game_id`、`build_id`、`account_id`、`channel`、`device_target_id`。服务器、赛季、语言、分辨率和存档在适用时参与 identity hash。任何关键字段变化都会阻止旧会话胶囊直接恢复；技能可以按自身适用域降级为待复验。
+
+运行记录不能只凭相同设备归入环境。首次引用必须由 canonical 环境元数据、匹配的游戏与构建、同环境且 hash 有效的证据文件或既有同环境认领证明身份。技能恢复链、技能验证 run、边的恢复技能、会话胶囊中的 pending evidence 与 action run 都执行相同的嵌套引用检查。
 
 MuMu 暴露的 `127.0.0.1:16384` 与 `emulator-5554` 已确认为同一实例，设备身份使用一个 canonical target，ADB serial 只保留为连接别名。
 
@@ -92,3 +94,13 @@ MuMu 暴露的 `127.0.0.1:16384` 与 `emulator-5554` 已确认为同一实例，
 阶段 0 交付严格合同、环境基线、冻结验收清单和当前 ExplorationRunner 的可重复多步基线。该阶段不改变真实账号，不点击登录页，也不宣称已经完成语义状态、任务调度、技能结晶或七日经营。
 
 唯一最终退出条件由计划目录中的 `acceptance.md` 定义：AP 11/11、P 13/13、E2E 10/10、G 12/12 全部通过，干净数据库重跑通过，独立审查为 PASS。
+
+## 12. 阶段 0 可重复入口
+
+- `python -m omnicompany.packages.domains.game_observatory.ai_player.baseline_cli` 运行冻结控制 fixture。命令会建立 `ObservatoryStore` 与 `AIPlayerStore`，保存环境和基准结果，重新打开数据库后逐项比对，再写结果文件。
+- `python -m omnicompany.packages.domains.game_observatory.ai_player.sanguo_prelogin_seed` 读取三国环境基线、攻略 seed 和研究原文，核对三者来源 ID 与数量，保存 14 条登录前候选知识，重新打开数据库核对中文 canonical 来源 ID。该命令只处理既有文件，设备动作计数固定为 0。
+- `afk_freeze_candidates.build_afk_freeze_candidates` 从既有 AFK canonical、证据数据库和原始 artifact 生成独立候选包。候选包可以通过结构验证，同时固定保持 `freeze_pass=false`，直到路线回放、中断注入、纯导航证据和人类真值签发全部完成。
+- `python -m omnicompany.packages.domains.game_observatory.ai_player.route_replay` 从验收清单和 benchmark ID 自动读取候选清单及固定 SHA，再把一次 live EvidenceRoute 与候选路线精确关联。执行前写入整条路线定义哈希；评估时核对 route ID、起止状态、完整路线定义、步骤顺序、真实物理动作预算、EvidenceRun/Manifest/Step 快照、动作 run、artifact SHA 和最终 manifest 时间。评估只判定执行证据是否闭合，语义终点在独立审定前固定为 `unadjudicated`，不能直接冻结真值。
+- `python -m omnicompany.packages.domains.game_observatory.ai_player.route_replay_suite` 读取一份 route ID 到 verification 路径的套件输入，要求候选清单中的路线恰好各出现一次，并拒绝跨路线复用 EvidenceRun/Step、路径逃逸以及评估过程中 acceptance 或 candidate 快照变化。套件结果同样只覆盖执行证据，固定不可冻结。
+- AI-player artifact 必须在自身 metadata 中携带 `environment_id`，或已经由同一环境登记。首次登记的无环境 artifact 与任何跨环境状态、边、技能、任务、会话和攻略引用都会被拒绝。
+- 可执行攻略必须同时匹配环境、构建、账号、渠道、客户端版本、赛季、服务器阶段和新鲜度窗口。缺少任一项的资料只能参与发现；已过期或与现场冲突的资料不能驱动动作。

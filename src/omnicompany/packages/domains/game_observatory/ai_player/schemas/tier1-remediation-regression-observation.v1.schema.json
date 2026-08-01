@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One raw fixed-runner observation; aggregate metrics are never caller supplied.",
+  "properties": {
+    "baseline_decision_latency_ms": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Decision Latency Ms"
+    },
+    "baseline_model_input_tokens": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Model Input Tokens"
+    },
+    "decision_latency_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decision Latency Ms"
+    },
+    "decision_mode": {
+      "default": "planner",
+      "enum": [
+        "planner",
+        "skill_replay",
+        "recovery"
+      ],
+      "title": "Decision Mode",
+      "type": "string"
+    },
+    "evidence_complete": {
+      "default": true,
+      "title": "Evidence Complete",
+      "type": "boolean"
+    },
+    "expected_change_matched": {
+      "title": "Expected Change Matched",
+      "type": "boolean"
+    },
+    "invalid_target_execution": {
+      "default": false,
+      "title": "Invalid Target Execution",
+      "type": "boolean"
+    },
+    "latency_telemetry_measured": {
+      "title": "Latency Telemetry Measured",
+      "type": "boolean"
+    },
+    "model_input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Input Tokens"
+    },
+    "policy_violation": {
+      "default": false,
+      "title": "Policy Violation",
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.tier1-remediation-observation.v1",
+      "default": "game-observatory.ai-player.tier1-remediation-observation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "token_telemetry_measured": {
+      "title": "Token Telemetry Measured",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "expected_change_matched",
+    "token_telemetry_measured",
+    "latency_telemetry_measured"
+  ],
+  "title": "Tier1RemediationRegressionObservationV1",
+  "type": "object"
+}

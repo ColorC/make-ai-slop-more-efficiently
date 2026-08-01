@@ -114,11 +114,12 @@ function startChannel(): void {
       || message.role === state.role
       || (message.targetWindowId && message.targetWindowId !== selfWindowId)
     ) return
-    const now = Date.now()
-    const peerIsStale = !!state.peerWindowId
-      && !!state.peerLastSeen
-      && now - state.peerLastSeen > STALE_MS
-    if (state.peerWindowId && state.peerWindowId !== message.windowId && !peerIsStale) return
+    // A link is a one-to-one claim, not a rolling presence lease. Browsers may
+    // throttle a background tab for much longer than STALE_MS; allowing a new
+    // sender to replace the claimed peer then routes the next selection into a
+    // third window. Keep the peer identity until an explicit release. Staleness
+    // only changes the connected indicator below.
+    if (state.peerWindowId && state.peerWindowId !== message.windowId) return
     // A viewer becomes paired only after the owner explicitly targets it.
     // This makes the first claimed viewer authoritative when the same URL was
     // accidentally pasted into more than one extra window.
@@ -168,7 +169,7 @@ function startChannel(): void {
     if (!state.linkId) return
     post({ type: 'heartbeat', linkId: state.linkId, role: state.role })
     if (state.peerWindowId && Date.now() - state.peerLastSeen > STALE_MS) {
-      useMultiagentLink.setState({ connected: false, peerWindowId: null, peerLastSeen: 0 })
+      useMultiagentLink.setState({ connected: false })
     }
   }
   pulse()

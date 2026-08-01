@@ -1,0 +1,105 @@
+{
+  "$defs": {
+    "StateMatchV1": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_conflicts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Critical Conflicts",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.state-match.v1",
+          "default": "game-observatory.ai-player.state-match.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        },
+        "state_id": {
+          "minLength": 1,
+          "title": "State Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state_id",
+        "score"
+      ],
+      "title": "StateMatchV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assignment_id": {
+      "minLength": 1,
+      "title": "Assignment Id",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "disposition": {
+      "enum": [
+        "recognized_existing",
+        "created_candidate",
+        "needs_adjudication"
+      ],
+      "title": "Disposition",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "observation_id": {
+      "minLength": 1,
+      "title": "Observation Id",
+      "type": "string"
+    },
+    "ranked_matches": {
+      "items": {
+        "$ref": "#/$defs/StateMatchV1"
+      },
+      "title": "Ranked Matches",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-recognition-decision.v1",
+      "default": "game-observatory.ai-player.state-recognition-decision.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "state_id": {
+      "minLength": 1,
+      "title": "State Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "observation_id",
+    "state_id",
+    "assignment_id",
+    "disposition",
+    "confidence"
+  ],
+  "title": "StateRecognitionDecisionV1",
+  "type": "object"
+}

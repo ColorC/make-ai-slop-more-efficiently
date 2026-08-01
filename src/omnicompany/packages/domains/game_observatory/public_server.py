@@ -28,6 +28,12 @@ def create_public_app() -> FastAPI:
         response.headers.setdefault(
             "Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()"
         )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; "
+            "base-uri 'self'; form-action 'self'",
+        )
         return response
 
     @app.get("/", include_in_schema=False)

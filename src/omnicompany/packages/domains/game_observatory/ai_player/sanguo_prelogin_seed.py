@@ -79,13 +79,18 @@ def seed_sanguo_prelogin_memory(
     research_native_path = research_native_path.resolve()
     baseline = json.loads(environment_path.read_text(encoding="utf-8"))
     guide_seed = json.loads(guide_seed_path.read_text(encoding="utf-8"))
+    research_native = json.loads(research_native_path.read_text(encoding="utf-8"))
     if baseline.get("schema") != "ai-player-environment-baseline.v1":
         raise ValueError("unsupported Sanguo environment baseline schema")
     if baseline.get("status") != "pre_login_observed":
         raise ValueError("this seed command accepts only the read-only pre-login baseline")
-    if baseline.get("device_actions_performed") != 0:
+    if baseline.get("action_boundary", {}).get("device_actions_performed_during_baseline") != 0:
         raise ValueError("pre-login seed baseline must record zero device actions")
     research_record_id = str(guide_seed["research_record_id"])
+    if baseline.get("guide_research", {}).get("record_id") != research_record_id:
+        raise ValueError("environment baseline and guide seed research record ids differ")
+    if len(research_native.get("sources", [])) != len(guide_seed.get("guides", [])):
+        raise ValueError("research source count and guide seed count differ")
     environment_id = "environment.sanguo.bilibili.mumu.prelogin.1_31_0"
     environment_sha = _sha256(environment_path)
     guide_seed_sha = _sha256(guide_seed_path)
@@ -133,6 +138,7 @@ def seed_sanguo_prelogin_memory(
             f"{baseline['game']['version_code']}"
         ),
         account_scope_id="account.unconfirmed.prelogin",
+        channel=baseline["game"]["channel"],
         device_scope_id="device.mumu15.local.canonical-16384",
         locale="zh-CN",
         viewport_width=1080,
@@ -165,7 +171,9 @@ def seed_sanguo_prelogin_memory(
     source_snapshots = reopened.observatory_store.list_source_snapshots(research_record_id)
     if reopened.get_environment(environment_id) != environment:
         raise RuntimeError("Sanguo pre-login environment changed after store reopen")
-    if persisted_guides != guides:
+    if {guide.id: guide for guide in persisted_guides} != {
+        guide.id: guide for guide in guides
+    }:
         raise RuntimeError("Sanguo guide candidates changed after store reopen")
     if not source_snapshots or any(
         snapshot.source_id != research_record_id for snapshot in source_snapshots
@@ -198,8 +206,7 @@ def seed_sanguo_prelogin_memory(
             sort_keys=True,
             indent=2,
         )
-        + "\
-",
+        + "\n",
         encoding="utf-8",
     )
     return result

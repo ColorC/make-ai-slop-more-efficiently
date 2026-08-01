@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assessment_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assessment Id"
+    },
+    "directive": {
+      "minLength": 1,
+      "title": "Directive",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "handler": {
+      "minLength": 1,
+      "title": "Handler",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "remediated_tier": {
+      "anyOf": [
+        {
+          "maximum": 4,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Remediated Tier"
+    },
+    "required_work_item": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Required Work Item"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.iteration-remediation-gate.v1",
+      "default": "game-observatory.ai-player.iteration-remediation-gate.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "open",
+        "blocked",
+        "remediated",
+        "unsupported_fail_closed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "verification_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verification Id"
+    }
+  },
+  "required": [
+    "environment_id",
+    "directive",
+    "status",
+    "handler",
+    "reason"
+  ],
+  "title": "IterationRemediationGateV1",
+  "type": "object"
+}

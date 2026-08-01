@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "gate_id": {
+      "const": "tier1.perception-executor-regression.v1",
+      "default": "tier1.perception-executor-regression.v1",
+      "title": "Gate Id",
+      "type": "string"
+    },
+    "key_id": {
+      "minLength": 1,
+      "title": "Key Id",
+      "type": "string"
+    },
+    "payload_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Payload Sha256",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.tier1-remediation-attestation.v1",
+      "default": "game-observatory.ai-player.tier1-remediation-attestation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature_base64": {
+      "minLength": 1,
+      "title": "Signature Base64",
+      "type": "string"
+    },
+    "verifier_id": {
+      "minLength": 1,
+      "title": "Verifier Id",
+      "type": "string"
+    },
+    "verifier_run_id": {
+      "minLength": 1,
+      "title": "Verifier Run Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "verifier_id",
+    "verifier_run_id",
+    "key_id",
+    "payload_sha256",
+    "signature_base64"
+  ],
+  "title": "Tier1RemediationAttestationV1",
+  "type": "object"
+}

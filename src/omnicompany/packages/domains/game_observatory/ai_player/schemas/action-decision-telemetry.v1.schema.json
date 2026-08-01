@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Optional measured planner telemetry; absence is preserved as unavailable.",
+  "properties": {
+    "baseline_decision_latency_ms": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Decision Latency Ms"
+    },
+    "baseline_model_input_tokens": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Model Input Tokens"
+    },
+    "decision_latency_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decision Latency Ms"
+    },
+    "model_input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Input Tokens"
+    },
+    "model_output_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Output Tokens"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.action-decision-telemetry.v1",
+      "default": "game-observatory.ai-player.action-decision-telemetry.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "title": "ActionDecisionTelemetryV1",
+  "type": "object"
+}

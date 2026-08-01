@@ -30,6 +30,16 @@ def canonical_direct_live_step_confirms_edge(
         run = store.observatory_store.get_evidence_run(step.evidence_run_id)
         live = step.live_evaluation
         terminal = step.terminal_evaluation
+        stability = getattr(step, "stability", None)
+        terminal_condition = getattr(step, "terminal_condition", None)
+        terminal_confirmed = (
+            terminal is not None and terminal.passed
+        ) or (
+            terminal_condition is None
+            and terminal is None
+            and stability is not None
+            and stability.settled
+        )
         if not all(
             (
                 run is not None,
@@ -47,7 +57,7 @@ def canonical_direct_live_step_confirms_edge(
                 step.action == edge.action,
                 step.target_bounds == edge.target_bounds,
                 live is not None and live.expectation_met and not live.stop_recommended,
-                terminal is not None and terminal.passed,
+                terminal_confirmed,
             )
         ):
             return False

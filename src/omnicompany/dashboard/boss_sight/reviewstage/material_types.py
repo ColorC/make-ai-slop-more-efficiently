@@ -20,6 +20,7 @@ DOMAIN_FORMAT_SOURCES: dict[str, str] = {
     "frontend_design": "omnicompany.packages.domains.frontend_design.formats:register_formats",
     "narrative": "omnicompany.packages.domains.narrative.formats:register_review_stage_formats",
     "bilibili_publish": "omnicompany.packages.domains.bilibili_publish.review_stage_formats:register_review_stage_formats",
+    "voxelcraft": "omnicompany.packages.domains.voxelcraft.review_stage_formats:register_review_stage_formats",
 }
 
 

@@ -1,0 +1,425 @@
+{
+  "$defs": {
+    "NormalizedAction": {
+      "properties": {
+        "axis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Button"
+        },
+        "duration_ms": {
+          "default": 250,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "keycode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keycode"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "pinch_direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Direction"
+        },
+        "pinch_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Percent"
+        },
+        "pinch_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Pinch Steps",
+          "type": "integer"
+        },
+        "pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressed"
+        },
+        "seconds": {
+          "default": 0.5,
+          "title": "Seconds",
+          "type": "number"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "two_finger_offset_x": {
+          "default": 0,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset X",
+          "type": "integer"
+        },
+        "two_finger_offset_y": {
+          "default": 50,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset Y",
+          "type": "integer"
+        },
+        "two_finger_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Two Finger Steps",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "tap",
+            "swipe",
+            "pinch",
+            "two_finger_swipe",
+            "text",
+            "key",
+            "launch",
+            "force_stop",
+            "wait",
+            "back",
+            "home",
+            "mouse_move",
+            "mouse_button",
+            "gamepad_button",
+            "gamepad_axis",
+            "reset"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "x2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X2"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "y2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NormalizedAction",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NormalizedAction"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "assertion": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assertion"
+    },
+    "checkpoint_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checkpoint Name"
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition"
+    },
+    "depends_on_step_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Depends On Step Ids",
+      "type": "array"
+    },
+    "expected_state_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected State Id"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "idempotency": {
+      "enum": [
+        "read_only",
+        "idempotent",
+        "verify_before_retry",
+        "never_retry"
+      ],
+      "title": "Idempotency",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "action",
+        "observe",
+        "assert",
+        "subskill",
+        "branch",
+        "checkpoint",
+        "recover"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "locator_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Locator Id"
+    },
+    "max_attempts": {
+      "default": 1,
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Max Attempts",
+      "type": "integer"
+    },
+    "observation": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observation"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-step.v1",
+      "default": "game-observatory.ai-player.skill-step.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "side_effect": {
+      "enum": [
+        "none",
+        "reversible",
+        "progression",
+        "social",
+        "economic",
+        "restricted"
+      ],
+      "title": "Side Effect",
+      "type": "string"
+    },
+    "subskill_version_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subskill Version Id"
+    },
+    "when_false_step_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "When False Step Ids",
+      "type": "array"
+    },
+    "when_true_step_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "When True Step Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "idempotency",
+    "side_effect"
+  ],
+  "title": "SkillStepV1",
+  "type": "object"
+}

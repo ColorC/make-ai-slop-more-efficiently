@@ -1,0 +1,159 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "ai_identity_label": {
+      "minLength": 1,
+      "title": "Ai Identity Label",
+      "type": "string"
+    },
+    "authorization_required_per_action": {
+      "const": true,
+      "default": true,
+      "title": "Authorization Required Per Action",
+      "type": "boolean"
+    },
+    "autonomous_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Autonomous Actions",
+      "type": "array"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "explicit_authorization_actions": {
+      "items": {
+        "enum": [
+          "real_money_payment",
+          "external_personal_identity_submission"
+        ],
+        "type": "string"
+      },
+      "title": "Explicit Authorization Actions",
+      "type": "array"
+    },
+    "game_internal_action_default": {
+      "const": "autonomous",
+      "default": "autonomous",
+      "title": "Game Internal Action Default",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "impersonation_allowed": {
+      "const": false,
+      "default": false,
+      "title": "Impersonation Allowed",
+      "type": "boolean"
+    },
+    "private_identity_access_allowed": {
+      "const": false,
+      "default": false,
+      "title": "Private Identity Access Allowed",
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.account-action-policy.v1",
+      "default": "game-observatory.ai-player.account-action-policy.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "ai_identity_label"
+  ],
+  "title": "AccountActionPolicyV1",
+  "type": "object"
+}

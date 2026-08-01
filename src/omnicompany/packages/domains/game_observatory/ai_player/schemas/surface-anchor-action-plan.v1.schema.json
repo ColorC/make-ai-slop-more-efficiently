@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "SourcePixelPoint": {
+      "properties": {
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "SourcePixelPoint",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "const": "tap",
+      "title": "Action",
+      "type": "string"
+    },
+    "anchor_id": {
+      "minLength": 1,
+      "title": "Anchor Id",
+      "type": "string"
+    },
+    "device_accessed": {
+      "const": false,
+      "default": false,
+      "title": "Device Accessed",
+      "type": "boolean"
+    },
+    "disposition": {
+      "enum": [
+        "guarded_tap_ready",
+        "visual_relocalization_required"
+      ],
+      "title": "Disposition",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "mobility": {
+      "enum": [
+        "fixed_chrome",
+        "fixed_surface",
+        "dynamic_world_object"
+      ],
+      "title": "Mobility",
+      "type": "string"
+    },
+    "production_route_ready": {
+      "const": false,
+      "default": false,
+      "title": "Production Route Ready",
+      "type": "boolean"
+    },
+    "reference_artifact_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Artifact Id"
+    },
+    "requires_running_session": {
+      "title": "Requires Running Session",
+      "type": "boolean"
+    },
+    "requires_visual_relocalization": {
+      "title": "Requires Visual Relocalization",
+      "type": "boolean"
+    },
+    "role": {
+      "minLength": 1,
+      "title": "Role",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.surface-anchor-action-plan.v1",
+      "default": "game-observatory.ai-player.surface-anchor-action-plan.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_artifact_id": {
+      "minLength": 1,
+      "title": "Source Artifact Id",
+      "type": "string"
+    },
+    "source_observation_id": {
+      "minLength": 1,
+      "title": "Source Observation Id",
+      "type": "string"
+    },
+    "source_pixel_bounds": {
+      "$ref": "#/$defs/SourcePixelRect"
+    },
+    "source_point": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourcePixelPoint"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "source_step_id": {
+      "minLength": 1,
+      "title": "Source Step Id",
+      "type": "string"
+    },
+    "state_id": {
+      "minLength": 1,
+      "title": "State Id",
+      "type": "string"
+    },
+    "state_version": {
+      "minimum": 1,
+      "title": "State Version",
+      "type": "integer"
+    },
+    "target_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Target Tokens",
+      "type": "array"
+    }
+  },
+  "required": [
+    "environment_id",
+    "state_id",
+    "state_version",
+    "source_step_id",
+    "source_observation_id",
+    "source_artifact_id",
+    "anchor_id",
+    "role",
+    "target_tokens",
+    "action",
+    "mobility",
+    "disposition",
+    "source_pixel_bounds",
+    "requires_running_session",
+    "requires_visual_relocalization"
+  ],
+  "title": "SurfaceAnchorActionPlanV1",
+  "type": "object"
+}

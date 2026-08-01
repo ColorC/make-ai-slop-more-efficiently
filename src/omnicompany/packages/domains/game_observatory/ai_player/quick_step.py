@@ -42,11 +42,55 @@ def _build_action(args: argparse.Namespace) -> tuple[NormalizedAction, SourcePix
                 height=args.bounds[3],
             ),
         )
+    if args.swipe is not None:
+        if args.bounds is None:
+            raise ValueError("swipe quick step requires --bounds x y width height")
+        return (
+            NormalizedAction(
+                type="swipe",
+                x=args.swipe[0],
+                y=args.swipe[1],
+                x2=args.swipe[2],
+                y2=args.swipe[3],
+                duration_ms=args.duration_ms,
+            ),
+            SourcePixelRect(
+                x=args.bounds[0],
+                y=args.bounds[1],
+                width=args.bounds[2],
+                height=args.bounds[3],
+            ),
+        )
     if args.wait is not None:
         return NormalizedAction(type="wait", seconds=args.wait), None
     if args.launch is not None:
         return NormalizedAction(type="launch", package=args.launch), None
+    if args.back:
+        return NormalizedAction(type="back"), None
     raise ValueError("quick step requires one action")
+
+
+def _reviewed_lifecycle_source_allowed(
+    args: argparse.Namespace,
+    *,
+    source_step: object,
+    source_artifact: object,
+) -> bool:
+    if not getattr(args, "allow_reviewed_lifecycle_source", False):
+        return False
+    step_action = getattr(getattr(source_step, "action", None), "type", None)
+    stability = getattr(source_step, "stability", None)
+    metadata = getattr(source_artifact, "metadata", {})
+    return bool(
+        step_action == "launch"
+        and getattr(source_step, "after_frame_id", None)
+        == getattr(source_artifact, "id", None)
+        and getattr(stability, "settled", False)
+        and metadata.get("evidence_role") == "after"
+        and metadata.get("lifecycle_action") == "launch"
+        and metadata.get("viewport_relation") == "exact"
+        and metadata.get("orientation_transition", {}).get("changed") is False
+    )
 
 
 def build_quick_request(args: argparse.Namespace) -> LiveStepRequestV1:
@@ -67,7 +111,15 @@ def build_quick_request(args: argparse.Namespace) -> LiveStepRequestV1:
     source_artifact = facility.store.get_artifact(str(source_step.after_frame_id))
     if source_artifact is None:
         raise ValueError("source evidence step has no terminal screenshot")
-    if source_artifact.metadata.get("semantic_state_eligible") is not True:
+    reviewed_lifecycle_source = _reviewed_lifecycle_source_allowed(
+        args,
+        source_step=source_step,
+        source_artifact=source_artifact,
+    )
+    if (
+        source_artifact.metadata.get("semantic_state_eligible") is not True
+        and not reviewed_lifecycle_source
+    ):
         raise ValueError("source terminal screenshot is not semantic-state eligible")
     action, bounds = _build_action(args)
     turn_id = _safe_turn_id(args.turn_id)
@@ -79,7 +131,11 @@ def build_quick_request(args: argparse.Namespace) -> LiveStepRequestV1:
         trace_run_ids=(
             [source_step.action_run_id] if source_step.action_run_id is not None else []
         ),
-        note="上一动作的终态，作为本次短回合输入。",
+        note=(
+            "已由执行代理复核的稳定启动终态，作为本次短回合输入。"
+            if reviewed_lifecycle_source
+            else "上一动作的终态，作为本次短回合输入。"
+        ),
     )
     player.resolve_evidence_references([reference])
     return LiveStepRequestV1(
@@ -135,10 +191,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expectation", required=True)
     actions = parser.add_mutually_exclusive_group(required=True)
     actions.add_argument("--tap", type=int, nargs=2, metavar=("X", "Y"))
+    actions.add_argument(
+        "--swipe",
+        type=int,
+        nargs=4,
+        metavar=("X1", "Y1", "X2", "Y2"),
+    )
     actions.add_argument("--wait", type=float)
     actions.add_argument("--launch")
+    actions.add_argument("--back", action="store_true")
     parser.add_argument("--bounds", type=int, nargs=4, metavar=("X", "Y", "W", "H"))
+    parser.add_argument("--duration-ms", type=int, default=650)
     parser.add_argument("--expect-no-change", action="store_true")
+    parser.add_argument(
+        "--allow-reviewed-lifecycle-source",
+        action="store_true",
+        help="allow an explicitly reviewed, stable launch After frame as the next source",
+    )
     parser.add_argument("--min-visual-distance", type=float, default=0.03)
     parser.add_argument("--settle-threshold", type=float, default=0.012)
     parser.add_argument("--required-consecutive", type=int, default=1)

@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "NavigationFrameV1": {
+      "additionalProperties": false,
+      "description": "One proven entry into a child surface in the current live session.",
+      "properties": {
+        "caller_state_id": {
+          "minLength": 1,
+          "title": "Caller State Id",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "entered_state_id": {
+          "minLength": 1,
+          "title": "Entered State Id",
+          "type": "string"
+        },
+        "forward_skill_version_id": {
+          "minLength": 1,
+          "title": "Forward Skill Version Id",
+          "type": "string"
+        },
+        "return_skill_version_id": {
+          "minLength": 1,
+          "title": "Return Skill Version Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.navigation-frame.v1",
+          "default": "game-observatory.ai-player.navigation-frame.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_evidence_step_id": {
+          "minLength": 1,
+          "title": "Source Evidence Step Id",
+          "type": "string"
+        },
+        "terminal_evidence_step_id": {
+          "minLength": 1,
+          "title": "Terminal Evidence Step Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "caller_state_id",
+        "entered_state_id",
+        "forward_skill_version_id",
+        "return_skill_version_id",
+        "source_evidence_step_id",
+        "terminal_evidence_step_id"
+      ],
+      "title": "NavigationFrameV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Persisted caller context for deterministic Back/close replay.",
+  "properties": {
+    "current_state_id": {
+      "minLength": 1,
+      "title": "Current State Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "frames": {
+      "items": {
+        "$ref": "#/$defs/NavigationFrameV1"
+      },
+      "title": "Frames",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.navigation-stack.v1",
+      "default": "game-observatory.ai-player.navigation-stack.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "session_id",
+    "version",
+    "current_state_id"
+  ],
+  "title": "NavigationStackV1",
+  "type": "object"
+}

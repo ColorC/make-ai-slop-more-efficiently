@@ -1,0 +1,1555 @@
+{
+  "$defs": {
+    "AcceptanceItemResultV1": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "AP",
+            "P",
+            "E2E",
+            "G",
+            "clean_database_rerun",
+            "independent_review"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "item_id": {
+          "minLength": 1,
+          "title": "Item Id",
+          "type": "string"
+        },
+        "receipt_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Receipt Id"
+        },
+        "receipt_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Receipt Sha256"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "item_id",
+        "status"
+      ],
+      "title": "AcceptanceItemResultV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "PASS"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-01"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-02"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-03"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-04"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-05"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-06"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-07"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-08"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-09"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-10"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "AP"
+                    },
+                    "item_id": {
+                      "const": "AP-11"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-01"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-02"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-03"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-04"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-05"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-06"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-07"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-08"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-09"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-10"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-11"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-12"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "P"
+                    },
+                    "item_id": {
+                      "const": "P-13"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-A1"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-A2"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-A3"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-A4"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-S1"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-S2"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-S3"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-X1"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-X2"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "E2E"
+                    },
+                    "item_id": {
+                      "const": "E2E-X3"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-01"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-02"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-03"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-04"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-05"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-06"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-07"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-08"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-09"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-10"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-11"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "G"
+                    },
+                    "item_id": {
+                      "const": "G-12"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "clean_database_rerun"
+                    },
+                    "item_id": {
+                      "const": "clean-database-rerun"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "items": {
+                "contains": {
+                  "properties": {
+                    "category": {
+                      "const": "independent_review"
+                    },
+                    "item_id": {
+                      "const": "independent-review"
+                    },
+                    "status": {
+                      "const": "PASS"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "item_id",
+                    "status"
+                  ]
+                },
+                "maxContains": 1,
+                "minContains": 1
+              }
+            }
+          }
+        ],
+        "properties": {
+          "blocker_count": {
+            "const": 0
+          },
+          "clean_database_rerun": {
+            "const": "PASS"
+          },
+          "counts": {
+            "additionalProperties": false,
+            "properties": {
+              "AP": {
+                "const": "11/11"
+              },
+              "E2E": {
+                "const": "10/10"
+              },
+              "G": {
+                "const": "12/12"
+              },
+              "P": {
+                "const": "13/13"
+              }
+            },
+            "required": [
+              "AP",
+              "P",
+              "E2E",
+              "G"
+            ],
+            "type": "object"
+          },
+          "independent_review": {
+            "const": "PASS"
+          },
+          "issues": {
+            "maxItems": 0
+          },
+          "items": {
+            "maxItems": 48,
+            "minItems": 48
+          },
+          "major_count": {
+            "const": 0
+          },
+          "safety_violation_count": {
+            "const": 0
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "acceptance_manifest_path": {
+      "minLength": 1,
+      "title": "Acceptance Manifest Path",
+      "type": "string"
+    },
+    "acceptance_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Acceptance Manifest Sha256",
+      "type": "string"
+    },
+    "blocker_count": {
+      "minimum": 0,
+      "title": "Blocker Count",
+      "type": "integer"
+    },
+    "clean_database_rerun": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "title": "Clean Database Rerun",
+      "type": "string"
+    },
+    "counts": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Counts",
+      "type": "object"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "evidence_index_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Index Sha256"
+    },
+    "independent_review": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "title": "Independent Review",
+      "type": "string"
+    },
+    "independent_review_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Independent Review Sha256"
+    },
+    "issues": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceItemResultV1"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "major_count": {
+      "minimum": 0,
+      "title": "Major Count",
+      "type": "integer"
+    },
+    "package_input_root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Package Input Root Sha256",
+      "type": "string"
+    },
+    "report_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Report Sha256"
+    },
+    "reviewed_evidence_root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reviewed Evidence Root Sha256",
+      "type": "string"
+    },
+    "reviewed_receipt_root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Reviewed Receipt Root Sha256",
+      "type": "string"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "safety_violation_count": {
+      "minimum": 0,
+      "title": "Safety Violation Count",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.acceptance-results.v1",
+      "default": "game-observatory.ai-player.acceptance-results.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "trust_policy_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Trust Policy Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "status",
+    "acceptance_manifest_path",
+    "acceptance_manifest_sha256",
+    "trust_policy_sha256",
+    "reviewed_receipt_root_sha256",
+    "reviewed_evidence_root_sha256",
+    "package_input_root_sha256",
+    "counts",
+    "blocker_count",
+    "major_count",
+    "safety_violation_count",
+    "clean_database_rerun",
+    "independent_review",
+    "items"
+  ],
+  "title": "AcceptanceExecutionResultV1",
+  "type": "object"
+}

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .contracts import AccountActionPolicyV1
 
@@ -19,6 +19,14 @@ class AccountActionIntentV1(BaseModel):
     involves_real_money: bool = False
     submits_external_personal_identity: bool = False
     impersonates_real_person: bool = False
+
+    @field_validator("category")
+    @classmethod
+    def normalize_category(cls, value: str) -> str:
+        normalized = value.strip().casefold()
+        if not normalized:
+            raise ValueError("account action category must contain non-whitespace text")
+        return normalized
 
 
 class AccountActionDecisionV1(BaseModel):
@@ -43,14 +51,17 @@ def evaluate_account_action(
             disposition="rejected",
             reason="AI player identity cannot impersonate a real person.",
         )
-    if intent.involves_real_money:
+    if intent.category == "real_money_payment" or intent.involves_real_money:
         return AccountActionDecisionV1(
             intent_id=intent.id,
             disposition="awaiting_authorization",
             reason="Real-money payment requires authorization for this action.",
             authorization_action="real_money_payment",
         )
-    if intent.submits_external_personal_identity:
+    if (
+        intent.category == "external_personal_identity_submission"
+        or intent.submits_external_personal_identity
+    ):
         return AccountActionDecisionV1(
             intent_id=intent.id,
             disposition="awaiting_authorization",

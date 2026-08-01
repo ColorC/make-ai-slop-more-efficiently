@@ -11,6 +11,8 @@ from .contracts import (
     ActionQualitySampleV1,
     EvidenceReferenceV1,
     PlayerIterationAssessmentV1,
+    PlayerSoftSignalReviewRequestV1,
+    PlayerSoftSignalReviewV1,
 )
 from .store import AIPlayerStore
 
@@ -20,6 +22,7 @@ class PlayerIterationPolicy:
     version: str = "player-iteration.v1"
     actions_per_review: int = 10
     expected_change_match_rate: float = 0.90
+    expected_change_coverage_rate: float = 0.95
     telemetry_coverage_rate: float = 0.95
     maximum_no_effect_rate: float = 0.08
     maximum_repeat_rate: float = 0.03
@@ -42,7 +45,10 @@ def _mean_reduction(samples: list[tuple[int, int]]) -> float | None:
     return fmean((baseline - measured) / baseline for measured, baseline in samples)
 
 
-def _merged_evidence(samples: list[ActionQualitySampleV1]) -> list[EvidenceReferenceV1]:
+def _merged_evidence(
+    samples: list[ActionQualitySampleV1],
+    soft_signal_reviews: list[PlayerSoftSignalReviewV1],
+) -> list[EvidenceReferenceV1]:
     environment_id = samples[0].environment_id
     values: dict[str, set[str]] = {
         "artifact_ids": set(),
@@ -51,10 +57,10 @@ def _merged_evidence(samples: list[ActionQualitySampleV1]) -> list[EvidenceRefer
         "trace_run_ids": set(),
         "source_ids": set(),
     }
-    for sample in samples:
-        if sample.environment_id != environment_id:
+    for entity in [*samples, *soft_signal_reviews]:
+        if entity.environment_id != environment_id:
             raise ValueError("an iteration window cannot cross environments")
-        for reference in sample.evidence_refs:
+        for reference in entity.evidence_refs:
             for field in values:
                 values[field].update(getattr(reference, field))
     return [
@@ -91,7 +97,7 @@ def assess_player_iteration(
     assessment_id: str,
     window_kind: str,
     samples: list[ActionQualitySampleV1],
-    frontier_exhausted: bool = False,
+    soft_signal_reviews: list[PlayerSoftSignalReviewV1] | None = None,
     policy: PlayerIterationPolicy = DEFAULT_ITERATION_POLICY,
 ) -> PlayerIterationAssessmentV1:
     """Evaluate correctness, useful behavior, account progress, then discovery coverage."""
@@ -113,8 +119,18 @@ def assess_player_iteration(
         item.execution_disposition == "executed" and not item.evidence_complete
         for item in ordered
     )
-    confirmed = sum(item.outcome == "confirmed" for item in executed)
-    token_measured = sum(item.token_measurement_status == "measured" for item in executed)
+    expected_change_measured = sum(
+        item.expected_change_measurement_status == "measured" for item in executed
+    )
+    expected_change_matched = sum(
+        item.expected_change_measurement_status == "measured"
+        and item.expected_change_matched is True
+        for item in executed
+    )
+    token_measured = sum(
+        item.token_measurement_status in {"measured", "shared_batch"}
+        for item in executed
+    )
     latency_measured = sum(item.decision_latency_ms is not None for item in executed)
     skill_token_pairs = [
         (item.model_input_tokens, item.baseline_model_input_tokens)
@@ -130,11 +146,47 @@ def assess_player_iteration(
         and item.decision_latency_ms is not None
         and item.baseline_decision_latency_ms is not None
     ]
-    expected_rate = _ratio(confirmed, executed_count)
+    skill_replays = [item for item in executed if item.decision_mode == "skill_replay"]
+    missing_skill_token_baselines = sum(
+        item.baseline_model_input_tokens is None for item in skill_replays
+    )
+    missing_skill_latency_baselines = sum(
+        item.baseline_decision_latency_ms is None for item in skill_replays
+    )
+    # Unavailable measurements remain in the denominator. Missing evidence can
+    # never make a small measured subset look healthy.
+    expected_rate = _ratio(expected_change_matched, executed_count)
+    expected_coverage = _ratio(expected_change_measured, executed_count)
     token_coverage = _ratio(token_measured, executed_count)
     latency_coverage = _ratio(latency_measured, executed_count)
     skill_token_reduction = _mean_reduction(skill_token_pairs)
     skill_latency_reduction = _mean_reduction(skill_latency_pairs)
+    shared_usage_groups: dict[str, tuple[int, int, int]] = {}
+    for item in executed:
+        if item.token_measurement_status != "shared_batch":
+            continue
+        assert item.model_usage_group_id is not None
+        assert item.model_usage_group_action_count is not None
+        assert item.model_usage_group_input_tokens is not None
+        assert item.model_usage_group_output_tokens is not None
+        group = (
+            item.model_usage_group_action_count,
+            item.model_usage_group_input_tokens,
+            item.model_usage_group_output_tokens,
+        )
+        previous = shared_usage_groups.setdefault(item.model_usage_group_id, group)
+        if previous != group:
+            raise ValueError("shared token usage group contains contradictory totals")
+    measured_input_tokens = sum(
+        item.model_input_tokens or 0
+        for item in executed
+        if item.token_measurement_status == "measured"
+    ) + sum(group[1] for group in shared_usage_groups.values())
+    measured_output_tokens = sum(
+        item.model_output_tokens or 0
+        for item in executed
+        if item.token_measurement_status == "measured"
+    ) + sum(group[2] for group in shared_usage_groups.values())
     tier1_metrics: dict[str, float | int | None] = {
         "sample_count": sample_count,
         "executed_count": executed_count,
@@ -142,10 +194,20 @@ def assess_player_iteration(
         "invalid_target_execution_count": invalid_target_executions,
         "incomplete_evidence_count": incomplete_evidence,
         "expected_change_match_rate": expected_rate,
+        "expected_change_measurement_coverage_rate": expected_coverage,
         "token_telemetry_coverage_rate": token_coverage,
+        "shared_token_usage_group_count": len(shared_usage_groups),
+        "measured_window_input_tokens": measured_input_tokens,
+        "measured_window_output_tokens": measured_output_tokens,
+        "measured_input_tokens_per_executed_action": (
+            measured_input_tokens / executed_count if executed_count else None
+        ),
         "latency_telemetry_coverage_rate": latency_coverage,
         "skill_token_reduction_rate": skill_token_reduction,
         "skill_latency_reduction_rate": skill_latency_reduction,
+        "skill_replay_count": len(skill_replays),
+        "missing_skill_token_baseline_count": missing_skill_token_baselines,
+        "missing_skill_latency_baseline_count": missing_skill_latency_baselines,
     }
     tier1_thresholds = {
         "minimum_sample_count": required_samples,
@@ -153,9 +215,14 @@ def assess_player_iteration(
         "maximum_invalid_target_execution_count": 0,
         "maximum_incomplete_evidence_count": 0,
         "minimum_expected_change_match_rate": policy.expected_change_match_rate,
+        "minimum_expected_change_measurement_coverage_rate": (
+            policy.expected_change_coverage_rate
+        ),
         "minimum_telemetry_coverage_rate": policy.telemetry_coverage_rate,
         "minimum_skill_token_reduction_rate": policy.skill_token_reduction_rate,
         "minimum_skill_latency_reduction_rate": policy.skill_latency_reduction_rate,
+        "maximum_missing_skill_token_baseline_count": 0,
+        "maximum_missing_skill_latency_baseline_count": 0,
     }
     tier1_reasons: list[str] = []
     if sample_count < required_samples or executed_count == 0:
@@ -170,10 +237,16 @@ def assess_player_iteration(
             tier1_reasons.append("存在已执行动作缺少完整终态证据。")
         if expected_rate < policy.expected_change_match_rate:
             tier1_reasons.append("动作产生预期语义变化的比例不足。")
+        if expected_coverage < policy.expected_change_coverage_rate:
+            tier1_reasons.append("expected-change evidence coverage is insufficient")
         if token_coverage < policy.telemetry_coverage_rate:
             tier1_reasons.append("token 计量覆盖不足。")
         if latency_coverage < policy.telemetry_coverage_rate:
             tier1_reasons.append("决策时延计量覆盖不足。")
+        if missing_skill_token_baselines:
+            tier1_reasons.append("已知技能重放缺少 token 对照基线。")
+        if missing_skill_latency_baselines:
+            tier1_reasons.append("已知技能重放缺少决策时延对照基线。")
         if skill_token_reduction is not None and (
             skill_token_reduction < policy.skill_token_reduction_rate
         ):
@@ -316,7 +389,7 @@ def assess_player_iteration(
                 "task_progress_action_count": sum(item.task_progress for item in ordered),
             }
             progress_thresholds = {
-                "minimum_favorable_metric_count": 1,
+                "minimum_favorable_metric_or_completed_objective_count": 1,
                 "minimum_objective_completed_count": 1 if window_kind == "daily_close" else 0,
             }
             progress_reasons: list[str] = []
@@ -324,8 +397,10 @@ def assess_player_iteration(
                 tier3_status = "not_evaluated"
                 progress_reasons.append("该窗口只复盘动作质量，账号经营在任务完成或日结窗口复盘。")
             else:
-                if favorable_progress < 1:
-                    progress_reasons.append("窗口内没有可核验的账号或目标正向变化。")
+                if favorable_progress + objectives_completed < 1:
+                    progress_reasons.append("窗口内没有可核验的账号正向变化或目标完成。")
+                if window_kind == "daily_close" and favorable_progress < 1:
+                    progress_reasons.append("日结窗口没有可核验的账号经营指标正向变化。")
                 if window_kind == "daily_close" and objectives_completed < 1:
                     progress_reasons.append("日结窗口没有完成任何明确目标。")
                 tier3_status = "failed" if progress_reasons else "passed"
@@ -340,7 +415,7 @@ def assess_player_iteration(
                     "刷新攻略，重排短中长期目标并检查账号成长停滞。",
                 )
             )
-            if tier3_status == "failed":
+            if tier3_status != "passed":
                 tiers.append(
                     _tier(
                         4,
@@ -366,14 +441,14 @@ def assess_player_iteration(
                 discovery_metrics: dict[str, float | int | None] = {
                     "new_canonical_content_count": coverage_gain,
                     "information_gain_units": information_gain,
-                    "frontier_exhausted": int(frontier_exhausted),
+                    "frontier_exhausted": 0,
                 }
                 discovery_thresholds = {"minimum_new_content_or_information": 1}
                 discovery_reasons: list[str] = []
                 if not evaluate_discovery:
                     tier4_status = "not_evaluated"
                     discovery_reasons.append("事故窗口只处理当前故障。")
-                elif coverage_gain + information_gain < 1 and not frontier_exhausted:
+                elif coverage_gain + information_gain < 1:
                     tier4_status = "failed"
                     discovery_reasons.append("窗口内没有关闭知识缺口，也没有证明前沿已经穷尽。")
                 else:
@@ -390,10 +465,26 @@ def assess_player_iteration(
                     )
                 )
 
+    ordered_reviews = sorted(
+        soft_signal_reviews or [],
+        key=lambda item: (item.reviewed_at, item.id),
+    )
+    if any(review.environment_id != environment_id for review in ordered_reviews):
+        raise ValueError("soft-signal reviews cannot cross iteration environments")
+    window_sample_ids = {item.id for item in ordered}
+    if any(
+        not set(review.sample_ids).issubset(window_sample_ids)
+        for review in ordered_reviews
+    ):
+        raise ValueError("soft-signal review samples must be inside the iteration window")
     signal_values: dict[str, list[int]] = {}
-    for sample in ordered:
-        for signal in sample.soft_signals:
-            signal_values.setdefault(signal.signal, []).append(signal.score)
+    signal_sources = (
+        [signal for review in ordered_reviews for signal in review.signals]
+        if ordered_reviews
+        else [signal for sample in ordered for signal in sample.soft_signals]
+    )
+    for signal in signal_sources:
+        signal_values.setdefault(signal.signal, []).append(signal.score)
     soft_averages = {key: fmean(values) for key, values in sorted(signal_values.items())}
     soft_reasons = [
         f"{signal} 的平均评分为 {score:.2f}，需要回看原始动作与画面。"
@@ -425,9 +516,10 @@ def assess_player_iteration(
     return PlayerIterationAssessmentV1(
         id=assessment_id,
         environment_id=environment_id,
-        evidence_refs=_merged_evidence(ordered),
+        evidence_refs=_merged_evidence(ordered, ordered_reviews),
         window_kind=window_kind,
         sample_ids=[item.id for item in ordered],
+        soft_signal_review_ids=[item.id for item in ordered_reviews],
         tiers=tiers,
         highest_contiguous_passed_tier=contiguous,
         overall_status=overall_status,
@@ -436,6 +528,7 @@ def assess_player_iteration(
         soft_review_reasons=soft_reasons,
         window_started_at=ordered[0].created_at,
         window_ended_at=ordered[-1].created_at,
+        created_at=ordered[-1].created_at,
     )
 
 
@@ -443,9 +536,13 @@ def stable_iteration_assessment_id(
     environment_id: str,
     window_kind: str,
     sample_ids: list[str],
+    soft_signal_review_ids: list[str] | None = None,
 ) -> str:
+    parts: list[object] = [environment_id, window_kind, sample_ids]
+    if soft_signal_review_ids:
+        parts.append(soft_signal_review_ids)
     payload = json.dumps(
-        [environment_id, window_kind, sample_ids],
+        parts,
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
@@ -480,11 +577,9 @@ class PlayerIterationMonitor:
                 stored.invalid_target_execution,
                 not stored.evidence_complete and stored.execution_disposition == "executed",
                 stored.prior_cluster_failures >= 2,
-                stored.outcome in {"blocked_by_overlay", "wrong_target"},
+                stored.outcome in {"blocked_by_overlay", "wrong_target", "failed"},
             )
         )
-        if incident:
-            return stored, self.assess("incident", [stored.id])
         recent = self.player_store.list_action_quality_samples(
             stored.environment_id,
             session_id=stored.session_id,
@@ -497,36 +592,70 @@ class PlayerIterationMonitor:
                 limit=1_000_000,
             )
         )
+        scheduled_assessment = None
         if total % self.policy.actions_per_review == 0:
-            return stored, self.assess("actions_10", list(reversed(recent)))
-        return stored, None
+            scheduled_assessment = self.assess(
+                stored.environment_id,
+                "actions_10",
+                list(reversed([item.id for item in recent])),
+            )
+        if incident:
+            return stored, self.assess(stored.environment_id, "incident", [stored.id])
+        return stored, scheduled_assessment
+
+    def record_review(
+        self,
+        review: PlayerSoftSignalReviewV1,
+    ) -> tuple[PlayerSoftSignalReviewV1, PlayerSoftSignalReviewRequestV1 | None]:
+        existing = self.player_store.get_soft_signal_review(review.environment_id, review.id)
+        if existing is not None:
+            if existing != review:
+                raise ValueError("soft-signal review id already contains different content")
+            requests = self.player_store.list_open_soft_signal_review_requests(
+                review.environment_id
+            )
+            request = next(
+                (item for item in requests if item.trigger_review_id == review.id),
+                None,
+            )
+            return existing, request
+        stored = self.player_store.append_soft_signal_review(review)
+        request_id = self.player_store._soft_signal_review_request_id(stored)
+        return stored, self.player_store.get_soft_signal_review_request(
+            stored.environment_id,
+            request_id,
+        )
 
     def assess(
         self,
+        environment_id: str,
         window_kind: str,
         sample_ids: list[str],
-        *,
-        frontier_exhausted: bool = False,
     ) -> PlayerIterationAssessmentV1:
         if not sample_ids:
             raise ValueError("an iteration review requires sample ids")
-        samples: list[ActionQualitySampleV1] = []
-        environment_id: str | None = None
-        for candidate_environment in self.player_store.list_environments():
-            candidate_samples = [
-                self.player_store.get_action_quality_sample(candidate_environment.id, sample_id)
-                for sample_id in sample_ids
-            ]
-            if all(item is not None for item in candidate_samples):
-                environment_id = candidate_environment.id
-                samples = [item for item in candidate_samples if item is not None]
-                break
-        if environment_id is None:
-            raise ValueError("iteration review samples do not exist in one environment")
+        candidate_samples = [
+            self.player_store.get_action_quality_sample(environment_id, sample_id)
+            for sample_id in sample_ids
+        ]
+        if any(item is None for item in candidate_samples):
+            raise ValueError("iteration review samples do not exist in the environment")
+        samples = [item for item in candidate_samples if item is not None]
+        soft_signal_reviews = sorted(
+            self.player_store.list_soft_signal_reviews(
+                environment_id,
+                sample_ids=sample_ids,
+                trust_scope="formal_external",
+                limit=1_000_000,
+            ),
+            key=lambda item: (item.reviewed_at, item.id),
+        )
+        soft_signal_review_ids = [item.id for item in soft_signal_reviews]
         assessment_id = stable_iteration_assessment_id(
             environment_id,
             window_kind,
             sample_ids,
+            soft_signal_review_ids,
         )
         existing = self.player_store.get_iteration_assessment(environment_id, assessment_id)
         if existing is not None:
@@ -535,7 +664,7 @@ class PlayerIterationMonitor:
             assessment_id=assessment_id,
             window_kind=window_kind,
             samples=samples,
-            frontier_exhausted=frontier_exhausted,
+            soft_signal_reviews=soft_signal_reviews,
             policy=self.policy,
         )
         return self.player_store.append_iteration_assessment(assessment)

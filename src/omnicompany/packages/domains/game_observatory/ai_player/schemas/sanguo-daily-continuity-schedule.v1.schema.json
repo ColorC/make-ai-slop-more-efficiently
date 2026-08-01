@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "continuity_run_id": {
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "title": "Continuity Run Id",
+      "type": "string"
+    },
+    "day_index": {
+      "maximum": 7,
+      "minimum": 1,
+      "title": "Day Index",
+      "type": "integer"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "pattern": ".*\\S.*",
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evaluated_at": {
+      "title": "Evaluated At",
+      "type": "string"
+    },
+    "expected_version": {
+      "minimum": 0,
+      "title": "Expected Version",
+      "type": "integer"
+    },
+    "natural_day": {
+      "format": "date",
+      "title": "Natural Day",
+      "type": "string"
+    },
+    "next_duty": {
+      "anyOf": [
+        {
+          "enum": [
+            "post_login_coverage_audit",
+            "current_goal_update",
+            "guide_freshness_check",
+            "reachable_business_progress",
+            "end_of_day_memory_consolidation",
+            "next_day_task_generation"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Next Duty"
+    },
+    "reasons": {
+      "items": {
+        "minLength": 1,
+        "pattern": ".*\\S.*",
+        "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.sanguo-daily-continuity-schedule.v1",
+      "default": "game-observatory.ai-player.sanguo-daily-continuity-schedule.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "not_started",
+        "in_progress",
+        "interrupted",
+        "ready_to_seal",
+        "sealed",
+        "completed",
+        "blocked"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "continuity_run_id",
+    "natural_day",
+    "day_index",
+    "status",
+    "expected_version",
+    "evaluated_at"
+  ],
+  "title": "SanguoDailyContinuityScheduleV1",
+  "type": "object"
+}

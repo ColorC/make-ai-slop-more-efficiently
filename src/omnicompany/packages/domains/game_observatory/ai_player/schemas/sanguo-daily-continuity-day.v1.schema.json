@@ -1,0 +1,534 @@
+{
+  "$defs": {
+    "DailyGuideFreshnessV1": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_at": {
+          "minLength": 1,
+          "title": "Checked At",
+          "type": "string"
+        },
+        "conclusion": {
+          "enum": [
+            "current",
+            "unverified",
+            "stale",
+            "contradicted"
+          ],
+          "title": "Conclusion",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Reason",
+          "type": "string"
+        },
+        "refresh_required": {
+          "title": "Refresh Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "conclusion",
+        "refresh_required",
+        "reason",
+        "checked_at"
+      ],
+      "title": "DailyGuideFreshnessV1",
+      "type": "object"
+    },
+    "DailyGuideReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "title": "DailyGuideReferenceV1",
+      "type": "object"
+    },
+    "DailyTaskSnapshotV1": {
+      "additionalProperties": false,
+      "properties": {
+        "body_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Body Sha256",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "body_sha256",
+        "updated_at"
+      ],
+      "title": "DailyTaskSnapshotV1",
+      "type": "object"
+    },
+    "DailyTerminalEvidenceReferenceV1": {
+      "additionalProperties": false,
+      "description": "Environment-free terminal evidence; the containing day supplies its environment.",
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Step Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "artifact_ids",
+        "evidence_run_ids",
+        "evidence_step_ids"
+      ],
+      "title": "DailyTerminalEvidenceReferenceV1",
+      "type": "object"
+    },
+    "SanguoDailyDutyCompletionV1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "duty": {
+                "enum": [
+                  "current_goal_update",
+                  "reachable_business_progress",
+                  "next_day_task_generation"
+                ]
+              }
+            },
+            "required": [
+              "duty"
+            ]
+          },
+          "then": {
+            "properties": {
+              "task_snapshots": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "task_snapshots"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "duty": {
+                "const": "guide_freshness_check"
+              }
+            },
+            "required": [
+              "duty"
+            ]
+          },
+          "then": {
+            "properties": {
+              "guide_freshness": {
+                "$ref": "#/$defs/DailyGuideFreshnessV1"
+              },
+              "guide_refs": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "guide_refs",
+              "guide_freshness"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "duty": {
+                "const": "end_of_day_memory_consolidation"
+              }
+            },
+            "required": [
+              "duty"
+            ]
+          },
+          "then": {
+            "properties": {
+              "memory_record_ids": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "memory_record_ids"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "completed_at": {
+          "minLength": 1,
+          "title": "Completed At",
+          "type": "string"
+        },
+        "duty": {
+          "enum": [
+            "post_login_coverage_audit",
+            "current_goal_update",
+            "guide_freshness_check",
+            "reachable_business_progress",
+            "end_of_day_memory_consolidation",
+            "next_day_task_generation"
+          ],
+          "title": "Duty",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/DailyTerminalEvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "guide_freshness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DailyGuideFreshnessV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "guide_refs": {
+          "items": {
+            "$ref": "#/$defs/DailyGuideReferenceV1"
+          },
+          "title": "Guide Refs",
+          "type": "array"
+        },
+        "memory_record_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Memory Record Ids",
+          "type": "array"
+        },
+        "session_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Session Ids",
+          "type": "array"
+        },
+        "summary": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Summary",
+          "type": "string"
+        },
+        "task_snapshots": {
+          "items": {
+            "$ref": "#/$defs/DailyTaskSnapshotV1"
+          },
+          "title": "Task Snapshots",
+          "type": "array"
+        }
+      },
+      "required": [
+        "duty",
+        "session_ids",
+        "evidence_refs",
+        "summary",
+        "completed_at"
+      ],
+      "title": "SanguoDailyDutyCompletionV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "sealed_at": {
+            "type": "null"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "sealed"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "duties": {
+            "minItems": 6
+          },
+          "sealed_at": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sealed_at"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "continuity_run_id": {
+      "minLength": 1,
+      "title": "Continuity Run Id",
+      "type": "string"
+    },
+    "created_at": {
+      "minLength": 1,
+      "title": "Created At",
+      "type": "string"
+    },
+    "day_index": {
+      "maximum": 7,
+      "minimum": 1,
+      "title": "Day Index",
+      "type": "integer"
+    },
+    "duties": {
+      "items": false,
+      "maxItems": 6,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SanguoDailyDutyCompletionV1"
+            },
+            {
+              "properties": {
+                "duty": {
+                  "const": "post_login_coverage_audit"
+                }
+              },
+              "required": [
+                "duty"
+              ]
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SanguoDailyDutyCompletionV1"
+            },
+            {
+              "properties": {
+                "duty": {
+                  "const": "current_goal_update"
+                }
+              },
+              "required": [
+                "duty"
+              ]
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SanguoDailyDutyCompletionV1"
+            },
+            {
+              "properties": {
+                "duty": {
+                  "const": "guide_freshness_check"
+                }
+              },
+              "required": [
+                "duty"
+              ]
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SanguoDailyDutyCompletionV1"
+            },
+            {
+              "properties": {
+                "duty": {
+                  "const": "reachable_business_progress"
+                }
+              },
+              "required": [
+                "duty"
+              ]
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SanguoDailyDutyCompletionV1"
+            },
+            {
+              "properties": {
+                "duty": {
+                  "const": "end_of_day_memory_consolidation"
+                }
+              },
+              "required": [
+                "duty"
+              ]
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SanguoDailyDutyCompletionV1"
+            },
+            {
+              "properties": {
+                "duty": {
+                  "const": "next_day_task_generation"
+                }
+              },
+              "required": [
+                "duty"
+              ]
+            }
+          ]
+        }
+      ],
+      "title": "Duties",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "interruption_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Interruption Count",
+      "type": "integer"
+    },
+    "natural_day": {
+      "format": "date",
+      "title": "Natural Day",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.sanguo-daily-continuity-day.v1",
+      "default": "game-observatory.ai-player.sanguo-daily-continuity-day.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "sealed_at": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sealed At"
+    },
+    "state": {
+      "default": "in_progress",
+      "enum": [
+        "in_progress",
+        "interrupted",
+        "sealed"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "timezone_name": {
+      "const": "Asia/Shanghai",
+      "default": "Asia/Shanghai",
+      "title": "Timezone Name",
+      "type": "string"
+    },
+    "updated_at": {
+      "minLength": 1,
+      "title": "Updated At",
+      "type": "string"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "continuity_run_id",
+    "natural_day",
+    "day_index",
+    "version",
+    "duties",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "SanguoDailyContinuityDayV1",
+  "type": "object"
+}

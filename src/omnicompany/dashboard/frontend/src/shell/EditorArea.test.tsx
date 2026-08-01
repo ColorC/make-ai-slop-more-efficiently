@@ -18,9 +18,12 @@ const dockMock = vi.hoisted(() => {
         group,
         options,
         api: {
-          isActive: false,
+          isActive: !options.inactive,
           close: vi.fn(),
           setActive: vi.fn(() => {
+            for (const candidate of panels) {
+              if (candidate.group === panel.group) candidate.api.isActive = false
+            }
             panel.api.isActive = true
           }),
           moveTo: vi.fn((moveOptions: any) => {
@@ -28,6 +31,11 @@ const dockMock = vi.hoisted(() => {
             panel.group = { id: `moved-${options.id}` }
           }),
         },
+      }
+      if (!options.inactive) {
+        for (const candidate of panels) {
+          if (candidate.group === group) candidate.api.isActive = false
+        }
       }
       panels.push(panel)
       return panel
@@ -152,5 +160,25 @@ describe('EditorArea dock placement', () => {
     expect(panel.options.title.endsWith('…')).toBe(true)
     expect(usePanels.getState().tabs.find((tab) => tab.id === 'cc_session:pty-long-title')?.title)
       .toBe(fullTitle)
+  })
+
+  it('re-opens content when the initially active CLI tab is re-indexed behind default tabs', async () => {
+    const cliTab = {
+      id: 'cc_session:pty-deeplink',
+      ref: { type: 'cc_session', id: 'pty-deeplink' },
+      title: 'CLI deep link',
+    } as const
+    usePanels.setState({ tabs: withDefaultTabs([cliTab]), activeId: cliTab.id })
+
+    render(<EditorArea />)
+
+    await waitFor(() => {
+      expect(dockMock.api.addPanel).toHaveBeenCalledTimes(4)
+    })
+    const cliPanel = dockMock.api.getPanel(cliTab.id)
+    const projectPanel = dockMock.api.getPanel('project_board:main')
+    expect(projectPanel.api.setActive).toHaveBeenCalledTimes(1)
+    expect(cliPanel.api.setActive).toHaveBeenCalledTimes(1)
+    expect(cliPanel.api.isActive).toBe(true)
   })
 })

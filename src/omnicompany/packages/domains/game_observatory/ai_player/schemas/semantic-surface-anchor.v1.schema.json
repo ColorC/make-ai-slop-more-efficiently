@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "NormalizedSurfaceRectV1": {
+      "additionalProperties": false,
+      "description": "Viewport-independent UI region in a 1000 by 1000 coordinate space.",
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Height",
+          "type": "integer"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "default": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "NormalizedSurfaceRectV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Reviewed locator hint for one interaction role; never a production route.",
+  "properties": {
+    "action": {
+      "default": "tap",
+      "enum": [
+        "tap",
+        "long_press",
+        "swipe"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "mobility": {
+      "enum": [
+        "fixed_chrome",
+        "fixed_surface",
+        "dynamic_world_object"
+      ],
+      "title": "Mobility",
+      "type": "string"
+    },
+    "normalized_bounds": {
+      "$ref": "#/$defs/NormalizedSurfaceRectV1"
+    },
+    "reference_artifact_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Artifact Id"
+    },
+    "role": {
+      "minLength": 1,
+      "title": "Role",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.semantic-surface-anchor.v1",
+      "default": "game-observatory.ai-player.semantic-surface-anchor.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "target_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Target Tokens",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "role",
+    "target_tokens",
+    "mobility",
+    "normalized_bounds"
+  ],
+  "title": "SemanticSurfaceAnchorV1",
+  "type": "object"
+}

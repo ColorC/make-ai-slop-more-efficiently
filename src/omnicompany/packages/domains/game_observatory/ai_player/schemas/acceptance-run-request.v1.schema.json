@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "AcceptanceFileReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "title": "AcceptanceFileReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "receipts": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceFileReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Receipts",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "run_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.acceptance-run-request.v1",
+      "default": "game-observatory.ai-player.acceptance-run-request.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "receipts"
+  ],
+  "title": "AcceptanceRunRequestV1",
+  "type": "object"
+}

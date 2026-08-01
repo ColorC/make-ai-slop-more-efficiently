@@ -1,0 +1,610 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "PlayerMetricDeltaV1": {
+      "additionalProperties": false,
+      "description": "One evidence-bound numeric change in the game account or its objectives.",
+      "properties": {
+        "after": {
+          "title": "After",
+          "type": "number"
+        },
+        "before": {
+          "title": "Before",
+          "type": "number"
+        },
+        "category": {
+          "enum": [
+            "account_progression",
+            "resource",
+            "objective",
+            "coverage"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "delta": {
+          "title": "Delta",
+          "type": "number"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "favorable": {
+          "title": "Favorable",
+          "type": "boolean"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "metric_key": {
+          "minLength": 1,
+          "title": "Metric Key",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.player-metric-delta.v1",
+          "default": "game-observatory.ai-player.player-metric-delta.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric_key",
+        "label",
+        "category",
+        "before",
+        "after",
+        "delta",
+        "unit",
+        "favorable",
+        "evidence_step_ids"
+      ],
+      "title": "PlayerMetricDeltaV1",
+      "type": "object"
+    },
+    "PlayerSoftSignalV1": {
+      "additionalProperties": false,
+      "description": "Evidence-bound reviewer judgement that can trigger work but never pass a hard gate.",
+      "properties": {
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.player-soft-signal.v1",
+          "default": "game-observatory.ai-player.player-soft-signal.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Score",
+          "type": "integer"
+        },
+        "signal": {
+          "enum": [
+            "tutorial_comprehension",
+            "intent_coherence",
+            "opportunity_awareness",
+            "strategic_continuity",
+            "curiosity_quality",
+            "loop_avoidance",
+            "player_naturalness"
+          ],
+          "title": "Signal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "signal",
+        "score",
+        "rationale",
+        "evidence_step_ids"
+      ],
+      "title": "PlayerSoftSignalV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One proposal/execution sample for the continuously improving AI player.",
+  "properties": {
+    "account_metric_deltas": {
+      "items": {
+        "$ref": "#/$defs/PlayerMetricDeltaV1"
+      },
+      "title": "Account Metric Deltas",
+      "type": "array"
+    },
+    "action_run_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Action Run Id"
+    },
+    "adapter_call_count": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Adapter Call Count",
+      "type": "integer"
+    },
+    "baseline_decision_latency_ms": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Decision Latency Ms"
+    },
+    "baseline_model_input_tokens": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Baseline Model Input Tokens"
+    },
+    "command_id": {
+      "minLength": 1,
+      "title": "Command Id",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "decision_latency_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decision Latency Ms"
+    },
+    "decision_mode": {
+      "enum": [
+        "new_state",
+        "known_state",
+        "skill_replay",
+        "recovery"
+      ],
+      "title": "Decision Mode",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_complete": {
+      "title": "Evidence Complete",
+      "type": "boolean"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "evidence_step_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Step Id"
+    },
+    "execution_disposition": {
+      "enum": [
+        "executed",
+        "rejected"
+      ],
+      "title": "Execution Disposition",
+      "type": "string"
+    },
+    "expected_change": {
+      "minLength": 1,
+      "title": "Expected Change",
+      "type": "string"
+    },
+    "expected_change_matched": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Change Matched"
+    },
+    "expected_change_measurement_status": {
+      "default": "unavailable",
+      "enum": [
+        "measured",
+        "unavailable"
+      ],
+      "title": "Expected Change Measurement Status",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "information_gain_units": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Information Gain Units",
+      "type": "integer"
+    },
+    "invalid_target_execution": {
+      "default": false,
+      "title": "Invalid Target Execution",
+      "type": "boolean"
+    },
+    "meaningful_change": {
+      "title": "Meaningful Change",
+      "type": "boolean"
+    },
+    "model_input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Input Tokens"
+    },
+    "model_output_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Output Tokens"
+    },
+    "model_usage_group_action_count": {
+      "anyOf": [
+        {
+          "minimum": 2,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Usage Group Action Count"
+    },
+    "model_usage_group_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Usage Group Id"
+    },
+    "model_usage_group_input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Usage Group Input Tokens"
+    },
+    "model_usage_group_output_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Usage Group Output Tokens"
+    },
+    "new_gameplay_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "New Gameplay Count",
+      "type": "integer"
+    },
+    "new_interface_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "New Interface Count",
+      "type": "integer"
+    },
+    "new_rule_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "New Rule Count",
+      "type": "integer"
+    },
+    "new_state_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "New State Count",
+      "type": "integer"
+    },
+    "new_transition_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "New Transition Count",
+      "type": "integer"
+    },
+    "objective_completed": {
+      "default": false,
+      "title": "Objective Completed",
+      "type": "boolean"
+    },
+    "outcome": {
+      "enum": [
+        "confirmed",
+        "rejected",
+        "no_effect",
+        "blocked_by_overlay",
+        "wrong_target",
+        "unsettled",
+        "failed"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "policy_violation": {
+      "default": false,
+      "title": "Policy Violation",
+      "type": "boolean"
+    },
+    "preflight_disposition": {
+      "enum": [
+        "passed",
+        "rejected",
+        "not_applicable"
+      ],
+      "title": "Preflight Disposition",
+      "type": "string"
+    },
+    "prior_cluster_failures": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Prior Cluster Failures",
+      "type": "integer"
+    },
+    "recovery_succeeded": {
+      "default": false,
+      "title": "Recovery Succeeded",
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.action-quality-sample.v1",
+      "default": "game-observatory.ai-player.action-quality-sample.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "semantic_state_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Semantic State Id"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "soft_signals": {
+      "items": {
+        "$ref": "#/$defs/PlayerSoftSignalV1"
+      },
+      "title": "Soft Signals",
+      "type": "array"
+    },
+    "target_cluster_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Cluster Id"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    },
+    "task_progress": {
+      "title": "Task Progress",
+      "type": "boolean"
+    },
+    "task_queue_falsely_empty": {
+      "default": false,
+      "title": "Task Queue Falsely Empty",
+      "type": "boolean"
+    },
+    "token_measurement_status": {
+      "enum": [
+        "measured",
+        "shared_batch",
+        "unavailable"
+      ],
+      "title": "Token Measurement Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "session_id",
+    "command_id",
+    "decision_mode",
+    "execution_disposition",
+    "preflight_disposition",
+    "outcome",
+    "expected_change",
+    "adapter_call_count",
+    "evidence_complete",
+    "meaningful_change",
+    "task_progress",
+    "token_measurement_status"
+  ],
+  "title": "ActionQualitySampleV1",
+  "type": "object"
+}

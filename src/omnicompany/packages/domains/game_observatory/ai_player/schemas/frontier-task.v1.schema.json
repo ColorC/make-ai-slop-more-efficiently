@@ -1,0 +1,258 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action_budget": {
+      "minimum": 0,
+      "title": "Action Budget",
+      "type": "integer"
+    },
+    "attempt_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Attempt Count",
+      "type": "integer"
+    },
+    "blocked_reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Blocked Reason"
+    },
+    "cooldown_until": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cooldown Until"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "dependency_task_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Dependency Task Ids",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "expected_coverage_gain": {
+      "default": 0.0,
+      "title": "Expected Coverage Gain",
+      "type": "number"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "max_attempts": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Max Attempts",
+      "type": "integer"
+    },
+    "novelty_score": {
+      "default": 0.0,
+      "title": "Novelty Score",
+      "type": "number"
+    },
+    "reactivation_condition": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reactivation Condition"
+    },
+    "reason": {
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "risk_score": {
+      "default": 0.0,
+      "minimum": 0.0,
+      "title": "Risk Score",
+      "type": "number"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.frontier-task.v1",
+      "default": "game-observatory.ai-player.frontier-task.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "user_goal",
+        "unknown_interaction",
+        "missing_transition",
+        "stale_memory",
+        "interface_family_gap",
+        "new_unlock",
+        "guide_update",
+        "failed_skill",
+        "gameplay_candidate",
+        "coverage_gap"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "status": {
+      "default": "queued",
+      "enum": [
+        "queued",
+        "active",
+        "cooldown",
+        "blocked",
+        "completed",
+        "failed",
+        "invalidated"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "time_budget_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Time Budget Seconds",
+      "type": "number"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "token_budget": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Token Budget"
+    },
+    "value_score": {
+      "default": 0.0,
+      "title": "Value Score",
+      "type": "number"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "title",
+    "source",
+    "reason",
+    "action_budget",
+    "time_budget_seconds"
+  ],
+  "title": "FrontierTaskV1",
+  "type": "object"
+}

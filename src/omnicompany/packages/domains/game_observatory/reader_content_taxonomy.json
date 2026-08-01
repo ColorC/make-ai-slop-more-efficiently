@@ -303,7 +303,7 @@
       "game_id": "sanguo-mouding-tianxia",
       "play_slug": "battle-loss-recovery",
       "level": "state_reference",
-      "group_id": "system.sanguo.troop-supply",
+      "group_id": "system.sanguo.martial-exercise",
       "order": 30
     },
     {

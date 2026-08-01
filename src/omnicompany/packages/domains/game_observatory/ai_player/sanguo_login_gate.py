@@ -168,8 +168,29 @@ class SanguoLoginGateSeedResultV1(BaseModel):
 
 
 def _identity_hash(payload: Mapping[str, Any]) -> str:
-    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    identity_payload = {key: value for key, value in payload.items() if key != "created_at"}
+    raw = json.dumps(
+        identity_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
     return hashlib.sha256(raw).hexdigest()
+
+
+def _same_except_timestamps(
+    left: BaseModel,
+    right: BaseModel,
+    *timestamp_fields: str,
+) -> bool:
+    """Accept a legacy seed only when every non-clock field is identical."""
+
+    left_payload = left.model_dump(mode="json", by_alias=True)
+    right_payload = right.model_dump(mode="json", by_alias=True)
+    for field in timestamp_fields:
+        left_payload.pop(field, None)
+        right_payload.pop(field, None)
+    return left_payload == right_payload
 
 
 def build_login_gate_fixture(store: ObservatoryStore) -> dict[str, Any]:
@@ -187,6 +208,8 @@ def build_login_gate_fixture(store: ObservatoryStore) -> dict[str, Any]:
                 **spec,
                 "artifact_sha256": artifact.sha256,
                 "screenshot_fingerprint": artifact.sha256,
+                "captured_at": step.ended_at or step.started_at,
+                "created_at": step.ended_at or step.started_at,
             }
         )
     edges: list[dict[str, Any]] = []
@@ -204,8 +227,19 @@ def build_login_gate_fixture(store: ObservatoryStore) -> dict[str, Any]:
                 "after_artifact_id": step.after_frame_id,
                 "recorded_step_status": step.status,
                 "recorded_run_status": run.status,
+                "created_at": step.ended_at or step.started_at,
             }
         )
+    identity_run = store.get_evidence_run(
+        "evidence.run.19651f10f47a4c04bc5b85100f9b21e3"
+    )
+    if identity_run is None:
+        raise ValueError("missing Sanguo login-gate identity run")
+    blocker_step = store.get_evidence_step(
+        "evidence.step.fd7273eeba1c4efc985e03ba5fa8b22c"
+    )
+    if blocker_step is None:
+        raise ValueError("missing Sanguo external-login blocker step")
     return {
         "schema": "sanguo-login-gate-fixture.v1",
         "environment": {
@@ -224,6 +258,7 @@ def build_login_gate_fixture(store: ObservatoryStore) -> dict[str, Any]:
             "version_code": 13100,
             "package": "com.bilibili.nslg",
             "identity_run_id": "evidence.run.19651f10f47a4c04bc5b85100f9b21e3",
+            "created_at": identity_run.started_at,
         },
         "states": states,
         "edges": edges,
@@ -232,6 +267,7 @@ def build_login_gate_fixture(store: ObservatoryStore) -> dict[str, Any]:
             "summary": "点击本地唯一“征战天下”后必须使用手机版扫码登录；没有游客或既有会话入口。",
             "reactivation_condition": "取得外部身份登录的单独授权并完成可审计的扫码登录",
             "user_gameplay_actions": 0,
+            "created_at": blocker_step.ended_at or blocker_step.started_at,
         },
     }
 
@@ -240,8 +276,7 @@ def write_login_gate_fixture(store_root: Path, output_path: Path) -> Path:
     payload = build_login_gate_fixture(ObservatoryStore(store_root))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\
-",
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     return output_path
@@ -276,13 +311,16 @@ def seed_login_gate_fixture(
                 evidence_run_ids=[environment_payload["identity_run_id"]],
             )
         ],
+        created_at=environment_payload["created_at"],
     )
     player = AIPlayerStore(observatory)
     existing_environment = player.get_environment(ENVIRONMENT_ID)
     if existing_environment is None:
         player.put_environment(environment)
-    elif existing_environment != environment:
+    elif not _same_except_timestamps(existing_environment, environment, "created_at"):
         raise ValueError("canonical Sanguo login-gate environment conflicts with fixture")
+    else:
+        environment = existing_environment
 
     artifact_ids = {
         state["artifact_id"] for state in payload["states"]
@@ -330,8 +368,21 @@ def seed_login_gate_fixture(
             features=features,
             evidence_refs=refs,
             observation_id=f"observation.{state_payload['id']}",
+            captured_at=state_payload["captured_at"],
+            created_at=state_payload["created_at"],
         )
-        player.append_state_observation(observation)
+        existing_observation = player.get_state_observation(ENVIRONMENT_ID, observation.id)
+        if existing_observation is None:
+            player.append_state_observation(observation)
+        elif not _same_except_timestamps(
+            existing_observation,
+            observation,
+            "captured_at",
+            "created_at",
+        ):
+            raise ValueError(f"Sanguo state observation conflicts with fixture: {observation.id}")
+        else:
+            observation = existing_observation
         state = SemanticStateV1(
             id=state_payload["id"],
             environment_id=ENVIRONMENT_ID,
@@ -340,14 +391,17 @@ def seed_login_gate_fixture(
             semantic_fingerprint=observation.feature_hash,
             observation_feature_hashes=[observation.feature_hash],
             tags=["prelogin", "evidence-backed-candidate"],
-            status="candidate",
+            status="accepted",
             evidence_refs=refs,
+            created_at=state_payload["created_at"],
         )
         existing_state = player.get_semantic_state(ENVIRONMENT_ID, state.id)
         if existing_state is None:
             player.put_semantic_state(state)
-        elif existing_state != state:
+        elif not _same_except_timestamps(existing_state, state, "created_at"):
             raise ValueError(f"Sanguo semantic state conflicts with fixture: {state.id}")
+        else:
+            state = existing_state
         assignment = StateAssignmentV1(
             id=f"assignment.{observation.id}.v1",
             environment_id=ENVIRONMENT_ID,
@@ -357,11 +411,12 @@ def seed_login_gate_fixture(
             confidence=1.0,
             reasons=["实机截图、UI 结构和可见文字共同建立的登录前状态候选"],
             evidence_refs=refs,
+            created_at=state_payload["created_at"],
         )
         current = player.get_current_state_assignment(ENVIRONMENT_ID, observation.id)
         if current is None:
             player.append_state_assignment(assignment)
-        elif current != assignment:
+        elif not _same_except_timestamps(current, assignment, "created_at"):
             raise ValueError(f"Sanguo state assignment conflicts with fixture: {assignment.id}")
 
     for edge_payload in payload["edges"]:
@@ -393,11 +448,12 @@ def seed_login_gate_fixture(
             ),
             outcome="verified_state_change",
             evidence_refs=refs,
+            created_at=edge_payload["created_at"],
         )
         existing_edge = player.get_transition_edge(ENVIRONMENT_ID, edge.id)
         if existing_edge is None:
             player.put_transition_edge(edge)
-        elif existing_edge != edge:
+        elif not _same_except_timestamps(existing_edge, edge, "created_at"):
             raise ValueError(f"Sanguo transition conflicts with fixture: {edge.id}")
 
     guides = load_guide_seed(
@@ -424,14 +480,21 @@ def seed_login_gate_fixture(
         environment_id=ENVIRONMENT_ID,
         kind="failure_forbidden",
         subject_id="login.external-identity-qr",
-        payload=payload["blocker"],
+        payload={
+            key: value
+            for key, value in payload["blocker"].items()
+            if key != "created_at"
+        },
         evidence_refs=blocker_refs,
+        created_at=payload["blocker"]["created_at"],
     )
     existing_blocker = player.get_memory(ENVIRONMENT_ID, blocker.id)
     if existing_blocker is None:
         player.append_memory(blocker)
-    elif existing_blocker != blocker:
+    elif not _same_except_timestamps(existing_blocker, blocker, "created_at"):
         raise ValueError("Sanguo login blocker memory conflicts with fixture")
+    else:
+        blocker = existing_blocker
 
     reopened = AIPlayerStore(ObservatoryStore(store_root))
     persistence_verified = (
@@ -476,8 +539,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.result.parent.mkdir(parents=True, exist_ok=True)
     args.result.write_text(
         json.dumps(result.model_dump(mode="json", by_alias=True), ensure_ascii=False, indent=2)
-        + "\
-",
+        + "\n",
         encoding="utf-8",
     )
     return int(not result.persistence_reopen_verified)

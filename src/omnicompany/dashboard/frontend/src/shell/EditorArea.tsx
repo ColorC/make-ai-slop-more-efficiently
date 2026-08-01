@@ -110,11 +110,17 @@ const CcSessionReviewTab: React.FC<IDockviewPanelHeaderProps<TabHeaderParams>> =
       title={liveTitle || props.params.tab?.title || props.api.title || sessionId}
       onContextMenu={(e) => openTabContextMenu(e, props)}
     >
-      {state === 'working' && (
-        <span className="omni-cc-tab-state" title={CC_TAB_WORKING_TITLE} role="status" aria-label={CC_TAB_WORKING_TITLE}>
-          <i className="omni-cc-tab-state-dot" aria-hidden="true" />
-        </span>
-      )}
+      {/* Keep the status slot mounted for every state. Only its visibility changes,
+          so a poll transition cannot push the tab title or resize the tab. */}
+      <span
+        className="omni-cc-tab-state"
+        title={state === 'working' ? CC_TAB_WORKING_TITLE : undefined}
+        role={state === 'working' ? 'status' : undefined}
+        aria-label={state === 'working' ? CC_TAB_WORKING_TITLE : undefined}
+        aria-hidden={state === 'working' ? undefined : true}
+      >
+        <i className="omni-cc-tab-state-dot" aria-hidden="true" />
+      </span>
       <DockviewDefaultTab {...props} />
     </div>
   )
@@ -469,6 +475,16 @@ function EditorArea() {
     const orderedAdds = nextActiveId
       ? [...toAdd].sort((a, b) => (a.id === nextActiveId ? -1 : b.id === nextActiveId ? 1 : 0))
       : toAdd
+    // Dockview 4.13 can leave its content container on the first inserted tab
+    // when an active tab is added first and then re-indexed behind existing tabs.
+    // Its header/API still report the requested tab as active, so a normal
+    // `if (!isActive) setActive()` cannot repair the empty/stale content pane.
+    const activeWillBeReindexed = Boolean(
+      nextActiveId
+      && orderedAdds.length > 1
+      && orderedAdds[0]?.id === nextActiveId
+      && nextTabs.findIndex((tab) => tab.id === nextActiveId) > 0,
+    )
     for (const tab of orderedAdds) {
       // 降级档忽略分屏意图: 新面板一律作为同组页签打开(不带 position direction)。
       const referencePanel = !degraded && tab.placement ? findPlacementReference(api, tab, nextActiveId) : undefined
@@ -511,7 +527,16 @@ function EditorArea() {
     }
     if (nextActiveId) {
       const p = api.getPanel(nextActiveId)
-      if (p && !p.api.isActive) p.api.setActive()
+      if (p && activeWillBeReindexed && p.api.isActive) {
+        // Force one real active-panel transition so Dockview re-attaches the
+        // requested panel's `onlyWhenVisible` content. Both calls are sync;
+        // React only commits the final requested panel from this call stack.
+        const sibling = api.panels.find((candidate) => candidate.id !== p.id && candidate.group === p.group)
+        sibling?.api.setActive()
+        p.api.setActive()
+      } else if (p && !p.api.isActive) {
+        p.api.setActive()
+      }
     }
     // 降级档: 同步完若仍是多组(例如从桌面拖出过分屏后收窄), 并回单组。
     if (degraded) mergeIntoSingleGroup(api)

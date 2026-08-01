@@ -24,7 +24,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from omnicompany.dashboard.controlplane.plans import parse_plan_frontmatter
 from omnicompany.packages.services._core.omnicompany.formats import PLAN
@@ -81,9 +81,26 @@ def _count_todos(text: str) -> tuple[int, int]:
 class PlanIndexScanner:
     """扫 docs/plans/ 出索引."""
 
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(
+        self,
+        workspace_root: str | Path,
+        *,
+        authority_index: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
         self.workspace_root = Path(workspace_root)
         self.plans_dir = self.workspace_root / "docs" / "plans"
+        if authority_index is None:
+            try:
+                from omnicompany.core.progress_authority import load_plan_authority_index
+
+                authority_index, self.authority_source = load_plan_authority_index(
+                    self.workspace_root,
+                )
+            except Exception:  # noqa: BLE001 - dashboard indexing must remain available
+                authority_index, self.authority_source = {}, "unavailable"
+        else:
+            self.authority_source = "provided"
+        self.authority_index = authority_index
 
     def scan(self) -> list[PlanIndexEntry]:
         if not self.plans_dir.is_dir():
@@ -119,16 +136,27 @@ class PlanIndexScanner:
                     mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
                 except OSError:
                     mtime = None
+                plan_id = f"{category_dir.name}/{plan_dir.name}"
+                authority = self.authority_index.get(plan_id) or {}
+                extra: dict[str, Any] = {
+                    "progress_authority": "whatnow",
+                    "authority_source": self.authority_source,
+                }
+                if authority.get("id"):
+                    extra["authority_task_id"] = authority["id"]
+                if authority.get("completion") is not None:
+                    extra["completion"] = authority["completion"]
                 entry = PlanIndexEntry(
-                    plan_id=f"{category_dir.name}/{plan_dir.name}",
+                    plan_id=plan_id,
                     category=category_dir.name,
                     plan_path=entry_md.relative_to(self.workspace_root).as_posix(),
                     project_path=project_path_str,
                     title=fm.get("title") or plan_dir.name,
-                    status=fm.get("status"),
+                    status=authority.get("status"),
                     todo_done=done,
                     todo_total=total,
                     last_modified_ts=mtime,
+                    extra=extra,
                 )
                 out.append(entry)
 

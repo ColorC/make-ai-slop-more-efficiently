@@ -1,0 +1,1062 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "NormalizedAction": {
+      "properties": {
+        "axis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Button"
+        },
+        "duration_ms": {
+          "default": 250,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "keycode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keycode"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "pinch_direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Direction"
+        },
+        "pinch_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Percent"
+        },
+        "pinch_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Pinch Steps",
+          "type": "integer"
+        },
+        "pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressed"
+        },
+        "seconds": {
+          "default": 0.5,
+          "title": "Seconds",
+          "type": "number"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "two_finger_offset_x": {
+          "default": 0,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset X",
+          "type": "integer"
+        },
+        "two_finger_offset_y": {
+          "default": 50,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset Y",
+          "type": "integer"
+        },
+        "two_finger_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Two Finger Steps",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "tap",
+            "swipe",
+            "pinch",
+            "two_finger_swipe",
+            "text",
+            "key",
+            "launch",
+            "force_stop",
+            "wait",
+            "back",
+            "home",
+            "mouse_move",
+            "mouse_button",
+            "gamepad_button",
+            "gamepad_axis",
+            "reset"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "x2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X2"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "y2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NormalizedAction",
+      "type": "object"
+    },
+    "SkillApplicabilityScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "account_scope_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Account Scope Ids",
+          "type": "array"
+        },
+        "build_scope_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Build Scope Ids",
+          "type": "array"
+        },
+        "channel": {
+          "minLength": 1,
+          "title": "Channel",
+          "type": "string"
+        },
+        "device_scope_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Device Scope Ids",
+          "type": "array"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "locale": {
+          "minLength": 1,
+          "title": "Locale",
+          "type": "string"
+        },
+        "required_state_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Required State Ids",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.skill-applicability-scope.v1",
+          "default": "game-observatory.ai-player.skill-applicability-scope.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "server_scope_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Server Scope Ids",
+          "type": "array"
+        },
+        "viewport_heights": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Viewport Heights",
+          "type": "array"
+        },
+        "viewport_widths": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Viewport Widths",
+          "type": "array"
+        },
+        "visual_variant_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Visual Variant Ids",
+          "type": "array"
+        },
+        "world_scope_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "World Scope Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "game_id",
+        "build_scope_ids",
+        "channel",
+        "locale",
+        "device_scope_ids",
+        "viewport_widths",
+        "viewport_heights",
+        "required_state_ids"
+      ],
+      "title": "SkillApplicabilityScopeV1",
+      "type": "object"
+    },
+    "SkillLocatorV1": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback_locator_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fallback Locator Ids",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "match_threshold": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Match Threshold"
+        },
+        "mobility": {
+          "anyOf": [
+            {
+              "enum": [
+                "fixed_chrome",
+                "fixed_surface",
+                "dynamic_world_object"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mobility"
+        },
+        "reference_artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Artifact Id"
+        },
+        "reference_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.skill-locator.v1",
+          "default": "game-observatory.ai-player.skill-locator.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "search_region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "selector": {
+          "minLength": 1,
+          "title": "Selector",
+          "type": "string"
+        },
+        "step_index": {
+          "minimum": 0,
+          "title": "Step Index",
+          "type": "integer"
+        },
+        "strategy": {
+          "enum": [
+            "source_pixel",
+            "ui_selector",
+            "visible_text",
+            "template",
+            "semantic_state",
+            "adapter_native"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "step_index",
+        "strategy",
+        "selector"
+      ],
+      "title": "SkillLocatorV1",
+      "type": "object"
+    },
+    "SkillStepV1": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NormalizedAction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "assertion": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assertion"
+        },
+        "checkpoint_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checkpoint Name"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "depends_on_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On Step Ids",
+          "type": "array"
+        },
+        "expected_state_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected State Id"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "idempotency": {
+          "enum": [
+            "read_only",
+            "idempotent",
+            "verify_before_retry",
+            "never_retry"
+          ],
+          "title": "Idempotency",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "action",
+            "observe",
+            "assert",
+            "subskill",
+            "branch",
+            "checkpoint",
+            "recover"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "locator_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locator Id"
+        },
+        "max_attempts": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "observation": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observation"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.skill-step.v1",
+          "default": "game-observatory.ai-player.skill-step.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "side_effect": {
+          "enum": [
+            "none",
+            "reversible",
+            "progression",
+            "social",
+            "economic",
+            "restricted"
+          ],
+          "title": "Side Effect",
+          "type": "string"
+        },
+        "subskill_version_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subskill Version Id"
+        },
+        "when_false_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "When False Step Ids",
+          "type": "array"
+        },
+        "when_true_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "When True Step Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "idempotency",
+        "side_effect"
+      ],
+      "title": "SkillStepV1",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "applicability": {
+      "minLength": 1,
+      "title": "Applicability",
+      "type": "string"
+    },
+    "applicability_scope": {
+      "$ref": "#/$defs/SkillApplicabilityScopeV1"
+    },
+    "content_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Content Sha256",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "creator_id": {
+      "minLength": 1,
+      "title": "Creator Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "execution_mode": {
+      "enum": [
+        "planned",
+        "interpreted",
+        "compiled"
+      ],
+      "title": "Execution Mode",
+      "type": "string"
+    },
+    "executor_kind": {
+      "enum": [
+        "normalized_actions",
+        "maa",
+        "airtest",
+        "mineflayer",
+        "specialized_adapter"
+      ],
+      "title": "Executor Kind",
+      "type": "string"
+    },
+    "executor_ref": {
+      "minLength": 1,
+      "title": "Executor Ref",
+      "type": "string"
+    },
+    "failure_checks": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Failure Checks",
+      "type": "array"
+    },
+    "failure_recovery_verified": {
+      "default": false,
+      "title": "Failure Recovery Verified",
+      "type": "boolean"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "independent_reset_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Independent Reset Count",
+      "type": "integer"
+    },
+    "invalidation_reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Invalidation Reason"
+    },
+    "level": {
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L5",
+        "L6"
+      ],
+      "title": "Level",
+      "type": "string"
+    },
+    "locators": {
+      "items": {
+        "$ref": "#/$defs/SkillLocatorV1"
+      },
+      "title": "Locators",
+      "type": "array"
+    },
+    "parameters_schema": {
+      "additionalProperties": true,
+      "title": "Parameters Schema",
+      "type": "object"
+    },
+    "perception_tier": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "title": "Perception Tier",
+      "type": "string"
+    },
+    "preconditions": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "procedure_steps": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Procedure Steps",
+      "type": "array"
+    },
+    "recovery_skill_version_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recovery Skill Version Ids",
+      "type": "array"
+    },
+    "safety_level": {
+      "enum": [
+        "read_only",
+        "reversible",
+        "progression",
+        "social",
+        "economic",
+        "restricted"
+      ],
+      "title": "Safety Level",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-version.v1",
+      "default": "game-observatory.ai-player.skill-version.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "interaction",
+        "surface",
+        "gameplay",
+        "cross_game"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "skill_id": {
+      "minLength": 1,
+      "title": "Skill Id",
+      "type": "string"
+    },
+    "skill_layer": {
+      "enum": [
+        "atomic",
+        "flow",
+        "strategy"
+      ],
+      "title": "Skill Layer",
+      "type": "string"
+    },
+    "source_skill_version_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Skill Version Id"
+    },
+    "source_transition_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Source Transition Ids",
+      "type": "array"
+    },
+    "status": {
+      "default": "candidate",
+      "enum": [
+        "candidate",
+        "validated",
+        "preferred",
+        "degraded",
+        "invalidated"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/SkillStepV1"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "success_checks": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Success Checks",
+      "type": "array"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "validation_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation Id"
+    },
+    "validation_run_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Validation Run Ids",
+      "type": "array"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "visual_variant_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Visual Variant Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "skill_id",
+    "creator_id",
+    "version",
+    "level",
+    "skill_layer",
+    "scope",
+    "execution_mode",
+    "perception_tier",
+    "title",
+    "applicability",
+    "applicability_scope",
+    "safety_level",
+    "preconditions",
+    "executor_kind",
+    "executor_ref",
+    "procedure_steps",
+    "steps",
+    "success_checks",
+    "failure_checks",
+    "source_transition_ids",
+    "content_sha256"
+  ],
+  "title": "SkillVersionV1",
+  "type": "object"
+}

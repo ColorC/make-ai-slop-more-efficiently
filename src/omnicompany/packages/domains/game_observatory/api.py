@@ -2842,6 +2842,36 @@ def _published_partial_fact_entries(
     return entries
 
 
+def _published_partial_fact_image_artifact_ids(facility: GameObservatory) -> set[str]:
+    """Return image artifacts referenced by reader-visible published bundles."""
+
+    candidates: set[str] = set()
+
+    def collect(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "artifact_id" and child:
+                    candidates.add(str(child))
+                elif key == "artifact_ids" and isinstance(child, list):
+                    candidates.update(str(item) for item in child if item)
+                else:
+                    collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+
+    for summary, bundle in _published_partial_fact_entries(facility):
+        if summary.get("cover_artifact_id"):
+            candidates.add(str(summary["cover_artifact_id"]))
+        collect(bundle)
+    artifacts = facility.store.get_artifacts(candidates)
+    return {
+        artifact_id
+        for artifact_id, artifact in artifacts.items()
+        if str(artifact.media_type or "").startswith("image/")
+    }
+
+
 def _public_partial_fact_catalog_item(
     summary: dict[str, Any], bundle: dict[str, Any]
 ) -> dict[str, Any]:
@@ -2916,7 +2946,7 @@ def _public_partial_fact_catalog_item(
                 {
                     "id": cover_artifact_id,
                     "url": (
-                        "/api/game-observatory/internal/artifacts/"
+                        "/api/game-observatory/artifacts/"
                         f"{quote(cover_artifact_id, safe='')}"
                     ),
                 }
@@ -4063,7 +4093,6 @@ def workspace_partial_fact_bundles(
     response: Response,
     x_game_observatory_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    _require_editor(request, x_game_observatory_token)
     facility = _facility()
     entries, errors, ignored = _partial_fact_workspace_entries(facility)
     bundles = [summary for summary, _bundle in entries]
@@ -4198,7 +4227,6 @@ def workspace_partial_fact_bundle(
     path: str = Query(..., min_length=1, max_length=512),
     x_game_observatory_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    _require_editor(request, x_game_observatory_token)
     facility = _facility()
     try:
         resolved = _partial_fact_path(facility, path)
@@ -5516,10 +5544,13 @@ def delete_mumu_clone(
 
 @game_observatory_router.get("/api/game-observatory/artifacts/{artifact_id}")
 def artifact_file(artifact_id: str) -> FileResponse:
-    artifact = _facility().store.get_artifact(artifact_id)
+    facility = _facility()
+    artifact = facility.store.get_artifact(artifact_id)
     if not artifact:
         raise HTTPException(status_code=404, detail="artifact not found")
-    if not artifact.metadata.get("public"):
+    if not artifact.metadata.get(
+        "public"
+    ) and artifact_id not in _published_partial_fact_image_artifact_ids(facility):
         raise HTTPException(status_code=404, detail="artifact is not public")
     path = Path(artifact.path)
     if not path.is_file():

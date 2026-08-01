@@ -1183,7 +1183,20 @@ async def add_comment(material_id: str, body: CommentBody) -> dict[str, Any]:
     }
     from ..authored.store import get_authored_store
     n = get_authored_store().create(
-        content=body.content, author=body.author, target=target, uses=["comment"],
+        content=body.content,
+        author=body.author,
+        target=target,
+        uses=["comment"],
+        feedback_status="delivered",
+    )
+    mentions = ctarget.get("mentions") if isinstance(ctarget, dict) else None
+    store.record_authored_comment(
+        material_id,
+        note_id=n.id,
+        author=body.author,
+        created_at=n.created_at,
+        mention_count=len(mentions) if isinstance(mentions, list) else 0,
+        feedback_status=n.feedback_status,
     )
     # 回成 comment 形态(兼容旧调用取 id/content/feedback_status)
     return {**n.to_dict(), "comment_id": n.id}
@@ -1256,7 +1269,19 @@ async def set_comment_feedback(
     if comment_id.startswith("note_"):
         from ..authored.store import get_authored_store
         try:
-            n = get_authored_store().update(comment_id, feedback_status=body.status, by=body.by)
+            authored_store = get_authored_store()
+            previous = authored_store.get(comment_id)
+            old_status = previous.feedback_status if previous is not None else "delivered"
+            n = authored_store.update(comment_id, feedback_status=body.status, by=body.by)
+            get_store().record_authored_comment_feedback(
+                material_id,
+                note_id=n.id,
+                from_status=old_status,
+                to_status=n.feedback_status,
+                by=body.by,
+                note=body.note,
+                updated_at=n.updated_at,
+            )
         except KeyError as e:
             raise HTTPException(404, f"note not found: {e}") from e
         except ValueError as e:

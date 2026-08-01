@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One evidence-bound numeric change in the game account or its objectives.",
+  "properties": {
+    "after": {
+      "title": "After",
+      "type": "number"
+    },
+    "before": {
+      "title": "Before",
+      "type": "number"
+    },
+    "category": {
+      "enum": [
+        "account_progression",
+        "resource",
+        "objective",
+        "coverage"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "delta": {
+      "title": "Delta",
+      "type": "number"
+    },
+    "evidence_step_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence Step Ids",
+      "type": "array"
+    },
+    "favorable": {
+      "title": "Favorable",
+      "type": "boolean"
+    },
+    "label": {
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+    },
+    "metric_key": {
+      "minLength": 1,
+      "title": "Metric Key",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.player-metric-delta.v1",
+      "default": "game-observatory.ai-player.player-metric-delta.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "unit": {
+      "minLength": 1,
+      "title": "Unit",
+      "type": "string"
+    }
+  },
+  "required": [
+    "metric_key",
+    "label",
+    "category",
+    "before",
+    "after",
+    "delta",
+    "unit",
+    "favorable",
+    "evidence_step_ids"
+  ],
+  "title": "PlayerMetricDeltaV1",
+  "type": "object"
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "issued_at": {
+      "title": "Issued At",
+      "type": "string"
+    },
+    "key_id": {
+      "minLength": 1,
+      "title": "Key Id",
+      "type": "string"
+    },
+    "payload_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Payload Sha256",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-run-attestation.v1",
+      "default": "game-observatory.ai-player.skill-run-attestation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature_base64": {
+      "minLength": 1,
+      "title": "Signature Base64",
+      "type": "string"
+    },
+    "validator_id": {
+      "minLength": 1,
+      "title": "Validator Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "validator_id",
+    "key_id",
+    "payload_sha256",
+    "signature_base64"
+  ],
+  "title": "SkillRunAttestationV1",
+  "type": "object"
+}

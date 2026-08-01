@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Non-device work item emitted by a low independent soft-signal score.",
+  "properties": {
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "device_action_budget": {
+      "const": 0,
+      "default": 0,
+      "title": "Device Action Budget",
+      "type": "integer"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "execution_mode": {
+      "const": "non_device_review",
+      "default": "non_device_review",
+      "title": "Execution Mode",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "sample_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Sample Ids",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.player-soft-signal-review-request.v1",
+      "default": "game-observatory.ai-player.player-soft-signal-review-request.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signal_names": {
+      "items": {
+        "enum": [
+          "tutorial_comprehension",
+          "intent_coherence",
+          "opportunity_awareness",
+          "strategic_continuity",
+          "curiosity_quality",
+          "loop_avoidance",
+          "player_naturalness"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Signal Names",
+      "type": "array"
+    },
+    "status": {
+      "const": "open",
+      "default": "open",
+      "title": "Status",
+      "type": "string"
+    },
+    "trigger_review_id": {
+      "minLength": 1,
+      "title": "Trigger Review Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "trigger_review_id",
+    "sample_ids",
+    "signal_names",
+    "reason"
+  ],
+  "title": "PlayerSoftSignalReviewRequestV1",
+  "type": "object"
+}

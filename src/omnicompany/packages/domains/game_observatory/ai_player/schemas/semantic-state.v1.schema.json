@@ -1,0 +1,365 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "NormalizedSurfaceRectV1": {
+      "additionalProperties": false,
+      "description": "Viewport-independent UI region in a 1000 by 1000 coordinate space.",
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Height",
+          "type": "integer"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "default": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "NormalizedSurfaceRectV1",
+      "type": "object"
+    },
+    "SemanticSurfaceAnchorV1": {
+      "additionalProperties": false,
+      "description": "Reviewed locator hint for one interaction role; never a production route.",
+      "properties": {
+        "action": {
+          "default": "tap",
+          "enum": [
+            "tap",
+            "long_press",
+            "swipe"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mobility": {
+          "enum": [
+            "fixed_chrome",
+            "fixed_surface",
+            "dynamic_world_object"
+          ],
+          "title": "Mobility",
+          "type": "string"
+        },
+        "normalized_bounds": {
+          "$ref": "#/$defs/NormalizedSurfaceRectV1"
+        },
+        "reference_artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Artifact Id"
+        },
+        "role": {
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.semantic-surface-anchor.v1",
+          "default": "game-observatory.ai-player.semantic-surface-anchor.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "target_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Tokens",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "target_tokens",
+        "mobility",
+        "normalized_bounds"
+      ],
+      "title": "SemanticSurfaceAnchorV1",
+      "type": "object"
+    },
+    "SemanticSurfaceProfileV1": {
+      "additionalProperties": false,
+      "description": "Reusable stable semantics for recognizing and operating one UI surface.",
+      "properties": {
+        "dynamic_field_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dynamic Field Names",
+          "type": "array"
+        },
+        "interaction_roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Interaction Roles",
+          "type": "array"
+        },
+        "page_identity_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Page Identity Tokens",
+          "type": "array"
+        },
+        "risk_boundary_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Boundary Tokens",
+          "type": "array"
+        },
+        "safe_exit_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Safe Exit Tokens",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.semantic-surface-profile.v1",
+          "default": "game-observatory.ai-player.semantic-surface-profile.v1",
+          "title": "Schema",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_identity_tokens"
+      ],
+      "title": "SemanticSurfaceProfileV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "aliases": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Aliases",
+      "type": "array"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "description": {
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "observation_feature_hashes": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Observation Feature Hashes",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.semantic-state.v1",
+      "default": "game-observatory.ai-player.semantic-state.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "semantic_fingerprint": {
+      "minLength": 1,
+      "title": "Semantic Fingerprint",
+      "type": "string"
+    },
+    "status": {
+      "default": "candidate",
+      "enum": [
+        "candidate",
+        "accepted",
+        "superseded",
+        "invalidated"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "supersedes_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Id"
+    },
+    "surface_anchors": {
+      "items": {
+        "$ref": "#/$defs/SemanticSurfaceAnchorV1"
+      },
+      "title": "Surface Anchors",
+      "type": "array"
+    },
+    "surface_profile": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SemanticSurfaceProfileV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "title",
+    "description",
+    "semantic_fingerprint",
+    "observation_feature_hashes"
+  ],
+  "title": "SemanticStateV1",
+  "type": "object"
+}

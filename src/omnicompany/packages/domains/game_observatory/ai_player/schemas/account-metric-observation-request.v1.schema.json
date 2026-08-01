@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "evidence_step_id": {
+      "minLength": 1,
+      "title": "Evidence Step Id",
+      "type": "string"
+    },
+    "extraction_artifact_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Extraction Artifact Id"
+    },
+    "frame_role": {
+      "enum": [
+        "before",
+        "after"
+      ],
+      "title": "Frame Role",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.account-metric-observation-request.v1",
+      "default": "game-observatory.ai-player.account-metric-observation-request.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_artifact_id": {
+      "minLength": 1,
+      "title": "Source Artifact Id",
+      "type": "string"
+    },
+    "source_kind": {
+      "enum": [
+        "screenshot_ocr",
+        "authoritative_state"
+      ],
+      "title": "Source Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "evidence_step_id",
+    "frame_role",
+    "source_kind",
+    "source_artifact_id"
+  ],
+  "title": "AccountMetricObservationRequestV1",
+  "type": "object"
+}

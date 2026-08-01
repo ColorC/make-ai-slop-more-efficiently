@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "ExternalAgentImageInputV1": {
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "media_type",
+        "size_bytes"
+      ],
+      "title": "ExternalAgentImageInputV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "input_images": {
+      "items": {
+        "$ref": "#/$defs/ExternalAgentImageInputV1"
+      },
+      "title": "Input Images",
+      "type": "array"
+    },
+    "operation": {
+      "enum": [
+        "start",
+        "resume"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "prompt_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prompt Sha256",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.external-agent-invocation-intent.v1",
+      "default": "game-observatory.ai-player.external-agent-invocation-intent.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 1,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "started_at": {
+      "minLength": 1,
+      "title": "Started At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "sequence",
+    "operation",
+    "prompt_sha256",
+    "started_at"
+  ],
+  "title": "ExternalAgentInvocationIntentV1",
+  "type": "object"
+}

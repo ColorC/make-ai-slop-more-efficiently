@@ -1861,6 +1861,15 @@ async def _terminate_process_tree(process: asyncio.subprocess.Process) -> None:
     if process.returncode is not None:
         return
     if os.name == "nt":
+        descendants: list[Any] = []
+        root_process: Any | None = None
+        try:
+            import psutil  # type: ignore[import-not-found]
+
+            root_process = psutil.Process(process.pid)
+            descendants = root_process.children(recursive=True)
+        except Exception:  # noqa: BLE001 - taskkill and direct kill remain available
+            root_process = None
         killer = await asyncio.create_subprocess_exec(
             "taskkill.exe",
             "/PID",
@@ -1871,8 +1880,32 @@ async def _terminate_process_tree(process: asyncio.subprocess.Process) -> None:
             stderr=asyncio.subprocess.DEVNULL,
             **headless_process_kwargs(),
         )
+        # taskkill can take multiple seconds to initialize on Windows. Kill the
+        # already-captured tree directly as well so timeout cleanup remains inside
+        # the caller's reserved cleanup window; taskkill stays as the native fallback.
+        for descendant in reversed(descendants):
+            try:
+                descendant.kill()
+            except Exception:  # noqa: BLE001 - process may have exited concurrently
+                pass
+        if root_process is not None:
+            try:
+                root_process.kill()
+            except Exception:  # noqa: BLE001 - process may have exited concurrently
+                pass
+        if process.returncode is None:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
         try:
-            await asyncio.wait_for(killer.wait(), timeout=3)
+            await asyncio.wait_for(process.wait(), timeout=0.5)
+        except asyncio.TimeoutError:
+            pass
+        if killer.returncode is None:
+            killer.kill()
+        try:
+            await asyncio.wait_for(killer.wait(), timeout=0.5)
         except asyncio.TimeoutError:
             killer.kill()
             await killer.wait()

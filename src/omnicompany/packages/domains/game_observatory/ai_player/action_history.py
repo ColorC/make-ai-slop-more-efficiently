@@ -75,15 +75,17 @@ class ActionHistoryGuard:
         self,
         *,
         environment_id: str,
-        session_id: str,
+        session_id: str | None = None,
+        current_state_id: str | None = None,
         action: NormalizedAction,
         target_bounds: SourcePixelRect | None = None,
     ) -> ActionHistoryDecisionV1:
-        capsule = self.store.get_latest_session_capsule(
-            environment_id,
-            session_id=session_id,
-        )
-        current_state_id = capsule.last_confirmed_state_id if capsule is not None else None
+        if current_state_id is None and session_id is not None:
+            capsule = self.store.get_latest_session_capsule(
+                environment_id,
+                session_id=session_id,
+            )
+            current_state_id = capsule.last_confirmed_state_id if capsule is not None else None
         if current_state_id is None:
             return ActionHistoryDecisionV1(
                 allowed=True,

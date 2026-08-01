@@ -140,7 +140,8 @@ describe('Dashboard stylesheet entrypoints', () => {
     expect(config).toContain("minify: 'terser'")
     expect(config).toContain("'/vilo-os':")
     expect(config).toContain('manualChunks(id: string)')
-    expect(config).toContain('chunkFileNames: stableChunkFileName')
+    expect(config).not.toContain('chunkFileNames:')
+    expect(config).not.toContain('stableChunkFileName')
     expect(config).toContain("'/lofa/file-bridge':")
   })
 

@@ -1,0 +1,788 @@
+{
+  "$defs": {
+    "AFKJB3CaseResultV1": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "pattern": "^B3-[0-9]{2}$",
+          "title": "Case Id",
+          "type": "string"
+        },
+        "execution_guard_correct": {
+          "title": "Execution Guard Correct",
+          "type": "boolean"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "matched_proposal_count": {
+          "minimum": 0,
+          "title": "Matched Proposal Count",
+          "type": "integer"
+        },
+        "predicted_routing_layer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predicted Routing Layer"
+        },
+        "predicted_would_execute": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predicted Would Execute"
+        },
+        "proposal_ledger_path": {
+          "title": "Proposal Ledger Path",
+          "type": "string"
+        },
+        "response_parseable": {
+          "title": "Response Parseable",
+          "type": "boolean"
+        },
+        "routing_correct": {
+          "title": "Routing Correct",
+          "type": "boolean"
+        },
+        "score": {
+          "$ref": "#/$defs/ExplorationBenchmarkScore"
+        },
+        "unmatched_proposal_count": {
+          "minimum": 0,
+          "title": "Unmatched Proposal Count",
+          "type": "integer"
+        },
+        "unmatched_proposal_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Unmatched Proposal Rate",
+          "type": "number"
+        }
+      },
+      "required": [
+        "case_id",
+        "invocation_id",
+        "response_parseable",
+        "routing_correct",
+        "execution_guard_correct",
+        "proposal_ledger_path",
+        "score",
+        "matched_proposal_count",
+        "unmatched_proposal_count",
+        "unmatched_proposal_rate"
+      ],
+      "title": "AFKJB3CaseResultV1",
+      "type": "object"
+    },
+    "ExplorationBenchmarkScore": {
+      "properties": {
+        "duplicate_rate": {
+          "title": "Duplicate Rate",
+          "type": "number"
+        },
+        "elapsed_seconds": {
+          "minimum": 0,
+          "title": "Elapsed Seconds",
+          "type": "number"
+        },
+        "eligible_proposal_count": {
+          "title": "Eligible Proposal Count",
+          "type": "integer"
+        },
+        "evidence_complete_rate": {
+          "title": "Evidence Complete Rate",
+          "type": "number"
+        },
+        "expected_recall": {
+          "title": "Expected Recall",
+          "type": "number"
+        },
+        "fixture_id": {
+          "title": "Fixture Id",
+          "type": "string"
+        },
+        "generated_at": {
+          "title": "Generated At",
+          "type": "string"
+        },
+        "geometry_failure_count": {
+          "title": "Geometry Failure Count",
+          "type": "integer"
+        },
+        "human_intervention_seconds": {
+          "minimum": 0,
+          "title": "Human Intervention Seconds",
+          "type": "number"
+        },
+        "important_recall": {
+          "title": "Important Recall",
+          "type": "number"
+        },
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "matched_expected_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matched Expected Ids",
+          "type": "array"
+        },
+        "matched_important_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matched Important Ids",
+          "type": "array"
+        },
+        "missing_expected_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Expected Ids",
+          "type": "array"
+        },
+        "missing_important_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Important Ids",
+          "type": "array"
+        },
+        "path": {
+          "enum": [
+            "manual",
+            "hypothesis"
+          ],
+          "title": "Path",
+          "type": "string"
+        },
+        "precision": {
+          "title": "Precision",
+          "type": "number"
+        },
+        "proposal_count": {
+          "title": "Proposal Count",
+          "type": "integer"
+        },
+        "safety_violation_count": {
+          "title": "Safety Violation Count",
+          "type": "integer"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
+        },
+        "unsupported_fact_count": {
+          "title": "Unsupported Fact Count",
+          "type": "integer"
+        },
+        "verified_novel_transition_count": {
+          "title": "Verified Novel Transition Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "path",
+        "proposal_count",
+        "eligible_proposal_count",
+        "matched_expected_ids",
+        "missing_expected_ids",
+        "matched_important_ids",
+        "missing_important_ids",
+        "expected_recall",
+        "important_recall",
+        "precision",
+        "evidence_complete_rate",
+        "duplicate_rate",
+        "safety_violation_count",
+        "geometry_failure_count",
+        "unsupported_fact_count",
+        "verified_novel_transition_count",
+        "human_intervention_seconds",
+        "elapsed_seconds"
+      ],
+      "title": "ExplorationBenchmarkScore",
+      "type": "object"
+    },
+    "ExternalAgentBenchmarkTurnV1": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_effort": {
+          "title": "Actual Effort",
+          "type": "string"
+        },
+        "duration_seconds": {
+          "title": "Duration Seconds",
+          "type": "number"
+        },
+        "effort_evidence": {
+          "title": "Effort Evidence",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "event_log_path": {
+          "title": "Event Log Path",
+          "type": "string"
+        },
+        "event_log_sha256": {
+          "title": "Event Log Sha256",
+          "type": "string"
+        },
+        "external_session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "External Session Id"
+        },
+        "input_images": {
+          "items": {
+            "$ref": "#/$defs/ExternalAgentImageInputV1"
+          },
+          "title": "Input Images",
+          "type": "array"
+        },
+        "invocation_id": {
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "last_message_path": {
+          "title": "Last Message Path",
+          "type": "string"
+        },
+        "last_message_sha256": {
+          "title": "Last Message Sha256",
+          "type": "string"
+        },
+        "model_evidence": {
+          "title": "Model Evidence",
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "start",
+            "resume"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "provider_cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider Cost Usd"
+        },
+        "provider_duration_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider Duration Seconds"
+        },
+        "resolved_model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Resolved Model Id"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "timed_out"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "time_to_first_token_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Time To First Token Seconds"
+        },
+        "timeout_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "hard_wall_clock",
+                "no_meaningful_progress"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Reason"
+        },
+        "unexpected_tool_events": {
+          "minimum": 0,
+          "title": "Unexpected Tool Events",
+          "type": "integer"
+        },
+        "usage": {
+          "$ref": "#/$defs/ExternalAgentTokenUsageV1"
+        },
+        "warning_count": {
+          "minimum": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "invocation_id",
+        "operation",
+        "status",
+        "external_session_id",
+        "resolved_model_id",
+        "model_evidence",
+        "actual_effort",
+        "effort_evidence",
+        "duration_seconds",
+        "provider_duration_seconds",
+        "time_to_first_token_seconds",
+        "provider_cost_usd",
+        "usage",
+        "unexpected_tool_events",
+        "warning_count",
+        "event_log_path",
+        "event_log_sha256",
+        "last_message_path",
+        "last_message_sha256"
+      ],
+      "title": "ExternalAgentBenchmarkTurnV1",
+      "type": "object"
+    },
+    "ExternalAgentImageInputV1": {
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "media_type",
+        "size_bytes"
+      ],
+      "title": "ExternalAgentImageInputV1",
+      "type": "object"
+    },
+    "ExternalAgentTokenUsageV1": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_creation_input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Cache Creation Input Tokens",
+          "type": "integer"
+        },
+        "cached_input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Cached Input Tokens",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "reasoning_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reasoning Tokens",
+          "type": "integer"
+        }
+      },
+      "title": "ExternalAgentTokenUsageV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "benchmark_id": {
+      "const": "afkj_external_agent_continuity_v1",
+      "title": "Benchmark Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/AFKJB3CaseResultV1"
+      },
+      "title": "Cases",
+      "type": "array"
+    },
+    "completed_at": {
+      "title": "Completed At",
+      "type": "string"
+    },
+    "completed_case_count": {
+      "maximum": 10,
+      "minimum": 0,
+      "title": "Completed Case Count",
+      "type": "integer"
+    },
+    "continuity_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Continuity Manifest Sha256",
+      "type": "string"
+    },
+    "decision_p50_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decision P50 Seconds"
+    },
+    "decision_p95_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decision P95 Seconds"
+    },
+    "diagnostic_failures": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Diagnostic Failures",
+      "type": "array"
+    },
+    "diagnostic_quality_pass": {
+      "title": "Diagnostic Quality Pass",
+      "type": "boolean"
+    },
+    "evidence_complete_rate": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Evidence Complete Rate",
+      "type": "number"
+    },
+    "expected_recall": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Expected Recall",
+      "type": "number"
+    },
+    "external_session_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "External Session Id"
+    },
+    "facility_contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Facility Contract Sha256",
+      "type": "string"
+    },
+    "fixture_freeze_status": {
+      "const": "not_frozen",
+      "default": "not_frozen",
+      "title": "Fixture Freeze Status",
+      "type": "string"
+    },
+    "fixture_path": {
+      "title": "Fixture Path",
+      "type": "string"
+    },
+    "fixture_semantic_status": {
+      "const": "candidate",
+      "default": "candidate",
+      "title": "Fixture Semantic Status",
+      "type": "string"
+    },
+    "fixture_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Fixture Sha256",
+      "type": "string"
+    },
+    "formal_disqualifiers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Formal Disqualifiers",
+      "type": "array"
+    },
+    "formal_quality_eligible": {
+      "const": false,
+      "default": false,
+      "title": "Formal Quality Eligible",
+      "type": "boolean"
+    },
+    "full_image_diagnostic_set": {
+      "title": "Full Image Diagnostic Set",
+      "type": "boolean"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "important_recall": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Important Recall",
+      "type": "number"
+    },
+    "precision": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Precision",
+      "type": "number"
+    },
+    "provider": {
+      "enum": [
+        "codex-cli",
+        "claude-code-cli"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "raw_runtime_root": {
+      "title": "Raw Runtime Root",
+      "type": "string"
+    },
+    "repetition": {
+      "minimum": 1,
+      "title": "Repetition",
+      "type": "integer"
+    },
+    "requested_case_count": {
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Requested Case Count",
+      "type": "integer"
+    },
+    "requested_case_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Requested Case Ids",
+      "type": "array"
+    },
+    "requested_effort": {
+      "const": "medium",
+      "default": "medium",
+      "title": "Requested Effort",
+      "type": "string"
+    },
+    "requested_model_selector": {
+      "title": "Requested Model Selector",
+      "type": "string"
+    },
+    "safety_violation_count": {
+      "minimum": 0,
+      "title": "Safety Violation Count",
+      "type": "integer"
+    },
+    "same_native_session": {
+      "title": "Same Native Session",
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.afkj-external-agent-b3-result.v1",
+      "default": "game-observatory.ai-player.afkj-external-agent-b3-result.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "started_at": {
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "task_id": {
+      "const": "B3",
+      "default": "B3",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "turns": {
+      "items": {
+        "$ref": "#/$defs/ExternalAgentBenchmarkTurnV1"
+      },
+      "title": "Turns",
+      "type": "array"
+    },
+    "unmatched_proposal_count": {
+      "minimum": 0,
+      "title": "Unmatched Proposal Count",
+      "type": "integer"
+    },
+    "unmatched_proposal_rate": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Unmatched Proposal Rate",
+      "type": "number"
+    },
+    "unmatched_semantics": {
+      "const": "offline_expected_probe_proxy_not_real_misclicks",
+      "default": "offline_expected_probe_proxy_not_real_misclicks",
+      "title": "Unmatched Semantics",
+      "type": "string"
+    },
+    "warm_exclusion_status": {
+      "const": "unproven",
+      "default": "unproven",
+      "title": "Warm Exclusion Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "benchmark_id",
+    "candidate_id",
+    "repetition",
+    "facility_contract_sha256",
+    "continuity_manifest_sha256",
+    "fixture_path",
+    "fixture_sha256",
+    "provider",
+    "requested_model_selector",
+    "external_session_id",
+    "requested_case_count",
+    "requested_case_ids",
+    "completed_case_count",
+    "full_image_diagnostic_set",
+    "formal_disqualifiers",
+    "diagnostic_quality_pass",
+    "diagnostic_failures",
+    "expected_recall",
+    "important_recall",
+    "precision",
+    "evidence_complete_rate",
+    "safety_violation_count",
+    "unmatched_proposal_count",
+    "unmatched_proposal_rate",
+    "same_native_session",
+    "cases",
+    "turns",
+    "raw_runtime_root",
+    "status",
+    "started_at",
+    "completed_at"
+  ],
+  "title": "AFKJB3BenchmarkResultV1",
+  "type": "object"
+}

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from ..models import NormalizedAction, utc_now
+from ..models import EvidenceStep, NormalizedAction, SourcePixelRect, utc_now
 from .contracts import (
     EvidenceReferenceV1,
     SkillLocatorV1,
@@ -20,17 +20,26 @@ from .skills import (
     applicability_scope_from_environment,
     build_skill_version,
 )
+from .skill_candidate_evidence import canonical_direct_live_step_confirms_edge
 from .store import AIPlayerStore
 
 
 class SkillCrystallizationRequestV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    schema_id: Literal[
+        "game-observatory.ai-player.skill-crystallization-request.v1"
+    ] = Field(
+        default="game-observatory.ai-player.skill-crystallization-request.v1",
+        alias="schema",
+    )
     environment_id: str = Field(min_length=1)
+    creator_id: str = Field(min_length=1)
     skill_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     level: Literal["L2", "L3", "L4"]
     transition_ids: list[str] = Field(min_length=1)
+    supporting_transition_ids: list[str] = Field(default_factory=list)
     applicability: str = Field(min_length=1)
     safety_level: Literal[
         "read_only",
@@ -54,9 +63,11 @@ class SkillCrystallizationRequestV1(BaseModel):
     ] = "normalized_actions"
     executor_ref: str | None = Field(default=None, min_length=1)
     perception_tier: Literal["P0", "P1", "P2", "P3", "P4", "P5"] = "P2"
+    provisional_trial: bool = False
 
     @field_validator(
         "transition_ids",
+        "supporting_transition_ids",
         "success_checks",
         "failure_checks",
         "recovery_skill_version_ids",
@@ -70,6 +81,16 @@ class SkillCrystallizationRequestV1(BaseModel):
             raise ValueError(f"{info.field_name} must not contain duplicates")
         return value
 
+    @model_validator(mode="after")
+    def validate_transition_roles(self) -> "SkillCrystallizationRequestV1":
+        duplicates = set(self.transition_ids).intersection(self.supporting_transition_ids)
+        if duplicates:
+            raise ValueError(
+                "a transition cannot be both a route step and supporting evidence: "
+                + ", ".join(sorted(duplicates))
+            )
+        return self
+
 
 def _evidence_union(edges: list[TransitionEdgeV1]) -> list[EvidenceReferenceV1]:
     unique: dict[str, EvidenceReferenceV1] = {}
@@ -77,6 +98,27 @@ def _evidence_union(edges: list[TransitionEdgeV1]) -> list[EvidenceReferenceV1]:
         for reference in edge.evidence_refs:
             unique.setdefault(reference.model_dump_json(by_alias=True), reference)
     return list(unique.values())
+
+
+_SUCCESSFUL_TRANSITION_OUTCOMES = {
+    "verified_transition",
+    "verified_state_change",
+    "verified_progress",
+}
+
+
+def _same_executable_transition(
+    supporting: TransitionEdgeV1,
+    route: TransitionEdgeV1,
+) -> bool:
+    """Match execution semantics while allowing evidence-specific descriptions."""
+
+    return (
+        supporting.from_state_id == route.from_state_id
+        and supporting.to_state_id == route.to_state_id
+        and supporting.action == route.action
+        and supporting.target_bounds == route.target_bounds
+    )
 
 
 def _action_phrase(action: NormalizedAction) -> str:
@@ -106,6 +148,81 @@ def _side_effect(safety_level: str) -> str:
     }[safety_level]
 
 
+_FIXED_CHROME_PATTERN = re.compile(
+    r"(?:返回|关闭|退出|菜单|导航|页签|标签|顶栏|底栏|侧栏|筛选)"
+)
+_DYNAMIC_WORLD_CONTEXT_PATTERN = re.compile(
+    r"(?:城外|场景内|地图场景|世界地图).{0,24}"
+    r"(?:地块|土地|资源地|空地|农田|林场|铁矿|石料|粮食|部队|城池|目标点)"
+)
+_DYNAMIC_WORLD_OBJECT_PATTERN = re.compile(
+    r"(?:地块|土地|资源地|空地|农田|林场|铁矿|石料|粮食|部队|城池|目标点)"
+)
+
+
+def _matching_evidence_steps(
+    store: AIPlayerStore,
+    edges: list[TransitionEdgeV1],
+) -> list[EvidenceStep]:
+    """Resolve only evidence steps that actually demonstrated this locator action."""
+
+    resolved: dict[str, EvidenceStep] = {}
+    for edge in edges:
+        for reference in edge.evidence_refs:
+            for step_id in reference.evidence_step_ids:
+                step = store.observatory_store.get_evidence_step(step_id)
+                if (
+                    step is not None
+                    and step.action == edge.action
+                    and step.target_bounds == edge.target_bounds
+                ):
+                    resolved.setdefault(step.id, step)
+    return [resolved[step_id] for step_id in sorted(resolved)]
+
+
+def _locator_mobility(
+    edge: TransitionEdgeV1,
+    evidence_steps: list[EvidenceStep],
+) -> Literal["fixed_chrome", "fixed_surface", "dynamic_world_object"]:
+    target_context = " ".join(
+        [
+            *(step.target_name or "" for step in evidence_steps),
+            edge.expected_change,
+            edge.observed_change,
+        ]
+    )
+    if _FIXED_CHROME_PATTERN.search(target_context):
+        return "fixed_chrome"
+    has_dynamic_scene = any(
+        getattr(step.stability, "dynamic_scene_profile", None) is not None
+        for step in evidence_steps
+    )
+    if _DYNAMIC_WORLD_CONTEXT_PATTERN.search(target_context) or (
+        has_dynamic_scene and _DYNAMIC_WORLD_OBJECT_PATTERN.search(target_context)
+    ):
+        return "dynamic_world_object"
+    # An animated scene makes unclassified source pixels unsafe.  A clearly named
+    # chrome control was handled above; unknown targets must re-localize visually.
+    if has_dynamic_scene:
+        return "dynamic_world_object"
+    return "fixed_surface"
+
+
+def _locator_selector(edge: TransitionEdgeV1, evidence_steps: list[EvidenceStep]) -> str:
+    target_names = list(
+        dict.fromkeys(
+            name.strip()
+            for step in evidence_steps
+            if (name := step.target_name) is not None and name.strip()
+        )
+    )
+    return " / ".join(target_names) if target_names else edge.expected_change
+
+
+def _template_reference_step(evidence_steps: list[EvidenceStep]) -> EvidenceStep | None:
+    return next((step for step in evidence_steps if step.before_frame_id is not None), None)
+
+
 class SkillCrystallizer:
     """Propose immutable candidates; this component has no promotion authority."""
 
@@ -123,11 +240,53 @@ class SkillCrystallizer:
         if any(edge is None for edge in edges):
             raise SkillLifecycleError("a crystallization route contains a missing transition")
         typed_edges = [edge for edge in edges if edge is not None]
+        self._require_crystallizable_edges(request, typed_edges)
+
+        supporting_edges = [
+            self.store.get_transition_edge(request.environment_id, transition_id)
+            for transition_id in request.supporting_transition_ids
+        ]
+        if any(edge is None for edge in supporting_edges):
+            raise SkillLifecycleError(
+                "skill crystallization contains a missing supporting transition"
+            )
+        typed_supporting_edges = [edge for edge in supporting_edges if edge is not None]
+        self._require_crystallizable_edges(request, typed_supporting_edges)
         if any(
-            edge.outcome not in {"verified_transition", "verified_state_change"}
-            for edge in typed_edges
+            not any(
+                _same_executable_transition(supporting, route)
+                for route in typed_edges
+            )
+            for supporting in typed_supporting_edges
         ):
-            raise SkillLifecycleError("only closed successful transitions may crystallize")
+            raise SkillLifecycleError(
+                "a supporting transition must match a route transition's endpoints, "
+                "normalized action, and target bounds"
+            )
+
+        evidence_edges = [*typed_edges, *typed_supporting_edges]
+        endpoint_ids = {
+            state_id
+            for edge in evidence_edges
+            for state_id in (edge.from_state_id, edge.to_state_id)
+            if state_id is not None
+        }
+        endpoints = {
+            state_id: self.store.get_semantic_state(request.environment_id, state_id)
+            for state_id in endpoint_ids
+        }
+        allowed_endpoint_statuses = (
+            {"candidate", "accepted"} if request.provisional_trial else {"accepted"}
+        )
+        if any(
+            state is None or state.status not in allowed_endpoint_statuses
+            for state in endpoints.values()
+        ):
+            raise SkillLifecycleError(
+                "provisional skill crystallization requires candidate or accepted endpoints"
+                if request.provisional_trial
+                else "skill crystallization requires accepted transition endpoints"
+            )
         for previous, current in zip(typed_edges, typed_edges[1:], strict=False):
             if previous.to_state_id != current.from_state_id:
                 raise SkillLifecycleError("a crystallization route must be continuous")
@@ -143,18 +302,53 @@ class SkillCrystallizer:
             locator_id = None
             if edge.target_bounds is not None:
                 locator_id = f"locator.{index + 1}"
+                equivalent_edges = [
+                    edge,
+                    *(
+                        supporting
+                        for supporting in typed_supporting_edges
+                        if _same_executable_transition(supporting, edge)
+                    ),
+                ]
+                evidence_steps = _matching_evidence_steps(self.store, equivalent_edges)
+                mobility = _locator_mobility(edge, evidence_steps)
+                reference_step = _template_reference_step(evidence_steps)
+                if mobility == "dynamic_world_object" and reference_step is None:
+                    raise SkillLifecycleError(
+                        "dynamic world object crystallization requires an evidence step "
+                        "with a before-frame reference artifact"
+                    )
                 locators.append(
                     SkillLocatorV1(
                         id=locator_id,
                         step_index=len(steps),
-                        strategy="source_pixel",
-                        selector=json.dumps(
-                            edge.target_bounds.model_dump(),
-                            ensure_ascii=False,
-                            sort_keys=True,
-                            separators=(",", ":"),
+                        strategy=(
+                            "template"
+                            if mobility == "dynamic_world_object"
+                            else "source_pixel"
                         ),
+                        selector=_locator_selector(edge, evidence_steps),
                         reference_bounds=edge.target_bounds,
+                        mobility=mobility,
+                        reference_artifact_id=(
+                            reference_step.before_frame_id
+                            if reference_step is not None
+                            else None
+                        ),
+                        search_region=(
+                            SourcePixelRect(
+                                x=0,
+                                y=0,
+                                width=reference_step.viewport_width,
+                                height=reference_step.viewport_height,
+                            )
+                            if mobility == "dynamic_world_object"
+                            and reference_step is not None
+                            else None
+                        ),
+                        match_threshold=(
+                            0.82 if mobility == "dynamic_world_object" else None
+                        ),
                     )
                 )
             action_id = f"step.{index + 1}.action"
@@ -189,11 +383,14 @@ class SkillCrystallizer:
                     kind="assert",
                     depends_on_step_ids=[action_id],
                     assertion=objective,
+                    expected_state_id=edge.to_state_id,
                     idempotency="read_only",
                     side_effect="none",
                 )
             )
-            procedure_steps.append(f"{_action_phrase(edge.action)}，随后{objective}")
+            procedure_steps.append(
+                f"步骤 {index + 1:02d}：{_action_phrase(edge.action)}，随后{objective}"
+            )
             previous_assertion_id = assertion_id
 
         layer = {"L2": "atomic", "L3": "flow", "L4": "strategy"}[request.level]
@@ -203,9 +400,10 @@ class SkillCrystallizer:
         candidate = build_skill_version(
             id=f"{request.skill_id}.version.{version}",
             skill_id=request.skill_id,
+            creator_id=request.creator_id,
             version=version,
             environment_id=request.environment_id,
-            evidence_refs=_evidence_union(typed_edges),
+            evidence_refs=_evidence_union(evidence_edges),
             level=request.level,
             skill_layer=layer,
             scope=scope,
@@ -238,7 +436,10 @@ class SkillCrystallizer:
             success_checks=request.success_checks,
             failure_checks=request.failure_checks,
             recovery_skill_version_ids=request.recovery_skill_version_ids,
-            source_transition_ids=request.transition_ids,
+            source_transition_ids=[
+                *request.transition_ids,
+                *request.supporting_transition_ids,
+            ],
             status="candidate",
             source_skill_version_id=latest.id if latest is not None else None,
             created_at=utc_now(),
@@ -246,3 +447,81 @@ class SkillCrystallizer:
         if latest is not None and latest.content_sha256 == candidate.content_sha256:
             return latest
         return self.store.append_skill_version(candidate)
+
+    def _require_crystallizable_edges(
+        self,
+        request: SkillCrystallizationRequestV1,
+        edges: list[TransitionEdgeV1],
+    ) -> None:
+        """Keep normal crystallization strict while allowing evidence-backed trials.
+
+        A provisional trial is executable only in validation mode.  It exists so the
+        second encounter can validate the first successful demonstration instead of
+        forcing another semantic Agent to repeat the same click.  Preferred promotion
+        remains governed by the independent SkillRun lifecycle.
+        """
+
+        if not edges:
+            return
+        invalid = [
+            edge
+            for edge in edges
+            if edge.outcome not in _SUCCESSFUL_TRANSITION_OUTCOMES
+            and not (
+                request.provisional_trial
+                and edge.outcome == "deferred"
+                and self._deferred_edge_has_confirmed_execution(edge)
+            )
+        ]
+        if not invalid:
+            return
+        raise SkillLifecycleError(
+            "only closed successful transitions may crystallize"
+            if not request.provisional_trial
+            else (
+                "a provisional transition requires a confirmed, meaningful, "
+                "evidence-complete execution"
+            )
+        )
+
+    def _deferred_edge_has_confirmed_execution(self, edge: TransitionEdgeV1) -> bool:
+        evidence_step_ids = {
+            step_id
+            for reference in edge.evidence_refs
+            for step_id in reference.evidence_step_ids
+        }
+        if not evidence_step_ids or edge.to_state_id is None:
+            return False
+        evidence_steps = [
+            self.store.observatory_store.get_evidence_step(step_id)
+            for step_id in evidence_step_ids
+        ]
+        if any(
+            step is None
+            or step.action != edge.action
+            or step.target_bounds != edge.target_bounds
+            for step in evidence_steps
+        ):
+            return False
+        samples = self.store.list_action_quality_samples(
+            edge.environment_id,
+            # Candidate discovery uses the bounded long-history window as well.
+            # A confirmed path must not become invalid merely because 100 newer
+            # interactions were recorded before its second visit.
+            limit=max(10_000, len(evidence_step_ids) * 4),
+        )
+        confirmed_step_ids = {
+            sample.evidence_step_id
+            for sample in samples
+            if sample.evidence_step_id is not None
+            and sample.outcome == "confirmed"
+            and sample.execution_disposition == "executed"
+            and sample.evidence_complete
+            and sample.meaningful_change
+            and sample.expected_change_matched is True
+            and not sample.invalid_target_execution
+            and not sample.policy_violation
+        }
+        return evidence_step_ids.issubset(
+            confirmed_step_ids
+        ) or canonical_direct_live_step_confirms_edge(self.store, edge)

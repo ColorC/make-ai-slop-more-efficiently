@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action_attempt_count": {
+      "minimum": 0,
+      "title": "Action Attempt Count",
+      "type": "integer"
+    },
+    "action_count": {
+      "minimum": 0,
+      "title": "Action Count",
+      "type": "integer"
+    },
+    "ai_player_store_schema_version": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ai Player Store Schema Version"
+    },
+    "code_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Code Hash",
+      "type": "string"
+    },
+    "config_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "elapsed_seconds": {
+      "minimum": 0,
+      "title": "Elapsed Seconds",
+      "type": "number"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "evidence_reference_completeness": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Evidence Reference Completeness",
+      "type": "number"
+    },
+    "evidence_required_count": {
+      "minimum": 0,
+      "title": "Evidence Required Count",
+      "type": "integer"
+    },
+    "evidence_resolved_count": {
+      "minimum": 0,
+      "title": "Evidence Resolved Count",
+      "type": "integer"
+    },
+    "executed_step_count": {
+      "minimum": 0,
+      "title": "Executed Step Count",
+      "type": "integer"
+    },
+    "final_state_id": {
+      "minLength": 1,
+      "title": "Final State Id",
+      "type": "string"
+    },
+    "fixture_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Fixture Hash",
+      "type": "string"
+    },
+    "fixture_id": {
+      "minLength": 1,
+      "title": "Fixture Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "title": "Generated At",
+      "type": "string"
+    },
+    "goal_state_id": {
+      "minLength": 1,
+      "title": "Goal State Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input Tokens"
+    },
+    "no_change_action_count": {
+      "minimum": 0,
+      "title": "No Change Action Count",
+      "type": "integer"
+    },
+    "objective_status": {
+      "enum": [
+        "met",
+        "not_met",
+        "indeterminate"
+      ],
+      "title": "Objective Status",
+      "type": "string"
+    },
+    "observation_count": {
+      "minimum": 0,
+      "title": "Observation Count",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Tokens"
+    },
+    "persistence_status": {
+      "default": "not_requested",
+      "enum": [
+        "not_requested",
+        "verified"
+      ],
+      "title": "Persistence Status",
+      "type": "string"
+    },
+    "planner_call_count": {
+      "minimum": 0,
+      "title": "Planner Call Count",
+      "type": "integer"
+    },
+    "planner_latency_samples": {
+      "items": {
+        "type": "number"
+      },
+      "title": "Planner Latency Samples",
+      "type": "array"
+    },
+    "planner_latency_seconds": {
+      "minimum": 0,
+      "title": "Planner Latency Seconds",
+      "type": "number"
+    },
+    "raw_fingerprint_count": {
+      "minimum": 0,
+      "title": "Raw Fingerprint Count",
+      "type": "integer"
+    },
+    "repeated_state_action_count": {
+      "minimum": 0,
+      "title": "Repeated State Action Count",
+      "type": "integer"
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "run_status": {
+      "enum": [
+        "running",
+        "passed",
+        "failed",
+        "stopped"
+      ],
+      "title": "Run Status",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.exploration-baseline-result.v1",
+      "default": "game-observatory.ai-player.exploration-baseline-result.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "stop_reason": {
+      "minLength": 1,
+      "title": "Stop Reason",
+      "type": "string"
+    },
+    "token_measurement_status": {
+      "enum": [
+        "available",
+        "unavailable"
+      ],
+      "title": "Token Measurement Status",
+      "type": "string"
+    },
+    "total_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Total Tokens"
+    },
+    "trace_artifact_id": {
+      "minLength": 1,
+      "title": "Trace Artifact Id",
+      "type": "string"
+    },
+    "unique_observed_transition_count": {
+      "minimum": 0,
+      "title": "Unique Observed Transition Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "fixture_id",
+    "fixture_hash",
+    "code_hash",
+    "config_hash",
+    "run_id",
+    "run_status",
+    "action_count",
+    "action_attempt_count",
+    "planner_call_count",
+    "observation_count",
+    "raw_fingerprint_count",
+    "executed_step_count",
+    "unique_observed_transition_count",
+    "repeated_state_action_count",
+    "no_change_action_count",
+    "goal_state_id",
+    "final_state_id",
+    "objective_status",
+    "stop_reason",
+    "elapsed_seconds",
+    "planner_latency_seconds",
+    "token_measurement_status",
+    "evidence_required_count",
+    "evidence_resolved_count",
+    "evidence_reference_completeness",
+    "trace_artifact_id"
+  ],
+  "title": "ExplorationBaselineResultV1",
+  "type": "object"
+}

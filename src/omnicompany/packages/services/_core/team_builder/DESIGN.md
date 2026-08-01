@@ -174,7 +174,7 @@ schema 详见 `formats.py::TB_A3_MATERIALS`.
 ### 归档
 
 - [_archive/routers_legacy.py](_archive/routers_legacy.py) · 原 `routers.py` 3053 行单文件实现
-- _archive/routers_codegen_legacy.py · 原 `routers_codegen.py` 的 `CodeGenLoop` 实现
+- [_archive/routers_codegen_legacy.py](_archive/routers_codegen_legacy.py) · 原 `routers_codegen.py` 的 `CodeGenLoop` 实现
 - [_archive/README.md](_archive/README.md) · 归档原因 / Diamond shortcut 说明
 
 ## 架构决策

@@ -8,10 +8,15 @@ from pathlib import Path
 import cv2
 
 from ..models import ArtifactRef, EvidenceRun, EvidenceStep, RunResult
-from .contracts import EvidenceReferenceV1, StateObservationFeaturesV1
+from .contracts import (
+    EvidenceReferenceV1,
+    SemanticSurfaceProfileV1,
+    StateObservationFeaturesV1,
+)
 from .device_executor import StateResolutionV1
 from .orchestrator import AutonomousExecutorRequestV1
 from .state_recognition import SemanticStateRecognizer, build_state_observation
+from .semantic_surface_profiles import resolve_semantic_surface_profile
 from .store import AIPlayerStore
 
 
@@ -33,7 +38,7 @@ def _dhash(path: Path) -> str:
 
 
 def _region_hashes(path: Path) -> dict[str, str]:
-    image = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    image = cv2.imread(str(path), cv2.IMREAD_COLOR)
     if image is None:
         raise ValueError(f"cannot decode screenshot: {path}")
     height, width = image.shape[:2]
@@ -44,12 +49,18 @@ def _region_hashes(path: Path) -> dict[str, str]:
                 row * height // 3 : (row + 1) * height // 3,
                 column * width // 3 : (column + 1) * width // 3,
             ]
-            resized = cv2.resize(crop, (8, 8), interpolation=cv2.INTER_AREA)
+            grayscale = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            resized = cv2.resize(grayscale, (8, 8), interpolation=cv2.INTER_AREA)
             bits = (resized >= float(resized.mean())).flatten()
             value = 0
             for bit in bits:
                 value = (value << 1) | int(bit)
-            output[f"grid-{row}-{column}"] = f"{value:016x}"
+            # Relative luminance edges collapse flat regions of different colours.
+            # Quantized channel means keep large visual changes while ignoring tiny
+            # frame-to-frame animation noise.
+            channel_means = crop.reshape(-1, 3).mean(axis=0)
+            colour = "".join(f"{min(15, int(item) // 16):x}" for item in channel_means)
+            output[f"grid-{row}-{column}"] = f"{value:016x}:{colour}"
     return output
 
 
@@ -67,7 +78,11 @@ class ScreenshotStateResolver:
         return frame
 
     @staticmethod
-    def _features(frame: ArtifactRef, run: EvidenceRun, channel: str) -> StateObservationFeaturesV1:
+    def _features(
+        frame: ArtifactRef,
+        run: EvidenceRun,
+        surface_profile: SemanticSurfaceProfileV1 | None = None,
+    ) -> StateObservationFeaturesV1:
         path = Path(frame.path).resolve()
         image = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
         if image is None:
@@ -80,15 +95,22 @@ class ScreenshotStateResolver:
             )
         return StateObservationFeaturesV1(
             screenshot_fingerprint=_dhash(path),
-            runtime_tokens=[
-                f"game:{run.game_id}",
-                f"build:{run.build_scope_id}",
-                f"channel:{channel}",
-                f"adapter:{run.adapter}",
-                f"viewport:{run.viewport_width}x{run.viewport_height}",
-                f"orientation:{run.orientation}",
-            ],
             region_fingerprints=_region_hashes(path),
+            page_identity_tokens=(
+                surface_profile.page_identity_tokens if surface_profile is not None else []
+            ),
+            dynamic_field_names=(
+                surface_profile.dynamic_field_names if surface_profile is not None else []
+            ),
+            interaction_roles=(
+                surface_profile.interaction_roles if surface_profile is not None else []
+            ),
+            safe_exit_tokens=(
+                surface_profile.safe_exit_tokens if surface_profile is not None else []
+            ),
+            risk_boundary_tokens=(
+                surface_profile.risk_boundary_tokens if surface_profile is not None else []
+            ),
         )
 
     def resolve(
@@ -123,7 +145,15 @@ class ScreenshotStateResolver:
                 environment_id=environment.id,
                 viewport_width=evidence_run.viewport_width,
                 viewport_height=evidence_run.viewport_height,
-                features=self._features(frame, evidence_run, environment.channel),
+                features=self._features(
+                    frame,
+                    evidence_run,
+                    resolve_semantic_surface_profile(
+                        evidence_step,
+                        [frame],
+                        role=role,
+                    ),
+                ),
                 evidence_refs=[reference],
                 observation_id=_stable_id(
                     "observation.device-evidence",

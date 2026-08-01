@@ -1,0 +1,254 @@
+{
+  "$defs": {
+    "EnvironmentScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "account_scope_id": {
+          "minLength": 1,
+          "title": "Account Scope Id",
+          "type": "string"
+        },
+        "build_scope_id": {
+          "minLength": 1,
+          "title": "Build Scope Id",
+          "type": "string"
+        },
+        "build_scope_id_aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Build Scope Id Aliases",
+          "type": "array"
+        },
+        "channel": {
+          "minLength": 1,
+          "title": "Channel",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "device_scope_id": {
+          "minLength": 1,
+          "title": "Device Scope Id",
+          "type": "string"
+        },
+        "device_scope_id_aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Device Scope Id Aliases",
+          "type": "array"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "game_id_aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Game Id Aliases",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "identity_hash": {
+          "minLength": 16,
+          "title": "Identity Hash",
+          "type": "string"
+        },
+        "locale": {
+          "minLength": 1,
+          "title": "Locale",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.environment-scope.v1",
+          "default": "game-observatory.ai-player.environment-scope.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "server_scope_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server Scope Id"
+        },
+        "viewport_height": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Height",
+          "type": "integer"
+        },
+        "viewport_width": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Width",
+          "type": "integer"
+        },
+        "world_scope_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "World Scope Id"
+        }
+      },
+      "required": [
+        "id",
+        "game_id",
+        "build_scope_id",
+        "account_scope_id",
+        "channel",
+        "device_scope_id",
+        "locale",
+        "viewport_width",
+        "viewport_height",
+        "identity_hash",
+        "evidence_refs"
+      ],
+      "title": "EnvironmentScopeV1",
+      "type": "object"
+    },
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The unique current leaf selected from one immutable environment lineage.",
+  "properties": {
+    "lineage_path": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Lineage Path",
+      "type": "array"
+    },
+    "lineage_statuses": {
+      "additionalProperties": {
+        "enum": [
+          "superseded",
+          "current"
+        ],
+        "type": "string"
+      },
+      "minProperties": 1,
+      "title": "Lineage Statuses",
+      "type": "object"
+    },
+    "requested_environment_id": {
+      "minLength": 1,
+      "title": "Requested Environment Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.environment-selection.v1",
+      "default": "game-observatory.ai-player.environment-selection.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "selected_environment": {
+      "$ref": "#/$defs/EnvironmentScopeV1"
+    },
+    "selected_environment_id": {
+      "minLength": 1,
+      "title": "Selected Environment Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requested_environment_id",
+    "selected_environment_id",
+    "selected_environment",
+    "lineage_path",
+    "lineage_statuses"
+  ],
+  "title": "EnvironmentSelectionV1",
+  "type": "object"
+}

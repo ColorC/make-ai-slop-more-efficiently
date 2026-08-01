@@ -98,6 +98,12 @@ class DesignSpecRenderer:
             f'</div></li>'
             for index, step in enumerate(spec["core_loop"]["steps"], start=1)
         )
+        flow_trace = "".join(
+            f'<li id="{cls._e(node["id"])}"><b>{index:02d} · {cls._e(node["title"])}</b>'
+            f'<span>{cls._e(node["description"])}</span>'
+            f'{cls._refs(node.get("source_ids", []), node.get("artifact_ids", []))}</li>'
+            for index, node in enumerate(payload["flow"], start=1)
+        )
 
         surface_html: list[str] = []
         layouts = {item["surface_id"]: item for item in spec["layout_specs"]}
@@ -172,7 +178,12 @@ class DesignSpecRenderer:
         mechanisms = "".join(
             f'<article class="rule" id="{cls._e(item["id"])}"><h3>{cls._e(item["title"])}</h3>'
             f'<p>{cls._e(item["description"])}</p>'
-            f'{f"<pre><code>{cls._e(item.get("code"))}</code></pre>" if item.get("code") else ""}</article>'
+            + (
+                f'<pre><code>{cls._e(item.get("code"))}</code></pre>'
+                if item.get("code")
+                else ""
+            )
+            + "</article>"
             for item in payload["mechanisms"]
         )
         resources = "".join(
@@ -235,7 +246,8 @@ class DesignSpecRenderer:
         )
         voices = "".join(
             f'<blockquote id="{cls._e(item["id"])}"><p>{cls._e(item["summary"])}</p>'
-            f'{f"<q>{cls._e(item.get("quote"))}</q>" if item.get("quote") else ""}'
+            + (f'<q>{cls._e(item.get("quote"))}</q>' if item.get("quote") else "")
+            +
             f'<footer>{cls._e(item["theme"])} · <a href="#source-{cls._e(item["source_id"])}">'
             f'{cls._e(sources[item["source_id"]]["title"])}</a> · 关联对象 {cls._e(" / ".join(item.get("target_object_ids", [])))}</footer></blockquote>'
             for item in payload["player_voices"]
@@ -265,8 +277,8 @@ class DesignSpecRenderer:
 <section class="chapter"><div class="chapter-head"><span>覆盖检查</span><div><h2>这份设计案包含什么</h2><ul class="coverage">{coverage_html}</ul></div></div></section>
 <section class="chapter" id="overview"><div class="chapter-head"><span>01 / Overview</span><div><h2>系统概述</h2><div class="statement-grid">{cls._statements(spec["overview"])}</div></div></div></section>
 <section class="chapter" id="goals"><div class="chapter-head"><span>02 / Goal & Entry</span><div><h2>玩家目标与入口</h2><div class="statement-grid">{cls._statements([*spec["player_goals"], *spec["entry_and_unlock"]])}</div></div></div></section>
-<section class="chapter" id="core-loop"><div class="chapter-head"><span>03 / Core Loop</span><div><h2>{cls._e(spec["core_loop"]["title"])}</h2><p>{cls._e(spec["core_loop"]["player_goal"])}</p><img class="diagram" src="{cls._e(diagrams["core_loop"])}" alt="核心循环图"><ol class="core-steps">{core_steps}</ol></div></div></section>
-<section class="chapter" id="information-architecture"><div class="chapter-head"><span>04 / IA & Screens</span><div><h2>信息架构与页面设计</h2><img class="diagram" src="{cls._e(diagrams["navigation"])}" alt="页面导航图"><table><thead><tr><th>从</th><th>触发</th><th>到</th><th>条件</th></tr></thead><tbody>{navigation_rows}</tbody></table>{"".join(surface_html)}</div></div></section>
+<section class="chapter" id="core-loop"><div class="chapter-head"><span>03 / Core Loop</span><div><h2>{cls._e(spec["core_loop"]["title"])}</h2><p>{cls._e(spec["core_loop"]["player_goal"])}</p><img class="diagram" src="{cls._e(diagrams["core_loop"])}" alt="核心循环图"><ol class="core-steps">{core_steps}</ol><h3>观察轨迹与设计步骤映射</h3><ol class="source-list">{flow_trace}</ol></div></div></section>
+<section class="chapter" id="information-architecture"><div class="chapter-head"><span>04 / IA & Screens</span><div id="surfaces"><h2>信息架构与页面设计</h2><img class="diagram" src="{cls._e(diagrams["navigation"])}" alt="页面导航图"><table><thead><tr><th>从</th><th>触发</th><th>到</th><th>条件</th></tr></thead><tbody>{navigation_rows}</tbody></table>{"".join(surface_html)}</div></div></section>
 <section class="chapter" id="interaction"><div class="chapter-head"><span>05 / Interaction</span><div><h2>交互与状态</h2><img class="diagram" src="{cls._e(diagrams["interaction"])}" alt="交互步骤图"><div class="card-grid">{interactions}</div>{state_tables}</div></div></section>
 <section class="chapter" id="rules"><div class="chapter-head"><span>06 / Rules & Economy</span><div><h2>机制与资源</h2><div class="card-grid">{mechanisms}</div><table><thead><tr><th>资源</th><th>角色</th><th>关系说明</th></tr></thead><tbody>{resources}</tbody></table></div></div></section>
 <section class="chapter" id="progression"><div class="chapter-head"><span>07 / Progression</span><div><h2>成长与数值</h2><div class="card-grid">{progression}{balances}</div></div></div></section>

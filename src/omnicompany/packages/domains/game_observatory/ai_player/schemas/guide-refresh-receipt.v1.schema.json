@@ -1,0 +1,115 @@
+{
+  "$defs": {
+    "GuideVersionReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "title": "GuideVersionReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Exactly one terminal receipt for a queued refresh request.",
+  "properties": {
+    "detail": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Detail",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "guides": {
+      "items": {
+        "$ref": "#/$defs/GuideVersionReferenceV1"
+      },
+      "title": "Guides",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "request_id": {
+      "minLength": 1,
+      "title": "Request Id",
+      "type": "string"
+    },
+    "research_pipeline": {
+      "const": "research.run",
+      "default": "research.run",
+      "title": "Research Pipeline",
+      "type": "string"
+    },
+    "research_record_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Research Record Id"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.guide-refresh-receipt.v1",
+      "default": "game-observatory.ai-player.guide-refresh-receipt.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_snapshot_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Snapshot Ids",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "offline",
+        "source_unavailable",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "environment_id",
+    "request_id",
+    "status",
+    "detail",
+    "finished_at"
+  ],
+  "title": "GuideRefreshReceiptV1",
+  "type": "object"
+}

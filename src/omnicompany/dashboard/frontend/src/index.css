@@ -109,6 +109,34 @@
 .dockview-theme-abyss .dv-default-tab-action:hover,
 .dockview-theme-abyss .dv-right-actions-container button:hover { background: var(--fp-glass-2); }
 
+/* CLI tab run state. The fixed-size slot is always present in the header; state
+   changes only affect visibility/paint, so polling never reflows the title or xterm. */
+.omni-dock-tab {
+  display: flex; align-items: center; min-width: 0; height: 100%;
+}
+.omni-dock-tab > .dv-default-tab { min-width: 0; flex: 1; }
+.omni-cc-tab-state {
+  display: inline-grid; place-items: center; flex: 0 0 11px;
+  width: 11px; height: 11px; margin-left: 2px;
+  color: var(--fp-warn); visibility: hidden;
+}
+.omni-cc-tab-state-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+}
+.omni-cc-session-tab[data-cc-tab-status='working'] .omni-cc-tab-state {
+  visibility: visible;
+}
+.omni-cc-session-tab[data-cc-tab-status='working'] .omni-cc-tab-state-dot {
+  animation: omni-cc-tab-pulse 1.35s ease-in-out infinite;
+}
+@keyframes omni-cc-tab-pulse {
+  0%, 100% { opacity: .45; box-shadow: 0 0 0 0 color-mix(in srgb, var(--fp-warn) 35%, transparent); }
+  50% { opacity: 1; box-shadow: 0 0 0 3px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .omni-cc-session-tab[data-cc-tab-status='working'] .omni-cc-tab-state-dot { animation: none; }
+}
+
 /* 代码块字号不低于地板 14(Prism / oneDark 主题内联会把 code 压到 ~12px)。
    code 容器由 codeTagProps 设 14px; .token 强制继承容器, 杜绝主题把单 token 压小。 */
 code[class*="language-"],

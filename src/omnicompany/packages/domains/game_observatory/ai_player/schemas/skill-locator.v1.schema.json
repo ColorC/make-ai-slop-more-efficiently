@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "fallback_locator_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Fallback Locator Ids",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "match_threshold": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Match Threshold"
+    },
+    "mobility": {
+      "anyOf": [
+        {
+          "enum": [
+            "fixed_chrome",
+            "fixed_surface",
+            "dynamic_world_object"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mobility"
+    },
+    "reference_artifact_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Artifact Id"
+    },
+    "reference_bounds": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourcePixelRect"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-locator.v1",
+      "default": "game-observatory.ai-player.skill-locator.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "search_region": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourcePixelRect"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "selector": {
+      "minLength": 1,
+      "title": "Selector",
+      "type": "string"
+    },
+    "step_index": {
+      "minimum": 0,
+      "title": "Step Index",
+      "type": "integer"
+    },
+    "strategy": {
+      "enum": [
+        "source_pixel",
+        "ui_selector",
+        "visible_text",
+        "template",
+        "semantic_state",
+        "adapter_native"
+      ],
+      "title": "Strategy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "step_index",
+    "strategy",
+    "selector"
+  ],
+  "title": "SkillLocatorV1",
+  "type": "object"
+}

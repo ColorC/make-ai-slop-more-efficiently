@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from omnicompany.core.config import omni_workspace_root
 
 from .canonical_graph import design_object_rows, design_relation_rows
 from .media_validation import assert_public_artifacts

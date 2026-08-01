@@ -1,0 +1,123 @@
+{
+  "$defs": {
+    "AcceptanceEvidenceIndexEntryV1": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Sha256"
+        },
+        "expected_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Expected Sha256",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "trust_policy",
+            "acceptance_manifest",
+            "receipt",
+            "receipt_evidence"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "pattern": "^traces/[A-Za-z0-9][A-Za-z0-9._/-]*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "trace_path": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Path"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "path",
+        "expected_sha256",
+        "verified"
+      ],
+      "title": "AcceptanceEvidenceIndexEntryV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceEvidenceIndexEntryV1"
+      },
+      "title": "Entries",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "run_id": {
+      "minLength": 1,
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.acceptance-evidence-index.v1",
+      "default": "game-observatory.ai-player.acceptance-evidence-index.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "status",
+    "entries"
+  ],
+  "title": "AcceptanceEvidenceIndexV1",
+  "type": "object"
+}

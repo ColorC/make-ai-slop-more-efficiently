@@ -1,0 +1,320 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "PlayerSoftSignalReviewAttestationV1": {
+      "additionalProperties": false,
+      "description": "Signed identity statement for one independent soft-signal review.",
+      "properties": {
+        "issued_at": {
+          "title": "Issued At",
+          "type": "string"
+        },
+        "key_id": {
+          "minLength": 1,
+          "title": "Key Id",
+          "type": "string"
+        },
+        "payload_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Payload Sha256",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "minLength": 1,
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "reviewer_role": {
+          "enum": [
+            "independent_agent",
+            "human",
+            "runtime_critic"
+          ],
+          "title": "Reviewer Role",
+          "type": "string"
+        },
+        "reviewer_run_id": {
+          "minLength": 1,
+          "title": "Reviewer Run Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.player-soft-signal-review-attestation.v1",
+          "default": "game-observatory.ai-player.player-soft-signal-review-attestation.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "signature_base64": {
+          "minLength": 1,
+          "title": "Signature Base64",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "reviewer_role",
+        "reviewer_run_id",
+        "key_id",
+        "payload_sha256",
+        "signature_base64"
+      ],
+      "title": "PlayerSoftSignalReviewAttestationV1",
+      "type": "object"
+    },
+    "PlayerSoftSignalV1": {
+      "additionalProperties": false,
+      "description": "Evidence-bound reviewer judgement that can trigger work but never pass a hard gate.",
+      "properties": {
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.player-soft-signal.v1",
+          "default": "game-observatory.ai-player.player-soft-signal.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Score",
+          "type": "integer"
+        },
+        "signal": {
+          "enum": [
+            "tutorial_comprehension",
+            "intent_coherence",
+            "opportunity_awareness",
+            "strategic_continuity",
+            "curiosity_quality",
+            "loop_avoidance",
+            "player_naturalness"
+          ],
+          "title": "Signal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "signal",
+        "score",
+        "rationale",
+        "evidence_step_ids"
+      ],
+      "title": "PlayerSoftSignalV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Append-only independent judgement over canonical action-quality samples.",
+  "properties": {
+    "attestation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlayerSoftSignalReviewAttestationV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "responds_to_request_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Responds To Request Id"
+    },
+    "review_evidence_run_id": {
+      "minLength": 1,
+      "title": "Review Evidence Run Id",
+      "type": "string"
+    },
+    "review_evidence_step_id": {
+      "minLength": 1,
+      "title": "Review Evidence Step Id",
+      "type": "string"
+    },
+    "reviewed_at": {
+      "title": "Reviewed At",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "minLength": 1,
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "reviewer_role": {
+      "enum": [
+        "independent_agent",
+        "human",
+        "runtime_critic"
+      ],
+      "title": "Reviewer Role",
+      "type": "string"
+    },
+    "reviewer_session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewer Session Id"
+    },
+    "sample_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Sample Ids",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.player-soft-signal-review.v1",
+      "default": "game-observatory.ai-player.player-soft-signal-review.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signals": {
+      "items": {
+        "$ref": "#/$defs/PlayerSoftSignalV1"
+      },
+      "minItems": 1,
+      "title": "Signals",
+      "type": "array"
+    },
+    "subject_session_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Subject Session Ids",
+      "type": "array"
+    },
+    "trust_scope": {
+      "default": "formal_external",
+      "enum": [
+        "formal_external",
+        "development_only"
+      ],
+      "title": "Trust Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "sample_ids",
+    "subject_session_ids",
+    "reviewer_id",
+    "reviewer_role",
+    "review_evidence_run_id",
+    "review_evidence_step_id",
+    "signals"
+  ],
+  "title": "PlayerSoftSignalReviewV1",
+  "type": "object"
+}

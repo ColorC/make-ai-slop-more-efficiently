@@ -86,7 +86,13 @@ _PUBLIC_GAME_OBSERVATORY_READ_PATHS = {
     "/game-observatory/live/",
     "/game-observatory/live.js",
     "/game-observatory/live.css",
+    "/game-observatory/sitemap.xml",
+    "/robots.txt",
     "/api/game-observatory/health",
+    "/api/game-observatory/catalog",
+    "/api/game-observatory/search",
+    "/api/game-observatory/tag-taxonomy",
+    "/api/game-observatory/content-taxonomy",
     "/api/game-observatory/ai-player/live",
     "/api/game-observatory/ai-player/live/frame.png",
     "/api/game-observatory/ai-player/live/stream.mjpg",
@@ -106,6 +112,14 @@ _PUBLIC_GAME_OBSERVATORY_STUDIO_SURFACES = {
     "reader",
 }
 _PUBLIC_GAME_OBSERVATORY_READ_PREFIXES = (
+    "/game-observatory/report/",
+    "/game-observatory/game/",
+    "/game-observatory/play/",
+    "/game-observatory/reports/",
+    "/api/game-observatory/reports/",
+    "/api/game-observatory/artifacts/",
+    "/api/game-observatory/diagrams/",
+    "/api/game-observatory/fragments/",
     "/api/game-observatory/internal/artifacts/",
     "/game-observatory/live-media/",
 )

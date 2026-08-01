@@ -44,6 +44,9 @@ from .reader_content_taxonomy import (
 PLAN_SCHEMA = "game-observatory.reader-story-production-plan.v1"
 STATE_SCHEMA = "game-observatory.reader-story-production-state.v1"
 PROVENANCE_SCHEMA = "game-observatory.reader-story-image-provenance.v1"
+NORMALIZED_RESULT_SCHEMA = (
+    "game-observatory.reader-story-normalized-worker-result.v1"
+)
 MODEL = "gpt-5.6-terra"
 MAX_CONCURRENCY = 3
 DIRECT_MAX_ATOMS = 600
@@ -1129,6 +1132,92 @@ def _structured_result(payload: Mapping[str, Any]) -> dict[str, Any]:
     return value
 
 
+def _materialize_structured_result(result_path: Path) -> Path:
+    """Return an immutable or auditable structured worker result.
+
+    External workers normally provide ``structured_output``.  A successful
+    run can occasionally leave the same JSON only in ``final_text`` (for
+    example, after a stream ends one closing brace early).  Never rewrite the
+    original audit payload.  Instead, accept only an exact JSON object or one
+    that becomes an object after appending at most two closing braces at EOF,
+    and write that derived payload beside the source result.
+    """
+
+    result_path = result_path.resolve()
+    payload = _read_json(result_path)
+    if not isinstance(payload, dict):
+        raise ValueError("Terra result payload must be an object")
+    if isinstance(payload.get("structured_output"), dict):
+        return result_path
+    final_text = str(payload.get("final_text") or "").strip()
+    if not final_text:
+        raise ValueError("Terra result has no JSON structured output")
+
+    parsed: Any | None = None
+    method = "exact_final_text"
+    appended_closing_braces = 0
+    try:
+        parsed = json.loads(final_text)
+    except json.JSONDecodeError as initial_error:
+        if initial_error.pos != len(final_text):
+            raise ValueError(
+                "Terra result has no JSON structured output"
+            ) from initial_error
+        for closing_braces in (1, 2):
+            try:
+                candidate = json.loads(final_text + ("}" * closing_braces))
+            except json.JSONDecodeError:
+                continue
+            if isinstance(candidate, dict):
+                parsed = candidate
+                method = "append_closing_braces_at_eof"
+                appended_closing_braces = closing_braces
+                break
+        if parsed is None:
+            raise ValueError(
+                "Terra result has no JSON structured output"
+            ) from initial_error
+    if not isinstance(parsed, dict):
+        raise ValueError("Terra structured output must be an object")
+
+    source_sha256 = _file_sha256(result_path)
+    normalized_path = result_path.with_name("normalized-result.json")
+    if normalized_path.is_file():
+        existing = _read_json(normalized_path)
+        normalization = (
+            existing.get("normalization")
+            if isinstance(existing, dict)
+            else {}
+        )
+        if (
+            isinstance(existing, dict)
+            and isinstance(existing.get("structured_output"), dict)
+            and isinstance(normalization, dict)
+            and normalization.get("source_result_sha256") == source_sha256
+        ):
+            return normalized_path
+        normalized_path = result_path.with_name(
+            f"normalized-result-{source_sha256[:12]}.json"
+        )
+
+    normalized = copy.deepcopy(payload)
+    normalized["structured_output"] = parsed
+    normalized["normalization"] = {
+        "schema": NORMALIZED_RESULT_SCHEMA,
+        "created_at": _now(),
+        "source_result": str(result_path),
+        "source_result_sha256": source_sha256,
+        "final_text_sha256": hashlib.sha256(
+            final_text.encode("utf-8")
+        ).hexdigest(),
+        "method": method,
+        "appended_closing_braces": appended_closing_braces,
+        "original_result_unchanged": True,
+    }
+    _atomic_json(normalized_path, normalized)
+    return normalized_path
+
+
 def _result_succeeded(payload: Mapping[str, Any]) -> bool:
     return (
         str(payload.get("status") or "") == ExternalAgentStatus.SUCCEEDED.value
@@ -1210,8 +1299,12 @@ async def _run_worker_stage(
         matching_attempts += 1
         existing = _read_json(result_path)
         if _result_succeeded(existing):
-            _structured_result(existing)
-            return result_path
+            try:
+                return _materialize_structured_result(result_path)
+            except ValueError:
+                # A transport-success payload with unusable structured data is
+                # still a failed attempt for this exact stage signature.
+                continue
     if matching_attempts >= MAX_WORKER_ATTEMPTS:
         raise RuntimeError(
             f"{stage} already failed {matching_attempts} times for the same inputs"
@@ -1293,8 +1386,15 @@ async def _run_worker_stage(
         payload = result.audit_payload()
         _write_json(result_path, payload)
         if _result_succeeded(payload):
-            _structured_result(payload)
-            return result_path
+            try:
+                return _materialize_structured_result(result_path)
+            except ValueError as exc:
+                if signature_attempt == MAX_WORKER_ATTEMPTS:
+                    raise RuntimeError(
+                        f"{stage} returned invalid structured output after "
+                        f"{signature_attempt} matching attempts: {exc}"
+                    ) from exc
+                continue
         if signature_attempt == MAX_WORKER_ATTEMPTS:
             raise RuntimeError(
                 f"{stage} failed after {signature_attempt} matching attempts: "

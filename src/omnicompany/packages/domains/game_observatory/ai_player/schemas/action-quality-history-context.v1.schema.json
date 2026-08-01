@@ -1,0 +1,509 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "NormalizedAction": {
+      "properties": {
+        "axis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Button"
+        },
+        "duration_ms": {
+          "default": 250,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "keycode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keycode"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "pinch_direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Direction"
+        },
+        "pinch_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Percent"
+        },
+        "pinch_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Pinch Steps",
+          "type": "integer"
+        },
+        "pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressed"
+        },
+        "seconds": {
+          "default": 0.5,
+          "title": "Seconds",
+          "type": "number"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "two_finger_offset_x": {
+          "default": 0,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset X",
+          "type": "integer"
+        },
+        "two_finger_offset_y": {
+          "default": 50,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset Y",
+          "type": "integer"
+        },
+        "two_finger_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Two Finger Steps",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "tap",
+            "swipe",
+            "pinch",
+            "two_finger_swipe",
+            "text",
+            "key",
+            "launch",
+            "force_stop",
+            "wait",
+            "back",
+            "home",
+            "mouse_move",
+            "mouse_button",
+            "gamepad_button",
+            "gamepad_axis",
+            "reset"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "x2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X2"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "y2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NormalizedAction",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    },
+    "TransitionEdgeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/NormalizedAction"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expected_change": {
+          "minLength": 1,
+          "title": "Expected Change",
+          "type": "string"
+        },
+        "from_state_id": {
+          "minLength": 1,
+          "title": "From State Id",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "observed_change": {
+          "minLength": 1,
+          "title": "Observed Change",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "verified_transition",
+            "verified_state_change",
+            "verified_progress",
+            "verified_no_change",
+            "failed",
+            "forbidden",
+            "deferred"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "recovery_skill_version_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Skill Version Id"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.transition-edge.v1",
+          "default": "game-observatory.ai-player.transition-edge.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "target_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "to_state_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To State Id"
+        },
+        "version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "environment_id",
+        "evidence_refs",
+        "id",
+        "from_state_id",
+        "action",
+        "expected_change",
+        "observed_change",
+        "outcome"
+      ],
+      "title": "TransitionEdgeV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Canonical command-time history needed to identify genuinely new graph facts.",
+  "properties": {
+    "command_id": {
+      "minLength": 1,
+      "title": "Command Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "known_state_ids_before_command": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Known State Ids Before Command",
+      "type": "array"
+    },
+    "known_transition_ids_before_command": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Known Transition Ids Before Command",
+      "type": "array"
+    },
+    "matching_prior_transitions": {
+      "items": {
+        "$ref": "#/$defs/TransitionEdgeV1"
+      },
+      "title": "Matching Prior Transitions",
+      "type": "array"
+    },
+    "result_transition": {
+      "$ref": "#/$defs/TransitionEdgeV1"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.action-quality-history-context.v1",
+      "default": "game-observatory.ai-player.action-quality-history-context.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "selectable_task_ids_after_consolidation": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Selectable Task Ids After Consolidation",
+      "type": "array"
+    }
+  },
+  "required": [
+    "environment_id",
+    "command_id",
+    "result_transition"
+  ],
+  "title": "ActionQualityHistoryContextV1",
+  "type": "object"
+}

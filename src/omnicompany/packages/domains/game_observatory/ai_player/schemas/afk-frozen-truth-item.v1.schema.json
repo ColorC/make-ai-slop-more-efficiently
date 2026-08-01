@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "HumanTruthEvidenceRefV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "sha256"
+      ],
+      "title": "HumanTruthEvidenceRefV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate": {
+      "additionalProperties": true,
+      "title": "Candidate",
+      "type": "object"
+    },
+    "candidate_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Candidate Hash",
+      "type": "string"
+    },
+    "candidate_id": {
+      "minLength": 1,
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "collection": {
+      "enum": [
+        "states",
+        "edges",
+        "objects",
+        "routes",
+        "controlled_interruptions",
+        "boundaries"
+      ],
+      "title": "Collection",
+      "type": "string"
+    },
+    "decision": {
+      "enum": [
+        "accepted",
+        "excluded"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/HumanTruthEvidenceRefV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "human_reason": {
+      "minLength": 20,
+      "title": "Human Reason",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.afk-frozen-truth-item.v1",
+      "default": "game-observatory.ai-player.afk-frozen-truth-item.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "collection",
+    "candidate_id",
+    "candidate_hash",
+    "candidate",
+    "decision",
+    "human_reason",
+    "evidence_refs"
+  ],
+  "title": "AFKFrozenTruthItemV1",
+  "type": "object"
+}

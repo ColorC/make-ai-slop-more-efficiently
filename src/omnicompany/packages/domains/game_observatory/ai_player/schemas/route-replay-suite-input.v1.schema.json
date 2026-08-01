@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "RouteReplaySuiteInputItemV1": {
+      "additionalProperties": false,
+      "properties": {
+        "route_id": {
+          "minLength": 1,
+          "title": "Route Id",
+          "type": "string"
+        },
+        "verification_path": {
+          "minLength": 1,
+          "title": "Verification Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "route_id",
+        "verification_path"
+      ],
+      "title": "RouteReplaySuiteInputItemV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "benchmark_id": {
+      "minLength": 1,
+      "title": "Benchmark Id",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/RouteReplaySuiteInputItemV1"
+      },
+      "minItems": 1,
+      "title": "Items",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.route-replay-suite-input.v1",
+      "default": "game-observatory.ai-player.route-replay-suite-input.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "benchmark_id",
+    "items"
+  ],
+  "title": "RouteReplaySuiteInputV1",
+  "type": "object"
+}

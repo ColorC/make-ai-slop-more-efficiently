@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 from typing import Any, Literal
 from urllib.request import Request, urlopen
 
 from pydantic import BaseModel, Field
 
 from .models import BenchmarkTask, ObjectiveCheck, utc_now
+from .subprocess_policy import headless_process_kwargs
 
 
 class AfkHeroUpgradeSnapshot(BaseModel):
@@ -24,6 +28,13 @@ class AfkHeroUpgradeSnapshot(BaseModel):
     build_scope_id: str
     state_hash: str
     verified_at: str | None = None
+    native_identity_verified: bool = False
+    hero_module_unlocked: bool = False
+    resource_mutation_authorized: bool = False
+    reset_verified: bool = False
+    runtime_account_uid: str | None = None
+    server_name: str | None = None
+    evidence_paths: list[str] = Field(default_factory=list)
 
 
 class AfkHeroUpgradeOracle:
@@ -76,6 +87,59 @@ class AfkHeroUpgradeOracle:
                 "symbols": symbols,
             }
         return {"ok": all_symbols, "root": str(self.source_root), "files": files}
+
+    @staticmethod
+    def _unity_cli_json(*args: str) -> dict[str, Any]:
+        executable = os.environ.get("demogame_UNITY_EXECUTABLE") or shutil.which("demogame-unity")
+        if not executable:
+            raise OSError("demogame-unity executable is unavailable")
+        completed = subprocess.run(  # noqa: S603 - fixed executable and allowlisted arguments
+            [executable, "--json", *args],
+            check=False,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=45,
+            **headless_process_kwargs(),
+        )
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or completed.stdout.strip()
+            raise OSError(f"demogame-unity {' '.join(args)} failed: {detail}")
+        payload = json.loads(completed.stdout)
+        if not isinstance(payload, dict):
+            raise ValueError("demogame-unity returned a non-object payload")
+        return payload
+
+    def unity_cli_evidence(self) -> dict[str, Any]:
+        """Read the canonical QA-Unity account gates without retaining its full server list."""
+        try:
+            editor = self._unity_cli_json("editor", "state")
+            is_playing = bool(editor.get("data", {}).get("isPlaying"))
+            account_payload = self._unity_cli_json("account", "profile") if is_playing else {}
+            profile = account_payload.get("profile", {})
+            if not isinstance(profile, dict):
+                raise ValueError("account profile is not an object")
+            identity = {
+                "runtime_stage": profile.get("runtimeStage"),
+                "account_profile": profile.get("accountProfile"),
+                "uid": profile.get("uid"),
+                "app_uid": profile.get("appUid"),
+                "server_id": profile.get("serverId"),
+                "server_name": profile.get("serverName"),
+                "module_preconditions": profile.get("modulePreconditions", {}),
+                "constraints": profile.get("constraints", []),
+            }
+            return {
+                "ok": is_playing and identity["runtime_stage"] == "in_game",
+                "editor": {
+                    "is_playing": is_playing,
+                    "is_compiling": bool(editor.get("data", {}).get("isCompiling")),
+                    "project_path": editor.get("data", {}).get("status", {}).get("projectPath"),
+                },
+                "identity": identity,
+            }
+        except (OSError, ValueError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
+            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
     def task(self, snapshot: AfkHeroUpgradeSnapshot) -> BenchmarkTask:
         return BenchmarkTask(
@@ -163,6 +227,13 @@ class AfkHeroUpgradeOracle:
             errors.append(f"AgentBridge project mismatch: {status.get('projectPath')!r}")
         if not status.get("isPlaying"):
             errors.append("Unity Editor is not in PlayMode")
+        unity_cli = self.unity_cli_evidence()
+        if status.get("isPlaying") and not unity_cli.get("ok"):
+            errors.append(f"QA-Unity account probe failed: {unity_cli.get('error') or unity_cli}")
+        elif unity_cli.get("ok"):
+            modules = unity_cli.get("identity", {}).get("module_preconditions", {})
+            if modules.get("Hero") is not True:
+                errors.append("runtime account does not have the Hero module unlocked")
         snapshot: AfkHeroUpgradeSnapshot | None = None
         if not snapshot_path or not snapshot_path.is_file():
             errors.append("verified fixed-account snapshot manifest is missing")
@@ -175,6 +246,28 @@ class AfkHeroUpgradeOracle:
                     errors.append("snapshot manifest is contract_only, not verified")
                 if snapshot.target_level != snapshot.starting_level + 1:
                     errors.append("snapshot target_level must equal starting_level + 1")
+                if snapshot.availability == "verified":
+                    required_gates = {
+                        "native_identity_verified": snapshot.native_identity_verified,
+                        "hero_module_unlocked": snapshot.hero_module_unlocked,
+                        "resource_mutation_authorized": snapshot.resource_mutation_authorized,
+                        "reset_verified": snapshot.reset_verified,
+                    }
+                    for gate, passed in required_gates.items():
+                        if not passed:
+                            errors.append(f"snapshot safety gate is false: {gate}")
+                    if not snapshot.runtime_account_uid:
+                        errors.append("snapshot runtime_account_uid is missing")
+                    if not snapshot.server_name:
+                        errors.append("snapshot server_name is missing")
+                    if not snapshot.evidence_paths:
+                        errors.append("snapshot evidence_paths are missing")
+                    identity = unity_cli.get("identity", {})
+                    if identity:
+                        if identity.get("uid") != snapshot.runtime_account_uid:
+                            errors.append("runtime account UID does not match the verified snapshot")
+                        if identity.get("server_name") != snapshot.server_name:
+                            errors.append("runtime server does not match the verified snapshot")
             except (OSError, ValueError) as exc:
                 errors.append(f"invalid snapshot manifest: {exc}")
         result = {
@@ -182,6 +275,7 @@ class AfkHeroUpgradeOracle:
             "generated_at": utc_now(),
             "ready": not errors,
             "bridge": {"port": bridge_port, "status": status, "health": health},
+            "unity_cli": unity_cli,
             "source": source,
             "snapshot": snapshot.model_dump(mode="json") if snapshot else None,
             "errors": errors,

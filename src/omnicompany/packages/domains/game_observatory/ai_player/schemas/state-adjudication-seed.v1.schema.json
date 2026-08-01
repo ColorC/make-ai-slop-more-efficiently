@@ -1,0 +1,533 @@
+{
+  "$defs": {
+    "NormalizedSurfaceRectV1": {
+      "additionalProperties": false,
+      "description": "Viewport-independent UI region in a 1000 by 1000 coordinate space.",
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Height",
+          "type": "integer"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "default": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "NormalizedSurfaceRectV1",
+      "type": "object"
+    },
+    "SemanticSurfaceAnchorV1": {
+      "additionalProperties": false,
+      "description": "Reviewed locator hint for one interaction role; never a production route.",
+      "properties": {
+        "action": {
+          "default": "tap",
+          "enum": [
+            "tap",
+            "long_press",
+            "swipe"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mobility": {
+          "enum": [
+            "fixed_chrome",
+            "fixed_surface",
+            "dynamic_world_object"
+          ],
+          "title": "Mobility",
+          "type": "string"
+        },
+        "normalized_bounds": {
+          "$ref": "#/$defs/NormalizedSurfaceRectV1"
+        },
+        "reference_artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Artifact Id"
+        },
+        "role": {
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.semantic-surface-anchor.v1",
+          "default": "game-observatory.ai-player.semantic-surface-anchor.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "target_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Tokens",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "target_tokens",
+        "mobility",
+        "normalized_bounds"
+      ],
+      "title": "SemanticSurfaceAnchorV1",
+      "type": "object"
+    },
+    "SemanticSurfaceProfileV1": {
+      "additionalProperties": false,
+      "description": "Reusable stable semantics for recognizing and operating one UI surface.",
+      "properties": {
+        "dynamic_field_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dynamic Field Names",
+          "type": "array"
+        },
+        "interaction_roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Interaction Roles",
+          "type": "array"
+        },
+        "page_identity_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Page Identity Tokens",
+          "type": "array"
+        },
+        "risk_boundary_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Boundary Tokens",
+          "type": "array"
+        },
+        "safe_exit_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Safe Exit Tokens",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.semantic-surface-profile.v1",
+          "default": "game-observatory.ai-player.semantic-surface-profile.v1",
+          "title": "Schema",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_identity_tokens"
+      ],
+      "title": "SemanticSurfaceProfileV1",
+      "type": "object"
+    },
+    "StateAdjudicationAttestationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "issued_at": {
+          "minLength": 1,
+          "title": "Issued At",
+          "type": "string"
+        },
+        "key_id": {
+          "minLength": 1,
+          "title": "Key Id",
+          "type": "string"
+        },
+        "payload_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Payload Sha256",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "minLength": 1,
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "reviewer_role": {
+          "enum": [
+            "independent_agent",
+            "human",
+            "runtime_critic"
+          ],
+          "title": "Reviewer Role",
+          "type": "string"
+        },
+        "reviewer_session_id": {
+          "minLength": 1,
+          "title": "Reviewer Session Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.state-adjudication-attestation.v1",
+          "default": "game-observatory.ai-player.state-adjudication-attestation.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "signature_base64": {
+          "minLength": 1,
+          "title": "Signature Base64",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "reviewer_role",
+        "reviewer_session_id",
+        "key_id",
+        "payload_sha256",
+        "signature_base64",
+        "issued_at"
+      ],
+      "title": "StateAdjudicationAttestationV1",
+      "type": "object"
+    },
+    "StateAdjudicationDecisionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "disposition": {
+          "enum": [
+            "accepted",
+            "candidate",
+            "invalidated",
+            "superseded"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "expected_state_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Expected State Sha256",
+          "type": "string"
+        },
+        "expected_version": {
+          "minimum": 1,
+          "title": "Expected Version",
+          "type": "integer"
+        },
+        "merge_into_state_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Merge Into State Id"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "reviewed_observation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Reviewed Observation Ids",
+          "type": "array"
+        },
+        "state_id": {
+          "minLength": 1,
+          "title": "State Id",
+          "type": "string"
+        },
+        "surface_anchors": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SemanticSurfaceAnchorV1"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Surface Anchors"
+        },
+        "surface_profile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SemanticSurfaceProfileV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state_id",
+        "expected_version",
+        "expected_state_sha256",
+        "disposition",
+        "title",
+        "description",
+        "reviewed_observation_ids",
+        "rationale"
+      ],
+      "title": "StateAdjudicationDecisionV1",
+      "type": "object"
+    },
+    "TransitionAdjudicationDecisionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_id": {
+          "minLength": 1,
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "expected_edge_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Expected Edge Sha256",
+          "type": "string"
+        },
+        "expected_version": {
+          "minimum": 1,
+          "title": "Expected Version",
+          "type": "integer"
+        },
+        "observed_change": {
+          "minLength": 1,
+          "title": "Observed Change",
+          "type": "string"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "reviewed_evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Reviewed Evidence Step Ids",
+          "type": "array"
+        },
+        "semantic_observation": {
+          "enum": [
+            "distinct_state",
+            "same_state_progress",
+            "same_state_no_progress",
+            "uncertain"
+          ],
+          "title": "Semantic Observation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edge_id",
+        "expected_version",
+        "expected_edge_sha256",
+        "semantic_observation",
+        "observed_change",
+        "reviewed_evidence_step_ids",
+        "rationale"
+      ],
+      "title": "TransitionAdjudicationDecisionV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adjudicator_id": {
+      "minLength": 1,
+      "title": "Adjudicator Id",
+      "type": "string"
+    },
+    "attestation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StateAdjudicationAttestationV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_run_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence Run Ids",
+      "type": "array"
+    },
+    "packet_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Packet Sha256",
+      "type": "string"
+    },
+    "reviewed_at": {
+      "minLength": 1,
+      "title": "Reviewed At",
+      "type": "string"
+    },
+    "reviewer_role": {
+      "enum": [
+        "independent_agent",
+        "human",
+        "runtime_critic"
+      ],
+      "title": "Reviewer Role",
+      "type": "string"
+    },
+    "reviewer_session_id": {
+      "minLength": 1,
+      "title": "Reviewer Session Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-adjudication-seed.v1",
+      "default": "game-observatory.ai-player.state-adjudication-seed.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "seed_id": {
+      "minLength": 1,
+      "title": "Seed Id",
+      "type": "string"
+    },
+    "state_decisions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StateAdjudicationDecisionV1"
+      },
+      "title": "State Decisions",
+      "type": "array"
+    },
+    "subject_session_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Subject Session Ids",
+      "type": "array"
+    },
+    "transition_decisions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TransitionAdjudicationDecisionV1"
+      },
+      "title": "Transition Decisions",
+      "type": "array"
+    },
+    "trust_scope": {
+      "default": "formal_external",
+      "enum": [
+        "formal_external",
+        "development_only"
+      ],
+      "title": "Trust Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seed_id",
+    "environment_id",
+    "packet_sha256",
+    "adjudicator_id",
+    "reviewer_role",
+    "reviewer_session_id",
+    "subject_session_ids",
+    "evidence_run_ids",
+    "reviewed_at"
+  ],
+  "title": "StateAdjudicationSeedV1",
+  "type": "object"
+}

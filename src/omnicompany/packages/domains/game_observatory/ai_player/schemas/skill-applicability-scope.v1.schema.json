@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "account_scope_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Account Scope Ids",
+      "type": "array"
+    },
+    "build_scope_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Build Scope Ids",
+      "type": "array"
+    },
+    "channel": {
+      "minLength": 1,
+      "title": "Channel",
+      "type": "string"
+    },
+    "device_scope_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Device Scope Ids",
+      "type": "array"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "locale": {
+      "minLength": 1,
+      "title": "Locale",
+      "type": "string"
+    },
+    "required_state_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Required State Ids",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-applicability-scope.v1",
+      "default": "game-observatory.ai-player.skill-applicability-scope.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "server_scope_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Server Scope Ids",
+      "type": "array"
+    },
+    "viewport_heights": {
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 1,
+      "title": "Viewport Heights",
+      "type": "array"
+    },
+    "viewport_widths": {
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 1,
+      "title": "Viewport Widths",
+      "type": "array"
+    },
+    "visual_variant_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Visual Variant Ids",
+      "type": "array"
+    },
+    "world_scope_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "World Scope Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "game_id",
+    "build_scope_ids",
+    "channel",
+    "locale",
+    "device_scope_ids",
+    "viewport_widths",
+    "viewport_heights",
+    "required_state_ids"
+  ],
+  "title": "SkillApplicabilityScopeV1",
+  "type": "object"
+}

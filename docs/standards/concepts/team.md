@@ -3,19 +3,16 @@
 > **必要不充分**: 不满足一定有问题, 满足不一定没问题.
 > 强制度: `[MUST]` / `[SHOULD]` / `[MAY]`
 >
-> 代码参考: `src/omnicompany/protocol/team.py` (`TeamSpec` / `TeamEdge`, canonical 协议类)
+> 代码参考: `src/omnicompany/protocol/pipeline.py` (PipelineSpec / PipelineEdge, protocol 层 Python 类名)
 > 设计参考: `.claude/skills/omnicompany-dev/SKILL.md` §4, §9
 
 ---
 
 ## 术语
 
-本规范主体和代码契约都用 **Team** 表达一组 Worker 的协作单位。唯一结构是
-`omnicompany.protocol.team.TeamSpec`。`Pipeline` / `PipelineSpec` 仅是旧 import 和旧数据的
-兼容名，不表示第二种结构，也不得用于新设计。
+本规范主体叙述用 **Team** 表达一组 Worker 的协作单位。`Pipeline` / `PipelineSpec` 是 protocol 层 Python 类名, 在本规范中等同于 Team — 仅代码引用场景保留 `Pipeline` 名字。
 
-下文历史条款（P-01~P-17）残留的 "Pipeline" / "管线" 字样请读作 Team；"节点"字样读作
-Worker。完整对照见 [`terminology.md §6`](../_global/terminology.md)。
+下文条款（P-01~P-17）的 "Pipeline" / "管线" 字样请读作 Team; "节点" 字样读作 Worker。完整对照见 [`terminology.md §6`](../_global/terminology.md)。
 
 ---
 

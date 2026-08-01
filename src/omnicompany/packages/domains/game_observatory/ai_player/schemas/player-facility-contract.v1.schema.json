@@ -1,0 +1,438 @@
+{
+  "$defs": {
+    "AgentLayerV1": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Candidates",
+          "type": "array"
+        },
+        "escalate_when": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Escalate When",
+          "type": "array"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "responsibility": {
+          "minLength": 1,
+          "title": "Responsibility",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "A0",
+            "A1",
+            "A2",
+            "A3",
+            "A4"
+          ],
+          "title": "Tier",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tier",
+        "name",
+        "responsibility",
+        "candidates"
+      ],
+      "title": "AgentLayerV1",
+      "type": "object"
+    },
+    "ContinuousSessionPolicyV1": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_restart_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Allowed Restart Reasons",
+          "type": "array"
+        },
+        "checkpoint_every_semantic_actions": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Checkpoint Every Semantic Actions",
+          "type": "integer"
+        },
+        "forbidden_behaviors": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Forbidden Behaviors",
+          "type": "array"
+        },
+        "full_help_load_events": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Full Help Load Events",
+          "type": "array"
+        },
+        "heartbeat_after_device_action": {
+          "default": true,
+          "title": "Heartbeat After Device Action",
+          "type": "boolean"
+        },
+        "heartbeat_interval_seconds_max": {
+          "default": 30,
+          "minimum": 1,
+          "title": "Heartbeat Interval Seconds Max",
+          "type": "integer"
+        },
+        "safe_stop_after_silence_seconds": {
+          "default": 60,
+          "minimum": 1,
+          "title": "Safe Stop After Silence Seconds",
+          "type": "integer"
+        },
+        "semantic_actions_per_session_min": {
+          "default": 10,
+          "minimum": 1,
+          "title": "Semantic Actions Per Session Min",
+          "type": "integer"
+        },
+        "semantic_actions_per_session_target": {
+          "default": 30,
+          "minimum": 1,
+          "title": "Semantic Actions Per Session Target",
+          "type": "integer"
+        },
+        "warn_after_silence_seconds": {
+          "default": 30,
+          "minimum": 1,
+          "title": "Warn After Silence Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "full_help_load_events",
+        "allowed_restart_reasons",
+        "forbidden_behaviors"
+      ],
+      "title": "ContinuousSessionPolicyV1",
+      "type": "object"
+    },
+    "ExternalAgentProviderV1": {
+      "additionalProperties": false,
+      "properties": {
+        "effort_argument": {
+          "minLength": 1,
+          "title": "Effort Argument",
+          "type": "string"
+        },
+        "event_format": {
+          "enum": [
+            "jsonl",
+            "stream-json"
+          ],
+          "title": "Event Format",
+          "type": "string"
+        },
+        "executable": {
+          "enum": [
+            "codex",
+            "claude"
+          ],
+          "title": "Executable",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "codex-cli",
+            "claude-code-cli"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "resume_template": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Resume Template",
+          "type": "array"
+        },
+        "session_id_source": {
+          "minLength": 1,
+          "title": "Session Id Source",
+          "type": "string"
+        },
+        "start_template": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Start Template",
+          "type": "array"
+        }
+      },
+      "required": [
+        "provider",
+        "executable",
+        "start_template",
+        "resume_template",
+        "event_format",
+        "session_id_source",
+        "effort_argument"
+      ],
+      "title": "ExternalAgentProviderV1",
+      "type": "object"
+    },
+    "PlayerCLICommandV1": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "诊断",
+            "上下文",
+            "环境",
+            "设备",
+            "会话",
+            "观察",
+            "操作",
+            "探索",
+            "任务",
+            "玩法",
+            "状态",
+            "记忆",
+            "技能",
+            "攻略",
+            "日账",
+            "证据",
+            "基准",
+            "账号",
+            "控制台"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "examples": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Examples",
+          "type": "array"
+        },
+        "guard_profile": {
+          "enum": [
+            "none",
+            "local_write",
+            "device_preflight",
+            "account_policy"
+          ],
+          "title": "Guard Profile",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_.-]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "json_output": {
+          "default": true,
+          "title": "Json Output",
+          "type": "boolean"
+        },
+        "mutation_scope": {
+          "enum": [
+            "read_only",
+            "local_state",
+            "device",
+            "account"
+          ],
+          "title": "Mutation Scope",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "category",
+        "summary",
+        "mutation_scope",
+        "guard_profile",
+        "examples"
+      ],
+      "title": "PlayerCLICommandV1",
+      "type": "object"
+    },
+    "PlayerTestPolicyV1": {
+      "additionalProperties": false,
+      "properties": {
+        "daily_test_limit_seconds": {
+          "default": 120,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Daily Test Limit Seconds",
+          "type": "integer"
+        },
+        "required_post_run_fields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Required Post Run Fields",
+          "type": "array"
+        },
+        "required_pre_run_fields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Required Pre Run Fields",
+          "type": "array"
+        },
+        "run_is_primary_e2e": {
+          "default": true,
+          "title": "Run Is Primary E2E",
+          "type": "boolean"
+        },
+        "stop_and_diagnose_when": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Stop And Diagnose When",
+          "type": "array"
+        }
+      },
+      "required": [
+        "required_pre_run_fields",
+        "required_post_run_fields",
+        "stop_and_diagnose_when"
+      ],
+      "title": "PlayerTestPolicyV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agent_layers": {
+      "items": {
+        "$ref": "#/$defs/AgentLayerV1"
+      },
+      "maxItems": 5,
+      "minItems": 5,
+      "title": "Agent Layers",
+      "type": "array"
+    },
+    "behavior_rules_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Behavior Rules Sha256",
+      "type": "string"
+    },
+    "canonical_sources": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Canonical Sources",
+      "type": "array"
+    },
+    "cli_help_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Cli Help Sha256",
+      "type": "string"
+    },
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/PlayerCLICommandV1"
+      },
+      "minItems": 1,
+      "title": "Commands",
+      "type": "array"
+    },
+    "continuous_session_policy": {
+      "$ref": "#/$defs/ContinuousSessionPolicyV1"
+    },
+    "external_agent_providers": {
+      "items": {
+        "$ref": "#/$defs/ExternalAgentProviderV1"
+      },
+      "minItems": 2,
+      "title": "External Agent Providers",
+      "type": "array"
+    },
+    "facility_contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Facility Contract Sha256",
+      "type": "string"
+    },
+    "help_language": {
+      "const": "zh-CN",
+      "default": "zh-CN",
+      "title": "Help Language",
+      "type": "string"
+    },
+    "invariants": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Invariants",
+      "type": "array"
+    },
+    "public_root": {
+      "const": "omni game player",
+      "default": "omni game player",
+      "title": "Public Root",
+      "type": "string"
+    },
+    "public_schema_bundle_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Public Schema Bundle Sha256",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.facility-contract.v1",
+      "default": "game-observatory.ai-player.facility-contract.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "test_policy": {
+      "$ref": "#/$defs/PlayerTestPolicyV1"
+    }
+  },
+  "required": [
+    "commands",
+    "external_agent_providers",
+    "agent_layers",
+    "continuous_session_policy",
+    "test_policy",
+    "invariants",
+    "canonical_sources",
+    "cli_help_sha256",
+    "public_schema_bundle_sha256",
+    "behavior_rules_sha256",
+    "facility_contract_sha256"
+  ],
+  "title": "PlayerFacilityContractV1",
+  "type": "object"
+}

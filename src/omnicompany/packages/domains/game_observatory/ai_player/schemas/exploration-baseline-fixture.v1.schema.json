@@ -1,0 +1,660 @@
+{
+  "$defs": {
+    "BenchmarkTask": {
+      "properties": {
+        "allowed_actions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Actions",
+          "type": "array"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/ObjectiveCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "goal": {
+          "title": "Goal",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "reset_method": {
+          "title": "Reset Method",
+          "type": "string"
+        },
+        "start_state": {
+          "title": "Start State",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "start_state",
+        "goal",
+        "allowed_actions",
+        "reset_method",
+        "checks"
+      ],
+      "title": "BenchmarkTask",
+      "type": "object"
+    },
+    "ExplorationDecision": {
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NormalizedAction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "expected_change": {
+          "title": "Expected Change",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "raw": {
+          "additionalProperties": true,
+          "title": "Raw",
+          "type": "object"
+        },
+        "risk_flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Flags",
+          "type": "array"
+        },
+        "safe_to_act": {
+          "default": false,
+          "title": "Safe To Act",
+          "type": "boolean"
+        },
+        "surface_summary": {
+          "title": "Surface Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surface_summary",
+        "rationale",
+        "expected_change",
+        "provider"
+      ],
+      "title": "ExplorationDecision",
+      "type": "object"
+    },
+    "ExplorationPolicy": {
+      "properties": {
+        "allowed_action_types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Action Types",
+          "type": "array"
+        },
+        "allowed_packages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Packages",
+          "type": "array"
+        },
+        "allowed_tap_regions": {
+          "items": {
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Allowed Tap Regions",
+          "type": "array"
+        },
+        "max_seconds": {
+          "default": 180.0,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Max Seconds",
+          "type": "number"
+        },
+        "max_state_visits": {
+          "default": 2,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max State Visits",
+          "type": "integer"
+        },
+        "max_steps": {
+          "default": 3,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Max Steps",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "allowed_action_types"
+      ],
+      "title": "ExplorationPolicy",
+      "type": "object"
+    },
+    "NormalizedAction": {
+      "properties": {
+        "axis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Button"
+        },
+        "duration_ms": {
+          "default": 250,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "keycode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keycode"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "pinch_direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Direction"
+        },
+        "pinch_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Percent"
+        },
+        "pinch_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Pinch Steps",
+          "type": "integer"
+        },
+        "pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressed"
+        },
+        "seconds": {
+          "default": 0.5,
+          "title": "Seconds",
+          "type": "number"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "two_finger_offset_x": {
+          "default": 0,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset X",
+          "type": "integer"
+        },
+        "two_finger_offset_y": {
+          "default": 50,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset Y",
+          "type": "integer"
+        },
+        "two_finger_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Two Finger Steps",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "tap",
+            "swipe",
+            "pinch",
+            "two_finger_swipe",
+            "text",
+            "key",
+            "launch",
+            "force_stop",
+            "wait",
+            "back",
+            "home",
+            "mouse_move",
+            "mouse_button",
+            "gamepad_button",
+            "gamepad_axis",
+            "reset"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "x2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X2"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "y2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NormalizedAction",
+      "type": "object"
+    },
+    "ObjectiveCheck": {
+      "properties": {
+        "actual": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "expected": {
+          "title": "Expected"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "passed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Passed"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "expected"
+      ],
+      "title": "ObjectiveCheck",
+      "type": "object"
+    },
+    "ReplayStateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "frame_seed": {
+          "minLength": 1,
+          "title": "Frame Seed",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "runtime_state": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime State"
+        },
+        "ui_tree": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ui Tree"
+        }
+      },
+      "required": [
+        "id",
+        "frame_seed"
+      ],
+      "title": "ReplayStateV1",
+      "type": "object"
+    },
+    "ReplayTransitionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/NormalizedAction"
+        },
+        "action_result": {
+          "additionalProperties": true,
+          "title": "Action Result",
+          "type": "object"
+        },
+        "from_state_id": {
+          "minLength": 1,
+          "title": "From State Id",
+          "type": "string"
+        },
+        "to_state_id": {
+          "minLength": 1,
+          "title": "To State Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_state_id",
+        "action",
+        "to_state_id"
+      ],
+      "title": "ReplayTransitionV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "account_scope_id": {
+      "minLength": 1,
+      "title": "Account Scope Id",
+      "type": "string"
+    },
+    "build_scope_id": {
+      "minLength": 1,
+      "title": "Build Scope Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "goal_state_id": {
+      "minLength": 1,
+      "title": "Goal State Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "planner_decisions": {
+      "items": {
+        "$ref": "#/$defs/ExplorationDecision"
+      },
+      "minItems": 1,
+      "title": "Planner Decisions",
+      "type": "array"
+    },
+    "planner_name": {
+      "default": "scripted-exploration-baseline",
+      "minLength": 1,
+      "title": "Planner Name",
+      "type": "string"
+    },
+    "policy": {
+      "$ref": "#/$defs/ExplorationPolicy"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.exploration-baseline-fixture.v1",
+      "default": "game-observatory.ai-player.exploration-baseline-fixture.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "start_state_id": {
+      "minLength": 1,
+      "title": "Start State Id",
+      "type": "string"
+    },
+    "states": {
+      "items": {
+        "$ref": "#/$defs/ReplayStateV1"
+      },
+      "minItems": 1,
+      "title": "States",
+      "type": "array"
+    },
+    "target_id": {
+      "minLength": 11,
+      "pattern": "^fixture://",
+      "title": "Target Id",
+      "type": "string"
+    },
+    "task": {
+      "$ref": "#/$defs/BenchmarkTask"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "transitions": {
+      "items": {
+        "$ref": "#/$defs/ReplayTransitionV1"
+      },
+      "title": "Transitions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "environment_id",
+    "game_id",
+    "build_scope_id",
+    "account_scope_id",
+    "target_id",
+    "start_state_id",
+    "goal_state_id",
+    "states",
+    "task",
+    "policy",
+    "planner_decisions"
+  ],
+  "title": "ExplorationBaselineFixtureV1",
+  "type": "object"
+}

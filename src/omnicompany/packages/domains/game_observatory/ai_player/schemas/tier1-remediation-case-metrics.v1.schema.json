@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "expected_change_match_rate": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Expected Change Match Rate",
+      "type": "number"
+    },
+    "incomplete_evidence_count": {
+      "minimum": 0,
+      "title": "Incomplete Evidence Count",
+      "type": "integer"
+    },
+    "invalid_target_execution_count": {
+      "minimum": 0,
+      "title": "Invalid Target Execution Count",
+      "type": "integer"
+    },
+    "latency_telemetry_coverage_rate": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Latency Telemetry Coverage Rate",
+      "type": "number"
+    },
+    "missing_skill_latency_baseline_count": {
+      "minimum": 0,
+      "title": "Missing Skill Latency Baseline Count",
+      "type": "integer"
+    },
+    "missing_skill_token_baseline_count": {
+      "minimum": 0,
+      "title": "Missing Skill Token Baseline Count",
+      "type": "integer"
+    },
+    "policy_violation_count": {
+      "minimum": 0,
+      "title": "Policy Violation Count",
+      "type": "integer"
+    },
+    "sample_count": {
+      "minimum": 1,
+      "title": "Sample Count",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.tier1-remediation-case-metrics.v1",
+      "default": "game-observatory.ai-player.tier1-remediation-case-metrics.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "skill_latency_reduction_rate": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": -10,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Skill Latency Reduction Rate"
+    },
+    "skill_replay_count": {
+      "minimum": 0,
+      "title": "Skill Replay Count",
+      "type": "integer"
+    },
+    "skill_token_reduction_rate": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": -10,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Skill Token Reduction Rate"
+    },
+    "token_telemetry_coverage_rate": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Token Telemetry Coverage Rate",
+      "type": "number"
+    }
+  },
+  "required": [
+    "sample_count",
+    "policy_violation_count",
+    "invalid_target_execution_count",
+    "incomplete_evidence_count",
+    "expected_change_match_rate",
+    "token_telemetry_coverage_rate",
+    "latency_telemetry_coverage_rate",
+    "skill_replay_count",
+    "missing_skill_token_baseline_count",
+    "missing_skill_latency_baseline_count"
+  ],
+  "title": "Tier1RemediationCaseMetricsV1",
+  "type": "object"
+}

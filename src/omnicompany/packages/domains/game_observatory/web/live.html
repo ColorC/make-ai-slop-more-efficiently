@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>AI 玩家直播间 · Game Observatory</title>
+  <link rel="stylesheet" href="/game-observatory/live.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/game-observatory/">
+      <span class="brand-mark">GO</span>
+      <span><b>AI 玩家直播间</b><small>Game Observatory · LAN</small></span>
+    </a>
+    <div class="live-state"><i></i><span data-room-status>正在连接设施</span></div>
+  </header>
+
+  <main class="room">
+    <section class="broadcast-layout">
+      <div class="watch-column">
+        <article class="stage">
+          <div class="stage-head">
+            <div>
+              <span class="eyebrow">LIVE GAMEPLAY</span>
+              <h1 data-game-title>当前游戏画面</h1>
+            </div>
+            <div class="stream-tools">
+              <span class="stream-note" data-frame-note>连接 60 FPS 直播流</span>
+              <div class="stream-modes" aria-label="直播协议">
+                <button type="button" data-stream-mode="hls" class="active">稳定直播</button>
+                <button type="button" data-stream-mode="webrtc">超低延迟</button>
+              </div>
+            </div>
+          </div>
+          <div class="frame-shell">
+            <iframe data-live-video title="AI 玩家当前游戏直播" allow="autoplay; fullscreen; picture-in-picture"></iframe>
+            <img data-live-frame alt="AI 玩家当前游戏画面" hidden>
+            <div class="frame-placeholder" data-frame-placeholder>等待设备画面</div>
+            <div class="frame-overlay">
+              <span data-agent-state>AGENT —</span>
+              <span data-stream-health>检测串流状态</span>
+              <time data-generated-at>—</time>
+            </div>
+          </div>
+          <div class="channel-strip">
+            <div><small>Agent</small><strong data-stage-agent>—</strong></div>
+            <div><small>模型</small><strong data-stage-model>—</strong></div>
+            <div><small>本次运行</small><strong data-stage-runtime>—</strong></div>
+            <div><small>累计行为</small><strong data-stage-actions>—</strong></div>
+          </div>
+        </article>
+      </div>
+
+      <aside class="interaction-rail">
+        <div class="interaction-head">
+          <div><span class="eyebrow">LIVE INTERACTION</span><h2>直播评论与指示</h2></div>
+        </div>
+        <p class="interaction-policy">指示会在 Agent 完成当前整轮后进入下一轮。</p>
+        <div class="chat-scroll" data-instruction-queue></div>
+        <form class="chat-form" data-instruction-form>
+          <label class="name-field">称呼<input name="display_name" maxlength="40" value="局域网观众"></label>
+          <label>给 AI 玩家一个游戏内目的
+            <textarea name="instruction" maxlength="500" rows="3" placeholder="例如：先查看当前资源，再继续补齐第七章的 4 级土地目标。"></textarea>
+          </label>
+          <button type="submit">发送指示</button>
+          <output data-submit-result></output>
+        </form>
+      </aside>
+    </section>
+
+    <section class="drawer-stack">
+      <details class="room-drawer" open>
+        <summary>
+          <span><i class="drawer-index">01</i><b>Agent 连续记录</b><small>决策、具体游戏行为与结果合并在同一条时间线</small></span>
+          <span class="drawer-meta" data-journal-count>读取中</span>
+        </summary>
+        <div class="drawer-body">
+          <p class="surface-note">这里按完整 Agent 轮次连续记录，合并同一时段内的真实点击、返回、滑动与等待；重复操作会归并，不逐帧刷屏。</p>
+          <div class="timeline-scroll"><div class="timeline" data-turns></div></div>
+        </div>
+      </details>
+
+      <details class="room-drawer">
+        <summary>
+          <span><i class="drawer-index">02</i><b>账号关键状态</b><small>关键数值先看，身份、任务与预算展开查看</small></span>
+          <time class="drawer-meta" data-observed-at>—</time>
+        </summary>
+        <div class="drawer-body">
+          <p class="surface-note">这里只承认绑定 canonical 原图的局部 OCR 精确整数；不使用交接文档、Agent 总结或“24.3万”这类近似值。点击已有读数可以直接打开来源截图。</p>
+          <div class="account-state-line" data-account-state></div>
+          <h3>最后确认的关键数值</h3>
+          <div class="key-metric-grid" data-account-metrics></div>
+          <details class="nested-details">
+            <summary>打开账号身份、运行预算与任务详情</summary>
+            <div class="account-details" data-account-details></div>
+            <div class="task-list" data-account-tasks></div>
+          </details>
+        </div>
+      </details>
+
+      <details class="room-drawer">
+        <summary>
+          <span><i class="drawer-index">03</i><b>AI 学会的游戏路线</b><small>从哪个界面、做什么、会到哪里</small></span>
+          <span class="drawer-meta" data-behavior-kind>读取中</span>
+        </summary>
+        <div class="drawer-body">
+          <p class="model-explainer" data-behavior-explanation></p>
+          <div class="model-summary" data-behavior-summary></div>
+          <div class="route-scroll"><div class="route-list" data-routes></div></div>
+          <div class="mini-columns">
+            <section><h3>还在尝试弄懂的目标</h3><div data-frontier></div></section>
+            <section><h3>已沉淀、可复用的游戏路线</h3><div data-skills></div></section>
+          </div>
+        </div>
+      </details>
+
+      <details class="room-drawer">
+        <summary>
+          <span><i class="drawer-index">04</i><b>Agent 运行详情</b><small>框架、模型、Token、费用与运行时长</small></span>
+          <span class="drawer-meta" data-agent-chip>未知</span>
+        </summary>
+        <div class="drawer-body runtime-layout">
+          <dl class="identity-list" data-agent-identity></dl>
+          <div class="stat-grid" data-agent-stats></div>
+          <p class="boundary-note">“思考”只展示 Agent 主动提交的公开决策摘要、最终输出和规范化操作回执，不暴露模型隐藏思维链。</p>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer>Game Observatory · 公司局域网内观察与受控互动</footer>
+  <script src="/game-observatory/live.js" defer></script>
+</body>
+</html>
+

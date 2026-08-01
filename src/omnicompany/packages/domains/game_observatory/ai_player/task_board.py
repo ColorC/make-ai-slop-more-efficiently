@@ -43,6 +43,8 @@ class TaskDispositionV1(BaseModel):
         "blocked",
         "attempts_exhausted",
         "risk_exceeds_limit",
+        "deferred_by_authoritative_focus",
+        "deferred_until_next_natural_day",
         "terminal",
     ]
     reason: str
@@ -70,6 +72,14 @@ class TaskBoardPolicy:
     active_task_bonus: float = 2.0
     attempt_penalty: float = 0.5
     risk_weight: float = 1.0
+    source_lanes: tuple[tuple[str, ...], ...] = (
+        ("user_goal",),
+        ("new_unlock", "gameplay_candidate"),
+        ("unknown_interaction", "interface_family_gap"),
+        ("guide_update", "missing_transition", "coverage_gap"),
+        ("stale_memory",),
+        ("failed_skill",),
+    )
 
 
 class TaskBoard:
@@ -116,22 +126,62 @@ class TaskBoard:
             explanation=explanation,
         )
 
+    def _source_lane(self, task: FrontierTaskV1) -> int:
+        for index, sources in enumerate(self.policy.source_lanes):
+            if task.source in sources:
+                return index
+        return len(self.policy.source_lanes)
+
+    @staticmethod
+    def _defer_non_authoritative_candidates(
+        dispositions: list[TaskDispositionV1],
+        *,
+        allowed_task_ids: set[str],
+    ) -> list[TaskDispositionV1]:
+        """Expose the execution restriction without mutating canonical tasks.
+
+        A continuity ledger can temporarily restrict execution to one or more
+        generated tasks while older tasks remain independently safe and
+        reachable.  Reporting those older tasks as ``eligible`` makes compact
+        projections look as if raw score selection could still execute them.
+        Keep their scores for diagnostics, but project the real execution
+        disposition explicitly.
+        """
+
+        return [
+            item.model_copy(
+                update={
+                    "disposition": "deferred_by_authoritative_focus",
+                    "reason": (
+                        "任务本身安全可达，但不属于当前权威任务焦点；"
+                        "等待账本推进、当前 active 任务收敛或新的权威焦点。"
+                    ),
+                }
+            )
+            if item.disposition == "eligible" and item.task_id not in allowed_task_ids
+            else item
+            for item in dispositions
+        ]
+
     def select(
         self,
         tasks: Sequence[FrontierTaskV1],
         *,
         now: datetime | None = None,
+        preferred_task_ids: Sequence[str] = (),
+        deferred_task_ids: Sequence[str] = (),
+        prefer_active: bool = False,
+        restrict_to_preferred: bool = False,
     ) -> TaskBoardDecisionV1:
         now = now or datetime.now(timezone.utc)
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("task-board clock must include a timezone")
         by_id = {task.id: task for task in tasks}
-        completed_ids = {
-            task.id for task in tasks if task.status in {"completed", "invalidated"}
-        }
+        completed_ids = {task.id for task in tasks if task.status == "completed"}
         dispositions: list[TaskDispositionV1] = []
         eligible: list[tuple[FrontierTaskV1, TaskScoreV1, bool]] = []
         dedup_winners: dict[tuple[object, ...], tuple[FrontierTaskV1, TaskScoreV1, bool]] = {}
+        deferred_id_set = set(deferred_task_ids)
 
         for task in sorted(tasks, key=lambda item: (item.created_at, item.id)):
             if task.status in {"completed", "failed", "invalidated"}:
@@ -140,6 +190,15 @@ class TaskBoard:
                         task_id=task.id,
                         disposition="terminal",
                         reason=f"任务已经处于终态 {task.status}。",
+                    )
+                )
+                continue
+            if task.id in deferred_id_set:
+                dispositions.append(
+                    TaskDispositionV1(
+                        task_id=task.id,
+                        disposition="deferred_until_next_natural_day",
+                        reason="次日生成任务尚未进入目标自然日，不得提前执行。",
                     )
                 )
                 continue
@@ -261,15 +320,58 @@ class TaskBoard:
                 reason=reason,
                 dispositions=sorted(dispositions, key=lambda item: item.task_id),
             )
+        selection_pool = eligible
+        selection_basis = "task score"
+        if prefer_active:
+            active = [item for item in eligible if item[0].status == "active"]
+            if active:
+                selection_pool = active
+                selection_basis = "active task"
+        preferred_id_set = set(preferred_task_ids)
+        if selection_basis != "active task" and preferred_id_set:
+            preferred = [item for item in eligible if item[0].id in preferred_id_set]
+            if preferred:
+                selection_pool = preferred
+                selection_basis = "authoritative task focus"
+            elif restrict_to_preferred:
+                dispositions = self._defer_non_authoritative_candidates(
+                    dispositions,
+                    allowed_task_ids=preferred_id_set
+                    | {task.id for task, _, _ in eligible if task.status == "active"},
+                )
+                return TaskBoardDecisionV1(
+                    idle_allowed=True,
+                    reason=(
+                        "权威任务焦点当前没有 eligible 任务；拒绝退回旧任务分数，"
+                        "等待账本推进、任务状态变化或新证据。"
+                    ),
+                    dispositions=sorted(dispositions, key=lambda item: item.task_id),
+                )
+        if selection_basis == "task score" and self.policy.source_lanes:
+            source_lane = min(self._source_lane(item[0]) for item in selection_pool)
+            selection_pool = [
+                item for item in selection_pool if self._source_lane(item[0]) == source_lane
+            ]
+            lane_sources = self.policy.source_lanes[source_lane]
+            selection_basis = f"player-purpose source lane ({', '.join(lane_sources)})"
         selected, selected_score, reactivate = min(
-            eligible,
+            selection_pool,
             key=lambda item: (-item[1].total, item[0].created_at, item[0].id),
         )
+        if restrict_to_preferred and preferred_id_set:
+            dispositions = self._defer_non_authoritative_candidates(
+                dispositions,
+                allowed_task_ids=preferred_id_set
+                | {task.id for task, _, _ in eligible if task.status == "active"},
+            )
         return TaskBoardDecisionV1(
             selected_task_id=selected.id,
             selected_expected_status=("cooldown" if reactivate else selected.status),
             idle_allowed=False,
-            reason=f"选择 {selected.title}：{selected_score.explanation}",
+            reason=(
+                f"按 {selection_basis} 选择 {selected.title}："
+                f"{selected_score.explanation}"
+            ),
             dispositions=sorted(dispositions, key=lambda item: item.task_id),
         )
 
@@ -298,5 +400,11 @@ class TaskBoard:
 
 def named_blockers(decision: TaskBoardDecisionV1) -> Iterable[str]:
     for item in decision.dispositions:
-        if item.disposition not in {"eligible", "terminal", "duplicate"}:
+        if item.disposition not in {
+            "eligible",
+            "terminal",
+            "duplicate",
+            "deferred_by_authoritative_focus",
+            "deferred_until_next_natural_day",
+        }:
             yield f"{item.task_id}：{item.reason}"

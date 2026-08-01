@@ -1,0 +1,193 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "ai_identity_label": {
+      "minLength": 1,
+      "title": "Ai Identity Label",
+      "type": "string"
+    },
+    "authorization_action": {
+      "anyOf": [
+        {
+          "enum": [
+            "real_money_payment",
+            "external_personal_identity_submission"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Authorization Action"
+    },
+    "channel": {
+      "minLength": 1,
+      "title": "Channel",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "message_text": {
+      "minLength": 1,
+      "title": "Message Text",
+      "type": "string"
+    },
+    "policy_disposition": {
+      "enum": [
+        "autonomous",
+        "awaiting_authorization",
+        "rejected"
+      ],
+      "title": "Policy Disposition",
+      "type": "string"
+    },
+    "policy_id": {
+      "minLength": 1,
+      "title": "Policy Id",
+      "type": "string"
+    },
+    "purpose": {
+      "minLength": 1,
+      "title": "Purpose",
+      "type": "string"
+    },
+    "recipients": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Recipients",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.speech-intent.v1",
+      "default": "game-observatory.ai-player.speech-intent.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "status": {
+      "default": "draft",
+      "enum": [
+        "draft",
+        "authorized",
+        "blocked",
+        "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "triggering_task_id": {
+      "minLength": 1,
+      "title": "Triggering Task Id",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "policy_id",
+    "triggering_task_id",
+    "ai_identity_label",
+    "channel",
+    "recipients",
+    "purpose",
+    "message_text",
+    "policy_disposition"
+  ],
+  "title": "SpeechIntentV1",
+  "type": "object"
+}

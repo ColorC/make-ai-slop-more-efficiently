@@ -1,0 +1,295 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "SkillRunAttestationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "issued_at": {
+          "title": "Issued At",
+          "type": "string"
+        },
+        "key_id": {
+          "minLength": 1,
+          "title": "Key Id",
+          "type": "string"
+        },
+        "payload_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Payload Sha256",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.skill-run-attestation.v1",
+          "default": "game-observatory.ai-player.skill-run-attestation.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "signature_base64": {
+          "minLength": 1,
+          "title": "Signature Base64",
+          "type": "string"
+        },
+        "validator_id": {
+          "minLength": 1,
+          "title": "Validator Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "validator_id",
+        "key_id",
+        "payload_sha256",
+        "signature_base64"
+      ],
+      "title": "SkillRunAttestationV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action_count": {
+      "minimum": 0,
+      "title": "Action Count",
+      "type": "integer"
+    },
+    "attempt_index": {
+      "minimum": 1,
+      "title": "Attempt Index",
+      "type": "integer"
+    },
+    "baseline_decision_latency_ms": {
+      "minimum": 0,
+      "title": "Baseline Decision Latency Ms",
+      "type": "number"
+    },
+    "baseline_model_input_tokens": {
+      "minimum": 0,
+      "title": "Baseline Model Input Tokens",
+      "type": "integer"
+    },
+    "decision_latency_ms": {
+      "minimum": 0,
+      "title": "Decision Latency Ms",
+      "type": "number"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "false_success": {
+      "default": false,
+      "title": "False Success",
+      "type": "boolean"
+    },
+    "finished_at": {
+      "title": "Finished At",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "independent_reset_id": {
+      "minLength": 1,
+      "title": "Independent Reset Id",
+      "type": "string"
+    },
+    "model_input_tokens": {
+      "minimum": 0,
+      "title": "Model Input Tokens",
+      "type": "integer"
+    },
+    "objective_success": {
+      "title": "Objective Success",
+      "type": "boolean"
+    },
+    "outcome": {
+      "enum": [
+        "success",
+        "failed",
+        "precondition_unmet",
+        "interrupted",
+        "safety_blocked",
+        "false_success"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "precondition_satisfied": {
+      "title": "Precondition Satisfied",
+      "type": "boolean"
+    },
+    "provenance_evidence_run_id": {
+      "minLength": 1,
+      "title": "Provenance Evidence Run Id",
+      "type": "string"
+    },
+    "provenance_evidence_step_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Provenance Evidence Step Ids",
+      "type": "array"
+    },
+    "provenance_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Provenance Sha256",
+      "type": "string"
+    },
+    "recovery_attempted": {
+      "default": false,
+      "title": "Recovery Attempted",
+      "type": "boolean"
+    },
+    "recovery_succeeded": {
+      "default": false,
+      "title": "Recovery Succeeded",
+      "type": "boolean"
+    },
+    "safety_violation_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Safety Violation Count",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-run.v1",
+      "default": "game-observatory.ai-player.skill-run.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "skill_version_id": {
+      "minLength": 1,
+      "title": "Skill Version Id",
+      "type": "string"
+    },
+    "started_at": {
+      "title": "Started At",
+      "type": "string"
+    },
+    "validation_passed": {
+      "title": "Validation Passed",
+      "type": "boolean"
+    },
+    "validator_attestation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SkillRunAttestationV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "validator_id": {
+      "minLength": 1,
+      "title": "Validator Id",
+      "type": "string"
+    },
+    "visual_variant_id": {
+      "minLength": 1,
+      "title": "Visual Variant Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "skill_version_id",
+    "validator_id",
+    "provenance_evidence_run_id",
+    "provenance_evidence_step_ids",
+    "provenance_sha256",
+    "attempt_index",
+    "independent_reset_id",
+    "visual_variant_id",
+    "outcome",
+    "precondition_satisfied",
+    "objective_success",
+    "validation_passed",
+    "action_count",
+    "model_input_tokens",
+    "baseline_model_input_tokens",
+    "decision_latency_ms",
+    "baseline_decision_latency_ms"
+  ],
+  "title": "SkillRunV1",
+  "type": "object"
+}

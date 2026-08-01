@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adjudicator_id": {
+      "minLength": 1,
+      "title": "Adjudicator Id",
+      "type": "string"
+    },
+    "assignment_version_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Assignment Version Ids",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "packet_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Packet Sha256",
+      "type": "string"
+    },
+    "persistence_reopen_verified": {
+      "title": "Persistence Reopen Verified",
+      "type": "boolean"
+    },
+    "replay_seed_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replay Seed Path"
+    },
+    "replay_seed_sha256": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "minLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replay Seed Sha256"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-adjudication-result.v1",
+      "default": "game-observatory.ai-player.state-adjudication-result.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "seed_id": {
+      "minLength": 1,
+      "title": "Seed Id",
+      "type": "string"
+    },
+    "seed_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Seed Sha256",
+      "type": "string"
+    },
+    "state_version_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "State Version Ids",
+      "type": "array"
+    },
+    "transition_version_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Transition Version Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "seed_id",
+    "seed_sha256",
+    "packet_sha256",
+    "environment_id",
+    "adjudicator_id",
+    "state_version_ids",
+    "transition_version_ids",
+    "persistence_reopen_verified"
+  ],
+  "title": "StateAdjudicationResultV1",
+  "type": "object"
+}

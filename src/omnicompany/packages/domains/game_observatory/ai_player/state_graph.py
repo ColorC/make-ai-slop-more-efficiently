@@ -13,7 +13,11 @@ from .contracts import SemanticStateV1, TransitionEdgeV1
 from .store import AIPlayerStore
 
 
-VerifiedOutcome = Literal["verified_transition", "verified_state_change"]
+VerifiedOutcome = Literal[
+    "verified_transition",
+    "verified_state_change",
+    "verified_progress",
+]
 
 
 class StateRouteV1(BaseModel):
@@ -57,20 +61,27 @@ class SemanticStateGraph:
         verified_only: bool = False,
     ) -> list[TransitionEdgeV1]:
         outcomes: Sequence[str] | None = (
-            ("verified_transition", "verified_state_change") if verified_only else None
+            ("verified_transition", "verified_state_change", "verified_progress")
+            if verified_only
+            else None
         )
         return self.store.list_transition_edges(environment_id, outcomes=outcomes)
 
     def put_edge(self, edge: TransitionEdgeV1) -> TransitionEdgeV1:
-        if edge.outcome in {"verified_transition", "verified_state_change"}:
+        verified = edge.outcome.startswith("verified_")
+        if verified:
             if edge.to_state_id is None:
                 raise ValueError("verified graph edge requires a destination")
             destination = self.store.get_semantic_state(edge.environment_id, edge.to_state_id)
-            if destination is None or destination.status in {"superseded", "invalidated"}:
-                raise ValueError("verified graph edge destination is not an active semantic state")
+            if destination is None or destination.status != "accepted":
+                raise ValueError("verified graph edge destination must be an accepted state")
         source = self.store.get_semantic_state(edge.environment_id, edge.from_state_id)
         if source is None or source.status in {"superseded", "invalidated"}:
             raise ValueError("graph edge source is not an active semantic state")
+        if (
+            verified and source.status != "accepted"
+        ):
+            raise ValueError("verified graph edge source must be an accepted state")
         return self.store.put_transition_edge(edge)
 
     def shortest_verified_route(
@@ -84,7 +95,9 @@ class SemanticStateGraph:
     ) -> StateRouteV1:
         if max_actions is not None and max_actions < 0:
             raise ValueError("max_actions must be non-negative")
-        active_states = {state.id for state in self.states(environment_id)}
+        active_states = {
+            state.id for state in self.states(environment_id, include_candidates=False)
+        }
         if start_state_id not in active_states:
             raise KeyError(f"unknown active start state: {start_state_id}")
         if goal_state_id not in active_states:
@@ -161,7 +174,7 @@ class SemanticStateGraph:
     ) -> tuple[str, ...]:
         if max_actions < 0:
             raise ValueError("max_actions must be non-negative")
-        active = {state.id for state in self.states(environment_id)}
+        active = {state.id for state in self.states(environment_id, include_candidates=False)}
         if start_state_id not in active:
             raise KeyError(f"unknown active start state: {start_state_id}")
         adjacency: dict[str, set[str]] = defaultdict(set)

@@ -72,6 +72,7 @@ from .commands.atlas import cmd_atlas
 from .commands.ledger import cmd_ledger
 from .commands.resolve import cmd_resolve
 from .commands.token_ledger import cmd_token_ledger
+from .commands.game import cmd_game
 
 # 统一命令组（执行 + 观测 + 管理）
 from .unified import (
@@ -219,6 +220,7 @@ cli.add_command(cmd_debt)
 cli.add_command(cmd_registry)
 # 统一引用解析器 (2026-07-02): target-architecture.md 3.2 节 —— 双链/URI/裸id → 真源 + 回指自检
 cli.add_command(cmd_resolve)
+cli.add_command(cmd_game)
 
 # ── 语义文件系统(所有产出皆 material)──
 cli.add_command(cmd_semantic)
@@ -341,4 +343,3 @@ except Exception as _e:  # noqa: BLE001
 
 if __name__ == "__main__":
     cli()
-

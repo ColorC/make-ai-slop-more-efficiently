@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "PlannerMeasurementAttestationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "minLength": 1,
+          "title": "Key Id",
+          "type": "string"
+        },
+        "payload_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Payload Sha256",
+          "type": "string"
+        },
+        "producer_identity": {
+          "minLength": 1,
+          "title": "Producer Identity",
+          "type": "string"
+        },
+        "signature_base64": {
+          "minLength": 1,
+          "title": "Signature Base64",
+          "type": "string"
+        }
+      },
+      "required": [
+        "producer_identity",
+        "key_id",
+        "payload_sha256",
+        "signature_base64"
+      ],
+      "title": "PlannerMeasurementAttestationV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Usage copied by the planner adapter from one completed model invocation.",
+  "properties": {
+    "artifact_id": {
+      "minLength": 1,
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "attestation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlannerMeasurementAttestationV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "command_id": {
+      "minLength": 1,
+      "title": "Command Id",
+      "type": "string"
+    },
+    "completed_at": {
+      "minLength": 1,
+      "title": "Completed At",
+      "type": "string"
+    },
+    "decision_latency_ms": {
+      "minimum": 0,
+      "title": "Decision Latency Ms",
+      "type": "integer"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "invocation_id": {
+      "minLength": 1,
+      "title": "Invocation Id",
+      "type": "string"
+    },
+    "model": {
+      "minLength": 1,
+      "title": "Model",
+      "type": "string"
+    },
+    "model_input_tokens": {
+      "minimum": 0,
+      "title": "Model Input Tokens",
+      "type": "integer"
+    },
+    "model_output_tokens": {
+      "minimum": 0,
+      "title": "Model Output Tokens",
+      "type": "integer"
+    },
+    "planner_request_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Planner Request Sha256",
+      "type": "string"
+    },
+    "producer_identity": {
+      "const": "omnicompany.ai-player.planner-runtime.v1",
+      "default": "omnicompany.ai-player.planner-runtime.v1",
+      "title": "Producer Identity",
+      "type": "string"
+    },
+    "provider": {
+      "minLength": 1,
+      "title": "Provider",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.planner-measurement-receipt.v1",
+      "default": "game-observatory.ai-player.planner-measurement-receipt.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "artifact_id",
+    "environment_id",
+    "session_id",
+    "task_id",
+    "command_id",
+    "planner_request_sha256",
+    "invocation_id",
+    "provider",
+    "model",
+    "model_input_tokens",
+    "model_output_tokens",
+    "decision_latency_ms",
+    "completed_at"
+  ],
+  "title": "PlannerMeasurementReceiptV1",
+  "type": "object"
+}

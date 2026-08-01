@@ -1,0 +1,277 @@
+{
+  "$defs": {
+    "RouteReplayAssessmentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_manifest_sha256": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Acceptance Manifest Sha256"
+        },
+        "assessment_scope": {
+          "const": "execution_evidence_only",
+          "readOnly": true,
+          "title": "Assessment Scope",
+          "type": "string"
+        },
+        "benchmark_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Benchmark Id"
+        },
+        "candidate_manifest_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Candidate Manifest Sha256",
+          "type": "string"
+        },
+        "candidate_route_id": {
+          "title": "Candidate Route Id",
+          "type": "string"
+        },
+        "candidate_route_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Candidate Route Sha256",
+          "type": "string"
+        },
+        "evidence_manifest_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Manifest Ids",
+          "type": "array"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "execution_evidence_pass": {
+          "title": "Execution Evidence Pass",
+          "type": "boolean"
+        },
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "replay_can_be_frozen": {
+          "const": false,
+          "readOnly": true,
+          "title": "Replay Can Be Frozen",
+          "type": "boolean"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.route-replay-assessment.v1",
+          "default": "game-observatory.ai-player.route-replay-assessment.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "semantic_goal_status": {
+          "const": "unadjudicated",
+          "readOnly": true,
+          "title": "Semantic Goal Status",
+          "type": "string"
+        },
+        "verification_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Verification Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_route_id",
+        "candidate_manifest_sha256",
+        "candidate_route_sha256",
+        "verification_sha256",
+        "execution_evidence_pass",
+        "evidence_run_ids",
+        "evidence_manifest_ids",
+        "evidence_step_ids",
+        "issues",
+        "assessment_scope",
+        "semantic_goal_status",
+        "replay_can_be_frozen"
+      ],
+      "title": "RouteReplayAssessmentV1",
+      "type": "object"
+    },
+    "RouteReplaySuiteResultV1": {
+      "additionalProperties": false,
+      "properties": {
+        "assessment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RouteReplayAssessmentV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "candidate_route_path": {
+          "title": "Candidate Route Path",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "route_id": {
+          "title": "Route Id",
+          "type": "string"
+        },
+        "verification_path": {
+          "title": "Verification Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "route_id",
+        "candidate_route_path",
+        "verification_path"
+      ],
+      "title": "RouteReplaySuiteResultV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acceptance_manifest_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Acceptance Manifest Sha256",
+      "type": "string"
+    },
+    "assessment_scope": {
+      "const": "execution_evidence_only",
+      "readOnly": true,
+      "title": "Assessment Scope",
+      "type": "string"
+    },
+    "benchmark_id": {
+      "title": "Benchmark Id",
+      "type": "string"
+    },
+    "candidate_manifest_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Candidate Manifest Sha256",
+      "type": "string"
+    },
+    "candidate_route_count": {
+      "minimum": 0,
+      "title": "Candidate Route Count",
+      "type": "integer"
+    },
+    "execution_evidence_pass": {
+      "title": "Execution Evidence Pass",
+      "type": "boolean"
+    },
+    "issues": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "replay_can_be_frozen": {
+      "const": false,
+      "readOnly": true,
+      "title": "Replay Can Be Frozen",
+      "type": "boolean"
+    },
+    "result_count": {
+      "readOnly": true,
+      "title": "Result Count",
+      "type": "integer"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/RouteReplaySuiteResultV1"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.route-replay-suite-assessment.v1",
+      "default": "game-observatory.ai-player.route-replay-suite-assessment.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "semantic_goal_status": {
+      "const": "unadjudicated",
+      "readOnly": true,
+      "title": "Semantic Goal Status",
+      "type": "string"
+    },
+    "suite_input_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Suite Input Sha256",
+      "type": "string"
+    },
+    "trusted_candidate_manifest_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Trusted Candidate Manifest Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "benchmark_id",
+    "acceptance_manifest_sha256",
+    "candidate_manifest_sha256",
+    "trusted_candidate_manifest_sha256",
+    "suite_input_sha256",
+    "candidate_route_count",
+    "execution_evidence_pass",
+    "results",
+    "issues",
+    "result_count",
+    "assessment_scope",
+    "semantic_goal_status",
+    "replay_can_be_frozen"
+  ],
+  "title": "RouteReplaySuiteAssessmentV1",
+  "type": "object"
+}

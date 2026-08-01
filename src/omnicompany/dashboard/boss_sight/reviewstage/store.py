@@ -1235,6 +1235,40 @@ class MaterialStore:
             self._notify("comment_added", m)
             return c
 
+    def record_authored_comment(
+        self,
+        material_id: str,
+        *,
+        note_id: str,
+        author: str,
+        created_at: str,
+        mention_count: int = 0,
+        feedback_status: str = "saved",
+    ) -> Material:
+        """Record the audit edge for a canonical authored-Note comment.
+
+        Authored Notes remain the only comment objects.  This preserves the
+        material history and event notification without repopulating the
+        deprecated ``Material.comments`` array.
+        """
+
+        with self._lock:
+            m = self.get(material_id)
+            if m is None:
+                raise KeyError(material_id)
+            m.history.append({
+                "event": "comment",
+                "by": author,
+                "at": created_at,
+                "mention_count": max(0, int(mention_count)),
+                "comment_id": note_id,
+                "feedback_status": feedback_status,
+                "source": "authored_note",
+            })
+            self._persist(m)
+            self._notify("comment_added", m)
+            return m
+
     def set_comment_feedback(
         self,
         material_id: str,
@@ -1275,6 +1309,37 @@ class MaterialStore:
             self._persist(m)
             self._notify("updated", m)
             return comment
+
+    def record_authored_comment_feedback(
+        self,
+        material_id: str,
+        *,
+        note_id: str,
+        from_status: str,
+        to_status: str,
+        by: str,
+        updated_at: str,
+        note: str = "",
+    ) -> Material:
+        """Record feedback transitions for a canonical authored Note."""
+
+        with self._lock:
+            m = self.get(material_id)
+            if m is None:
+                raise KeyError(material_id)
+            m.history.append({
+                "event": "comment_feedback",
+                "comment_id": note_id,
+                "from": from_status,
+                "to": to_status,
+                "by": by,
+                "note": note,
+                "at": updated_at,
+                "source": "authored_note",
+            })
+            self._persist(m)
+            self._notify("updated", m)
+            return m
 
     def edit_comment(
         self,

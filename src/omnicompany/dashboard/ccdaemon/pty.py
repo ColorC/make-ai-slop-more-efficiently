@@ -441,6 +441,13 @@ class PtySession:
     codex_process_uuid: str | None = field(default=None, repr=False)
     codex_log_cursor: int = field(default=0, repr=False)
     codex_thread_candidates: dict[str, int] = field(default_factory=dict, repr=False)
+    # Dashboard input is not the only way a provider-backed PTY can receive a
+    # turn: Codex may be driven from its native app while the same ConPTY is
+    # mirrored here.  The native-link watcher establishes this bit only after
+    # the linked rollout advances beyond its first observed mtime, so startup
+    # paint never masquerades as agent work.
+    provider_activity_seen: bool = field(default=False, repr=False)
+    codex_rollout_mtime: float = field(default=0.0, repr=False)
 
     def to_meta(self) -> dict[str, Any]:
         # Hosted sessions are already verified during discovery/creation and
@@ -452,14 +459,22 @@ class PtySession:
             if self.host_port
             else bool(self.pty and self.pty.isalive())
         )
-        # A PTY is working only after a non-empty user submission and while the
-        # agent is still producing output.  Process startup, prompt repaint,
-        # resize traffic and browser attachment are deliberately insufficient.
+        # A PTY is working only after a real turn was observed (either through
+        # Dashboard input or through advancement of the linked native Codex
+        # rollout) and while the agent is still producing output. Process
+        # startup, prompt repaint, resize traffic and browser attachment are
+        # deliberately insufficient.
+        turn_observed = bool(
+            (self.has_user_turn and self.last_submit_at)
+            or self.provider_activity_seen
+        )
         working = bool(
             alive
-            and self.has_user_turn
-            and self.last_submit_at
-            and self.last_output_at >= self.last_submit_at
+            and turn_observed
+            and (
+                self.provider_activity_seen
+                or self.last_output_at >= self.last_submit_at
+            )
             and (time.time() - self.last_output_at) < PTY_WORKING_WINDOW_S
         )
         return {
@@ -2304,6 +2319,20 @@ class PtyManager:
                         provider_session_id,
                         sess.provider_title,
                     )
+                active_provider_session_id = provider_session_id or sess.provider_session_id
+                rollout = _codex_jsonl_for(active_provider_session_id)
+                try:
+                    rollout_mtime = rollout.stat().st_mtime if rollout is not None else 0.0
+                except OSError:
+                    rollout_mtime = 0.0
+                if (
+                    rollout_mtime
+                    and sess.codex_rollout_mtime
+                    and rollout_mtime > sess.codex_rollout_mtime
+                ):
+                    sess.provider_activity_seen = True
+                if rollout_mtime:
+                    sess.codex_rollout_mtime = rollout_mtime
                 await asyncio.sleep(CODEX_LINK_POLL_S)
         except asyncio.CancelledError:
             pass

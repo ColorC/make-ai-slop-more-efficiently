@@ -17,12 +17,14 @@
     "template_version": { "const": "mechanics-first-play-design.v1" },
     "system_definition": {
       "type": "object",
-      "required": ["title", "definition", "managed_objects", "boundaries"],
+      "required": ["title", "definition", "managed_objects", "boundaries", "reader_intro", "relationship_overview"],
       "properties": {
         "title": { "type": "string", "minLength": 1 },
         "definition": { "type": "string", "minLength": 1 },
         "managed_objects": { "type": "array", "minItems": 1, "items": { "type": "string" } },
-        "boundaries": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        "boundaries": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "reader_intro": { "type": "array", "minItems": 2, "items": { "type": "string", "minLength": 20 } },
+        "relationship_overview": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 20 } }
       }
     },
     "mechanism_map": {
@@ -48,9 +50,10 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["name", "stages", "gates", "reset_or_inheritance"],
+        "required": ["name", "description", "stages", "gates", "reset_or_inheritance"],
         "properties": {
           "name": { "type": "string" },
+          "description": { "type": "string", "minLength": 20 },
           "stages": { "type": "array", "minItems": 1, "items": { "type": "string" } },
           "gates": { "type": "array", "items": { "type": "string" } },
           "reset_or_inheritance": { "type": "string" },
@@ -63,9 +66,10 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["resource", "sources", "uses", "result"],
+        "required": ["resource", "description", "sources", "uses", "result"],
         "properties": {
           "resource": { "type": "string" },
+          "description": { "type": "string", "minLength": 20 },
           "sources": { "type": "array", "minItems": 1, "items": { "type": "string" } },
           "uses": { "type": "array", "minItems": 1, "items": { "type": "string" } },
           "result": { "type": "string" },
@@ -112,11 +116,14 @@
         "title",
         "definition",
         "player_result",
+        "reader_copy",
+        "objects",
         "state_variables",
         "inputs",
         "rules",
         "outputs",
         "states",
+        "feedback",
         "boundaries",
         "dependencies",
         "artifact_id",
@@ -127,7 +134,20 @@
         "title": { "type": "string" },
         "definition": { "type": "string" },
         "player_result": { "type": "string" },
+        "reader_copy": {
+          "type": "object",
+          "required": ["concept_paragraphs", "player_flow_paragraphs", "rule_intro", "state_and_limits_paragraphs", "system_link_paragraphs", "image_caption"],
+          "properties": {
+            "concept_paragraphs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 20 } },
+            "player_flow_paragraphs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 20 } },
+            "rule_intro": { "type": "string", "minLength": 20 },
+            "state_and_limits_paragraphs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 20 } },
+            "system_link_paragraphs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 20 } },
+            "image_caption": { "type": "string", "minLength": 1 }
+          }
+        },
         "artifact_id": { "type": "string" },
+        "objects": { "type": "array", "minItems": 1, "items": { "type": "string" } },
         "state_variables": { "type": "array", "minItems": 1, "items": { "type": "string" } },
         "inputs": { "type": "array", "minItems": 1, "items": { "type": "string" } },
         "rules": {
@@ -145,6 +165,7 @@
         },
         "outputs": { "type": "array", "minItems": 1, "items": { "type": "string" } },
         "states": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "feedback": { "type": "array", "minItems": 1, "items": { "type": "string" } },
         "resources": { "type": "array", "items": { "type": "string" } },
         "boundaries": { "type": "array", "minItems": 1, "items": { "type": "string" } },
         "dependencies": { "type": "array", "minItems": 1, "items": { "type": "string" } },

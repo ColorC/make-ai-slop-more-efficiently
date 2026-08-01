@@ -43,10 +43,10 @@ def _auto_wake_enabled() -> bool:
             get_control_observability_store,
         )
         controls = get_control_observability_store().list_controls().get("by_key", {})
-        return bool(controls.get("controller.auto_wake", {}).get("value", True))
+        return bool(controls.get("controller.auto_wake", {}).get("value", False))
     except Exception:  # noqa: BLE001
-        _log.exception("ControllerWaker: read controller.auto_wake failed, default on")
-        return True
+        _log.exception("ControllerWaker: read controller.auto_wake failed, default off")
+        return False
 
 
 def _is_delegated_subagent(sess: Any) -> bool:

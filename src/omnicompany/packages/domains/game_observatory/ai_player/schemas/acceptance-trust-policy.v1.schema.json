@@ -1,0 +1,166 @@
+{
+  "$defs": {
+    "AcceptanceFileReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "title": "AcceptanceFileReferenceV1",
+      "type": "object"
+    },
+    "AcceptanceTrustedGateIssuerV1": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_categories": {
+          "items": {
+            "enum": [
+              "AP",
+              "P",
+              "E2E",
+              "G",
+              "clean_database_rerun"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Allowed Categories",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "issuer_id": {
+          "minLength": 1,
+          "title": "Issuer Id",
+          "type": "string"
+        },
+        "key_id": {
+          "minLength": 1,
+          "title": "Key Id",
+          "type": "string"
+        },
+        "public_key_base64": {
+          "minLength": 1,
+          "title": "Public Key Base64",
+          "type": "string"
+        }
+      },
+      "required": [
+        "issuer_id",
+        "key_id",
+        "public_key_base64",
+        "allowed_categories"
+      ],
+      "title": "AcceptanceTrustedGateIssuerV1",
+      "type": "object"
+    },
+    "AcceptanceTrustedReviewerV1": {
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "minLength": 1,
+          "title": "Key Id",
+          "type": "string"
+        },
+        "public_key_base64": {
+          "minLength": 1,
+          "title": "Public Key Base64",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "minLength": 1,
+          "title": "Reviewer Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "key_id",
+        "public_key_base64"
+      ],
+      "title": "AcceptanceTrustedReviewerV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "canonical_manifest": {
+      "$ref": "#/$defs/AcceptanceFileReferenceV1"
+    },
+    "created_at": {
+      "minLength": 1,
+      "title": "Created At",
+      "type": "string"
+    },
+    "executor_identity_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Executor Identity Ids",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "gate_issuers": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceTrustedGateIssuerV1"
+      },
+      "minItems": 1,
+      "title": "Gate Issuers",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "implementation_identity_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Implementation Identity Ids",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "independent_reviewers": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceTrustedReviewerV1"
+      },
+      "minItems": 1,
+      "title": "Independent Reviewers",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "policy_id": {
+      "minLength": 1,
+      "title": "Policy Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.acceptance-trust-policy.v1",
+      "default": "game-observatory.ai-player.acceptance-trust-policy.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "policy_id",
+    "created_at",
+    "canonical_manifest",
+    "executor_identity_ids",
+    "implementation_identity_ids",
+    "gate_issuers",
+    "independent_reviewers"
+  ],
+  "title": "AcceptanceTrustPolicyV1",
+  "type": "object"
+}

@@ -1,0 +1,339 @@
+{
+  "$defs": {
+    "AccountMetricDefinitionV1": {
+      "additionalProperties": false,
+      "description": "Stable interpretation policy fixed before reading either observation.",
+      "properties": {
+        "category": {
+          "enum": [
+            "account_progression",
+            "resource",
+            "objective",
+            "coverage"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "improvement_direction": {
+          "enum": [
+            "higher_is_favorable",
+            "lower_is_favorable",
+            "track_only"
+          ],
+          "title": "Improvement Direction",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "maximum_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Value"
+        },
+        "metric_key": {
+          "minLength": 1,
+          "title": "Metric Key",
+          "type": "string"
+        },
+        "minimum_ocr_confidence": {
+          "default": 0.9,
+          "maximum": 1,
+          "minimum": 0.5,
+          "title": "Minimum Ocr Confidence",
+          "type": "number"
+        },
+        "minimum_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Value"
+        },
+        "numeric_format": {
+          "enum": [
+            "integer",
+            "decimal",
+            "percentage",
+            "compact_zh"
+          ],
+          "title": "Numeric Format",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.account-metric-definition.v1",
+          "default": "game-observatory.ai-player.account-metric-definition.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "game_id",
+        "metric_key",
+        "label",
+        "category",
+        "unit",
+        "numeric_format",
+        "improvement_direction"
+      ],
+      "title": "AccountMetricDefinitionV1",
+      "type": "object"
+    },
+    "AuthoritativeMetricEvidenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "const": "authoritative_state",
+          "default": "authoritative_state",
+          "title": "Method",
+          "type": "string"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "provider_version": {
+          "minLength": 1,
+          "title": "Provider Version",
+          "type": "string"
+        },
+        "record_locator": {
+          "minLength": 1,
+          "title": "Record Locator",
+          "type": "string"
+        },
+        "snapshot_artifact_id": {
+          "minLength": 1,
+          "title": "Snapshot Artifact Id",
+          "type": "string"
+        },
+        "snapshot_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Snapshot Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_artifact_id",
+        "snapshot_sha256",
+        "provider",
+        "provider_version",
+        "record_locator"
+      ],
+      "title": "AuthoritativeMetricEvidenceV1",
+      "type": "object"
+    },
+    "ScreenshotOCRMetricEvidenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "engine": {
+          "minLength": 1,
+          "title": "Engine",
+          "type": "string"
+        },
+        "engine_version": {
+          "minLength": 1,
+          "title": "Engine Version",
+          "type": "string"
+        },
+        "extraction_artifact_id": {
+          "minLength": 1,
+          "title": "Extraction Artifact Id",
+          "type": "string"
+        },
+        "extraction_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Extraction Sha256",
+          "type": "string"
+        },
+        "frame_artifact_id": {
+          "minLength": 1,
+          "title": "Frame Artifact Id",
+          "type": "string"
+        },
+        "frame_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Frame Sha256",
+          "type": "string"
+        },
+        "method": {
+          "const": "screenshot_ocr",
+          "default": "screenshot_ocr",
+          "title": "Method",
+          "type": "string"
+        },
+        "raw_text": {
+          "minLength": 1,
+          "title": "Raw Text",
+          "type": "string"
+        },
+        "region": {
+          "$ref": "#/$defs/SourcePixelRect"
+        }
+      },
+      "required": [
+        "frame_artifact_id",
+        "frame_sha256",
+        "extraction_artifact_id",
+        "extraction_sha256",
+        "region",
+        "raw_text",
+        "confidence",
+        "engine",
+        "engine_version"
+      ],
+      "title": "ScreenshotOCRMetricEvidenceV1",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "definition": {
+      "$ref": "#/$defs/AccountMetricDefinitionV1"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_run_id": {
+      "minLength": 1,
+      "title": "Evidence Run Id",
+      "type": "string"
+    },
+    "evidence_step_id": {
+      "minLength": 1,
+      "title": "Evidence Step Id",
+      "type": "string"
+    },
+    "frame_role": {
+      "enum": [
+        "before",
+        "after"
+      ],
+      "title": "Frame Role",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "observed_at": {
+      "minLength": 1,
+      "title": "Observed At",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.account-metric-observation.v1",
+      "default": "game-observatory.ai-player.account-metric-observation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source": {
+      "discriminator": {
+        "mapping": {
+          "authoritative_state": "#/$defs/AuthoritativeMetricEvidenceV1",
+          "screenshot_ocr": "#/$defs/ScreenshotOCRMetricEvidenceV1"
+        },
+        "propertyName": "method"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ScreenshotOCRMetricEvidenceV1"
+        },
+        {
+          "$ref": "#/$defs/AuthoritativeMetricEvidenceV1"
+        }
+      ],
+      "title": "Source"
+    },
+    "value": {
+      "title": "Value",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "environment_id",
+    "definition",
+    "evidence_step_id",
+    "evidence_run_id",
+    "frame_role",
+    "value",
+    "observed_at",
+    "source"
+  ],
+  "title": "AccountMetricObservationV1",
+  "type": "object"
+}

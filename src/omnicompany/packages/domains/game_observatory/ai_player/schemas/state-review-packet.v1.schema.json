@@ -1,0 +1,2421 @@
+{
+  "$defs": {
+    "EvidenceDynamicSceneProfile": {
+      "description": "Explicit bounded acceptance policy for terminals with continuous motion.",
+      "properties": {
+        "analysis_window_frames": {
+          "default": 5,
+          "maximum": 12,
+          "minimum": 1,
+          "title": "Analysis Window Frames",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "bounded-motion-terminal",
+          "default": "bounded-motion-terminal",
+          "title": "Kind",
+          "type": "string"
+        },
+        "max_inlier_frame_distance": {
+          "default": 0.1,
+          "exclusiveMinimum": 0,
+          "maximum": 0.12,
+          "title": "Max Inlier Frame Distance",
+          "type": "number"
+        },
+        "required_inlier_ratio": {
+          "default": 0.8,
+          "maximum": 1,
+          "minimum": 0.66,
+          "title": "Required Inlier Ratio",
+          "type": "number"
+        }
+      },
+      "title": "EvidenceDynamicSceneProfile",
+      "type": "object"
+    },
+    "EvidenceLiveEvaluation": {
+      "description": "Durable visual-effect evaluation of the caller's declared expectation.",
+      "properties": {
+        "effect_scope": {
+          "const": "visual_state_change_only",
+          "default": "visual_state_change_only",
+          "title": "Effect Scope",
+          "type": "string"
+        },
+        "elapsed_seconds": {
+          "minimum": 0,
+          "title": "Elapsed Seconds",
+          "type": "number"
+        },
+        "evaluation_region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evaluation_source": {
+          "default": "legacy_global_visual_distance",
+          "enum": [
+            "legacy_global_visual_distance",
+            "primary_visual_distance",
+            "target_context_visual_and_structure",
+            "visual_no_change",
+            "unmet"
+          ],
+          "title": "Evaluation Source",
+          "type": "string"
+        },
+        "evaluator_version": {
+          "default": "legacy-global-visual.v1",
+          "minLength": 1,
+          "title": "Evaluator Version",
+          "type": "string"
+        },
+        "expectation_met": {
+          "title": "Expectation Met",
+          "type": "boolean"
+        },
+        "expected_min_visual_distance": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Expected Min Visual Distance",
+          "type": "number"
+        },
+        "global_visual_distance": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Global Visual Distance"
+        },
+        "runtime_limit_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Runtime Limit Seconds",
+          "type": "integer"
+        },
+        "stop_recommended": {
+          "title": "Stop Recommended",
+          "type": "boolean"
+        },
+        "target_effect": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceTargetEffectEvaluation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "visual_distance": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Visual Distance",
+          "type": "number"
+        }
+      },
+      "required": [
+        "expectation_met",
+        "stop_recommended",
+        "visual_distance",
+        "expected_min_visual_distance",
+        "elapsed_seconds",
+        "runtime_limit_seconds"
+      ],
+      "title": "EvidenceLiveEvaluation",
+      "type": "object"
+    },
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "EvidenceRun": {
+      "properties": {
+        "action_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Action Run Ids",
+          "type": "array"
+        },
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "build_scope_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Scope Id"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ended At"
+        },
+        "environment": {
+          "additionalProperties": true,
+          "title": "Environment",
+          "type": "object"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "game_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Game Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "manifest_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manifest Id"
+        },
+        "observation_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Observation Run Ids",
+          "type": "array"
+        },
+        "orientation": {
+          "enum": [
+            "portrait",
+            "landscape",
+            "square"
+          ],
+          "title": "Orientation",
+          "type": "string"
+        },
+        "scope_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope Id"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "default": "running",
+          "enum": [
+            "running",
+            "paused",
+            "passed",
+            "failed",
+            "stopped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Step Ids",
+          "type": "array"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "viewport_height": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Height",
+          "type": "integer"
+        },
+        "viewport_width": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "target_id",
+        "adapter",
+        "viewport_width",
+        "viewport_height",
+        "orientation"
+      ],
+      "title": "EvidenceRun",
+      "type": "object"
+    },
+    "EvidenceStability": {
+      "properties": {
+        "analysis_inlier_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Analysis Inlier Count",
+          "type": "integer"
+        },
+        "analysis_required_inliers": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Analysis Required Inliers",
+          "type": "integer"
+        },
+        "analysis_window_distances": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Analysis Window Distances",
+          "type": "array"
+        },
+        "dynamic_scene_profile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceDynamicSceneProfile"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "final_distance": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Distance"
+        },
+        "method": {
+          "const": "perceptual-frame-distance",
+          "default": "perceptual-frame-distance",
+          "title": "Method",
+          "type": "string"
+        },
+        "observed_consecutive": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Observed Consecutive",
+          "type": "integer"
+        },
+        "profile": {
+          "default": "static-consecutive",
+          "enum": [
+            "static-consecutive",
+            "bounded-motion-terminal",
+            "trusted-reference-or-static"
+          ],
+          "title": "Profile",
+          "type": "string"
+        },
+        "required_consecutive": {
+          "default": 2,
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Required Consecutive",
+          "type": "integer"
+        },
+        "sample_distances": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Sample Distances",
+          "type": "array"
+        },
+        "sampled_frames": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Sampled Frames",
+          "type": "integer"
+        },
+        "settled": {
+          "default": false,
+          "title": "Settled",
+          "type": "boolean"
+        },
+        "threshold": {
+          "default": 0.01,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Threshold",
+          "type": "number"
+        },
+        "trusted_reference_artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trusted Reference Artifact Id"
+        },
+        "trusted_reference_distance": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trusted Reference Distance"
+        },
+        "trusted_reference_matched": {
+          "default": false,
+          "title": "Trusted Reference Matched",
+          "type": "boolean"
+        },
+        "trusted_reference_max_distance": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trusted Reference Max Distance"
+        },
+        "waited_seconds": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Waited Seconds",
+          "type": "number"
+        }
+      },
+      "title": "EvidenceStability",
+      "type": "object"
+    },
+    "EvidenceStep": {
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/NormalizedAction"
+        },
+        "action_ended_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action Ended At"
+        },
+        "action_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action Run Id"
+        },
+        "action_started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action Started At"
+        },
+        "after_frame_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After Frame Id"
+        },
+        "after_ui_tree_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "After Ui Tree Id"
+        },
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "before_frame_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Before Frame Id"
+        },
+        "before_ui_tree_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Before Ui Tree Id"
+        },
+        "ended_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ended At"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "evidence_run_id": {
+          "title": "Evidence Run Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "intermediate_frame_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Intermediate Frame Ids",
+          "type": "array"
+        },
+        "live_evaluation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceLiveEvaluation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "observation_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Observation Run Ids",
+          "type": "array"
+        },
+        "quality_advisories": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Quality Advisories",
+          "type": "array"
+        },
+        "quality_issues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Quality Issues",
+          "type": "array"
+        },
+        "source_end_point": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_point": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "stability": {
+          "$ref": "#/$defs/EvidenceStability"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "default": "running",
+          "enum": [
+            "running",
+            "passed",
+            "failed",
+            "stopped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "step_index": {
+          "minimum": 1,
+          "title": "Step Index",
+          "type": "integer"
+        },
+        "target_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "target_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Name"
+        },
+        "terminal_condition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceTerminalCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "terminal_evaluation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvidenceTerminalEvaluation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "video_artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Video Artifact Id"
+        },
+        "viewport_height": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Height",
+          "type": "integer"
+        },
+        "viewport_width": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "evidence_run_id",
+        "step_index",
+        "action",
+        "viewport_width",
+        "viewport_height"
+      ],
+      "title": "EvidenceStep",
+      "type": "object"
+    },
+    "EvidenceTargetEffectEvaluation": {
+      "description": "Auditable local effect measured around the action target.",
+      "properties": {
+        "evaluation_bounds": {
+          "$ref": "#/$defs/SourcePixelRect"
+        },
+        "min_structural_distance": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Structural Distance",
+          "type": "number"
+        },
+        "min_visual_distance": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Visual Distance",
+          "type": "number"
+        },
+        "padding_pixels": {
+          "minimum": 0,
+          "title": "Padding Pixels",
+          "type": "integer"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "structural_distance": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Structural Distance",
+          "type": "number"
+        },
+        "target_bounds": {
+          "$ref": "#/$defs/SourcePixelRect"
+        },
+        "visual_distance": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Visual Distance",
+          "type": "number"
+        }
+      },
+      "required": [
+        "target_bounds",
+        "evaluation_bounds",
+        "padding_pixels",
+        "visual_distance",
+        "structural_distance",
+        "min_visual_distance",
+        "min_structural_distance",
+        "passed"
+      ],
+      "title": "EvidenceTargetEffectEvaluation",
+      "type": "object"
+    },
+    "EvidenceTerminalCondition": {
+      "description": "Optional, game-agnostic visual predicates for accepting an action terminal.",
+      "properties": {
+        "max_visual_distance_from_reference": {
+          "default": 0.03,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Max Visual Distance From Reference",
+          "type": "number"
+        },
+        "min_observation_seconds": {
+          "default": 0,
+          "maximum": 60,
+          "minimum": 0,
+          "title": "Min Observation Seconds",
+          "type": "number"
+        },
+        "min_visual_change_from_before": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Visual Change From Before"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "visual_reference_artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visual Reference Artifact Id"
+        }
+      },
+      "title": "EvidenceTerminalCondition",
+      "type": "object"
+    },
+    "EvidenceTerminalEvaluation": {
+      "properties": {
+        "condition": {
+          "$ref": "#/$defs/EvidenceTerminalCondition"
+        },
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "observed_seconds": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Observed Seconds",
+          "type": "number"
+        },
+        "passed": {
+          "default": false,
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "visual_change_from_before": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visual Change From Before"
+        },
+        "visual_distance_from_reference": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Visual Distance From Reference"
+        }
+      },
+      "required": [
+        "condition"
+      ],
+      "title": "EvidenceTerminalEvaluation",
+      "type": "object"
+    },
+    "NormalizedAction": {
+      "properties": {
+        "axis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Button"
+        },
+        "duration_ms": {
+          "default": 250,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "keycode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keycode"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "pinch_direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Direction"
+        },
+        "pinch_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Percent"
+        },
+        "pinch_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Pinch Steps",
+          "type": "integer"
+        },
+        "pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressed"
+        },
+        "seconds": {
+          "default": 0.5,
+          "title": "Seconds",
+          "type": "number"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "two_finger_offset_x": {
+          "default": 0,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset X",
+          "type": "integer"
+        },
+        "two_finger_offset_y": {
+          "default": 50,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset Y",
+          "type": "integer"
+        },
+        "two_finger_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Two Finger Steps",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "tap",
+            "swipe",
+            "pinch",
+            "two_finger_swipe",
+            "text",
+            "key",
+            "launch",
+            "force_stop",
+            "wait",
+            "back",
+            "home",
+            "mouse_move",
+            "mouse_button",
+            "gamepad_button",
+            "gamepad_axis",
+            "reset"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "x2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X2"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "y2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NormalizedAction",
+      "type": "object"
+    },
+    "NormalizedSurfaceRectV1": {
+      "additionalProperties": false,
+      "description": "Viewport-independent UI region in a 1000 by 1000 coordinate space.",
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Height",
+          "type": "integer"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "default": "game-observatory.ai-player.normalized-surface-rect.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "maximum": 999,
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "NormalizedSurfaceRectV1",
+      "type": "object"
+    },
+    "SemanticStateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "observation_feature_hashes": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Observation Feature Hashes",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.semantic-state.v1",
+          "default": "game-observatory.ai-player.semantic-state.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "semantic_fingerprint": {
+          "minLength": 1,
+          "title": "Semantic Fingerprint",
+          "type": "string"
+        },
+        "status": {
+          "default": "candidate",
+          "enum": [
+            "candidate",
+            "accepted",
+            "superseded",
+            "invalidated"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "supersedes_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes Id"
+        },
+        "surface_anchors": {
+          "items": {
+            "$ref": "#/$defs/SemanticSurfaceAnchorV1"
+          },
+          "title": "Surface Anchors",
+          "type": "array"
+        },
+        "surface_profile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SemanticSurfaceProfileV1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "environment_id",
+        "evidence_refs",
+        "id",
+        "title",
+        "description",
+        "semantic_fingerprint",
+        "observation_feature_hashes"
+      ],
+      "title": "SemanticStateV1",
+      "type": "object"
+    },
+    "SemanticSurfaceAnchorV1": {
+      "additionalProperties": false,
+      "description": "Reviewed locator hint for one interaction role; never a production route.",
+      "properties": {
+        "action": {
+          "default": "tap",
+          "enum": [
+            "tap",
+            "long_press",
+            "swipe"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mobility": {
+          "enum": [
+            "fixed_chrome",
+            "fixed_surface",
+            "dynamic_world_object"
+          ],
+          "title": "Mobility",
+          "type": "string"
+        },
+        "normalized_bounds": {
+          "$ref": "#/$defs/NormalizedSurfaceRectV1"
+        },
+        "reference_artifact_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Artifact Id"
+        },
+        "role": {
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.semantic-surface-anchor.v1",
+          "default": "game-observatory.ai-player.semantic-surface-anchor.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "target_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Target Tokens",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "target_tokens",
+        "mobility",
+        "normalized_bounds"
+      ],
+      "title": "SemanticSurfaceAnchorV1",
+      "type": "object"
+    },
+    "SemanticSurfaceProfileV1": {
+      "additionalProperties": false,
+      "description": "Reusable stable semantics for recognizing and operating one UI surface.",
+      "properties": {
+        "dynamic_field_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dynamic Field Names",
+          "type": "array"
+        },
+        "interaction_roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Interaction Roles",
+          "type": "array"
+        },
+        "page_identity_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Page Identity Tokens",
+          "type": "array"
+        },
+        "risk_boundary_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Boundary Tokens",
+          "type": "array"
+        },
+        "safe_exit_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Safe Exit Tokens",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.semantic-surface-profile.v1",
+          "default": "game-observatory.ai-player.semantic-surface-profile.v1",
+          "title": "Schema",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_identity_tokens"
+      ],
+      "title": "SemanticSurfaceProfileV1",
+      "type": "object"
+    },
+    "SourcePixelPoint": {
+      "properties": {
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "SourcePixelPoint",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    },
+    "StateAssignmentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "exact_fingerprint",
+            "nearest_prototype",
+            "source_state_guard",
+            "expected_state_guard",
+            "new_candidate",
+            "adjudicated_merge",
+            "adjudicated_split",
+            "recovery_recheck"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "observation_id": {
+          "minLength": 1,
+          "title": "Observation Id",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Reasons",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.state-assignment.v1",
+          "default": "game-observatory.ai-player.state-assignment.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "state_id": {
+          "minLength": 1,
+          "title": "State Id",
+          "type": "string"
+        },
+        "status": {
+          "default": "active",
+          "enum": [
+            "active",
+            "superseded",
+            "invalidated"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "supersedes_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Supersedes Id"
+        },
+        "version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "environment_id",
+        "evidence_refs",
+        "id",
+        "observation_id",
+        "state_id",
+        "method",
+        "confidence",
+        "reasons"
+      ],
+      "title": "StateAssignmentV1",
+      "type": "object"
+    },
+    "StateObservationFeaturesV1": {
+      "additionalProperties": false,
+      "description": "Stable and volatile signals captured from one game frame.",
+      "properties": {
+        "critical_features": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Critical Features",
+          "type": "object"
+        },
+        "dynamic_field_names": {
+          "description": "Names or typed roles of values that must be reread, never their current values.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Dynamic Field Names",
+          "type": "array"
+        },
+        "interaction_roles": {
+          "description": "Stable semantic roles of visible controls and gestures.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Interaction Roles",
+          "type": "array"
+        },
+        "overlay_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Overlay Tokens",
+          "type": "array"
+        },
+        "page_identity_tokens": {
+          "description": "Stable semantic page identity, excluding selected entities and dynamic values.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Page Identity Tokens",
+          "type": "array"
+        },
+        "region_fingerprints": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Region Fingerprints",
+          "type": "object"
+        },
+        "risk_boundary_tokens": {
+          "description": "Stable preview, write, consumption, payment, or irreversible action boundaries.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Boundary Tokens",
+          "type": "array"
+        },
+        "runtime_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Runtime Tokens",
+          "type": "array"
+        },
+        "safe_exit_tokens": {
+          "description": "Stable safe exits and their expected return destinations.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Safe Exit Tokens",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.state-observation-features.v1",
+          "default": "game-observatory.ai-player.state-observation-features.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "screenshot_fingerprint": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Screenshot Fingerprint"
+        },
+        "selected_object_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Selected Object Tokens",
+          "type": "array"
+        },
+        "ui_structure_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ui Structure Tokens",
+          "type": "array"
+        },
+        "ui_text_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ui Text Tokens",
+          "type": "array"
+        },
+        "volatile_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Volatile Tokens",
+          "type": "array"
+        }
+      },
+      "title": "StateObservationFeaturesV1",
+      "type": "object"
+    },
+    "StateObservationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at": {
+          "title": "Captured At",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "feature_hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Feature Hash",
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/$defs/StateObservationFeaturesV1"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.state-observation.v1",
+          "default": "game-observatory.ai-player.state-observation.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "viewport_height": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Height",
+          "type": "integer"
+        },
+        "viewport_width": {
+          "exclusiveMinimum": 0,
+          "title": "Viewport Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "environment_id",
+        "evidence_refs",
+        "id",
+        "viewport_width",
+        "viewport_height",
+        "features",
+        "feature_hash"
+      ],
+      "title": "StateObservationV1",
+      "type": "object"
+    },
+    "StateReviewArtifactV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Media Type"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "path",
+        "sha256",
+        "size_bytes"
+      ],
+      "title": "StateReviewArtifactV1",
+      "type": "object"
+    },
+    "StateReviewCandidateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/StateReviewArtifactV1"
+          },
+          "minItems": 1,
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "assignments": {
+          "items": {
+            "$ref": "#/$defs/StateAssignmentV1"
+          },
+          "minItems": 1,
+          "title": "Assignments",
+          "type": "array"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/StateObservationV1"
+          },
+          "minItems": 1,
+          "title": "Observations",
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SemanticStateV1"
+        },
+        "state_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "State Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "state_sha256",
+        "assignments",
+        "observations",
+        "artifacts"
+      ],
+      "title": "StateReviewCandidateV1",
+      "type": "object"
+    },
+    "StateReviewEvidenceRunV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/StateReviewArtifactV1"
+          },
+          "minItems": 1,
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "run": {
+          "$ref": "#/$defs/EvidenceRun"
+        },
+        "run_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Run Sha256",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/StateReviewEvidenceStepV1"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run",
+        "run_sha256",
+        "steps",
+        "artifacts"
+      ],
+      "title": "StateReviewEvidenceRunV1",
+      "type": "object"
+    },
+    "StateReviewEvidenceStepV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/StateReviewArtifactV1"
+          },
+          "minItems": 1,
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "step": {
+          "$ref": "#/$defs/EvidenceStep"
+        },
+        "step_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Step Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step",
+        "step_sha256",
+        "artifacts"
+      ],
+      "title": "StateReviewEvidenceStepV1",
+      "type": "object"
+    },
+    "StateReviewScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "context_edge_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Context Edge Ids",
+          "type": "array"
+        },
+        "context_state_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Context State Ids",
+          "type": "array"
+        },
+        "decision_edge_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Decision Edge Ids",
+          "type": "array"
+        },
+        "decision_state_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Decision State Ids",
+          "type": "array"
+        },
+        "endpoint_state_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Endpoint State Ids",
+          "type": "array"
+        },
+        "merge_target_state_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Merge Target State Ids",
+          "type": "array"
+        },
+        "mode": {
+          "const": "scoped",
+          "default": "scoped",
+          "title": "Mode",
+          "type": "string"
+        },
+        "parent_packet_id": {
+          "minLength": 1,
+          "title": "Parent Packet Id",
+          "type": "string"
+        },
+        "parent_packet_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Parent Packet Sha256",
+          "type": "string"
+        },
+        "requested_edge_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requested Edge Ids",
+          "type": "array"
+        },
+        "requested_state_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requested State Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "parent_packet_id",
+        "parent_packet_sha256",
+        "decision_state_ids",
+        "decision_edge_ids",
+        "endpoint_state_ids"
+      ],
+      "title": "StateReviewScopeV1",
+      "type": "object"
+    },
+    "TransitionEdgeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/NormalizedAction"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expected_change": {
+          "minLength": 1,
+          "title": "Expected Change",
+          "type": "string"
+        },
+        "from_state_id": {
+          "minLength": 1,
+          "title": "From State Id",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "observed_change": {
+          "minLength": 1,
+          "title": "Observed Change",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "verified_transition",
+            "verified_state_change",
+            "verified_progress",
+            "verified_no_change",
+            "failed",
+            "forbidden",
+            "deferred"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "recovery_skill_version_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Skill Version Id"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.transition-edge.v1",
+          "default": "game-observatory.ai-player.transition-edge.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "target_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "to_state_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To State Id"
+        },
+        "version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "environment_id",
+        "evidence_refs",
+        "id",
+        "from_state_id",
+        "action",
+        "expected_change",
+        "observed_change",
+        "outcome"
+      ],
+      "title": "TransitionEdgeV1",
+      "type": "object"
+    },
+    "TransitionReviewCandidateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/StateReviewArtifactV1"
+          },
+          "minItems": 1,
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "edge": {
+          "$ref": "#/$defs/TransitionEdgeV1"
+        },
+        "edge_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "title": "Edge Sha256",
+          "type": "string"
+        },
+        "from_state_status": {
+          "minLength": 1,
+          "title": "From State Status",
+          "type": "string"
+        },
+        "from_state_title": {
+          "minLength": 1,
+          "title": "From State Title",
+          "type": "string"
+        },
+        "to_state_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To State Status"
+        },
+        "to_state_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To State Title"
+        }
+      },
+      "required": [
+        "edge",
+        "edge_sha256",
+        "from_state_title",
+        "from_state_status",
+        "artifacts"
+      ],
+      "title": "TransitionReviewCandidateV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "context_edges": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TransitionReviewCandidateV1"
+      },
+      "title": "Context Edges",
+      "type": "array"
+    },
+    "context_states": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StateReviewCandidateV1"
+      },
+      "title": "Context States",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/TransitionReviewCandidateV1"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_run_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence Run Ids",
+      "type": "array"
+    },
+    "evidence_runs": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StateReviewEvidenceRunV1"
+      },
+      "title": "Evidence Runs",
+      "type": "array"
+    },
+    "packet_id": {
+      "minLength": 1,
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-review-packet.v1",
+      "default": "game-observatory.ai-player.state-review-packet.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StateReviewScopeV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "states": {
+      "items": {
+        "$ref": "#/$defs/StateReviewCandidateV1"
+      },
+      "title": "States",
+      "type": "array"
+    },
+    "subject_session_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Subject Session Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "packet_id",
+    "environment_id",
+    "evidence_run_ids",
+    "subject_session_ids",
+    "states",
+    "edges"
+  ],
+  "title": "StateReviewPacketV1",
+  "type": "object"
+}

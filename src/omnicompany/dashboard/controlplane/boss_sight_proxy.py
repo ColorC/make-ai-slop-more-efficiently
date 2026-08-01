@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 
 import httpx
 import websockets
@@ -23,6 +24,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, WebSocket, WebS
 from starlette.websockets import WebSocketState
 
 from omnicompany.dashboard.ccdaemon import lifecycle
+from omnicompany.dashboard.boss_sight.reviewstage.links import review_material_open_path
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,37 @@ _HOP_BY_HOP = {
 
 def _filter_headers(headers: dict[str, str]) -> dict[str, str]:
     return {k: v for k, v in headers.items() if k.lower() not in _HOP_BY_HOP}
+
+
+_REVIEWSTAGE_FILE_PATH = re.compile(r"reviewstage/([^/]+)/file")
+
+
+def _reviewstage_markdown_navigation_id(
+    path: str,
+    *,
+    method: str,
+    sec_fetch_dest: str | None,
+    raw: str | None,
+    status_code: int,
+    content_type: str | None,
+) -> str | None:
+    """Recognize a human navigation to a Markdown material carrier.
+
+    A current ccdaemon redirects this request itself.  Keeping the same narrow
+    check in the Dashboard proxy also protects a live daemon that has not yet
+    been restarted: renderer fetches and explicit raw-source requests must
+    continue to receive the carrier bytes, while a browser document navigation
+    should enter the native Review material tab.
+    """
+
+    if method.upper() != "GET" or (sec_fetch_dest or "").lower() != "document":
+        return None
+    if raw is not None or status_code != 200:
+        return None
+    if not (content_type or "").lower().startswith("text/markdown"):
+        return None
+    match = _REVIEWSTAGE_FILE_PATH.fullmatch(path.strip("/"))
+    return match.group(1) if match else None
 
 
 # ── WebSocket 透传 (catch-all 之前注册, 否则被 HTTP catch-all 抢) ─────────
@@ -155,6 +188,20 @@ async def http_proxy(path: str, request: Request) -> Response:
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {e}")
 
+    material_id = _reviewstage_markdown_navigation_id(
+        path,
+        method=request.method,
+        sec_fetch_dest=request.headers.get("sec-fetch-dest"),
+        raw=request.query_params.get("raw"),
+        status_code=upstream.status_code,
+        content_type=upstream.headers.get("content-type"),
+    )
+    if material_id is not None and "download" not in request.query_params:
+        return Response(
+            status_code=307,
+            headers={"location": review_material_open_path(material_id)},
+        )
+
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,
@@ -163,4 +210,4 @@ async def http_proxy(path: str, request: Request) -> Response:
     )
 
 
-__all__ = ["boss_sight_proxy_router"]
+__all__ = ["boss_sight_proxy_router", "_reviewstage_markdown_navigation_id"]

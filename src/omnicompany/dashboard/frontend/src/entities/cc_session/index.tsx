@@ -60,6 +60,20 @@ export function resolvePtyMetaById(list: CcSessionMeta[], id: string): CcSession
   return prefixMatches.length === 1 ? prefixMatches[0] : undefined
 }
 
+async function fetchPtyMetaById(id: string): Promise<CcSessionMeta | undefined> {
+  // A freshly-created hosted PTY is returned by POST before its immutable host
+  // discovery generation is necessarily visible to the first list request.
+  // Deep links open immediately after creation, so retry the read briefly
+  // instead of misclassifying that live shell as a provider-resumable session.
+  const delays = [0, 80, 160, 320]
+  for (const delay of delays) {
+    if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay))
+    const match = resolvePtyMetaById(await ccApi.list(), id)
+    if (match) return match
+  }
+  return undefined
+}
+
 function toPtyEntity(m: CcSessionMeta): CcSessionEntity {
   const cwdLast = m.cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] || m.cwd
   const status: CcSessionStatus = m.status || (m.alive ? 'alive' : 'recoverable')
@@ -130,8 +144,7 @@ const resolver: EntityResolver<CcSessionEntity> = {
       const m = list.find((x) => x.id === id)
       if (m) return toChatEntity(m)
     } else {
-      const list = await ccApi.list()
-      const m = resolvePtyMetaById(list, id)
+      const m = await fetchPtyMetaById(id)
       if (m) return toPtyEntity(m)
     }
     return {

@@ -1051,6 +1051,8 @@ def build_reader_projection(
         related = READER_PLAY_PROFILES.get(str(connection.get("play_slug") or ""))
         connection["title"] = related["title"] if related else str(connection["play_slug"])
 
+    return profile
+
 
 def build_reader_game_projection(bundle: dict[str, Any]) -> dict[str, str]:
     game = bundle.get("game") if isinstance(bundle.get("game"), dict) else {}
@@ -1067,4 +1069,3 @@ def build_reader_game_projection(bundle: dict[str, Any]) -> dict[str, str]:
         "title": title,
         "summary": f"查看《{title}》的系统、规则、界面和相关玩法。",
     }
-    return profile

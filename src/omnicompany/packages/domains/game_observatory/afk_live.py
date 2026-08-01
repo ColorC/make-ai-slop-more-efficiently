@@ -279,9 +279,9 @@ class AfkLiveDesignBuilder:
         )
 
     @staticmethod
-    def _sources(source_evidence: dict[str, Any]) -> list[SourceRef]:
+    def _sources(source_evidence: dict[str, Any], captured_at: str) -> list[SourceRef]:
         files = source_evidence["files"]
-        return [
+        sources = [
             SourceRef(
                 id="src.afk.live-mumu-1.7.21",
                 kind=ContentKind.direct_observation,
@@ -357,6 +357,7 @@ class AfkLiveDesignBuilder:
                 note="玩家希望资源充足时能对共鸣队列进行 +1/+5/+10 等批量升级。",
             ),
         ]
+        return [source.model_copy(update={"captured_at": captured_at}) for source in sources]
 
     def _run_refs(
         self,
@@ -482,7 +483,7 @@ class AfkLiveDesignBuilder:
         source_evidence = AfkHeroUpgradeOracle(Path(manifest.source_root)).source_evidence()
         if not source_evidence["ok"]:
             raise ValueError("AFK source oracle symbols are incomplete")
-        sources = self._sources(source_evidence)
+        sources = self._sources(source_evidence, manifest.captured_at)
         source_ids = [item.id for item in sources]
         live_source = "src.afk.live-mumu-1.7.21"
         surfaces = self._surfaces(screens, live_source)
@@ -631,8 +632,7 @@ class AfkLiveDesignBuilder:
                 title="下一等级多资源成本计算",
                 description="升级界面调用 GetLevelUpCost，按目标等级、当前等级与赛季态生成多项成本，并逐项判断是否足够。",
                 representation="pseudocode",
-                code="costs = GetLevelUpCost(current + 1, current, isSeason)\
-canUpgrade = every(cost.owned >= cost.required)",
+                code="costs = GetLevelUpCost(current + 1, current, isSeason)\ncanUpgrade = every(cost.owned >= cost.required)",
                 source_ids=["src.afk.hero-upgrade-view", "src.afk.hero-model-cost"],
                 artifact_ids=[screens["hero_detail"].id],
                 run_id=screens["hero_detail"].run_id,
@@ -988,6 +988,8 @@ canUpgrade = every(cost.owned >= cost.required)",
         design_spec = ReverseEngineeredGameDesignSpec(
             id="design-spec.afk.hero-hall-season-upgrade.v1",
             title=concept.title,
+            created_at=manifest.captured_at,
+            updated_at=manifest.captured_at,
             scope_id=scope.id,
             system_instance_id=instance.id,
             overview=[overview],
@@ -1019,6 +1021,8 @@ canUpgrade = every(cost.owned >= cost.required)",
         report = GameReport(
             id=self.REPORT_ID,
             slug=self.SLUG,
+            created_at=manifest.captured_at,
+            updated_at=manifest.captured_at,
             game_id="afk-journey",
             game_title="AFK Journey",
             system_id=concept.id,
@@ -1063,14 +1067,16 @@ canUpgrade = every(cost.owned >= cost.required)",
 
     @staticmethod
     def _ocr_tokens(path: Path) -> list[dict[str, Any]]:
-        try:
-            from rapidocr_onnxruntime import RapidOCR  # type: ignore[import-not-found]
-        except ImportError as exc:  # pragma: no cover - environment boundary
-            raise RuntimeError("rapidocr_onnxruntime is required for AFK visual benchmark") from exc
-        result, _ = RapidOCR()(str(path))
+        from .recognition_service import RecognitionService
+
+        result = RecognitionService().ocr_region(path)
         return [
-            {"text": str(item[1]), "score": float(item[2]), "box": item[0]}
-            for item in (result or [])
+            {
+                "text": str(item.text),
+                "score": item.score,
+                "box": item.bounds.model_dump(mode="json") if item.bounds else None,
+            }
+            for item in result.detections
         ]
 
     def verify(self, manifest: AfkLiveEvidenceManifest, report: GameReport) -> dict[str, Any]:
@@ -1095,7 +1101,7 @@ canUpgrade = every(cost.owned >= cost.required)",
             {"id": "ocr-combat-power", "passed": contains(manifest.observed_fields["combat_power"]), "actual": digit_stream},
             {"id": "ocr-two-costs", "passed": all(contains(value) for value in expected_costs), "actual": digit_stream},
             {"id": "source-formula-present", "passed": AfkHeroUpgradeOracle(Path(manifest.source_root)).source_evidence()["ok"], "actual": "GetLevelUpCost / nextLevel / btn_upgrade"},
-            {"id": "no-resource-mutation", "passed": manifest.upgrade_executed is False, "actual": manifest.upgrade_executed},
+            {"id": "no-resource-mutation", "passed": manifest.upgrade_executed is False, "actual": manifest.upgrade_executed is False},
             {"id": "design-artifact-pairing", "passed": len(report.design_spec.design_artifacts) >= len(report.surfaces) + 1 if report.design_spec else False, "actual": len(report.design_spec.design_artifacts) if report.design_spec else 0},
         ]
         payload = {
@@ -1106,7 +1112,7 @@ canUpgrade = every(cost.owned >= cost.required)",
             "manifest": manifest.model_dump(mode="json"),
             "report_id": report.id,
             "checks": checks,
-            "ocr": {"engine": "rapidocr_onnxruntime", "tokens": tokens},
+            "ocr": {"engine": "RecognitionService", "tokens": tokens},
             "source_oracle": AfkHeroUpgradeOracle(Path(manifest.source_root)).source_evidence(),
         }
         path = self.store.export_root / "afk-mumu-hero-upgrade-observation.json"
@@ -1119,5 +1125,30 @@ canUpgrade = every(cost.owned >= cost.required)",
         verification = self.verify(manifest, report)
         if not verification["ok"]:
             raise ValueError("AFK live design verification failed")
-        self.store.upsert_report(report)
-        return {"report": report, "verification": verification}
+        verified = {item["id"]: item for item in verification["checks"]}
+        check_aliases = {"path-reaches-hero-detail": "four-real-surface-frames"}
+        benchmark_checks = []
+        for check in report.benchmark_task.checks:
+            result = verified.get(check_aliases.get(check.id, check.id))
+            if result is None:
+                raise ValueError(f"AFK benchmark check has no verifier result: {check.id}")
+            benchmark_checks.append(
+                check.model_copy(
+                    update={"actual": result.get("actual"), "passed": result["passed"]}
+                )
+            )
+        report = report.model_copy(
+            update={
+                "benchmark_task": report.benchmark_task.model_copy(
+                    update={"checks": benchmark_checks}
+                ),
+            }
+        )
+        report.assert_publishable()
+        existing = self.store.get_report(report.id)
+        changed = existing is None or existing.model_dump(mode="json") != report.model_dump(mode="json")
+        if changed:
+            self.store.upsert_report(report)
+        else:
+            report = existing
+        return {"report": report, "verification": verification, "changed": changed}

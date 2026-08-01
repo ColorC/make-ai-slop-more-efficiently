@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Stable and volatile signals captured from one game frame.",
+  "properties": {
+    "critical_features": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Critical Features",
+      "type": "object"
+    },
+    "dynamic_field_names": {
+      "description": "Names or typed roles of values that must be reread, never their current values.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Dynamic Field Names",
+      "type": "array"
+    },
+    "interaction_roles": {
+      "description": "Stable semantic roles of visible controls and gestures.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Interaction Roles",
+      "type": "array"
+    },
+    "overlay_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Overlay Tokens",
+      "type": "array"
+    },
+    "page_identity_tokens": {
+      "description": "Stable semantic page identity, excluding selected entities and dynamic values.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Page Identity Tokens",
+      "type": "array"
+    },
+    "region_fingerprints": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Region Fingerprints",
+      "type": "object"
+    },
+    "risk_boundary_tokens": {
+      "description": "Stable preview, write, consumption, payment, or irreversible action boundaries.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Risk Boundary Tokens",
+      "type": "array"
+    },
+    "runtime_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Runtime Tokens",
+      "type": "array"
+    },
+    "safe_exit_tokens": {
+      "description": "Stable safe exits and their expected return destinations.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Safe Exit Tokens",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-observation-features.v1",
+      "default": "game-observatory.ai-player.state-observation-features.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "screenshot_fingerprint": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Screenshot Fingerprint"
+    },
+    "selected_object_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Selected Object Tokens",
+      "type": "array"
+    },
+    "ui_structure_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Ui Structure Tokens",
+      "type": "array"
+    },
+    "ui_text_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Ui Text Tokens",
+      "type": "array"
+    },
+    "volatile_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Volatile Tokens",
+      "type": "array"
+    }
+  },
+  "title": "StateObservationFeaturesV1",
+  "type": "object"
+}

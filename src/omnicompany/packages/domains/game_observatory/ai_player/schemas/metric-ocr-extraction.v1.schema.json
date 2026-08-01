@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "MetricOCRDetectionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "metric_key": {
+          "minLength": 1,
+          "title": "Metric Key",
+          "type": "string"
+        },
+        "region": {
+          "$ref": "#/$defs/SourcePixelRect"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric_key",
+        "region",
+        "text",
+        "confidence"
+      ],
+      "title": "MetricOCRDetectionV1",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "detections": {
+      "items": {
+        "$ref": "#/$defs/MetricOCRDetectionV1"
+      },
+      "minItems": 1,
+      "title": "Detections",
+      "type": "array"
+    },
+    "engine": {
+      "minLength": 1,
+      "title": "Engine",
+      "type": "string"
+    },
+    "engine_version": {
+      "minLength": 1,
+      "title": "Engine Version",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_step_id": {
+      "minLength": 1,
+      "title": "Evidence Step Id",
+      "type": "string"
+    },
+    "frame_role": {
+      "enum": [
+        "before",
+        "after"
+      ],
+      "title": "Frame Role",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.metric-ocr-extraction.v1",
+      "default": "game-observatory.ai-player.metric-ocr-extraction.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_artifact_id": {
+      "minLength": 1,
+      "title": "Source Artifact Id",
+      "type": "string"
+    },
+    "source_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_step_id",
+    "frame_role",
+    "source_artifact_id",
+    "source_sha256",
+    "engine",
+    "engine_version",
+    "detections"
+  ],
+  "title": "MetricOCRExtractionPayloadV1",
+  "type": "object"
+}

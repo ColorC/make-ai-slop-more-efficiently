@@ -19,5 +19,13 @@ test('the production entry loads the recovered Settings and Token statistics sur
   await expect(page.getByText('会话数', { exact: true })).toBeVisible()
 
   const entryScript = await page.locator('script[type="module"]').getAttribute('src')
-  expect(entryScript).toMatch(/^\/assets\/index-[^?]+\.js\?v=[0-9a-f]{16}$/)
+  expect(entryScript).toMatch(/^\/assets\/index-[^?]+\.js$/)
+})
+
+test('the global command palette mounts once from the canonical ESM entry', async ({ page }) => {
+  await page.goto(`/?command_palette_singleton=${Date.now()}`)
+  await page.getByRole('button', { name: /搜索 \/ 命令/ }).click()
+
+  await expect(page.getByRole('combobox', { expanded: true })).toHaveCount(1)
+  await expect(page.getByRole('listbox')).toHaveCount(1)
 })

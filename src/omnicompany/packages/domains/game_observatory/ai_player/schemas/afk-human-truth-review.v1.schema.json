@@ -1,0 +1,173 @@
+{
+  "$defs": {
+    "AFKHumanTruthDecisionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_hash": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Candidate Hash",
+          "type": "string"
+        },
+        "candidate_id": {
+          "minLength": 1,
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "collection": {
+          "enum": [
+            "states",
+            "edges",
+            "objects",
+            "routes",
+            "controlled_interruptions",
+            "boundaries"
+          ],
+          "title": "Collection",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "accepted",
+            "excluded"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/HumanTruthEvidenceRefV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "human_reason": {
+          "minLength": 20,
+          "title": "Human Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "collection",
+        "candidate_id",
+        "candidate_hash",
+        "decision",
+        "human_reason",
+        "evidence_refs"
+      ],
+      "title": "AFKHumanTruthDecisionV1",
+      "type": "object"
+    },
+    "HumanReviewerV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "human_reviewer",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "HumanReviewerV1",
+      "type": "object"
+    },
+    "HumanTruthEvidenceRefV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "sha256"
+      ],
+      "title": "HumanTruthEvidenceRefV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "benchmark_id": {
+      "const": "afk_hero_growth_v1",
+      "default": "afk_hero_growth_v1",
+      "title": "Benchmark Id",
+      "type": "string"
+    },
+    "candidate_manifest_id": {
+      "const": "afk_hero_growth_v1_candidate_v4",
+      "default": "afk_hero_growth_v1_candidate_v4",
+      "title": "Candidate Manifest Id",
+      "type": "string"
+    },
+    "candidate_manifest_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Candidate Manifest Sha256",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/AFKHumanTruthDecisionV1"
+      },
+      "minItems": 1,
+      "title": "Items",
+      "type": "array"
+    },
+    "reviewed_at": {
+      "format": "date-time",
+      "title": "Reviewed At",
+      "type": "string"
+    },
+    "reviewer": {
+      "$ref": "#/$defs/HumanReviewerV1"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.afk-human-truth-review.v1",
+      "default": "game-observatory.ai-player.afk-human-truth-review.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "candidate_manifest_sha256",
+    "reviewer",
+    "reviewed_at",
+    "items"
+  ],
+  "title": "AFKHumanTruthReviewV1",
+  "type": "object"
+}

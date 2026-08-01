@@ -4,12 +4,20 @@ CREATE TABLE IF NOT EXISTS ai_player_action_quality_samples (
     session_id TEXT NOT NULL,
     task_id TEXT,
     command_id TEXT NOT NULL,
+    action_run_id TEXT,
+    evidence_step_id TEXT,
     outcome TEXT NOT NULL,
     execution_disposition TEXT NOT NULL,
     body_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
     PRIMARY KEY(environment_id, id),
-    FOREIGN KEY(environment_id) REFERENCES ai_player_environments(id) ON DELETE RESTRICT
+    FOREIGN KEY(environment_id) REFERENCES ai_player_environments(id) ON DELETE RESTRICT,
+    FOREIGN KEY(session_id) REFERENCES ai_player_sessions(id) ON DELETE RESTRICT,
+    FOREIGN KEY(environment_id, task_id)
+        REFERENCES ai_player_frontier_tasks(environment_id, id) ON DELETE RESTRICT,
+    UNIQUE(environment_id, command_id),
+    UNIQUE(environment_id, action_run_id),
+    UNIQUE(environment_id, evidence_step_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_player_action_quality_window

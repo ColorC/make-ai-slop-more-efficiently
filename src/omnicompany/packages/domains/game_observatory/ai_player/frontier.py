@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -56,11 +57,24 @@ class FrontierGenerationResultV1(BaseModel):
     audit_summary: str
 
 
+@dataclass(frozen=True)
+class FrontierAuditPolicy:
+    recent_candidate_state_limit: int = 4
+    recent_transition_window: int = 128
+    recent_unresolved_transition_limit: int = 4
+    gameplay_candidate_limit: int = 8
+
+
 class FrontierGenerator:
     """Turns evidence-bound coverage signals into idempotent canonical tasks."""
 
-    def __init__(self, store: AIPlayerStore) -> None:
+    def __init__(
+        self,
+        store: AIPlayerStore,
+        policy: FrontierAuditPolicy | None = None,
+    ) -> None:
         self.store = store
+        self.policy = policy or FrontierAuditPolicy()
 
     @staticmethod
     def _task_id(environment_id: str, signal: FrontierSignalV1) -> str:
@@ -77,10 +91,26 @@ class FrontierGenerator:
         return f"task.frontier.{hashlib.sha256(key.encode('utf-8')).hexdigest()[:24]}"
 
     def audit_signals(self, environment_id: str) -> list[FrontierSignalV1]:
+        """Return a bounded, recent execution frontier.
+
+        Canonical state and transition history is intentionally much larger than
+        the runnable frontier.  Turning every historical candidate or failed edge
+        into a task would create a repair archive, not a useful player queue.
+        Keep current gameplay candidates and only the newest unresolved evidence
+        slices; older facts remain queryable in their canonical stores.
+        """
+
         signals: list[FrontierSignalV1] = []
-        for state in self.store.list_semantic_states(environment_id):
-            if state.status != "candidate":
-                continue
+        candidate_states = self.store.list_semantic_states(
+            environment_id,
+            statuses=("candidate",),
+        )
+        candidate_states = sorted(
+            candidate_states,
+            key=lambda item: (item.created_at, item.id, item.version),
+            reverse=True,
+        )[: self.policy.recent_candidate_state_limit]
+        for state in candidate_states:
             signals.append(
                 FrontierSignalV1(
                     source="coverage_gap",
@@ -97,9 +127,16 @@ class FrontierGenerator:
                     risk_score=1,
                 )
             )
-        for edge in self.store.list_transition_edges(environment_id):
-            if edge.outcome not in {"deferred", "failed"}:
-                continue
+        recent_edges = self.store.list_recent_transition_edges(
+            environment_id,
+            limit=self.policy.recent_transition_window,
+        )
+        unresolved_edges = sorted(
+            (edge for edge in recent_edges if edge.outcome in {"deferred", "failed"}),
+            key=lambda item: (item.created_at, item.id, item.version),
+            reverse=True,
+        )[: self.policy.recent_unresolved_transition_limit]
+        for edge in unresolved_edges:
             signals.append(
                 FrontierSignalV1(
                     source="missing_transition",
@@ -114,6 +151,36 @@ class FrontierGenerator:
                     novelty_score=2,
                     expected_coverage_gain=4,
                     risk_score=2 if edge.outcome == "failed" else 1,
+                )
+            )
+        gameplay_candidates = sorted(
+            (
+                candidate
+                for candidate in self.store.list_gameplay_candidates(environment_id)
+                if candidate.status == "candidate"
+            ),
+            key=lambda item: (item.created_at, item.id, item.version),
+            reverse=True,
+        )[: self.policy.gameplay_candidate_limit]
+        for candidate in gameplay_candidates:
+            signals.append(
+                FrontierSignalV1(
+                    source="gameplay_candidate",
+                    subject_id=f"gameplay-candidate:{candidate.id}",
+                    title=f"验证并扩展玩法候选：{candidate.title}",
+                    reason=(
+                        f"玩法候选 {candidate.id} 已由真实转移形成边界："
+                        f"{candidate.boundary_summary}；下一轮应沿已知入口与出口继续验证规则、"
+                        "资源或进度反馈，并识别相邻玩法，不用旧失败技能代替玩家推进。"
+                    ),
+                    evidence_refs=candidate.evidence_refs,
+                    value_score=7,
+                    novelty_score=5,
+                    expected_coverage_gain=5,
+                    risk_score=1,
+                    action_budget=12,
+                    time_budget_seconds=900,
+                    max_attempts=2,
                 )
             )
         return signals

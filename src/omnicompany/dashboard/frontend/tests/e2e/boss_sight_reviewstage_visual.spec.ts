@@ -21,7 +21,9 @@ mkdirSync(SHOTS_DIR, { recursive: true })
 
 
 async function createMaterial(request: APIRequestContext, body: Record<string, unknown>): Promise<any> {
-  const r = await request.post(`${DASHBOARD}/api/boss-sight/reviewstage`, { data: body })
+  const r = await request.post(`${DASHBOARD}/api/boss-sight/reviewstage`, {
+    data: { project: 'omnicompany', track: '工作报告', version: 1, ...body },
+  })
   expect(r.ok(), `create material: ${r.status()} ${await r.text()}`).toBeTruthy()
   return await r.json()
 }

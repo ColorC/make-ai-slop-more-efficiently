@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evaluator": {
+      "minLength": 1,
+      "title": "Evaluator",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "evidence_reuse_count": {
+      "minimum": 0,
+      "title": "Evidence Reuse Count",
+      "type": "integer"
+    },
+    "false_success_count": {
+      "minimum": 0,
+      "title": "False Success Count",
+      "type": "integer"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "independent_reset_count": {
+      "minimum": 0,
+      "title": "Independent Reset Count",
+      "type": "integer"
+    },
+    "interruption_count": {
+      "minimum": 0,
+      "title": "Interruption Count",
+      "type": "integer"
+    },
+    "latency_reduction_rate": {
+      "maximum": 1,
+      "minimum": -1,
+      "title": "Latency Reduction Rate",
+      "type": "number"
+    },
+    "reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+    },
+    "safety_violation_count": {
+      "minimum": 0,
+      "title": "Safety Violation Count",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-validation.v1",
+      "default": "game-observatory.ai-player.skill-validation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "skill_run_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Skill Run Ids",
+      "type": "array"
+    },
+    "skill_version_id": {
+      "minLength": 1,
+      "title": "Skill Version Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "success_rate": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Success Rate",
+      "type": "number"
+    },
+    "successful_recovery_count": {
+      "minimum": 0,
+      "title": "Successful Recovery Count",
+      "type": "integer"
+    },
+    "successful_run_count": {
+      "minimum": 0,
+      "title": "Successful Run Count",
+      "type": "integer"
+    },
+    "token_reduction_rate": {
+      "maximum": 1,
+      "minimum": -1,
+      "title": "Token Reduction Rate",
+      "type": "number"
+    },
+    "total_run_count": {
+      "minimum": 1,
+      "title": "Total Run Count",
+      "type": "integer"
+    },
+    "unmet_precondition_count": {
+      "minimum": 0,
+      "title": "Unmet Precondition Count",
+      "type": "integer"
+    },
+    "visual_variant_count": {
+      "minimum": 0,
+      "title": "Visual Variant Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "skill_version_id",
+    "skill_run_ids",
+    "evaluator",
+    "status",
+    "total_run_count",
+    "successful_run_count",
+    "false_success_count",
+    "safety_violation_count",
+    "independent_reset_count",
+    "visual_variant_count",
+    "unmet_precondition_count",
+    "interruption_count",
+    "successful_recovery_count",
+    "evidence_reuse_count",
+    "success_rate",
+    "token_reduction_rate",
+    "latency_reduction_rate"
+  ],
+  "title": "SkillValidationV1",
+  "type": "object"
+}

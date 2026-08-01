@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import socket
+import subprocess
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -24,6 +26,7 @@ from .models import (
     utc_now,
 )
 from .store import ObservatoryStore
+from .subprocess_policy import headless_process_kwargs
 
 
 def _port_open(host: str, port: int, timeout: float = 0.8) -> bool:
@@ -182,6 +185,179 @@ class AfkUnityExplorerAdapter(GameAdapter):
         self.store.save_run(run)
         self.store.append_event(run.id, "unity_dispatch_result", {"artifact_id": artifact.id})
         return run
+
+
+class MinecraftMineflayerAdapter(GameAdapter):
+    """Read-only Mineflayer oracle probe using voxelcraft' installed dependency."""
+
+    def __init__(
+        self,
+        store: ObservatoryStore,
+        *,
+        node: str = "node",
+        node_modules: Path | None = None,
+        runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run,
+        port_probe: Callable[[str, int], bool] = _port_open,
+    ) -> None:
+        self.store = store
+        self.node = node
+        self.node_modules = node_modules or (
+            Path(__file__).resolve().parents[1]
+            / "voxelcraft/content/paths/mechanism/bot/node_modules"
+        )
+        self.runner = runner
+        self.port_probe = port_probe
+        self.host = "127.0.0.1"
+        self.port = 25565
+        self.target: TargetInfo | None = None
+        self.last_state: dict[str, Any] | None = None
+
+    def connect(self, target: str) -> TargetInfo:
+        parsed = urlparse(target)
+        if parsed.scheme != "minecraft":
+            raise AdapterError("Mineflayer target must be minecraft://host:port")
+        self.host = parsed.hostname or "127.0.0.1"
+        self.port = parsed.port or 25565
+        dependency = self.node_modules / "mineflayer"
+        online = dependency.is_dir() and self.port_probe(self.host, self.port)
+        self.target = TargetInfo(
+            id=target,
+            kind="minecraft",
+            label="Minecraft Mineflayer read-only oracle",
+            status="online" if online else "offline",
+            capabilities=[
+                "runtime_state",
+                "inventory_oracle",
+                "world_position",
+                "source_probe",
+                "read_only",
+            ],
+            metadata={
+                "host": self.host,
+                "port": self.port,
+                "node_modules": str(self.node_modules),
+                "dependency_available": dependency.is_dir(),
+            },
+        )
+        return self.target
+
+    def observe(self) -> ObservationBundle:
+        if not self.target or self.target.status != "online":
+            raise AdapterError("connect an online Mineflayer target before observe")
+        script = Path(__file__).resolve().with_name("minecraft_oracle.js")
+        env = dict(os.environ)
+        env["NODE_PATH"] = str(self.node_modules)
+        proc = self.runner(
+            [
+                self.node,
+                str(script),
+                self.host,
+                str(self.port),
+                f"Obs{uuid.uuid4().hex[:8]}",
+                "15000",
+            ],
+            capture_output=True,
+            timeout=20,
+            check=False,
+            env=env,
+            **headless_process_kwargs(),
+        )
+        stdout = proc.stdout.decode("utf-8", "replace").strip()
+        stderr = proc.stderr.decode("utf-8", "replace").strip()
+        try:
+            state = json.loads(stdout.splitlines()[-1])
+        except (IndexError, json.JSONDecodeError) as exc:
+            raise AdapterError(f"Mineflayer oracle returned invalid JSON: {stderr or stdout}") from exc
+        if proc.returncode != 0 or not state.get("ok"):
+            raise AdapterError(str(state.get("error") or stderr or "Mineflayer oracle failed"))
+        self.last_state = state
+        encoded = json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8")
+        digest = hashlib.sha256(encoded).hexdigest()
+        run_id = f"run.minecraft-oracle.{uuid.uuid4().hex}"
+        state_id = f"art.minecraft-oracle.{digest[:16]}"
+        state_path = self.store.artifact_root / f"{state_id}.json"
+        state_path.write_bytes(encoded)
+        state_artifact = ArtifactRef(
+            id=state_id,
+            kind="runtime_state",
+            path=str(state_path),
+            sha256=digest,
+            run_id=run_id,
+            media_type="application/json",
+            metadata={"adapter": "mineflayer-read-only-oracle", "public": False},
+        )
+        # ObservationBundle requires a frame. This JSON artifact deliberately fills
+        # both roles because this oracle is semantic-only and emits no pixels.
+        run = RunResult(
+            id=run_id,
+            adapter="mineflayer-read-only-oracle",
+            target_id=self.target.id,
+            status="passed",
+            ended_at=utc_now(),
+            artifact_ids=[state_artifact.id],
+        )
+        self.store.save_artifact(state_artifact)
+        self.store.save_run(run)
+        self.store.append_event(
+            run.id,
+            "observe",
+            {
+                "runtime_state": state_artifact.id,
+                "inventory_items": len(state.get("inventory", [])),
+                "read_only": True,
+            },
+        )
+        return ObservationBundle(
+            target_id=self.target.id,
+            frame=state_artifact,
+            runtime_state=state_artifact,
+            metadata={"adapter": run.adapter, "semantic_only": True},
+        )
+
+    def reset(self, snapshot: str | None = None) -> dict[str, Any]:
+        raise AdapterError("Mineflayer oracle reset requires an operator-approved world restore")
+
+    def checkpoint(self) -> str:
+        raise AdapterError("Mineflayer oracle does not own voxelcraft world snapshots")
+
+    def restore(self, snapshot: str) -> dict[str, Any]:
+        raise AdapterError("Mineflayer oracle restore is disabled in read-only mode")
+
+    def act(self, action: NormalizedAction) -> dict[str, Any]:
+        if action.type == "wait":
+            time.sleep(max(0.0, min(action.seconds, 30.0)))
+            return {"ok": True, "waited": max(0.0, min(action.seconds, 30.0))}
+        raise AdapterError("Mineflayer oracle is read-only; full benchmark was not authorized")
+
+    def evaluate(self, task: BenchmarkTask) -> RunResult:
+        if not self.target:
+            raise AdapterError("connect a Mineflayer target before evaluate")
+        if self.last_state is None:
+            self.observe()
+        inventory = {item.get("name"): item.get("count") for item in self.last_state.get("inventory", [])}
+        checks: list[ObjectiveCheck] = []
+        for item in task.checks:
+            actual: Any = None
+            if item.id == "inventory_contains_stone_pickaxe":
+                actual = int(inventory.get("stone_pickaxe") or 0) > 0
+            checks.append(
+                item.model_copy(
+                    update={
+                        "actual": actual,
+                        "passed": actual == item.expected if actual is not None else None,
+                    }
+                )
+            )
+        return RunResult(
+            id=f"run.minecraft-oracle-evaluate.{uuid.uuid4().hex}",
+            adapter="mineflayer-read-only-oracle",
+            target_id=self.target.id,
+            task_id=task.id,
+            status="stopped",
+            ended_at=utc_now(),
+            checks=checks,
+            error="read-only oracle captured the start state; full stone-pickaxe benchmark was not run",
+        )
 
 
 class MinecraftVisualAdapter(GameAdapter):

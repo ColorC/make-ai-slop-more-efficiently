@@ -12,6 +12,8 @@ from typing import Any
 
 from omnicompany.core.config import omni_workspace_root
 
+from .subprocess_policy import headless_process_kwargs
+
 
 class ScrcpyControlError(RuntimeError):
     pass
@@ -80,6 +82,13 @@ class ScrcpyControlTransport:
         self._socket: socket.socket | None = None
         self._process: subprocess.Popen[bytes] | None = None
         self._forward_port: int | None = None
+        self._reverse_socket_name: str | None = None
+        self.server_output = ""
+        self.server_exit_code: int | None = None
+        self.tunnel_mode: str | None = None
+        self.tunnel_detached = False
+        self._touch_messages_sent = 0
+        self._touch_trace: list[str] = []
 
     @staticmethod
     def _infer_server_version(path: Path) -> str:
@@ -95,6 +104,7 @@ class ScrcpyControlTransport:
             capture_output=True,
             timeout=timeout,
             check=False,
+            **headless_process_kwargs(),
         )
         output = proc.stdout.decode("utf-8", "replace")
         error = proc.stderr.decode("utf-8", "replace")
@@ -107,6 +117,39 @@ class ScrcpyControlTransport:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
             probe.bind(("127.0.0.1", 0))
             return int(probe.getsockname()[1])
+
+    def _prepare_reverse_tunnel(self, socket_name: str) -> tuple[socket.socket, int] | None:
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = int(listener.getsockname()[1])
+            self._adb("reverse", f"localabstract:{socket_name}", f"tcp:{port}")
+        except (OSError, ScrcpyControlError):
+            listener.close()
+            return None
+        self._reverse_socket_name = socket_name
+        self.tunnel_mode = "adb-reverse"
+        return listener, port
+
+    def _detach_active_tunnel(self) -> None:
+        if self._reverse_socket_name is not None:
+            socket_name = self._reverse_socket_name
+            try:
+                self._adb("reverse", "--remove", f"localabstract:{socket_name}")
+            except ScrcpyControlError:
+                return
+            self._reverse_socket_name = None
+            self.tunnel_detached = True
+            return
+        if self._forward_port is not None:
+            port = self._forward_port
+            try:
+                self._adb("forward", "--remove", f"tcp:{port}")
+            except ScrcpyControlError:
+                return
+            self._forward_port = None
+            self.tunnel_detached = True
 
     def input_state(self) -> dict[str, Any]:
         dump = self._adb("shell", "dumpsys", "input")
@@ -135,20 +178,29 @@ class ScrcpyControlTransport:
         self.assert_input_idle("before multi-touch")
         self._adb("push", str(self.server_path), self.REMOTE_SERVER, timeout=60.0)
         scid = int(uuid.uuid4().hex[:7], 16)
-        port = self._free_local_port()
         socket_name = f"scrcpy_{scid:08x}"
-        self._adb("forward", f"tcp:{port}", f"localabstract:{socket_name}")
-        self._forward_port = port
+        reverse_tunnel = self._prepare_reverse_tunnel(socket_name)
+        if reverse_tunnel is not None:
+            listener, port = reverse_tunnel
+            tunnel_option = ""
+        else:
+            listener = None
+            port = self._free_local_port()
+            self._adb("forward", f"tcp:{port}", f"localabstract:{socket_name}")
+            self._forward_port = port
+            self.tunnel_mode = "adb-forward"
+            tunnel_option = "tunnel_forward=true "
         command = (
             f"CLASSPATH={self.REMOTE_SERVER} app_process / "
             f"com.genymobile.scrcpy.Server {self.server_version} "
-            f"scid={scid:x} log_level=error video=false audio=false control=true "
-            "tunnel_forward=true cleanup=false power_on=false raw_stream=true"
+            f"scid={scid:x} log_level=debug video=false audio=false control=true "
+            f"{tunnel_option}cleanup=false power_on=false raw_stream=true"
         )
         self._process = subprocess.Popen(
             [str(self.adb_path), "-s", self.serial, "shell", command],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            **headless_process_kwargs(),
         )
         deadline = time.monotonic() + 10.0
         last_error: OSError | None = None
@@ -156,17 +208,23 @@ class ScrcpyControlTransport:
             if self._process.poll() is not None:
                 break
             try:
-                self._socket = socket.create_connection(("127.0.0.1", port), timeout=1.0)
+                if listener is not None:
+                    listener.settimeout(1.0)
+                    self._socket, _peer = listener.accept()
+                else:
+                    self._socket = socket.create_connection(("127.0.0.1", port), timeout=1.0)
                 self._socket.settimeout(2.0)
+                self._detach_active_tunnel()
+                if listener is not None:
+                    listener.close()
                 return self
             except OSError as exc:
                 last_error = exc
                 time.sleep(0.1)
-        output = b""
-        if self._process.stdout:
-            output = self._process.stdout.read()
+        if listener is not None:
+            listener.close()
         self.close()
-        detail = output.decode("utf-8", "replace").strip()
+        detail = self.server_output
         raise ScrcpyControlError(
             detail or f"scrcpy control socket did not open: {last_error or 'unknown error'}"
         )
@@ -190,6 +248,17 @@ class ScrcpyControlTransport:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=3.0)
+            if process.stdout:
+                output = process.stdout.read()
+                process.stdout.close()
+                self.server_output = output.decode("utf-8", "replace").strip()
+            self.server_exit_code = process.returncode
+        reverse_socket_name, self._reverse_socket_name = self._reverse_socket_name, None
+        if reverse_socket_name is not None:
+            try:
+                self._adb("reverse", "--remove", f"localabstract:{reverse_socket_name}")
+            except ScrcpyControlError:
+                pass
         port, self._forward_port = self._forward_port, None
         if port is not None:
             try:
@@ -229,7 +298,35 @@ class ScrcpyControlTransport:
             0,
             0,
         )
-        self._socket.sendall(message)
+        event_number = self._touch_messages_sent + 1
+        event = (
+            f"#{event_number}:action={action},pointer={pointer_id},"
+            f"position=({x},{y}),pressure={fixed_pressure}"
+        )
+        try:
+            self._socket.sendall(message)
+        except OSError as exc:
+            prior = " | ".join(self._touch_trace[-4:]) or "none"
+            raise ScrcpyControlError(
+                "scrcpy control send failed "
+                f"event={event} viewport={self.width}x{self.height} "
+                f"last_success=[{prior}]: {exc}"
+            ) from exc
+        self._touch_messages_sent = event_number
+        self._touch_trace.append(event)
+
+    def diagnostic_summary(self) -> str:
+        trace = " | ".join(self._touch_trace[-4:]) or "none"
+        parts = [
+            f"scrcpy_server_exit={self.server_exit_code}",
+            f"adb_tunnel_mode={self.tunnel_mode}",
+            f"adb_tunnel_detached={str(self.tunnel_detached).lower()}",
+            f"touch_messages_sent={self._touch_messages_sent}",
+            f"last_touch_events=[{trace}]",
+        ]
+        if self.server_output:
+            parts.append(f"scrcpy_server_output={self.server_output}")
+        return "; ".join(parts)
 
     @staticmethod
     def _point_between(start: tuple[float, float], end: tuple[float, float], t: float) -> tuple[int, int]:
@@ -251,16 +348,52 @@ class ScrcpyControlTransport:
         if steps < 2:
             raise ScrcpyControlError("multi-touch gesture requires at least two steps")
         interval = max(duration, 0.05) / steps
-        self._send_touch(self.ACTION_DOWN, 0, *self._point_between(start_a, end_a, 0), 1.0)
-        self._send_touch(self.ACTION_DOWN, 1, *self._point_between(start_b, end_b, 0), 1.0)
-        for index in range(1, steps + 1):
-            t = index / steps
-            self._send_touch(self.ACTION_MOVE, 0, *self._point_between(start_a, end_a, t), 1.0)
-            self._send_touch(self.ACTION_MOVE, 1, *self._point_between(start_b, end_b, t), 1.0)
-            time.sleep(interval)
-        self._send_touch(self.ACTION_UP, 1, *self._point_between(start_b, end_b, 1), 0.0)
-        self._send_touch(self.ACTION_UP, 0, *self._point_between(start_a, end_a, 1), 0.0)
-        time.sleep(0.15)
+        down: set[int] = set()
+        primary_error: BaseException | None = None
+        try:
+            self._send_touch(
+                self.ACTION_DOWN, 0, *self._point_between(start_a, end_a, 0), 1.0
+            )
+            down.add(0)
+            self._send_touch(
+                self.ACTION_DOWN, 1, *self._point_between(start_b, end_b, 0), 1.0
+            )
+            down.add(1)
+            for index in range(1, steps + 1):
+                t = index / steps
+                self._send_touch(
+                    self.ACTION_MOVE,
+                    0,
+                    *self._point_between(start_a, end_a, t),
+                    1.0,
+                )
+                self._send_touch(
+                    self.ACTION_MOVE,
+                    1,
+                    *self._point_between(start_b, end_b, t),
+                    1.0,
+                )
+                time.sleep(interval)
+        except BaseException as exc:
+            primary_error = exc
+            raise
+        finally:
+            release_error: BaseException | None = None
+            for pointer_id, end in ((1, end_b), (0, end_a)):
+                if pointer_id not in down:
+                    continue
+                try:
+                    self._send_touch(
+                        self.ACTION_UP,
+                        pointer_id,
+                        *self._point_between(end, end, 1),
+                        0.0,
+                    )
+                except BaseException as exc:
+                    release_error = release_error or exc
+            time.sleep(0.15)
+            if primary_error is None and release_error is not None:
+                raise release_error
 
     def pinch(
         self,

@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "HumanReviewerV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "human_reviewer",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "HumanReviewerV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adjudication_body": {
+      "minLength": 20,
+      "title": "Adjudication Body",
+      "type": "string"
+    },
+    "candidate_manifest_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Candidate Manifest Sha256",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "review_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Review Sha256",
+      "type": "string"
+    },
+    "reviewer": {
+      "$ref": "#/$defs/HumanReviewerV1"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.afk-human-truth-attestation.v1",
+      "default": "game-observatory.ai-player.afk-human-truth-attestation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature_algorithm": {
+      "const": "ed25519",
+      "title": "Signature Algorithm",
+      "type": "string"
+    },
+    "signature_base64": {
+      "minLength": 1,
+      "title": "Signature Base64",
+      "type": "string"
+    },
+    "verdict": {
+      "const": "approved_for_afk_stage1_truth_freeze",
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reviewer",
+    "candidate_manifest_sha256",
+    "review_sha256",
+    "verdict",
+    "generated_at",
+    "adjudication_body",
+    "signature_algorithm",
+    "signature_base64"
+  ],
+  "title": "AFKHumanTruthAttestationV1",
+  "type": "object"
+}

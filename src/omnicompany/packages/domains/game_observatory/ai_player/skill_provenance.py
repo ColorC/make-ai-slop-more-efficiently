@@ -175,9 +175,26 @@ class SkillRunEvidenceWriter:
         existing_step = observatory.get_evidence_step(step.id)
         existing_manifest = observatory.get_evidence_manifest(evidence_run.id)
         existing_values = (existing_run, existing_step, existing_manifest)
-        expected_values = (evidence_run, step, manifest)
         if any(value is not None for value in existing_values):
-            if existing_values != expected_values:
+            if not all(value is not None for value in existing_values):
+                raise ValueError("skill-run validation evidence id already has different content")
+            assert existing_run is not None
+            assert existing_step is not None
+            assert existing_manifest is not None
+            if (
+                existing_run.environment.get("skill_validation") != telemetry
+                or existing_run.environment.get("source_evidence_refs")
+                != evidence_run.environment["source_evidence_refs"]
+                or existing_run.status != terminal_status
+                or existing_run.step_ids != [existing_step.id]
+                or existing_step.evidence_run_id != existing_run.id
+                or existing_step.status != terminal_status
+                or existing_step.action != step.action
+                or existing_step.artifact_ids != artifact_ids
+                or not existing_manifest.publishable
+                or existing_manifest.run != existing_run
+                or existing_manifest.steps != [existing_step]
+            ):
                 raise ValueError("skill-run validation evidence id already has different content")
         else:
             observatory.save_evidence_run(evidence_run)

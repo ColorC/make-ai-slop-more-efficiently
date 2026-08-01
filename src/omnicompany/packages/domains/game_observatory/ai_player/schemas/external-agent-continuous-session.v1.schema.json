@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actual_effort": {
+      "enum": [
+        "medium",
+        "high",
+        "unsupported",
+        "unreported"
+      ],
+      "title": "Actual Effort",
+      "type": "string"
+    },
+    "atomic_action_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Atomic Action Count",
+      "type": "integer"
+    },
+    "cache_creation_input_tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Cache Creation Input Tokens",
+      "type": "integer"
+    },
+    "cached_input_tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Cached Input Tokens",
+      "type": "integer"
+    },
+    "checkpoint_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checkpoint Id"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "external_session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Session Id"
+    },
+    "facility_contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Facility Contract Sha256",
+      "type": "string"
+    },
+    "generation": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "heartbeat_sequence": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Heartbeat Sequence",
+      "type": "integer"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "input_tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Input Tokens",
+      "type": "integer"
+    },
+    "invocation_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Invocation Count",
+      "type": "integer"
+    },
+    "last_error": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Error"
+    },
+    "last_heartbeat_at": {
+      "minLength": 1,
+      "title": "Last Heartbeat At",
+      "type": "string"
+    },
+    "last_invocation_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Invocation Id"
+    },
+    "model_selector": {
+      "minLength": 1,
+      "title": "Model Selector",
+      "type": "string"
+    },
+    "observation_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Observation Count",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Output Tokens",
+      "type": "integer"
+    },
+    "permission_mode": {
+      "enum": [
+        "readonly",
+        "workspace-write",
+        "trusted-bypass"
+      ],
+      "title": "Permission Mode",
+      "type": "string"
+    },
+    "phase_id": {
+      "minLength": 1,
+      "title": "Phase Id",
+      "type": "string"
+    },
+    "previous_session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Session Id"
+    },
+    "provider": {
+      "enum": [
+        "codex-cli",
+        "claude-code-cli"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "reasoning_tokens": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Reasoning Tokens",
+      "type": "integer"
+    },
+    "requested_effort": {
+      "enum": [
+        "medium",
+        "high"
+      ],
+      "title": "Requested Effort",
+      "type": "string"
+    },
+    "resolved_model_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolved Model Id"
+    },
+    "restart_reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "phase_complete",
+            "provider_failover",
+            "hard_reset",
+            "environment_identity_change",
+            "facility_contract_change",
+            "unrecoverable_context_pollution",
+            "benchmark_isolation"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Restart Reason"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.external-agent-session.v1",
+      "default": "game-observatory.ai-player.external-agent-session.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "semantic_action_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Semantic Action Count",
+      "type": "integer"
+    },
+    "started_at": {
+      "minLength": 1,
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "default": "starting",
+      "enum": [
+        "starting",
+        "active",
+        "suspended",
+        "closed",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "task_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Task Ids",
+      "type": "array"
+    },
+    "total_duration_seconds": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Total Duration Seconds",
+      "type": "number"
+    },
+    "updated_at": {
+      "minLength": 1,
+      "title": "Updated At",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "provider",
+    "model_selector",
+    "requested_effort",
+    "actual_effort",
+    "permission_mode",
+    "environment_id",
+    "phase_id",
+    "facility_contract_sha256",
+    "started_at",
+    "last_heartbeat_at",
+    "updated_at"
+  ],
+  "title": "ExternalAgentContinuousSessionV1",
+  "type": "object"
+}

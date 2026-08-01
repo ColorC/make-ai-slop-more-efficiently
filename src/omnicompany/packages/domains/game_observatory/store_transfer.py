@@ -26,17 +26,20 @@ class StoreTransferResultV1(BaseModel):
     source_root: str
     destination_root: str
     dry_run: bool
+    mode: Literal["evidence_and_sources", "source_snapshots_only"]
     source_targets: int
     source_artifacts: int
     source_evidence_runs: int
     source_evidence_steps: int
     source_evidence_manifests: int
+    source_snapshots: int
     copied_artifacts: int
     reused_artifacts: int
     inserted_targets: int
     inserted_evidence_runs: int
     inserted_evidence_steps: int
     inserted_evidence_manifests: int
+    inserted_source_snapshots: int
     verification_pass: bool
 
 
@@ -56,6 +59,7 @@ def transfer_evidence_store(
     destination_root: Path,
     *,
     dry_run: bool = False,
+    source_snapshots_only: bool = False,
 ) -> StoreTransferResultV1:
     source_root = source_root.resolve()
     destination_root = destination_root.resolve()
@@ -63,12 +67,12 @@ def transfer_evidence_store(
         raise ValueError("source and destination Observatory roots must differ")
     if not (source_root / "observatory.sqlite3").is_file():
         raise FileNotFoundError(f"source Observatory database is missing: {source_root}")
-    source = ObservatoryStore(source_root)
+    source = ObservatoryStore(source_root, allow_workspace_shadow=True)
     destination = ObservatoryStore(destination_root)
 
-    source_targets = source.list_targets()
-    source_artifacts = source.list_artifacts()
-    source_runs = source.list_evidence_runs(limit=1000)
+    source_targets = [] if source_snapshots_only else source.list_targets()
+    source_artifacts = [] if source_snapshots_only else source.list_artifacts()
+    source_runs = [] if source_snapshots_only else source.list_evidence_runs(limit=1000)
     source_steps = [
         step for run in source_runs for step in source.list_evidence_steps(run.id)
     ]
@@ -77,6 +81,7 @@ def transfer_evidence_store(
         for run in source_runs
         if (manifest := source.get_evidence_manifest(run.id)) is not None
     ]
+    source_snapshots = source.list_source_snapshots()
 
     artifact_plan: list[tuple[ArtifactRef, Path, Path, bool]] = []
     for artifact in source_artifacts:
@@ -113,6 +118,14 @@ def transfer_evidence_store(
                 f"{manifest.evidence_run_id}"
             )
 
+    destination_snapshots = {
+        snapshot.id: snapshot for snapshot in destination.list_source_snapshots()
+    }
+    for snapshot in source_snapshots:
+        existing = destination_snapshots.get(snapshot.id)
+        if existing is not None and not _same_model(existing, snapshot):
+            raise ValueError(f"destination source snapshot conflicts with source: {snapshot.id}")
+
     inserted_targets = sum(
         destination.get_target(target.id) is None for target in source_targets
     )
@@ -123,6 +136,9 @@ def transfer_evidence_store(
     inserted_manifests = sum(
         destination.get_evidence_manifest(manifest.evidence_run_id) is None
         for manifest in source_manifests
+    )
+    inserted_snapshots = sum(
+        snapshot.id not in destination_snapshots for snapshot in source_snapshots
     )
     copied_artifacts = sum(not destination_path.exists() for _, _, destination_path, _ in artifact_plan)
     reused_artifacts = len(artifact_plan) - copied_artifacts
@@ -147,6 +163,9 @@ def transfer_evidence_store(
         for manifest in source_manifests:
             if destination.get_evidence_manifest(manifest.evidence_run_id) is None:
                 destination.save_evidence_manifest(manifest)
+        for snapshot in source_snapshots:
+            if snapshot.id not in destination_snapshots:
+                destination.save_source_snapshot(snapshot)
 
     verification_pass = True
     if not dry_run:
@@ -174,22 +193,33 @@ def transfer_evidence_store(
             and _same_model(stored, manifest)
             for manifest in source_manifests
         )
+        persisted_snapshots = {
+            snapshot.id: snapshot for snapshot in destination.list_source_snapshots()
+        }
+        verification_pass = verification_pass and all(
+            snapshot.id in persisted_snapshots
+            and _same_model(persisted_snapshots[snapshot.id], snapshot)
+            for snapshot in source_snapshots
+        )
 
     return StoreTransferResultV1(
         source_root=str(source_root),
         destination_root=str(destination_root),
         dry_run=dry_run,
+        mode=("source_snapshots_only" if source_snapshots_only else "evidence_and_sources"),
         source_targets=len(source_targets),
         source_artifacts=len(source_artifacts),
         source_evidence_runs=len(source_runs),
         source_evidence_steps=len(source_steps),
         source_evidence_manifests=len(source_manifests),
+        source_snapshots=len(source_snapshots),
         copied_artifacts=copied_artifacts,
         reused_artifacts=reused_artifacts,
         inserted_targets=inserted_targets,
         inserted_evidence_runs=inserted_runs,
         inserted_evidence_steps=inserted_steps,
         inserted_evidence_manifests=inserted_manifests,
+        inserted_source_snapshots=inserted_snapshots,
         verification_pass=verification_pass,
     )
 
@@ -199,6 +229,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--destination-root", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--source-snapshots-only", action="store_true")
     parser.add_argument("--result", type=Path)
     return parser
 
@@ -209,12 +240,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.source_root,
         args.destination_root,
         dry_run=args.dry_run,
+        source_snapshots_only=args.source_snapshots_only,
     )
     payload = json.dumps(result.model_dump(mode="json", by_alias=True), ensure_ascii=False, indent=2)
     if args.result:
         args.result.parent.mkdir(parents=True, exist_ok=True)
-        args.result.write_text(payload + "\
-", encoding="utf-8")
+        args.result.write_text(payload + "\n", encoding="utf-8")
     print(payload)
     return int(not result.verification_pass)
 

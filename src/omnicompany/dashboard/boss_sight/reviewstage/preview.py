@@ -30,6 +30,7 @@ from typing import Any
 # 2026-06-25:"文本类更大一点,过小的文本不具备阅览意义")。
 WEB_VIEWPORT = {"width": 960, "height": 600}
 TEXT_VIEWPORT = {"width": 600, "height": 460}
+INLINE_HTML_TIMEOUT_MS = 60_000
 _RENDER_VERSION = "2"  # 渲染策略版本号:改了它 → 所有旧封面失效、重截
 WEB_KINDS = {"html", "demo", "static-report", "custom_web_template", "webgame-spec"}
 TEXT_KINDS = {"markdown", "plan", "agent-workflow-report"}
@@ -266,7 +267,14 @@ def generate_for(materials: list[Any], store_root: Path, *, read_text=None) -> d
                                 else:
                                     raise
                         else:  # html(网页内联) / doc(文本渲染)
-                            page.set_content(payload, wait_until="load", timeout=6000)
+                            # 单文件网页产物可能内联几十 MB 的 JS/素材；6 秒硬超时会让
+                            # 已成功提交的材料永久耗尽重试预算。DOMContentLoaded 已保证
+                            # 同步模块完成，又不会被非关键外部资源的 load 事件拖死。
+                            page.set_content(
+                                payload,
+                                wait_until="domcontentloaded",
+                                timeout=INLINE_HTML_TIMEOUT_MS,
+                            )
                         page.wait_for_timeout(350)
                         page.screenshot(path=str(out), clip={"x": 0, "y": 0, **vp})
                         generated.append(m.id)

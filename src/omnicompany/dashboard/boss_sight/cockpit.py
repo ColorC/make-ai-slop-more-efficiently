@@ -166,7 +166,10 @@ def _attention_from_material(material: Material) -> list[dict[str, Any]]:
 
     for comment in material.comments:
         feedback_status = comment.feedback_status or "delivered"
-        if feedback_status == "todo_done":
+        # Merely saving a comment must not wake the controller or create an
+        # unresolved cockpit item.  Only an explicit delivery enters this
+        # workflow; completed todo feedback is terminal as before.
+        if feedback_status in {"saved", "todo_done"}:
             continue
         attention_id = f"comment:{material.id}:{comment.id}"
         out.append({

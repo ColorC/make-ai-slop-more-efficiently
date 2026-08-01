@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "applicability": {
+      "minLength": 1,
+      "title": "Applicability",
+      "type": "string"
+    },
+    "creator_id": {
+      "minLength": 1,
+      "title": "Creator Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "executor_kind": {
+      "default": "normalized_actions",
+      "enum": [
+        "normalized_actions",
+        "maa",
+        "airtest",
+        "mineflayer",
+        "specialized_adapter"
+      ],
+      "title": "Executor Kind",
+      "type": "string"
+    },
+    "executor_ref": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Executor Ref"
+    },
+    "failure_checks": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Failure Checks",
+      "type": "array"
+    },
+    "level": {
+      "enum": [
+        "L2",
+        "L3",
+        "L4"
+      ],
+      "title": "Level",
+      "type": "string"
+    },
+    "parameters_schema": {
+      "additionalProperties": true,
+      "title": "Parameters Schema",
+      "type": "object"
+    },
+    "perception_tier": {
+      "default": "P2",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "title": "Perception Tier",
+      "type": "string"
+    },
+    "provisional_trial": {
+      "default": false,
+      "title": "Provisional Trial",
+      "type": "boolean"
+    },
+    "recovery_skill_version_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recovery Skill Version Ids",
+      "type": "array"
+    },
+    "safety_level": {
+      "enum": [
+        "read_only",
+        "reversible",
+        "progression",
+        "social",
+        "economic",
+        "restricted"
+      ],
+      "title": "Safety Level",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.skill-crystallization-request.v1",
+      "default": "game-observatory.ai-player.skill-crystallization-request.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "skill_id": {
+      "minLength": 1,
+      "title": "Skill Id",
+      "type": "string"
+    },
+    "success_checks": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Success Checks",
+      "type": "array"
+    },
+    "supporting_transition_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Supporting Transition Ids",
+      "type": "array"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "transition_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Transition Ids",
+      "type": "array"
+    },
+    "visual_variant_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Visual Variant Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "environment_id",
+    "creator_id",
+    "skill_id",
+    "title",
+    "level",
+    "transition_ids",
+    "applicability",
+    "safety_level",
+    "success_checks",
+    "failure_checks"
+  ],
+  "title": "SkillCrystallizationRequestV1",
+  "type": "object"
+}

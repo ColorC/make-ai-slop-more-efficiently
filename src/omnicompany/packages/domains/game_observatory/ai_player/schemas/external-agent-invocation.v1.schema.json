@@ -1,0 +1,395 @@
+{
+  "$defs": {
+    "ExternalAgentImageInputV1": {
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
+          ],
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "media_type",
+        "size_bytes"
+      ],
+      "title": "ExternalAgentImageInputV1",
+      "type": "object"
+    },
+    "ExternalAgentTokenUsageV1": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_creation_input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Cache Creation Input Tokens",
+          "type": "integer"
+        },
+        "cached_input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Cached Input Tokens",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "reasoning_tokens": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reasoning Tokens",
+          "type": "integer"
+        }
+      },
+      "title": "ExternalAgentTokenUsageV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actual_effort": {
+      "enum": [
+        "medium",
+        "high",
+        "unsupported",
+        "unreported"
+      ],
+      "title": "Actual Effort",
+      "type": "string"
+    },
+    "completed_at": {
+      "minLength": 1,
+      "title": "Completed At",
+      "type": "string"
+    },
+    "duration_seconds": {
+      "minimum": 0,
+      "title": "Duration Seconds",
+      "type": "number"
+    },
+    "effort_evidence": {
+      "default": "unreported",
+      "enum": [
+        "provider-event",
+        "native-session-log",
+        "accepted-cli-argument",
+        "unreported"
+      ],
+      "title": "Effort Evidence",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "maxLength": 8000,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "event_count": {
+      "minimum": 0,
+      "title": "Event Count",
+      "type": "integer"
+    },
+    "event_log_path": {
+      "minLength": 1,
+      "title": "Event Log Path",
+      "type": "string"
+    },
+    "event_log_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Event Log Sha256",
+      "type": "string"
+    },
+    "exit_code": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exit Code"
+    },
+    "external_session_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Session Id"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "input_images": {
+      "items": {
+        "$ref": "#/$defs/ExternalAgentImageInputV1"
+      },
+      "title": "Input Images",
+      "type": "array"
+    },
+    "last_message_path": {
+      "minLength": 1,
+      "title": "Last Message Path",
+      "type": "string"
+    },
+    "last_message_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Last Message Sha256",
+      "type": "string"
+    },
+    "model_evidence": {
+      "default": "unreported",
+      "enum": [
+        "provider-event",
+        "native-session-log",
+        "accepted-cli-argument",
+        "unreported"
+      ],
+      "title": "Model Evidence",
+      "type": "string"
+    },
+    "model_selector": {
+      "minLength": 1,
+      "title": "Model Selector",
+      "type": "string"
+    },
+    "operation": {
+      "enum": [
+        "start",
+        "resume"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "permission_mode": {
+      "enum": [
+        "readonly",
+        "workspace-write",
+        "trusted-bypass"
+      ],
+      "title": "Permission Mode",
+      "type": "string"
+    },
+    "prompt_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt Sha256"
+    },
+    "provider": {
+      "enum": [
+        "codex-cli",
+        "claude-code-cli"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "provider_cost_usd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Cost Usd"
+    },
+    "provider_duration_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Duration Seconds"
+    },
+    "requested_effort": {
+      "enum": [
+        "medium",
+        "high"
+      ],
+      "title": "Requested Effort",
+      "type": "string"
+    },
+    "resolved_model_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolved Model Id"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.external-agent-invocation.v1",
+      "default": "game-observatory.ai-player.external-agent-invocation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 1,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "started_at": {
+      "minLength": 1,
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "timed_out"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "stderr_tail": {
+      "default": "",
+      "maxLength": 16000,
+      "title": "Stderr Tail",
+      "type": "string"
+    },
+    "stdout_tail": {
+      "default": "",
+      "maxLength": 16000,
+      "title": "Stdout Tail",
+      "type": "string"
+    },
+    "time_to_first_token_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Time To First Token Seconds"
+    },
+    "timeout_reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "hard_wall_clock",
+            "no_meaningful_progress"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timeout Reason"
+    },
+    "usage": {
+      "$ref": "#/$defs/ExternalAgentTokenUsageV1"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "session_id",
+    "sequence",
+    "operation",
+    "provider",
+    "model_selector",
+    "requested_effort",
+    "actual_effort",
+    "permission_mode",
+    "status",
+    "usage",
+    "duration_seconds",
+    "event_count",
+    "event_log_path",
+    "event_log_sha256",
+    "last_message_path",
+    "last_message_sha256",
+    "started_at",
+    "completed_at"
+  ],
+  "title": "ExternalAgentInvocationV1",
+  "type": "object"
+}

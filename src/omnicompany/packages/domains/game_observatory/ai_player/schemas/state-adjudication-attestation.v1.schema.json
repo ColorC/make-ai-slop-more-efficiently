@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "issued_at": {
+      "minLength": 1,
+      "title": "Issued At",
+      "type": "string"
+    },
+    "key_id": {
+      "minLength": 1,
+      "title": "Key Id",
+      "type": "string"
+    },
+    "payload_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Payload Sha256",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "minLength": 1,
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "reviewer_role": {
+      "enum": [
+        "independent_agent",
+        "human",
+        "runtime_critic"
+      ],
+      "title": "Reviewer Role",
+      "type": "string"
+    },
+    "reviewer_session_id": {
+      "minLength": 1,
+      "title": "Reviewer Session Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-adjudication-attestation.v1",
+      "default": "game-observatory.ai-player.state-adjudication-attestation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature_base64": {
+      "minLength": 1,
+      "title": "Signature Base64",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reviewer_id",
+    "reviewer_role",
+    "reviewer_session_id",
+    "key_id",
+    "payload_sha256",
+    "signature_base64",
+    "issued_at"
+  ],
+  "title": "StateAdjudicationAttestationV1",
+  "type": "object"
+}

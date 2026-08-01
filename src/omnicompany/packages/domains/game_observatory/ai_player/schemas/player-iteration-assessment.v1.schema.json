@@ -1,0 +1,297 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "_IterationTierAssessmentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "directive": {
+          "minLength": 1,
+          "title": "Directive",
+          "type": "string"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Metrics",
+          "type": "object"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "insufficient_data",
+            "not_evaluated"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "thresholds": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Thresholds",
+          "type": "object"
+        },
+        "tier": {
+          "enum": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "title": "Tier",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tier",
+        "name",
+        "status",
+        "directive"
+      ],
+      "title": "_IterationTierAssessmentV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Deterministic four-tier review; soft scores may request review but cannot pass tiers.",
+  "properties": {
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "directive": {
+      "enum": [
+        "continue",
+        "shadow_only",
+        "pause_physical_and_repair_perception_executor",
+        "revise_planner_and_task_policy",
+        "refresh_guides_and_reprioritize_objectives",
+        "expand_discovery_frontier"
+      ],
+      "title": "Directive",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "highest_contiguous_passed_tier": {
+      "maximum": 4,
+      "minimum": 0,
+      "title": "Highest Contiguous Passed Tier",
+      "type": "integer"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "overall_status": {
+      "enum": [
+        "passed",
+        "failed",
+        "insufficient_data"
+      ],
+      "title": "Overall Status",
+      "type": "string"
+    },
+    "policy_version": {
+      "const": "player-iteration.v1",
+      "default": "player-iteration.v1",
+      "title": "Policy Version",
+      "type": "string"
+    },
+    "sample_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Sample Ids",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.player-iteration-assessment.v1",
+      "default": "game-observatory.ai-player.player-iteration-assessment.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "soft_review_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Soft Review Reasons",
+      "type": "array"
+    },
+    "soft_signal_averages": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "propertyNames": {
+        "enum": [
+          "tutorial_comprehension",
+          "intent_coherence",
+          "opportunity_awareness",
+          "strategic_continuity",
+          "curiosity_quality",
+          "loop_avoidance",
+          "player_naturalness"
+        ]
+      },
+      "title": "Soft Signal Averages",
+      "type": "object"
+    },
+    "soft_signal_review_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Soft Signal Review Ids",
+      "type": "array"
+    },
+    "tiers": {
+      "items": {
+        "$ref": "#/$defs/_IterationTierAssessmentV1"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "title": "Tiers",
+      "type": "array"
+    },
+    "window_ended_at": {
+      "minLength": 1,
+      "title": "Window Ended At",
+      "type": "string"
+    },
+    "window_kind": {
+      "enum": [
+        "actions_10",
+        "verified_task",
+        "daily_close",
+        "incident"
+      ],
+      "title": "Window Kind",
+      "type": "string"
+    },
+    "window_started_at": {
+      "minLength": 1,
+      "title": "Window Started At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "environment_id",
+    "evidence_refs",
+    "id",
+    "window_kind",
+    "sample_ids",
+    "tiers",
+    "highest_contiguous_passed_tier",
+    "overall_status",
+    "directive",
+    "window_started_at",
+    "window_ended_at"
+  ],
+  "title": "PlayerIterationAssessmentV1",
+  "type": "object"
+}

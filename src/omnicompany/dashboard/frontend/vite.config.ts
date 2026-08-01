@@ -1,8 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { dirname, relative, resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 // 共用 wiki 核（唯一正本在 webworks 仓）: markdown 材料渲染走它, 不再自带极简实现。
@@ -22,21 +21,6 @@ const walkerGameTarget = process.env.OMNI_WALKER_GAME_URL || 'http://127.0.0.1:5
 const viloDemoTarget = process.env.OMNI_VILO_DEMO_URL || 'http://127.0.0.1:8892'
 const viloOsTarget = process.env.OMNI_VILO_OS_URL || 'http://127.0.0.1:5186'
 
-// Rollup's default content-hashed chunk names can form a hash-reference cycle:
-// two semantically identical builds may receive different names when chunks
-// reference one another.  Use the stable module set as the chunk identity so
-// release reproducibility can be checked byte-for-byte without weakening the
-// gate.  The digest also disambiguates repeated names such as `Editor`.
-function stableChunkFileName(chunk: { name: string; moduleIds: string[] }): string {
-  const moduleIds = [...chunk.moduleIds]
-    .map((id) => relative(here, id).replaceAll('\\', '/'))
-    .sort()
-  const identity = moduleIds.length > 0 ? moduleIds.join('\n') : chunk.name
-  const digest = createHash('sha256').update(identity).digest('hex').slice(0, 12)
-  const safeName = chunk.name.replace(/[^A-Za-z0-9._-]+/g, '-') || 'chunk'
-  return `assets/${safeName}-${digest}.js`
-}
-
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -52,6 +36,10 @@ export default defineConfig({
       '/api': {
         target: `http://localhost:${dashboardProxyPort}`,
         changeOrigin: true,
+        // Terminal and native-chat transports both upgrade below /api.
+        // Without WS forwarding, the dev UI renders xterm but remains stuck in
+        // "connecting", which masks production PTY/resume regressions.
+        ws: true,
       },
       // FileBridge intentionally lives outside /api so the same route can be
       // consumed by Dashboard and LOFA. Keep dev/E2E behavior identical to the
@@ -85,10 +73,18 @@ export default defineConfig({
     // minified production chunk (undeclared variable at runtime). Terser keeps
     // the lazy terminal chunk compact without changing xterm's semantics.
     minify: 'terser',
+    // Terser ranks short identifier names from each chunk's character
+    // frequencies.  Vite's multi-worker scheduling made that ranking and the
+    // resulting content hashes drift between otherwise identical builds on
+    // this large graph.  A single worker keeps public/source builds byte-stable.
+    terserOptions: { maxWorkers: 1 },
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
-        chunkFileNames: stableChunkFileName,
+        // Keep Vite/Rollup's content-hashed filenames. Naming chunks only by
+        // their module set makes changed module contents reuse an old URL;
+        // browsers can then combine a fresh entry with stale React-dependent
+        // chunks and fail with React invariant 321.
         // 注意: 只把「静态可达」的大库放进 manualChunks(分文件利于缓存)。
         // 纯动态引入的库(cytoscape/react-syntax-highlighter/xterm)**不要**写在这里 ——
         // 把动态库强行塞进具名 manualChunk 会把它钉回入口的静态图、被 index.html modulepreload,

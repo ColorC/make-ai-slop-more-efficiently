@@ -1,0 +1,258 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "GuideRefreshEnvironmentV1": {
+      "additionalProperties": false,
+      "description": "Environment identity captured when the trigger occurs.",
+      "properties": {
+        "account_scope_id": {
+          "minLength": 1,
+          "title": "Account Scope Id",
+          "type": "string"
+        },
+        "build_scope_id": {
+          "minLength": 1,
+          "title": "Build Scope Id",
+          "type": "string"
+        },
+        "channel": {
+          "minLength": 1,
+          "title": "Channel",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "game_version": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Game Version"
+        },
+        "season": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Season"
+        },
+        "server_stage": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Server Stage"
+        }
+      },
+      "required": [
+        "environment_id",
+        "game_id",
+        "build_scope_id",
+        "account_scope_id",
+        "channel"
+      ],
+      "title": "GuideRefreshEnvironmentV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Append-only request emitted by A2 without waiting for research.",
+  "properties": {
+    "attempt": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "consecutive_failures": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Consecutive Failures",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "current_state_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current State Id"
+    },
+    "environment": {
+      "$ref": "#/$defs/GuideRefreshEnvironmentV1"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "query": {
+      "maxLength": 1000,
+      "minLength": 3,
+      "title": "Query",
+      "type": "string"
+    },
+    "retry_of_request_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry Of Request Id"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.guide-refresh-request.v1",
+      "default": "game-observatory.ai-player.guide-refresh-request.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "status": {
+      "const": "queued",
+      "default": "queued",
+      "title": "Status",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "trigger": {
+      "enum": [
+        "first_entry_to_new_system",
+        "high_value_hard_to_reverse_choice",
+        "version_or_season_change",
+        "two_consecutive_failures"
+      ],
+      "title": "Trigger",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "environment_id",
+    "task_id",
+    "trigger",
+    "query",
+    "environment",
+    "evidence_refs"
+  ],
+  "title": "GuideRefreshRequestV1",
+  "type": "object"
+}

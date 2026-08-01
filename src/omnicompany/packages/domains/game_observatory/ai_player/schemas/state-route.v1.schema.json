@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action_count": {
+      "readOnly": true,
+      "title": "Action Count",
+      "type": "integer"
+    },
+    "edge_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Edge Ids",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "goal_state_id": {
+      "minLength": 1,
+      "title": "Goal State Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.state-route.v1",
+      "default": "game-observatory.ai-player.state-route.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "start_state_id": {
+      "minLength": 1,
+      "title": "Start State Id",
+      "type": "string"
+    },
+    "state_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "State Ids",
+      "type": "array"
+    },
+    "total_cost": {
+      "minimum": 0,
+      "title": "Total Cost",
+      "type": "number"
+    },
+    "verified_only": {
+      "const": true,
+      "default": true,
+      "title": "Verified Only",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "environment_id",
+    "start_state_id",
+    "goal_state_id",
+    "state_ids",
+    "edge_ids",
+    "total_cost",
+    "action_count"
+  ],
+  "title": "StateRouteV1",
+  "type": "object"
+}

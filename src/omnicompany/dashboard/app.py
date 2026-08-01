@@ -607,12 +607,17 @@ _INDEX_ASSET_RE = re.compile(r'(?P<prefix>(?:src|href)=["\'])(?P<url>/assets/[^"
 
 
 def _versioned_index(index_html: Path) -> str:
-    """Return the SPA entry with one build-generation query on root assets.
+    """Return the SPA entry with one build-generation query on root styles.
 
     The generation includes the index bytes plus the size and nanosecond mtime
     of every directly referenced asset.  Thus even a recovery build that
-    rewrites bytes under an accidentally reused filename gets a new browser
-    cache key without clearing cookies, local storage, or the global cache.
+    rewrites CSS under an accidentally reused filename gets a new browser cache
+    key without clearing cookies, local storage, or the global cache.
+
+    Do not add a query to the ESM entry script. Lazy Rollup chunks import shared
+    exports back from the canonical, unqueried entry URL; querying only the HTML
+    entry makes the browser execute the same module graph under two identities
+    and mounts two React roots (including two command palettes).
     """
     raw = index_html.read_bytes()
     text = raw.decode("utf-8")
@@ -629,6 +634,8 @@ def _versioned_index(index_html: Path) -> str:
     token = digest.hexdigest()[:16]
 
     def add_generation(match: re.Match[str]) -> str:
+        if match.group("prefix").startswith("src="):
+            return match.group(0)
         url = match.group("url")
         separator = "&" if "?" in url else "?"
         return f'{match.group("prefix")}{url}{separator}v={token}{match.group("suffix")}'

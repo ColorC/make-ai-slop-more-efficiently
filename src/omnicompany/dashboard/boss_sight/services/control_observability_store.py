@@ -23,7 +23,7 @@ CONTROL_DEFINITIONS: dict[str, dict[str, Any]] = {
     "controller.auto_wake": {
         "label": "Controller auto wake",
         "description": "Allow controller wakeups from review/subagent events.",
-        "default": True,
+        "default": False,
     },
     "reviewstage.push_to_user": {
         "label": "Review push to user",
@@ -285,6 +285,14 @@ class ControlObservabilityStore:
                             if k in controls[key]
                         })
                         state["controls"][key]["value"] = bool(state["controls"][key]["value"])
+                        # A system-owned value is only a persisted copy of the
+                        # historical default, not an explicit user choice.  It
+                        # must follow a safer default change; human/controller
+                        # choices remain authoritative.
+                        if state["controls"][key].get("updated_by") == "system":
+                            state["controls"][key]["value"] = bool(
+                                CONTROL_DEFINITIONS[key]["default"]
+                            )
                         if not isinstance(state["controls"][key].get("history"), list):
                             state["controls"][key]["history"] = []
             obs = raw.get("observability")

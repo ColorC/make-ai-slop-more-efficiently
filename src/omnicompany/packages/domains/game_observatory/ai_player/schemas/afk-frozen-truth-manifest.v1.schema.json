@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "HumanReviewerV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "human_reviewer",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "HumanReviewerV1",
+      "type": "object"
+    },
+    "ImmutableFileRefV1": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "title": "ImmutableFileRefV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attestation_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Attestation Sha256",
+      "type": "string"
+    },
+    "benchmark_id": {
+      "const": "afk_hero_growth_v1",
+      "default": "afk_hero_growth_v1",
+      "title": "Benchmark Id",
+      "type": "string"
+    },
+    "candidate_manifest_id": {
+      "const": "afk_hero_growth_v1_candidate_v4",
+      "default": "afk_hero_growth_v1_candidate_v4",
+      "title": "Candidate Manifest Id",
+      "type": "string"
+    },
+    "candidate_manifest_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Candidate Manifest Sha256",
+      "type": "string"
+    },
+    "collections": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ImmutableFileRefV1"
+      },
+      "title": "Collections",
+      "type": "object"
+    },
+    "counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+    },
+    "freeze_pass": {
+      "const": true,
+      "title": "Freeze Pass",
+      "type": "boolean"
+    },
+    "freeze_status": {
+      "const": "human_signed_frozen",
+      "title": "Freeze Status",
+      "type": "string"
+    },
+    "frozen": {
+      "const": true,
+      "title": "Frozen",
+      "type": "boolean"
+    },
+    "frozen_at": {
+      "format": "date-time",
+      "title": "Frozen At",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "review_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "title": "Review Sha256",
+      "type": "string"
+    },
+    "reviewer": {
+      "$ref": "#/$defs/HumanReviewerV1"
+    },
+    "schema": {
+      "const": "game-observatory.ai-player.afk-frozen-truth-manifest.v1",
+      "default": "game-observatory.ai-player.afk-frozen-truth-manifest.v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "candidate_manifest_sha256",
+    "review_sha256",
+    "attestation_sha256",
+    "reviewer",
+    "frozen_at",
+    "freeze_status",
+    "frozen",
+    "freeze_pass",
+    "counts",
+    "collections",
+    "manifest_hash"
+  ],
+  "title": "AFKFrozenTruthManifestV1",
+  "type": "object"
+}
