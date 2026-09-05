@@ -6,4 +6,4 @@ maafw==5.11.2
 
 # Production-compatible evidence/object projection and PostgreSQL JSONB index.
 minio==7.2.20
-psycopg[binary]==3.3.4
+psycopg[binary]==3.3.5
