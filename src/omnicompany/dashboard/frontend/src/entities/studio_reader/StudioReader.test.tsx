@@ -75,7 +75,7 @@ vi.mock('../../api/reviewstageClient', async (orig) => {
   return { ...mod, reviewstageApi: { ...mod.reviewstageApi, canvas: vi.fn(), domainTree: vi.fn() } }
 })
 
-import { StudioReaderPanel } from './index'
+import { ReviewProjectionReader as StudioReaderPanel } from './index'
 import { reviewstageApi } from '../../api/reviewstageClient'
 import { usePanels } from '../../stores/panelsStore'
 

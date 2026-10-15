@@ -1,0 +1,856 @@
+{
+  "$defs": {
+    "AccountActionIntentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "minLength": 1,
+          "title": "Category",
+          "type": "string"
+        },
+        "game_internal": {
+          "title": "Game Internal",
+          "type": "boolean"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "impersonates_real_person": {
+          "default": false,
+          "title": "Impersonates Real Person",
+          "type": "boolean"
+        },
+        "involves_real_money": {
+          "default": false,
+          "title": "Involves Real Money",
+          "type": "boolean"
+        },
+        "submits_external_personal_identity": {
+          "default": false,
+          "title": "Submits External Personal Identity",
+          "type": "boolean"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "summary",
+        "game_internal"
+      ],
+      "title": "AccountActionIntentV1",
+      "type": "object"
+    },
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "GuardedBatchActionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "account_action_intent": {
+          "$ref": "#/$defs/AccountActionIntentV1"
+        },
+        "action": {
+          "$ref": "#/$defs/NormalizedAction"
+        },
+        "expectation": {
+          "$ref": "#/$defs/GuardedBatchExpectationV1"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "lightweight_guard_checks": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Lightweight Guard Checks",
+          "type": "array"
+        },
+        "locator_id": {
+          "minLength": 1,
+          "title": "Locator Id",
+          "type": "string"
+        },
+        "recovery_action": {
+          "minLength": 1,
+          "title": "Recovery Action",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "sequence",
+        "locator_id",
+        "action",
+        "account_action_intent",
+        "expectation",
+        "lightweight_guard_checks",
+        "recovery_action"
+      ],
+      "title": "GuardedBatchActionV1",
+      "type": "object"
+    },
+    "GuardedBatchExpectationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "effective_when": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Effective When",
+          "type": "array"
+        },
+        "expected_business_change": {
+          "minLength": 1,
+          "title": "Expected Business Change",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "visual_change",
+            "visual_no_change"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "min_visual_distance": {
+          "default": 0.02,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Visual Distance",
+          "type": "number"
+        },
+        "stop_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Stop Conditions",
+          "type": "array"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "kind",
+        "expected_business_change",
+        "effective_when",
+        "stop_conditions"
+      ],
+      "title": "GuardedBatchExpectationV1",
+      "type": "object"
+    },
+    "GuardedBatchLocatorV1": {
+      "additionalProperties": false,
+      "properties": {
+        "board_cell": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Board Cell"
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "fixed_source_pixel",
+            "runtime_recognized_board_cell"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "point": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "recognition_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recognition Requirements",
+          "type": "array"
+        },
+        "source_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Artifact Ids",
+          "type": "array"
+        },
+        "source_evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Evidence Step Ids",
+          "type": "array"
+        },
+        "target_name": {
+          "minLength": 1,
+          "title": "Target Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "target_name",
+        "source_evidence_step_ids",
+        "source_artifact_ids"
+      ],
+      "title": "GuardedBatchLocatorV1",
+      "type": "object"
+    },
+    "NormalizedAction": {
+      "properties": {
+        "axis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Button"
+        },
+        "duration_ms": {
+          "default": 250,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "keycode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keycode"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "pinch_direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Direction"
+        },
+        "pinch_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Percent"
+        },
+        "pinch_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Pinch Steps",
+          "type": "integer"
+        },
+        "pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressed"
+        },
+        "seconds": {
+          "default": 0.5,
+          "title": "Seconds",
+          "type": "number"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "two_finger_offset_x": {
+          "default": 0,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset X",
+          "type": "integer"
+        },
+        "two_finger_offset_y": {
+          "default": 50,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset Y",
+          "type": "integer"
+        },
+        "two_finger_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Two Finger Steps",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "tap",
+            "swipe",
+            "pinch",
+            "two_finger_swipe",
+            "text",
+            "key",
+            "launch",
+            "force_stop",
+            "wait",
+            "back",
+            "home",
+            "mouse_move",
+            "mouse_button",
+            "gamepad_button",
+            "gamepad_axis",
+            "reset"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "x2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X2"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "y2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NormalizedAction",
+      "type": "object"
+    },
+    "SourcePixelPoint": {
+      "properties": {
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "SourcePixelPoint",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One-action capacity recovery contract kept outside throughput credit.",
+  "properties": {
+    "activation_requirements": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Activation Requirements",
+      "type": "array"
+    },
+    "blocking_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocking Reasons",
+      "type": "array"
+    },
+    "candidate_id": {
+      "minLength": 1,
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "checkpoint_requirements": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Checkpoint Requirements",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "executable": {
+      "title": "Executable",
+      "type": "boolean"
+    },
+    "execution_authorization": {
+      "enum": [
+        "none",
+        "single_live_validation"
+      ],
+      "title": "Execution Authorization",
+      "type": "string"
+    },
+    "execution_credit": {
+      "const": "recovery_only_not_throughput",
+      "default": "recovery_only_not_throughput",
+      "title": "Execution Credit",
+      "type": "string"
+    },
+    "execution_status": {
+      "enum": [
+        "dry_run_only",
+        "ready_for_live_validation",
+        "live_validated"
+      ],
+      "title": "Execution Status",
+      "type": "string"
+    },
+    "expected_empty_cells": {
+      "const": 0,
+      "title": "Expected Empty Cells",
+      "type": "integer"
+    },
+    "expected_generator_next_tap_candidate": {
+      "const": false,
+      "title": "Expected Generator Next Tap Candidate",
+      "type": "boolean"
+    },
+    "expected_released_cells": {
+      "const": 1,
+      "title": "Expected Released Cells",
+      "type": "integer"
+    },
+    "failure_branch": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Failure Branch",
+      "type": "array"
+    },
+    "forbidden_actions": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Forbidden Actions",
+      "type": "array"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "locators": {
+      "items": {
+        "$ref": "#/$defs/GuardedBatchLocatorV1"
+      },
+      "minItems": 2,
+      "title": "Locators",
+      "type": "array"
+    },
+    "minimum_energy": {
+      "minimum": 0,
+      "title": "Minimum Energy",
+      "type": "integer"
+    },
+    "minimum_negative_identity_distance": {
+      "minimum": 0,
+      "title": "Minimum Negative Identity Distance",
+      "type": "integer"
+    },
+    "minimum_session_action_budget": {
+      "minimum": 2,
+      "title": "Minimum Session Action Budget",
+      "type": "integer"
+    },
+    "planned_action": {
+      "$ref": "#/$defs/GuardedBatchActionV1"
+    },
+    "recovery_branch": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Recovery Branch",
+      "type": "array"
+    },
+    "reference_artifact_id": {
+      "minLength": 1,
+      "title": "Reference Artifact Id",
+      "type": "string"
+    },
+    "route_id": {
+      "minLength": 1,
+      "title": "Route Id",
+      "type": "string"
+    },
+    "route_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Route Version",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "game-observatory.recovery-route-preparation.v1",
+      "default": "game-observatory.recovery-route-preparation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "selected_pair_identity_distance": {
+      "minimum": 0,
+      "title": "Selected Pair Identity Distance",
+      "type": "integer"
+    },
+    "source_evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Source Evidence Refs",
+      "type": "array"
+    },
+    "source_identity_threshold": {
+      "minimum": 0,
+      "title": "Source Identity Threshold",
+      "type": "integer"
+    },
+    "source_locator_id": {
+      "minLength": 1,
+      "title": "Source Locator Id",
+      "type": "string"
+    },
+    "success_branch": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Success Branch",
+      "type": "array"
+    },
+    "target_locator_id": {
+      "minLength": 1,
+      "title": "Target Locator Id",
+      "type": "string"
+    },
+    "terminal_receipt_requirements": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Terminal Receipt Requirements",
+      "type": "array"
+    },
+    "validation_evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "title": "Validation Evidence Refs",
+      "type": "array"
+    },
+    "validation_skill_run_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Validation Skill Run Ids",
+      "type": "array"
+    },
+    "wall_clock_boundary": {
+      "minLength": 1,
+      "title": "Wall Clock Boundary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "route_id",
+    "game_id",
+    "environment_id",
+    "created_at",
+    "execution_status",
+    "execution_authorization",
+    "executable",
+    "activation_requirements",
+    "reference_artifact_id",
+    "source_evidence_refs",
+    "expected_empty_cells",
+    "expected_generator_next_tap_candidate",
+    "minimum_energy",
+    "minimum_session_action_budget",
+    "source_identity_threshold",
+    "selected_pair_identity_distance",
+    "minimum_negative_identity_distance",
+    "expected_released_cells",
+    "source_locator_id",
+    "target_locator_id",
+    "locators",
+    "planned_action",
+    "checkpoint_requirements",
+    "terminal_receipt_requirements",
+    "wall_clock_boundary",
+    "success_branch",
+    "failure_branch",
+    "recovery_branch",
+    "forbidden_actions"
+  ],
+  "title": "RecoveryRoutePreparationV1",
+  "type": "object"
+}

@@ -39,6 +39,8 @@ export interface ProjectItem {
   bg?: string
   /** 卡片小图标: lucide 图标名(kebab-case, 如 shield-check) */
   icon?: string
+  /** 项目专属图标图; 前端优先于 lucide 图标展示。 */
+  icon_url?: string | null
   plan_categories?: string[]
   links?: ProjectLink[]
   pinned?: boolean
@@ -130,18 +132,37 @@ export interface ProjectFindings {
   corrections: ProjectFindingItem[]
 }
 
+const PROJECTS_SHARED_TTL_MS = 15_000
+let projectsShared: { startedAt: number; promise: Promise<ProjectsBoard> } | null = null
+
+function loadProjectsBoard(fresh: boolean): Promise<ProjectsBoard> {
+  const now = Date.now()
+  if (!fresh && projectsShared && now - projectsShared.startedAt < PROJECTS_SHARED_TTL_MS) {
+    return projectsShared.promise
+  }
+
+  const pf = (window as any).__omniPrefetch
+  const prefetched = !fresh && pf?.projects && now - (pf.t || 0) < PROJECTS_SHARED_TTL_MS
+    ? pf.projects as Promise<ProjectsBoard | null>
+    : undefined
+  const promise = prefetched
+    ? prefetched.then((data) => data ?? fetch('/api/projects').then((response) => jsonOrThrow<ProjectsBoard>(response)))
+    : fetch(fresh ? '/api/projects?fresh=1' : '/api/projects').then((response) => jsonOrThrow<ProjectsBoard>(response))
+
+  projectsShared = { startedAt: now, promise }
+  promise.catch(() => {
+    if (projectsShared?.promise === promise) projectsShared = null
+  })
+  return promise
+}
+
 export const projectsApi = {
   /** fresh=true = 用户主动刷新, 穿透服务端 index 解析缓存 */
   list: (fresh = false): Promise<ProjectsBoard> => {
     // index.html 里随 HTML 就发出的首屏预取(见 window.__omniPrefetch 的注释): 启动后 15s 窗口内
     // 所有非 fresh 调用共享同一份 promise(启动期多组件重复取列表, 兼作去重; 不能消费一次即
     // 置空 —— 先挂载的侧栏会把它抢走, 项目板反而落回排队的网络请求)。预取失败(null)回退正常请求。
-    const pf = (window as any).__omniPrefetch
-    const pre = !fresh && pf?.projects && Date.now() - (pf.t || 0) < 15000
-      ? pf.projects as Promise<ProjectsBoard | null>
-      : undefined
-    if (pre) return pre.then((d) => d ?? fetch('/api/projects').then((r) => jsonOrThrow<ProjectsBoard>(r)))
-    return fetch(fresh ? '/api/projects?fresh=1' : '/api/projects').then((r) => jsonOrThrow<ProjectsBoard>(r))
+    return loadProjectsBoard(fresh)
   },
   index: (id: string): Promise<ProjectIndexDoc> =>
     fetch(`/api/projects/${encodeURIComponent(id)}/index`).then((r) => jsonOrThrow<ProjectIndexDoc>(r)),

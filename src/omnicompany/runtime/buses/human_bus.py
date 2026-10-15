@@ -2,6 +2,8 @@
 # [OMNI] material_id="material:runtime.buses.human_bus.approval_inbox.py"
 """HumanBus · 人类审批统一入口.
 
+HumanBus 是通用运行时交互概念，不是持续学习项目、知识库、沉淀设施或计划入口。
+
 解决 L2 被各层"需要人类"事件淹没的问题 (2026-04-23 用户). 三类分流:
 
 | kind             | 默认行为                      | 用例                           |

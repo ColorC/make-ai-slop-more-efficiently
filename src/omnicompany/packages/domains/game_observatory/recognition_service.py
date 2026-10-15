@@ -37,6 +37,8 @@ class RecognitionRequestV1(BaseModel):
     threshold: float = Field(default=0.3, ge=0, le=1)
     color_lower: tuple[tuple[int, int, int], ...] = ()
     color_upper: tuple[tuple[int, int, int], ...] = ()
+    color_space: Literal["bgr", "hsv"] = "bgr"
+    template_region: SourcePixelRect | None = None
     pipeline_entry: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
@@ -172,6 +174,133 @@ class RapidOCRBackend:
             hit=bool(detections),
             detections=tuple(detections),
         )
+
+
+class OpenCVRecognitionBackend:
+    """Deterministic local color/template backend for typed recognition requests."""
+
+    name = "opencv"
+
+    def __init__(self) -> None:
+        try:
+            self.version = importlib.metadata.version("opencv-python")
+        except importlib.metadata.PackageNotFoundError:
+            try:
+                self.version = importlib.metadata.version("opencv-python-headless")
+            except importlib.metadata.PackageNotFoundError:  # pragma: no cover
+                self.version = "unavailable"
+        self._image_cache: dict[tuple[str, int, int], Any] = {}
+        self._image_cache_order: list[tuple[str, int, int]] = []
+
+    def supports(self, kind: RecognitionKind) -> bool:
+        return kind in {"color_match", "template_match"}
+
+    @staticmethod
+    def _cv2():
+        try:
+            import cv2  # type: ignore[import-not-found]
+        except ImportError as error:  # pragma: no cover - deployment boundary
+            raise RuntimeError("OpenCV recognition backend is not installed") from error
+        return cv2
+
+    def _load_image(self, path: str) -> Any:
+        """Decode one immutable artifact once across its typed region requests."""
+
+        resolved = Path(path).resolve()
+        stat = resolved.stat()
+        key = (str(resolved), stat.st_mtime_ns, stat.st_size)
+        cached = self._image_cache.get(key)
+        if cached is not None:
+            return cached
+        image = _load_image(str(resolved))
+        stale = [item for item in self._image_cache_order if item[0] == key[0]]
+        for item in stale:
+            self._image_cache.pop(item, None)
+            self._image_cache_order.remove(item)
+        self._image_cache[key] = image
+        self._image_cache_order.append(key)
+        while len(self._image_cache_order) > 4:
+            evicted = self._image_cache_order.pop(0)
+            self._image_cache.pop(evicted, None)
+        return image
+
+    def _color_match(self, request: RecognitionRequestV1) -> RecognitionResultV1:
+        cv2 = self._cv2()
+        image, offset_x, offset_y = _crop(self._load_image(request.image_path), request.region)
+        working = cv2.cvtColor(image, cv2.COLOR_BGR2HSV) if request.color_space == "hsv" else image
+        mask = None
+        for lower, upper in zip(request.color_lower, request.color_upper, strict=True):
+            current = cv2.inRange(working, lower, upper)
+            mask = current if mask is None else cv2.bitwise_or(mask, current)
+        if mask is None:  # model validation should make this unreachable
+            raise ValueError("color_match has no color ranges")
+        area = max(1, int(mask.shape[0] * mask.shape[1]))
+        coverage = float(cv2.countNonZero(mask)) / area
+        grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(grayscale, 80, 160)
+        edge_density = float(cv2.countNonZero(edges)) / area
+        bounds = SourcePixelRect(
+            x=offset_x,
+            y=offset_y,
+            width=max(1, int(image.shape[1])),
+            height=max(1, int(image.shape[0])),
+        )
+        detection = RecognitionDetectionV1(
+            score=max(0.0, min(1.0, coverage)),
+            bounds=bounds,
+            raw={
+                "coverage_ratio": coverage,
+                "edge_density": edge_density,
+                "color_space": request.color_space,
+            },
+        )
+        return RecognitionResultV1(
+            backend=self.name,
+            backend_version=self.version,
+            kind=request.kind,
+            hit=coverage >= request.threshold,
+            detections=(detection,),
+        )
+
+    def _template_match(self, request: RecognitionRequestV1) -> RecognitionResultV1:
+        cv2 = self._cv2()
+        image, offset_x, offset_y = _crop(self._load_image(request.image_path), request.region)
+        detections: list[RecognitionDetectionV1] = []
+        for template_path in request.template_paths:
+            template, _, _ = _crop(self._load_image(template_path), request.template_region)
+            if template.shape[0] > image.shape[0] or template.shape[1] > image.shape[1]:
+                raise ValueError("template is larger than the recognition region")
+            response = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
+            _minimum, maximum, _minimum_location, maximum_location = cv2.minMaxLoc(response)
+            score = max(0.0, min(1.0, float(maximum)))
+            detections.append(
+                RecognitionDetectionV1(
+                    score=score,
+                    bounds=SourcePixelRect(
+                        x=offset_x + int(maximum_location[0]),
+                        y=offset_y + int(maximum_location[1]),
+                        width=max(1, int(template.shape[1])),
+                        height=max(1, int(template.shape[0])),
+                    ),
+                    raw={"template_path": template_path},
+                )
+            )
+        best = max((item.score for item in detections), default=0.0)
+        return RecognitionResultV1(
+            backend=self.name,
+            backend_version=self.version,
+            kind=request.kind,
+            hit=best >= request.threshold,
+            detections=tuple(detections),
+            raw={"best_score": best},
+        )
+
+    def recognize(self, request: RecognitionRequestV1) -> RecognitionResultV1:
+        if not self.supports(request.kind):
+            raise ValueError(f"{self.name} does not support {request.kind}")
+        if request.kind == "color_match":
+            return self._color_match(request)
+        return self._template_match(request)
 
 
 class MaaRecognitionBackend:
@@ -314,7 +443,7 @@ class RecognitionService:
     """Select exactly one registered backend for every recognition request."""
 
     def __init__(self, backends: tuple[RecognitionBackend, ...] | None = None) -> None:
-        configured = backends or (RapidOCRBackend(),)
+        configured = backends or (RapidOCRBackend(), OpenCVRecognitionBackend())
         self.backends = {backend.name: backend for backend in configured}
         if len(self.backends) != len(configured):
             raise ValueError("RecognitionService backend names must be unique")

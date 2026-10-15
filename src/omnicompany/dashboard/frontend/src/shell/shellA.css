@@ -13,14 +13,34 @@
    ============================================================ */
 
 /* ===== 左 rail(固定 56px，不做 hover 展开；本体透明露网格,材质只在 icon 底衬) ===== */
+/* 2026-08-06(用户裁决:「侧边栏底部透明从而能露出背后的统一蓝图底板」):
+   材质与右缘分隔线从 rail 本体挪到 ::before 一层, 再用 mask 从 62% 起向下渐隐 ——
+   于是上半截仍是描图纸(图标有床、可读), 下半截连玻璃带分隔线一起化掉, #bp-grid 的
+   格纸与刻度直接透上来, rail 看着像"贴在图板上的一条描图纸", 而不是一根到底的柱子。
+   为什么走 ::before 而不是直接给 .sha-rail 加 mask: mask 会连同子元素(图标/文字)一起裁,
+   底部的 ⋯ 与状态点会跟着淡掉。分层后只有材质被裁, 内容始终 100% 不透明。 */
 .sha-rail { flex: none; width: 56px; display: flex; flex-direction: column; gap: 4px; padding: 10px 5px;
   position: relative; isolation: isolate; overflow: hidden; box-sizing: border-box;
-  border-right: 1px solid var(--fp-border-subtle);
+  background: transparent; border-right: 0;
+  transition: background var(--fp-t-fast); }
+.sha-rail::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: color-mix(in srgb, var(--fp-bp-tracing) 82%, transparent);
   backdrop-filter: var(--fp-bp-tracing-blur); -webkit-backdrop-filter: var(--fp-bp-tracing-blur);
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--fp-border-strong) 18%, transparent), var(--fp-bp-shadow-sm);
+  /* 右缘白线也进这一层, 才能跟着一起渐隐(border 无法单独被 mask 裁) */
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--fp-border-strong) 34%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 62%, transparent 97%);
+  mask-image: linear-gradient(to bottom, #000 0, #000 62%, transparent 97%);
   transition: background var(--fp-t-fast); }
-.sha-rail:hover { background: color-mix(in srgb, var(--fp-bp-tracing-strong) 88%, transparent); }
+.sha-rail:hover::before { background: color-mix(in srgb, var(--fp-bp-tracing-strong) 88%, transparent); }
+/* 底部两组(⋯ 与状态细点)落在透明区: 分隔线随之改为渐隐短线, 文字给一层软垫保可读
+   —— 与 G.7 波六「展开态文字直接落网格」同一处理。 */
+.sha-rail .sha-ri-bottom, .sha-rail .sha-status { position: relative; z-index: 1; }
+.sha-rail .sha-status { border-top: 0; }
+.sha-rail .sha-status::before {
+  content: ""; position: absolute; top: 0; left: 8px; right: 8px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(235,245,255,.22), transparent); }
+.sha-rail .sha-status .dot { box-shadow: 0 1px 3px rgba(9,26,62,.9); }
 /* icon 底衬(rail 透明化后玻璃材质收到 36px 底衬一级:icon 本体有床,网格在底衬间隙透出) */
 .sha-rail .ico-c, .sha-rail .ico-s { width: 36px; height: 36px;
   flex: 0 0 36px; box-sizing: border-box;
@@ -37,15 +57,52 @@
   color: var(--fp-text-3); white-space: nowrap; cursor: pointer; transition: all var(--fp-t-fast);
   text-align: left; font: inherit; width: 100%; box-sizing: border-box; flex: none; }
 .sha-ri:hover { background: var(--fp-bp-panel-hover); border-color: var(--fp-border-subtle); color: var(--fp-text); }
-/* 选中 = hatch 结构标记 + 绘图线框(框住图标+底衬整体) */
+/* 选中 = 金属标签片(2026-08-06 用户裁决:「切换不再是切换一个纸质标注,
+   而是贴了一层金属标签(类似于真的拿着个记事板)」)。
+
+   实体感靠四件事叠出来, 全是渐变与阴影, 零图片零 JS:
+     ① 拉丝纹  —— 90° 极细 repeating-linear-gradient(1px 亮/3px 暗), 模拟金属拉丝方向;
+     ② 底色渐变 —— 135° 由亮到暗, 给出"一块有厚度的板被光斜照"的读数;
+     ③ 倒角    —— 上缘 inset 亮线 + 下缘 inset 暗线 = 冲压件的圆角高光与背光;
+     ④ 投影    —— 外部硬错位影, 让它明显"压在"描图纸之上, 而不是印在里面。
+   再加两颗铆钉(::before / ::after 的小圆点), 这是"标签被钉在板子上"的最短表达。
+   按下时整块沉 1px 且投影收窄 —— 手感与真按一块金属片一致。 */
 .sha-ri.on { color: var(--fp-text);
-  background: var(--fp-bp-hatch), color-mix(in srgb, var(--fp-bp-panel-text) 78%, transparent);
-  border-color: var(--fp-border-strong);
-  box-shadow: inset 2px 0 0 rgba(255,255,255,.84);
-  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
-.sha-ri.on::after { content: ""; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
-  border-top: 1px solid var(--fp-bp-brass-hi); border-right: 1px solid var(--fp-bp-brass-hi);
-  pointer-events: none; opacity: .78; }
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255,255,255,.055) 0 1px, transparent 1px 3px),
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--fp-bp-paper-2) 92%, #fff) 0%,
+      var(--fp-bp-paper-2) 42%,
+      color-mix(in srgb, var(--fp-bp-solid) 88%, #000) 100%);
+  border-color: rgba(235,245,255,.62);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.42),        /* 上倒角高光 */
+    inset 0 -1px 0 rgba(4,10,26,.72),           /* 下倒角背光 */
+    inset 1px 0 0 rgba(255,255,255,.16),
+    2px 2px 0 rgba(6,16,38,.55);                /* 压在描图纸之上的硬影 */
+  clip-path: none; }
+/* 铆钉:左上 + 右下各一颗(对角摆放, 单侧两颗会读成"按钮上的两个点") */
+.sha-ri.on::before, .sha-ri.on::after {
+  content: ""; position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 35% 30%,
+    rgba(255,255,255,.85) 0 35%, rgba(120,145,185,.9) 55%, rgba(8,18,40,.9) 100%);
+  box-shadow: 0 1px 0 rgba(255,255,255,.22); }
+.sha-ri.on::before { top: 5px; left: 5px; }
+.sha-ri.on::after { bottom: 5px; right: 5px; }
+/* 按下 = 金属片被压进板面 */
+.sha-ri.on:active { transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.3),
+    inset 0 -1px 0 rgba(4,10,26,.6),
+    1px 1px 0 rgba(6,16,38,.5); }
+/* 金属片上的图标底衬不再另铺一层玻璃(两层材质会打架), 改为透出金属本体 */
+.sha-ri.on .ico-c, .sha-ri.on .ico-s {
+  background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-color: rgba(235,245,255,.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
 .sha-ri .lb { display: none;
   font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); text-transform: uppercase; letter-spacing: .08em;
   text-shadow: 0 1px 2px rgba(9,26,62,.9); } /* 波六:文字直接落网格,软垫不加背景 */

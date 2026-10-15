@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react'
 import { MessageSquare, Package } from 'lucide-react'
+import CronView from './CronView'
 import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
 import './controller.css'
@@ -7,7 +8,6 @@ import './controller.css'
 // 子视图逐个懒加载（2026-07 首屏拆包）：总控注册进入首屏静态图，
 // 静态引入这些面板会把它们全部钉进主包；切到对应视图时再下载各自 chunk。
 const HomeThreeCards = lazy(() => import('./HomeThreeCards'))
-const CronView = lazy(() => import('./CronView'))
 const ProjectBoard = lazy(() => import('../project/ProjectBoard'))
 const QuestBoard = lazy(() => import('../quest/QuestBoard'))
 const MultiagentView = lazy(() => import('../multiagent/MultiagentView'))
@@ -24,7 +24,7 @@ export interface ControllerEntity extends Entity {
 const SINGLE: ControllerEntity = {
   type: 'controller',
   id: 'main',
-  title: '总控',
+  title: '中枢',
   tags: ['fixed', 'boss-sight'],
 }
 
@@ -58,8 +58,8 @@ const Editor: React.FC<{ entity: ControllerEntity }> = () => {
   const view = useControllerView((s) => s.view)
   const setView = useControllerView((s) => s.setView)
   const views: Array<{ key: typeof view; label: string; testid: string }> = [
-    { key: 'chat', label: '总控对话', testid: 'controller-view-chat' },
-    { key: 'sessions', label: '会话 / CLI', testid: 'controller-view-sessions' },
+    { key: 'chat', label: 'assistant', testid: 'controller-view-chat' },
+    { key: 'sessions', label: 'CLI Hub', testid: 'controller-view-sessions' },
     { key: 'home', label: '最近访问', testid: 'controller-view-home' },
     { key: 'project', label: '项目', testid: 'controller-view-project' },
     { key: 'quest', label: '任务窗口', testid: 'controller-view-quest' },
@@ -70,7 +70,7 @@ const Editor: React.FC<{ entity: ControllerEntity }> = () => {
   return (
     <div style={S.root} data-testid="boss-controller-root">
       <div className="ct-bar">
-        <span className="v2-seg" role="radiogroup" aria-label="总控视图">
+        <span className="v2-seg" role="radiogroup" aria-label="中枢视图">
           {views.map((item) => (
             <button
               key={item.key}
@@ -120,6 +120,6 @@ const Editor: React.FC<{ entity: ControllerEntity }> = () => {
 export const controllerRegistration: EntityRegistration<ControllerEntity> = {
   resolver,
   renderer: { type: 'controller', Editor },
-  label: '总控',
+  label: '中枢',
   icon: <MessageSquare size={14} />,
 }

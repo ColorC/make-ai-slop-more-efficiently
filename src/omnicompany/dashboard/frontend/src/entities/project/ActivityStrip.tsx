@@ -10,7 +10,7 @@ export function ActivityStrip({ days }: { days?: boolean[] }) {
     <span
       data-testid="project-activity-strip"
       title={`近 7 天活跃 ${activeCount} 天(左旧右新, 最右=今天)`}
-      className="v2-fresh"
+      className="v2-fresh mo-cells"
     >
       {days.map((on, i) => (
         <i key={i} className={on ? 'on' : ''} />

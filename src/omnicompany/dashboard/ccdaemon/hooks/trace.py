@@ -121,6 +121,12 @@ def handle_stop(stdin: dict) -> int:
         },
         tags=_tags(stdin),
     )
+    try:
+        from .session_companion import enqueue_from_payload
+
+        enqueue_from_payload(stdin, trigger="stop")
+    except Exception:
+        pass
     # Codex Stop requires JSON (plain text is invalid); an empty object means
     # success/continue and remains harmless for Claude Code.
     if sh.hook_provider(stdin) == "codex":

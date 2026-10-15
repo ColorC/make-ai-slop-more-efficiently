@@ -80,12 +80,27 @@ def load_progress_board(
     *,
     timeout: float = 3.0,
 ) -> tuple[dict[str, Any] | None, str]:
-    """Load the authority, preferring the live service and then its persisted store."""
+    """Load the authority, preferring the live service and then its persisted store.
+
+    M3b: OMNI_TASK_SSOT=plan-groups 时权威源 = plan-groups 文件模型
+    （经 lifecycle.plan_groups_store.board 同口径拼装），不再依赖 :8230。
+    """
     # Tests that point OMNI_WORKSPACE_ROOT at a fixture must never leak into the
     # developer's live WhatNow.  An explicit opt-in remains available for true
     # integration tests.
     allow_live = not os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("OMNI_TEST_ALLOW_LIVE_PROGRESS") == "1"
     if allow_live:
+        try:
+            from omnicompany.packages.services._core.lifecycle.task import ssot_is_plan_groups
+
+            if ssot_is_plan_groups():
+                from omnicompany.packages.services._core.lifecycle import (
+                    plan_groups_store as pgs,
+                )
+
+                return pgs.board(True), "plan-groups"
+        except Exception:  # noqa: BLE001 - 真源分流失败回落既有链
+            pass
         url = progress_service_url() + "/api/board?archived=1"
         try:
             with urllib.request.urlopen(url, timeout=timeout) as response:

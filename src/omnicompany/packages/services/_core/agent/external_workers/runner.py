@@ -162,7 +162,7 @@ def resolve_external_agent_model(
             return "gpt-5.3-codex-spark"
         return "gpt-5.4-mini"
     if provider == "opencode":
-        return "the_company/gpt-5.6-terra"
+        return "opencode-go/deepseek-v4-flash"
     if provider == "omni-native":
         return "qwen3.7-max"
     if provider == "kimi":

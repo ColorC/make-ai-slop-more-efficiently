@@ -2,7 +2,7 @@
 # [OMNI] material_id="material:services._focus.plan_progress_recorder.sync.py"
 """plan-progress 全量同步驱动器 —— 让"新计划自动纳管 + 进度不及时就刷新"成为定时能力。
 
-口径(对齐 poof-note「批量与定时的语义空间健康治理·方面一」):
+口径（对齐历史 Material 札记「批量与定时的语义空间健康治理·方面一」）:
   进度只在 whatnow(:8230)这一处管。本驱动器遍历 docs/plans 下所有活跃计划:
     - 在 whatnow 查无对应 task 的 → 新计划, 自动建 task(归属由 plan_id 顶段映射到北极星, 兜底「新计划待归类」)并评估进度。
     - 已纳管但计划文件比 task 上次更新还新的 → 进度可能过时, 重新评估刷新。
@@ -61,6 +61,19 @@ def _post(path: str, body: dict) -> dict:
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
+# ── M3b 真源分流: OMNI_TASK_SSOT=plan-groups 时读写改走 plan-groups 文件真源 ──
+def _ssot_pg() -> bool:
+    from omnicompany.packages.services._core.lifecycle.task import ssot_is_plan_groups
+    return ssot_is_plan_groups()
+
+
+def _board(archived: bool = False) -> dict:
+    if _ssot_pg():
+        from omnicompany.packages.services._core.lifecycle import plan_groups_store as pgs
+        return pgs.board(archived)
+    return _get("/api/board" + ("?archived=1" if archived else ""))
+
+
 def _discover_plans(plans_root: Path) -> list[str]:
     """docs/plans 下所有含 plan.md 的活跃计划(排除 _archive / _scratch)。"""
     out: list[str] = []
@@ -107,6 +120,15 @@ def _goal_for(plan_id: str) -> str:
 def _ensure_triage_goal(board: dict) -> None:
     if any(g.get("id") == TRIAGE_GOAL for c in board.get("clusters", []) for g in c.get("goals", [])):
         return
+    if _ssot_pg():
+        from omnicompany.packages.services._core.lifecycle import plan_groups_store as pgs
+        pgs.ensure_milestone("omnicompany", {
+            "id": TRIAGE_GOAL, "cluster_id": "omnicompany", "title": "新计划待归类",
+            "kind": "里程碑", "line": "side", "status": "active",
+            "objective": "plans-sync 自动纳管但还没判定归属哪条北极星的新计划, 在这里暂存待人/总控再归位。",
+            "source": "manual", "ord": 99,
+        })
+        return
     _post("/api/goals", {
         "id": TRIAGE_GOAL, "cluster_id": "omnicompany", "title": "新计划待归类",
         "kind": "里程碑", "line": "side", "status": "active",
@@ -119,9 +141,9 @@ async def sync_all(*, only_changed: bool = True, limit: int | None = None,
                    dry_run: bool = False, echo: Callable[[str], None] = print) -> dict[str, Any]:
     plans_root = Path(omni_workspace_root()) / "docs" / "plans"
     try:
-        board = _get("/api/board?archived=1")
+        board = _board(archived=True)
     except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"whatnow 不可达(:8230): {e}"}
+        return {"ok": False, "error": f"任务真源不可读(:8230 或 plan-groups): {e}"}
     if not dry_run:
         _ensure_triage_goal(board)
     idx = _board_index(board)

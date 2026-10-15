@@ -23,6 +23,56 @@ from ._db_helpers import db_paths, discover_event_dbs, row_to_dict, safe_conn, s
 
 traces_router = APIRouter(prefix="/v2", tags=["traces"])
 
+_SQLITE_MAX_PARAMETERS = 900
+
+
+def _recent_trace_rows(
+    conn: sqlite3.Connection,
+    *,
+    target_count: int,
+) -> tuple[list[dict[str, Any]], int, bool]:
+    """Build bounded summaries from recently inserted task intents.
+
+    ``events.db`` is hundreds of MB on a normal workstation. The old list
+    endpoint grouped every event and then issued one more query per trace,
+    turning a navigation-panel read into a multi-minute thread-pool occupant.
+    Rowid is SQLite's insertion order here. Walking it backwards avoids the
+    expensive timestamp sort in ``ide_events.db`` while still giving the UI
+    the recent run ordering it needs. Trace detail remains exact on demand;
+    the navigation list deliberately does not count every historical event.
+    """
+
+    wanted = max(1, min(int(target_count), _SQLITE_MAX_PARAMETERS))
+    rows = conn.execute(
+        """SELECT trace_id, timestamp, data, source
+           FROM events
+           WHERE event_type='task.intent'
+           ORDER BY rowid DESC
+           LIMIT ?""",
+        (wanted,),
+    ).fetchall()
+    summaries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        trace_id = str(row[0] or "")
+        if not trace_id or trace_id in seen:
+            continue
+        seen.add(trace_id)
+        timestamp = str(row[1] or "")
+        summaries.append({
+            "trace_id": trace_id,
+            "started_at": timestamp,
+            "ended_at": timestamp,
+            "event_count": 1,
+            "tool_calls": 0,
+            "llm_calls": 0,
+            "finished": 0,
+            "errored": 0,
+            "_intent_data": str(row[2] or ""),
+            "_event_source": str(row[3] or ""),
+        })
+    return summaries, len(rows), len(rows) >= wanted
+
 
 @traces_router.get("/rounds")
 def api_rounds(limit: int = Query(20, le=200)):
@@ -153,48 +203,37 @@ def api_trace_list(
     q: str = Query("", description="Search in task description"),
     source: str = Query("", description="Filter by source/domain"),
 ):
-    """Aggregated trace list from ALL events.db files across data/.
+    """Bounded recent trace list from the unified event databases.
 
     Each trace = one unique trace_id, with its first task.intent as description,
     event counts, source domain, and timestamps.
     """
     all_traces: list[dict] = []
     event_dbs = discover_event_dbs()
+    target_count = min(_SQLITE_MAX_PARAMETERS, offset + limit + 1)
+    scanned_events = 0
+    scan_truncated = False
 
     for domain, db_path in event_dbs:
         conn = safe_conn(db_path)
         if not conn:
             continue
         try:
-            rows = conn.execute("""
-                SELECT
-                    trace_id,
-                    MIN(timestamp) as started_at,
-                    MAX(timestamp) as ended_at,
-                    COUNT(*) as event_count,
-                    SUM(CASE WHEN event_type='agent.tool.call' THEN 1 ELSE 0 END) as tool_calls,
-                    SUM(CASE WHEN event_type='agent.llm.request' THEN 1 ELSE 0 END) as llm_calls,
-                    MAX(CASE WHEN event_type IN
-                        ('task.finish','agent.loop.finish','agent_loop.finish',
-                         'agent.turn.end','task.completed') THEN 1 ELSE 0 END) as finished,
-                    MAX(CASE WHEN event_type IN
-                        ('task.error','agent.loop.error','agent_loop.error') THEN 1 ELSE 0 END) as errored
-                FROM events
-                GROUP BY trace_id
-                ORDER BY MIN(timestamp) DESC
-            """).fetchall()
+            rows, scanned, truncated = _recent_trace_rows(
+                conn,
+                target_count=target_count,
+            )
+            scanned_events += scanned
+            scan_truncated = scan_truncated or truncated
 
             for row in rows:
                 r = dict(row)
-                intent_row = conn.execute(
-                    "SELECT data FROM events WHERE trace_id=? AND event_type='task.intent' ORDER BY timestamp LIMIT 1",
-                    (r["trace_id"],),
-                ).fetchone()
+                intent_data = str(r.pop("_intent_data", ""))
                 task_desc = None
-                src = domain
-                if intent_row:
+                src = str(r.pop("_event_source", "")) or domain
+                if intent_data:
                     try:
-                        ev_data = json.loads(intent_row[0])
+                        ev_data = json.loads(intent_data)
                         payload = ev_data.get("payload", {})
                         src = ev_data.get("source", domain)
                         task_desc = (
@@ -245,9 +284,19 @@ def api_trace_list(
     if source:
         all_traces = [t for t in all_traces if source in t.get("domain", "") or source in t.get("source", "")]
 
-    total = len(all_traces)
+    has_more = len(all_traces) > offset + limit
+    total = min(len(all_traces), offset + limit) + (1 if has_more else 0)
     items = all_traces[offset:offset + limit]
-    return {"items": items, "total": total}
+    return {
+        "items": items,
+        "total": total,
+        "has_more": has_more,
+        "scan": {
+            "mode": "bounded-recent-events",
+            "events_scanned": scanned_events,
+            "truncated": scan_truncated,
+        },
+    }
 
 
 @traces_router.get("/trace-detail/{trace_id}")

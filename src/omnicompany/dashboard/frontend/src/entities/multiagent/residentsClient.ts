@@ -4,6 +4,19 @@
  * 见 docs/plans/[2026-06-24]MULTIAGENT-AND-REVIEW-REDESIGN/plan.md (P1/P3)。
  */
 
+export interface SessionLineage {
+  kind: 'root' | 'derived'
+  origin: 'ai' | 'human' | 'unknown'
+  relation: 'subagent' | 'worker' | 'fork' | 'created' | 'unknown'
+  parent_session_id?: string
+  parent_title?: string
+  depth?: number
+  agent_name?: string
+  agent_path?: string
+  /** 派生时声明的职责；与父会话可能重复的首条消息分开。 */
+  task?: string
+}
+
 export interface Resident {
   key: string
   provider: string
@@ -18,6 +31,8 @@ export interface Resident {
   preview?: string
   current_task?: string
   initial_task?: string
+  /** 会话显式声明的真实主题；与便宜模型生成的 title 分开。 */
+  topic?: string
   title?: string
   last_step?: string
   run_status: string
@@ -25,6 +40,9 @@ export interface Resident {
   mtime?: number
   pty_id?: string | null
   active_plan?: string | null
+  active_plan_title?: string | null
+  workstream?: string | null
+  workstream_name?: string | null
   // 会话级任务绑定(SESSION-SELF-BINDING 阶段三前多为空, 属预期)。
   task_id?: string | null
   // 有会话自己声明的绑定(vs digest 推测) — residents.py: rec["authoritative"]=True。
@@ -35,6 +53,10 @@ export interface Resident {
   attention?: boolean
   attention_headline?: string
   attention_ts?: number
+  /** Runtime 创建者，仅作为 lineage 缺失时的兼容回退。 */
+  origin?: 'human' | 'agent'
+  /** Provider/绑定账本的只读归一投影；不是第二套会话注册表。 */
+  lineage?: SessionLineage
 }
 
 export interface ResidentsResponse {

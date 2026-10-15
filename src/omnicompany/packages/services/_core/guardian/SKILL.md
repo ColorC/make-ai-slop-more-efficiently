@@ -128,6 +128,25 @@ omni guardian patrol --json-out
 
 **用途**: 单测精确确认 `authority-confirmation.md` 仍是 active 方向权威、`autonomous-execution-rules.md` 仍绑定确认表、分散 README / standards / templates / SKILL 只保留短锚点; patrol 走真实 guardian 路径。当前 CLI 不支持按 rule 过滤, patrol 输出里若命中 `OMNI-093a~d`, 不要在分散文件里补第二套规则, 回集中确认表或执行规范修。
 
+### 场景 I · 受保护资产只读核查
+
+`assets` 不启动巡逻、资源策略、备份或清理；只查询显式路径并输出 JSON。目录与资产保护判定沿用工作区 `AGENTS.md` 和 [directory_cleanliness.md](../../../../../../docs/standards/_global/directory_cleanliness.md)，本入口不维护第二套规则。
+
+```powershell
+omni guardian assets sessions --db "$env:USERPROFILE\.codex\state_5.sqlite" --native-root "$env:USERPROFILE\.codex\sessions" --native-root "$env:USERPROFILE\.codex\archived_sessions" --max-rows 100 --max-entries 3000 --max-seconds 5 --summary
+omni guardian assets footprint --root "C:/workspace/omnicompany\var\runtime" --max-entries 3000 --max-seconds 5 --max-depth 4
+```
+
+已知归档需显式同时提供 `--archive-root <目录>` 和 `--archive-manifest <既有列表JSON>`；不会自动扩大查找范围。一个数据库对应其原生账户根，不能将不同账户中相同 UUID 当作同一资产。
+
+- 会话索引按最多 64 行一页读取，SQL 使用结果上限与进度中断，避免无界计数；`--max-sql-steps` 默认 100000。`--max-rows` 默认 5000、最多 10000，文件枚举默认 15000 条（占用入口 30000），深度默认 4（占用入口 8）。清单最多 2 MiB，每候选只读首行最多 1 KiB，首部总额默认 256 KiB。根目录最多 32 个；不跟随 reparse point/符号链接。
+- `--max-seconds` 是**软墙钟预算**，涵盖 SQL、路径/枚举、首部、统计、序列化和输出；不含 CLI 导入/启动排队时间。单次 OS I/O、SQLite I/O、输出阻塞或机器挂起不能在本进程内强行中断。耗尽后停止新增读取，有限部分结果的收尾仍可能超时；它不是实时硬截止保证。
+- stdout 为结果 JSON；stderr 为小型输出完成/耗时记录，自动消费者必须同时检查退出码及 stderr。退出 0 表示声明范围完整；退出 2 表示部分结果、权限/链接/范围限制、失败或预算耗尽。若最终序列化或 stdout 写出时超预算，stdout 中先前的覆盖字段可能仍为 true，stderr 与退出 2 会标明最终状态。
+- `coverage.stage_seconds` 和 `slowest_operations` 用来定位耗时；分页/预算未完成时 `indexed_rows=null`，只能使用 `indexed_rows_lower_bound`，不得把抽样 counts 当作全部会话数量。占用的逻辑字节是部分扫描下限，不能表示可释放或物理独占空间。
+- 存在候选不等于内容相同或可恢复；同名同尺寸仅为线索。缺失/未知/受限资产始终受保护，所有结果 `automatic_cleanup_allowed=false`，没有恢复、上传、删除或停进程参数。
+
+验证入口：`python -B -m unittest discover -s tests/guardian -p 'test_*asset*.py' -v`（合成夹具，不读取认证内容或真实会话正文）。
+
 ## 入口清单
 
 | 入口 | 场景 | 主要参数 |

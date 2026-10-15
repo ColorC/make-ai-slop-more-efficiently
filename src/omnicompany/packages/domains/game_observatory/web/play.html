@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>浪漫餐厅 · 实机游玩</title>
+  <link rel="stylesheet" href="/game-observatory/play/play.css">
+  <link rel="stylesheet" href="/game-observatory/play/play-map.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><h1>浪漫餐厅</h1><div id="connection" class="connection" aria-live="polite">正在连接</div><dl id="status" class="status-list" aria-live="polite"><div><dt>状态</dt><dd>准备中</dd></div></dl></div>
+      <div class="toolbar" role="toolbar" aria-label="游玩控制">
+        <button type="button" data-mode="manual" aria-pressed="false">我来玩</button>
+        <button type="button" data-mode="auto" aria-pressed="false">自动游玩</button>
+        <button type="button" data-mode="paused" aria-pressed="false">暂停</button>
+        <button id="records-toggle" type="button" aria-expanded="true" aria-controls="records-panel">记录</button>
+        <button id="fullscreen-toggle" type="button">全屏</button>
+        <a class="map-entry" href="#play-map">地图</a>
+      </div>
+    </header>
+    <section class="layout">
+      <section class="stage" aria-label="游戏画面">
+        <div class="screen-wrap">
+          <canvas id="screen" aria-label="游戏画面"></canvas>
+          <video id="replay-video" controls hidden aria-label="回放片段"></video>
+          <div id="screen-message" class="screen-message">正在准备画面…</div>
+          <div id="access-gate" class="access-gate" hidden>
+            <p id="access-message">需要登录后才能游玩</p>
+            <a id="access-action" class="map-entry" href="#">登录后游玩</a>
+          </div>
+        </div>
+        <p id="latency" class="latency" aria-live="polite"></p>
+        <button id="replay-live" class="replay-live" type="button" hidden>返回直播</button>
+      </section>
+      <aside id="records-panel" class="records-panel" aria-label="游玩记录">
+        <div class="records-heading"><h2>最近记录</h2><span id="records-state">等待画面</span></div>
+        <div id="records-list" class="records-list"><p class="records-empty">记录会在游玩后显示</p></div>
+      </aside>
+    </section>
+    <div id="play-map" class="graph" aria-label="界面地图"></div>
+    <dialog id="record-preview" aria-labelledby="record-preview-title">
+      <div class="record-preview-head"><h2 id="record-preview-title">操作前画面</h2><button id="record-preview-close" type="button">关闭</button></div>
+      <img id="record-preview-image" alt="操作前画面">
+    </dialog>
+  </main>
+  <script type="module" src="/game-observatory/play/play.js"></script>
+  <script type="module">
+    // 2026-09-17, by the owner's ruling: the interface map is the Spark Workshop game map,
+    // carried by romantic-restaurant Materials, not the old text-card graph.  The canvas is
+    // looked up in the Workshop catalog by domain and its 游戏地图 label, never by a fixed id.
+    const MAP_DOMAIN = "romantic-restaurant";
+    const MAP_LABEL = "游戏地图";
+    const mapContainer = document.querySelector("#play-map");
+    let mapUrl = "";
+
+    function closeMap() {
+      history.replaceState(null, "", `${location.pathname}${location.search}`);
+      syncMap();
+    }
+
+    function render(message) {
+      const toolbar = document.createElement("div");
+      toolbar.className = "play-map-toolbar";
+      const title = document.createElement("strong");
+      title.className = "play-map-title";
+      title.textContent = "浪漫餐厅游戏地图";
+      toolbar.append(title);
+      if (mapUrl) {
+        const open = document.createElement("a");
+        open.className = "map-entry";
+        open.href = mapUrl;
+        open.target = "_blank";
+        open.rel = "noopener";
+        open.textContent = "在新窗口打开";
+        toolbar.append(open);
+      }
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = "关闭地图";
+      close.addEventListener("click", closeMap);
+      toolbar.append(close);
+      const body = document.createElement(mapUrl ? "iframe" : "p");
+      if (mapUrl) {
+        body.className = "play-map-frame";
+        body.title = "浪漫餐厅游戏地图";
+        body.src = mapUrl;
+      } else {
+        body.className = "play-map-message";
+        body.textContent = message;
+      }
+      mapContainer.replaceChildren(toolbar, body);
+    }
+
+    async function resolveMap() {
+      const response = await fetch("/bside/api/canvases", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Workshop 画布目录返回 ${response.status}`);
+      const { canvases = [] } = await response.json();
+      const map = canvases.find(item => item.catalog?.domain === MAP_DOMAIN && item.catalog?.labels?.includes(MAP_LABEL));
+      if (!map) throw new Error("Workshop 里还没有发布浪漫餐厅游戏地图");
+      return `/bside/interface-map?canvas=${encodeURIComponent(map.document_id)}`;
+    }
+
+    async function syncMap() {
+      const open = location.hash === "#play-map";
+      mapContainer.classList.add("play-map");
+      mapContainer.classList.toggle("is-open", open);
+      if (!open || mapUrl) return;
+      render("正在打开游戏地图…");
+      try {
+        mapUrl = await resolveMap();
+        render("");
+      } catch (error) {
+        render(`游戏地图暂时无法打开：${error.message}`);
+      }
+    }
+
+    window.addEventListener("hashchange", syncMap);
+    window.addEventListener("keydown", event => { if (event.key === "Escape" && location.hash === "#play-map") closeMap(); });
+    syncMap();
+  </script>
+</body>
+</html>

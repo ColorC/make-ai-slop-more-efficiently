@@ -1,6 +1,9 @@
 # [OMNI] origin=ai-ide ts=2026-05-07 type=infra
 # [OMNI] material_id="material:dashboard.cc_wrapper.cc_chat_bridge.endpoints.py"
-"""Claude Code 网页 chat 后端 — 用 claude-agent-sdk 包装本地 claude 二进制.
+"""已封存的结构化 chat 历史兼容后端。
+
+新 Agent 工作不得进入本模块；统一走 ``/cc/agent-workers`` 的真实 CLI/PT​​Y。
+这里暂时保留旧记录读取、恢复和事件兼容，以避免丢失既有数据。
 
 跟 pty_service.py 互补:
   pty_service.py     PTY 路线 — xterm + 原始字节流, 适合需要终端 UI 的场景
@@ -105,6 +108,51 @@ VALID_PERMISSION_MODES = {"default", "acceptEdits", "auto", "bypassPermissions",
 # 主防线是给 subagent 子进程注入 OMNI_CLI_CALLER=subagent (cli/_access.py 据此拒绝
 # subagent 调 `omni worker spawn`); 本上限封顶递归 spawn 万一失控的规模。
 MAX_LIVE_SUBAGENTS = int(os.environ.get("OMNI_MAX_LIVE_SUBAGENTS", "16") or "16")
+# 2026-08-09 用户裁决(实证起点: chat-c7a383adbba9 从 08-08 15:06 挂到 08-09, 报完 PASS
+# 却一直占着运行时): spawn 是 fire-and-forget —— 完成只 emit subagent.completed、
+# controller_waker 记一笔 plan_completion_log, **全链路没有任何一处收工**。于是 subagent
+# 干完活继续攥着 provider runtime, 占 MAX_LIVE_SUBAGENTS 名额, 还会在 Multiagent 名册里
+# 冒出来一条你打不开的 chat 会话(kind=chat 一律被 EditorRouter 打到 chatui 落点卡)。
+#
+# 收工用「空闲超时」而不是「完成即杀」: 总控会对同一个 subagent 追加下一轮(继续/纠正),
+# 完成即杀会打断多轮派活。所以只回收「没人订阅 + 不在 turn 中 + 静默超过阈值」的。
+# 0 = 关闭清扫(排障时用)。
+SUBAGENT_IDLE_REAP_S = int(os.environ.get("OMNI_SUBAGENT_IDLE_REAP_S", "1800") or "1800")
+SUBAGENT_REAP_SWEEP_S = int(os.environ.get("OMNI_SUBAGENT_REAP_SWEEP_S", "60") or "60")
+
+
+def should_reap_subagent(
+    *,
+    caller_identity: str | None,
+    ended_at: float | None,
+    runtime_alive: bool,
+    in_flight_turn: bool,
+    subscribers: int,
+    idle_seconds: float,
+    threshold_seconds: int = SUBAGENT_IDLE_REAP_S,
+) -> bool:
+    """该不该回收这个会话的运行时。纯判据, 便于单测覆盖每条否决。
+
+    只回收**机器派出来的** subagent(caller_identity=subagent): 人开的会话不管挂多久
+    都不能动 —— 那是用户的东西。另外四条否决:
+      · 已结束的不必再动;
+      · 运行时已经没了的没什么可回收;
+      · 还在 turn 里的绝不能杀(会截断正在写的产出);
+      · 有人订阅着说明有人在看/在续着聊。
+    """
+    if threshold_seconds <= 0:
+        return False
+    if caller_identity != CALLER_SUBAGENT:
+        return False
+    if ended_at is not None:
+        return False
+    if not runtime_alive:
+        return False
+    if in_flight_turn:
+        return False
+    if subscribers > 0:
+        return False
+    return idle_seconds >= threshold_seconds
 LOCAL_MODEL_SENTINELS = {"", "(default)", "(local)", "(local default)"}
 _UNSET = object()
 CLAUDE_WORKSPACE_GUARD_PROMPT = """
@@ -238,6 +286,9 @@ class CcChatSession:
     claude_session_id: str | None = None  # 来自 SystemMessage(subtype="init") 的 session_id
     ended_at: float | None = None
     exit_reason: str | None = None
+    # 最后一次"有事发生"的时刻: 建会话、提交 turn、turn 跑完、有人来订阅。
+    # 空闲回收(SUBAGENT_IDLE_REAP_S)只看这个, 不看 started_at —— 否则长跑会话会被误杀。
+    last_activity_at: float = 0.0
     # 路径 A (claude_code): 直接持 ClaudeSDKClient (现有路径, 不动)
     client: casdk.ClaudeSDKClient | None = None
     current_receive_task: asyncio.Task | None = None
@@ -288,7 +339,21 @@ class CcChatSession:
     # N2c: 本轮最后一段 assistant 文本 — 给持续目标续发循环检测 GOAL_DONE 完成信号用。
     _last_turn_text: str = ""
 
+    def touch(self, now: float | None = None) -> None:
+        """记一次活动 —— 空闲回收只认这个时刻。"""
+        self.last_activity_at = time.time() if now is None else now
+
     def to_meta(self) -> dict[str, Any]:
+        runtime_alive = self.client is not None or self.provider_impl is not None
+        logical_alive = self.ended_at is None
+        observed_at = time.time()
+        state = (
+            "working"
+            if runtime_alive and self.in_flight_turn
+            else "idle"
+            if runtime_alive
+            else "unknown"
+        )
         reported_tokens = (
             self.cumulative_input_tokens
             + self.cumulative_output_tokens
@@ -309,11 +374,28 @@ class CcChatSession:
             "favorite": self.favorite,
             "cwd": self.cwd,
             "started_at": self.started_at,
-            "alive": self.ended_at is None,
-            # alive=逻辑会话仍可续接；runtime_alive=当前 daemon 仍持有真实 provider
-            # runtime。Multiagent/恢复全部只认后者，避免重启后把全部历史会话当活进程。
-            "runtime_alive": self.client is not None or self.provider_impl is not None,
-            "running": self.in_flight_turn,
+            # A durable chat record can remain resumable after its provider
+            # runtime is gone. `alive` is the live-runtime contract; keep the
+            # historical fact separately so callers cannot mistake it for a
+            # running session.
+            "alive": runtime_alive,
+            "logical_alive": logical_alive,
+            "runtime_alive": runtime_alive,
+            "process_alive": runtime_alive,
+            "processAlive": runtime_alive,
+            "running": bool(runtime_alive and self.in_flight_turn),
+            "working": bool(runtime_alive and self.in_flight_turn),
+            "working_known": runtime_alive,
+            "state": state,
+            "state_evidence_at": self.last_activity_at or self.started_at,
+            "observed_at": observed_at,
+            "observedAt": observed_at,
+            "source": "ccdaemon.chat",
+            "session_id": self.id,
+            "pty_id": None,
+            "visible": True,
+            "last_activity_at": self.last_activity_at or self.started_at,
+            "lastActivityAt": self.last_activity_at or self.started_at,
             "subscribers": len(self.subscribers),
             "buffered_chunks": len(self.history_summary),
             "message_count": len(self.history_summary),
@@ -341,7 +423,7 @@ class CcChatSession:
             "last_token_budget": self.last_token_budget,
             "ended_at": self.ended_at,
             "exit_reason": self.exit_reason,
-            "status": "alive" if self.ended_at is None else "ended",
+            "status": state if logical_alive else "ended",
             "cmd": [self.provider, "(chat)", self.model or "(local)"],
             "cols": 0,
             "rows": 0,
@@ -440,6 +522,16 @@ class CcChatSessionManager:
     def list_meta(self) -> list[dict[str, Any]]:
         return [s.to_meta() for s in self._sessions.values() if s.ended_at is None]
 
+    def in_memory_session_count(self) -> int:
+        """Cheap count of chat sessions with a live provider runtime."""
+
+        return sum(
+            1
+            for session in self._sessions.values()
+            if session.ended_at is None
+            and (session.client is not None or session.provider_impl is not None)
+        )
+
     def list_meta_page(
         self,
         *,
@@ -496,7 +588,29 @@ class CcChatSessionManager:
 
         return {
             "items": items,
-            "alive_count": len([s for s in self._sessions.values() if s.ended_at is None]),
+            "alive_count": len([
+                s for s in self._sessions.values()
+                if s.ended_at is None
+                and (s.client is not None or s.provider_impl is not None)
+            ]),
+            "logical_alive_count": len([s for s in self._sessions.values() if s.ended_at is None]),
+            "process_alive_count": len([
+                s for s in self._sessions.values()
+                if s.ended_at is None
+                and (s.client is not None or s.provider_impl is not None)
+            ]),
+            "working_count": len([
+                s for s in self._sessions.values()
+                if s.ended_at is None
+                and (s.client is not None or s.provider_impl is not None)
+                and s.in_flight_turn
+            ]),
+            "unknown_count": len([
+                s for s in self._sessions.values()
+                if s.ended_at is None
+                and not (s.client is not None or s.provider_impl is not None)
+            ]),
+            "source": "ccdaemon.chat",
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -596,7 +710,7 @@ class CcChatSessionManager:
                     # subagent.completed 时 ControllerWaker 集中附给总控 (§6.3 集中审视).
                     if sess.provider != "controller":
                         try:
-                            from omnicompany.dashboard.boss_sight.services.soft_violation_store import (
+                            from omnicompany.packages.services.boss_sight.services.soft_violation_store import (
                                 get_soft_violation_store,
                             )
                             input_summary = json.dumps(tool_input, ensure_ascii=False)[:200] \
@@ -672,10 +786,10 @@ class CcChatSessionManager:
         """
         if sess.client is not None:
             return
-        from omnicompany.dashboard.boss_sight.controller.worker import (
-            BossSightControllerWorker,
+        from omnicompany.packages.services.boss_sight.controller.system_prompt import (
+            CONTROLLER_SYSTEM_PROMPT,
         )
-        controller_prompt = BossSightControllerWorker.NODE_PROMPT or ""
+        controller_prompt = CONTROLLER_SYSTEM_PROMPT
         # system.md 自 2026-06-03 起已是 claude_code 原生版(用 Bash 调 omni cli, 自然语言回复,
         # 无 submit_response)。这里只留一句末尾强化, 不再重复正文。
         adapter = (
@@ -1012,6 +1126,7 @@ class CcChatSessionManager:
                 caller_identity=caller_identity,
                 effort=_normalize_effort(effort, provider),
             )
+            sess.touch()
             # #2 接管式采纳: resume 别处已有会话(同 session_id, fork_session=False)→ 接管它继续跑。
             # claude: 设 claude_session_id 即走 resume(下方 resume_id 用之); codex: 走 provider_session_id 续接。
             if adopt_session_id:
@@ -1166,6 +1281,18 @@ class CcChatSessionManager:
         try:
             async for nm in sess.provider_impl.consume_messages():
                 try:
+                    if str(sess.provider or "").lower().startswith("codex"):
+                        from .codex_capacity_retry import observe_provider_event, _generation
+
+                        await observe_provider_event({
+                            **nm,
+                            "provider_owned": True,
+                            "provider": sess.provider,
+                            "session_id": sess.id,
+                            "provider_session_id": sess.claude_session_id or "",
+                            "generation": _generation(sess.id, sess.claude_session_id or ""),
+                            "runtime_host": "omni-chat",
+                        })
                     if nm.get("kind") in {"text", "thinking", "tool_use", "tool_result", "error"}:
                         await self._append_event_history(sess, nm)
                     else:
@@ -1209,6 +1336,7 @@ class CcChatSessionManager:
                 # 块 3: subagent.completed 事件 (一个 turn 跑完, 总控可以来看)
                 # 排除 controller session 自身 (避免总控自己完成 turn 时唤起自己)
                 if nm.get("kind") == "complete" and sess.provider != "controller":
+                    sess.touch()
                     last_assistant = ""
                     for h in reversed(sess.history_summary or []):
                         if isinstance(h, dict) and h.get("role") == "assistant":
@@ -1233,7 +1361,7 @@ class CcChatSessionManager:
             logger.exception("provider consume task crashed for %s", sess.id)
             await self._broadcast_turn_error(sess, type(e).__name__, str(e))
 
-    async def kill(self, sid: str) -> bool:
+    async def kill(self, sid: str, reason: str = "killed") -> bool:
         async with self._lock:
             sess = self._sessions.get(sid)
             if sess is None:
@@ -1253,10 +1381,56 @@ class CcChatSessionManager:
             if sess.provider_consume_task and not sess.provider_consume_task.done():
                 sess.provider_consume_task.cancel()
             sess.ended_at = time.time()
-            sess.exit_reason = "killed"
-            await self._broadcast(sess, {"kind": "exit", "reason": "killed"})
+            sess.exit_reason = reason
+            await self._broadcast(sess, {"kind": "exit", "reason": reason})
             await self._persist(sess)
             return True
+
+    async def reap_idle_subagents(self, now: float | None = None) -> list[str]:
+        """回收干完活却一直挂着的 subagent 运行时。返回被回收的 session id。
+
+        见 SUBAGENT_IDLE_REAP_S 的说明: spawn 链路只通知不收工, 这里补上收工。
+        逐个 kill(reason="idle_reaped") —— 会话记录、历史、plan 痕迹全部留着,
+        只释放 provider runtime 和 MAX_LIVE_SUBAGENTS 名额。
+        """
+        if SUBAGENT_IDLE_REAP_S <= 0:
+            return []
+        stamp = time.time() if now is None else now
+        candidates: list[str] = []
+        # 先在锁外挑候选(kill 自己要拿锁), 快照一份避免边遍历边改。
+        for sid, sess in list(self._sessions.items()):
+            if should_reap_subagent(
+                caller_identity=sess.caller_identity,
+                ended_at=sess.ended_at,
+                runtime_alive=sess.client is not None or sess.provider_impl is not None,
+                in_flight_turn=sess.in_flight_turn,
+                subscribers=len(sess.subscribers),
+                idle_seconds=stamp - (sess.last_activity_at or sess.started_at),
+                threshold_seconds=SUBAGENT_IDLE_REAP_S,
+            ):
+                candidates.append(sid)
+
+        reaped: list[str] = []
+        for sid in candidates:
+            sess = self._sessions.get(sid)
+            if sess is None:
+                continue
+            idle_s = int(stamp - (sess.last_activity_at or sess.started_at))
+            # 先留痕再收工: 事后查"它怎么没了"要能查到, 且带上空闲了多久。
+            self._emit_session_event(sess, "subagent.reaped", {
+                "subagent_id": sid,
+                "provider": sess.provider,
+                "active_plan": sess.active_plan,
+                "idle_seconds": idle_s,
+                "threshold_seconds": SUBAGENT_IDLE_REAP_S,
+            })
+            if await self.kill(sid, reason="idle_reaped"):
+                reaped.append(sid)
+                logger.info(
+                    "cc_chat_bridge: reaped idle subagent %s (provider=%s plan=%s idle=%ss)",
+                    sid, sess.provider, sess.active_plan, idle_s,
+                )
+        return reaped
 
     def patch_active_plan(self, sid: str, plan_id: str | None) -> dict[str, Any]:
         sess = self._sessions.get(sid)
@@ -2024,6 +2198,7 @@ class CcChatSessionManager:
                     return
 
                 sess.in_flight_turn = True
+                sess.touch()
                 await sess.client.query(effective_prompt, session_id=target_session_id)
                 sess.history_summary.append({"role": "user", "text": prompt})
                 self._emit_session_event(sess, "chat.input.user.accepted", {
@@ -2498,69 +2673,32 @@ class CreateChatSessionBody(BaseModel):
 @cc_chat_router.get("/health")
 async def chat_health() -> dict[str, Any]:
     return {
-        "status": "ok",
+        "status": "archived_read_only",
         "default_model": DEFAULT_MODEL or "(local claude default)",
-        "session_count": len(get_chat_manager().list_meta()),
+        # 就绪探针的热路径: lifecycle 在 /health 超时后会回落到这里(timeout 0.5),
+        # 所以这里只数不序列化 —— 跟 /health 与 /cc/health 同一口径。
+        "session_count": get_chat_manager().in_memory_session_count(),
         "default_cwd": default_session_cwd(),
         "claude_agent_sdk_version": getattr(casdk, "__version__", "?"),
-        "note": "走本地 claude binary, 认证用 claude login 订阅, 不要 ANTHROPIC_API_KEY",
+        "note": "Legacy structured-chat history only. Create/resume work through /cc/agent-workers (real CLI/PTY).",
     }
 
 
 @cc_chat_router.post("/sessions")
 async def create_session(body: CreateChatSessionBody | None = None) -> dict[str, Any]:
-    body = body or CreateChatSessionBody()
-    try:
-        sess = await get_chat_manager().create(
-            cwd=body.cwd,
-            model=body.model,
-            provider=body.provider or "claude_code",
-            fork_from_provider_session_id=body.fork_from_provider_session_id,
-            adopt_session_id=body.adopt_session_id,
-            # P0-a: 总控 spawn(from_controller)或采纳(adopt)的会话标记为 subagent → 子进程注入身份, 防递归 spawn
-            caller_identity=(CALLER_SUBAGENT if (body.from_controller or body.adopt_session_id) else None),
-            effort=body.effort,
-        )
-    except RuntimeError as e:
-        raise HTTPException(503, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-
-    # 块 3: 关联 active_plan (frontmatter guard 自动生效)
-    if body.active_plan:
-        try:
-            get_chat_manager().patch_active_plan(sess.id, body.active_plan)
-        except Exception:  # noqa: BLE001
-            logger.exception("cc_chat_bridge: patch_active_plan failed for %s", sess.id)
-
-    # 块 3: subagent.spawned 事件 (string event_type, 不动 EventType enum)
-    get_chat_manager()._emit_session_event(
-        sess,
-        "subagent.spawned",
-        {
-            "subagent_id": sess.id,
-            "provider": sess.provider,
-            "model": sess.model,
-            "cwd": sess.cwd,
-            "active_plan": sess.active_plan,
-            "from_controller": bool(body.from_controller),
+    del body
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "code": "legacy_chat_creation_archived",
+            "message": "Structured chat creation is sealed; create a real CLI Agent Worker instead.",
+            "migration": {
+                "cli": "omni agent start",
+                "http": "POST /cc/agent-workers",
+            },
+            "history_preserved": True,
         },
-        tags=["subagent", "lifecycle"],
     )
-
-    # 块 3: fire-and-forget 发第一条 prompt (spawn 工具用 sync HTTP 调本端点即可)
-    if body.initial_prompt:
-        prompt_text = body.initial_prompt
-        if body.from_controller:
-            prompt_text = (
-                "[from: BOSS-SIGHT controller, not_user: true]\n\n"
-                + prompt_text
-            )
-        asyncio.create_task(
-            get_chat_manager().submit_user_prompt(sess, prompt_text)
-        )
-
-    return sess.to_meta()
 
 
 def _list_sessions_sync(
@@ -2801,6 +2939,8 @@ async def chat_ws(ws: WebSocket, sid: str) -> None:
 
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
     sess.subscribers.add(queue)
+    # 有人来看/来续聊: 刷新活动时刻, 免得空闲清扫在他读历史的当口把运行时收走。
+    sess.touch()
 
     # snapshot: 把 history_summary 喂给新订阅者
     try:

@@ -5,15 +5,15 @@
 # [OMNI] material_id="material:services._core.lifecycle.note_source.py"
 """overlay-note-store 浅路径 **只读** 读取器。
 
-overlay-shell 已把笔记从 AppData 的 IndexedDB 落到浅路径 `C:/workspace/overlay-note-store/`:
+Canvas 把 Material 札记落到浅路径 `C:/workspace/overlay-note-store/`:
 - `index.json`  —— 笔记清单 (id / title / createDate / updatedDate / ydoc / md)
 - `docs/<id>.md`   —— 人可读正文 (懒导出: 笔记被打开/编辑过才有)
 - `docs/<id>.ydoc` —— Yjs 二进制快照 (完整但需解码, 本读取器不碰)
 
 omni 侧只读 index.json + .md, **不复制、不另存**。读不到 .md 时回退提示走
-`omni notes refresh`(overlay-shell 在跑时触发 backfill 导出)。
+`omni notes refresh`(札记画布打开时触发 backfill 导出)。
 
-参考: overlay-shell/src-tauri/src/notesstore.rs (落盘逻辑) / overlay-note-store/index.json (格式)。
+参考: dashboard notes-web / overlay-note-store/index.json (格式)。
 """
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def overlay_note_store_dir() -> Path:
 
 @dataclass
 class OverlayNote:
-    """一条 overlay note 的只读视图。"""
+    """一条 Material 札记的只读视图。"""
 
     id: str
     title: str
@@ -76,6 +76,11 @@ class OverlayNote:
         except OSError:
             return None
 
+    @property
+    def anchor(self) -> str:
+        """返回无旧产品品牌的 canonical 跨流引用。"""
+        return f"omni://note/{self.id}"
+
     def to_dict(self, *, with_body: bool = False) -> dict[str, Any]:
         d: dict[str, Any] = {
             "id": self.id,
@@ -85,7 +90,7 @@ class OverlayNote:
             "tags": list(self.tags),
             "links": list(self.links),
             "has_body": self.has_body,
-            "anchor": f"note:poof-note://{self.id}",
+            "anchor": self.anchor,
         }
         if with_body:
             d["body"] = self.body()
@@ -109,7 +114,7 @@ class OverlayNoteSource:
         if not self.index_path.is_file():
             raise FileNotFoundError(
                 f"读不到 overlay-note-store 浅路径索引: {self.index_path} "
-                f"(overlay-shell 未落浅路径 / OVERLAY_NOTE_STORE_DIR 未配 / 旧 POOF_NOTES_DIR 未配)"
+                f"(札记画布未落浅路径 / OVERLAY_NOTE_STORE_DIR 未配；旧环境变量仍兼容)"
             )
         try:
             return json.loads(self.index_path.read_text(encoding="utf-8"))
@@ -149,7 +154,7 @@ def read_note_source(root: Path | None = None) -> OverlayNoteSource:
     return OverlayNoteSource(root)
 
 
-# Legacy API aliases kept for callers/tests that still import the old names.
+# Legacy compatibility aliases: old callers may still import these identifiers.
 PoofNote = OverlayNote
 PoofNoteSource = OverlayNoteSource
 poof_notes_dir = overlay_note_store_dir

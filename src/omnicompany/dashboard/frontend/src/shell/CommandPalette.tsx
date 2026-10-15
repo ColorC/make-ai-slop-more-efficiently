@@ -16,6 +16,7 @@ import WebFileContextMenu, {
   type WebFileMenuState,
 } from '../shared/view/ui/WebFileContextMenu'
 import { installDoubleCtrlShortcut } from './doubleCtrlShortcut'
+import { BlueprintSelect } from '../components/BlueprintSelect'
 
 // ⌘K 命令面板(壳层 A 收编全局搜索于此;2026-07-19 蓝图 G 化:深色描图纸 + 虚线边 + mono 栈)。
 // 开合路径:①kbar 自带 ⌘K/Ctrl+K;②薄条 ⌘K 提示钮 → window 事件 'omni:toggle-command-palette'
@@ -40,14 +41,14 @@ const SEARCH_BAR: React.CSSProperties = {
   display: 'flex', alignItems: 'center',
   borderBottom: '1px solid var(--fp-border)',
 }
-const SCOPE_SELECT: React.CSSProperties = {
-  marginRight: 10, padding: '5px 24px 5px 8px',
-  color: 'var(--fp-text-2)', background: 'var(--fp-bg-2)',
-  border: '1px solid var(--fp-border-strong)', borderRadius: 2,
-  outline: 'none', fontSize: 12, fontFamily: 'var(--fp-font-mono)',
-}
+const SCOPE_SELECT: React.CSSProperties = { marginRight: 10, flex: 'none' }
 
 type SearchScope = 'all' | 'omni' | 'files'
+const SCOPE_OPTIONS: { value: SearchScope; label: string }[] = [
+  { value: 'all', label: '全部' },
+  { value: 'omni', label: 'Omni 实体' },
+  { value: 'files', label: '本机文件' },
+]
 
 function ResultRow({
   active,
@@ -127,6 +128,14 @@ function PaletteToggleBridge() {
 
 // 静态动作:原顶栏全局搜索的特例入口(KB 关系图谱 / 可达性审计),保持 ⌘K 迁移后可达性不丢。
 const STATIC_ACTIONS: Action[] = [
+  {
+    id: 'tabs:close-others',
+    name: '只留当前页签',
+    subtitle: '关闭其他已打开页签，只留当前这一张',
+    section: '页签',
+    keywords: '关闭 其他 页签 close others tabs only current 只留 当前',
+    perform: () => usePanels.getState().closeOtherTabs(),
+  },
   {
     id: 'open:graph:main',
     name: 'KB 关系图谱',
@@ -299,18 +308,23 @@ function CommandPaletteBody() {
                 defaultPlaceholder="搜索 / 命令: 实体、材料或本机文件…"
                 onChange={(event) => setQuery(event.target.value)}
               />
-              <select
-                aria-label="搜索范围"
-                title="搜索范围"
-                value={scope}
+              {/* 2026-08-06: 原生 select 展开是系统黑弹层, 换蓝图自绘件(描图纸 + hatch 选中)。
+                  kbar 会吞按键, 所以整块包一层 stopPropagation 让下拉自己吃方向键/Esc。 */}
+              <span
                 style={SCOPE_SELECT}
-                onChange={(event) => setScope(event.target.value as SearchScope)}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                <option value="all">全部</option>
-                <option value="omni">Omni 实体</option>
-                <option value="files">本机文件</option>
-              </select>
+                <BlueprintSelect
+                  aria-label="搜索范围"
+                  title="搜索范围"
+                  label="搜索范围"
+                  value={scope}
+                  onChange={(v) => setScope(v as SearchScope)}
+                  options={SCOPE_OPTIONS}
+                  menuMinWidth={150}
+                  data-testid="palette-scope"
+                />
+              </span>
             </div>
             <ResultsRender
               onFileContextMenu={(event, target) => {

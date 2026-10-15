@@ -27,9 +27,9 @@ from .commands.loops import cmd_loops
 from .commands.pain import cmd_pain
 from .commands.evo import cmd_evo
 from .commands.domain import cmd_domain
-from .commands.inquiry import cmd_inquiry
 from .commands.guardian import cmd_guardian
 from .commands.home import cmd_home
+from .commands.desktop_node import cmd_desktop_node
 from .commands.debt import cmd_debt
 from .commands.registry import cmd_registry
 from .commands.assistant import cmd_assistant
@@ -37,13 +37,19 @@ from .commands.human import cmd_human
 from .commands.llm_audit import cmd_llm, cmd_pipeline
 from .commands.docauthor import cmd_docauthor
 from .commands.cc import cmd_cc
+from .commands.codex_capacity_retry import cmd_codex_capacity_retry
 from .commands.identity import cmd_who, cmd_session, cmd_whoami
 from .commands.plan import cmd_plan
+from .commands.todo import cmd_todo
+from .commands.taskline import cmd_taskline
+from .commands.inbox import cmd_inbox
+from .commands.tbus import cmd_tbus
 from .commands.creation import cmd_new, cmd_sandbox
 from .commands.guide import cmd_guide, cmd_reflect
 from .commands.self_portrait import cmd_self_portrait
 from .commands.registration import cmd_register, cmd_lookup, cmd_register_types
 from .commands.protection import cmd_lock
+from .commands.cleanup import cmd_cleanup
 from .commands.meta_io import cmd_meta_io
 from .commands.team import cmd_team
 from .commands.worker import cmd_worker
@@ -51,12 +57,13 @@ from .commands.context import cmd_context
 from .commands.chat import cmd_chat
 from .commands.progress import cmd_progress
 from .commands.convos import cmd_convos
+from .commands.handoff import cmd_handoff
 from .commands.workflow import cmd_workflow
 from .commands.dashboard import cmd_dashboard
 from .commands.project import cmd_project
+from .commands.workstream import cmd_workstream
 from .commands.governance import cmd_governance
 from .commands.cron import cmd_cron
-from .commands.testmap import cmd_testmap
 from .commands.plan_gate import cmd_plan_complete_gate
 from .commands.semantic import cmd_semantic
 from .commands.research import cmd_research
@@ -64,34 +71,86 @@ from .commands.decisions import cmd_decisions
 from .commands.notify import cmd_notify
 from .commands.refs import cmd_refs
 from .commands.agents import cmd_agents
+from .commands.coordination import cmd_coordination
 from .commands.dispatch import cmd_dispatch
 from .commands.notes import cmd_notes
+from .commands.canvas import cmd_canvas
 from .commands.task import cmd_task
 from .commands.atlas import cmd_atlas
 from .commands.ledger import cmd_ledger
 from .commands.resolve import cmd_resolve
 from .commands.token_ledger import cmd_token_ledger
+from .commands.material import cmd_material
+from .commands.learning_observatory import cmd_learning_observatory
+from .commands.convflow import cmd_convflow
+from .commands.hr import cmd_hr
+from .commands.litework import cmd_litework
+from .commands.share import cmd_share
+from .commands.skill import cmd_skill
 
-try:
-    from .commands.game import cmd_game
-except ModuleNotFoundError as _game_import_error:
-    _game_optional_modules = {
-        "PIL",
-        "cv2",
-        "numpy",
-        "onnxruntime",
-        "rapidocr_onnxruntime",
-    }
-    if _game_import_error.name not in _game_optional_modules:
-        raise
+class _LazyCommand(click.Command):
+    """Expose a top-level command without importing its heavy implementation."""
 
-    @click.group("game")
-    def cmd_game() -> None:
-        """Game Observatory commands (requires the game-observatory extra)."""
-        raise click.ClickException(
-            'Game Observatory dependencies are not installed. '
-            'Run: pip install "omnicompany[game-observatory]"'
+    def __init__(self, name: str, module: str, attribute: str, help_text: str) -> None:
+        super().__init__(
+            name=name,
+            help=help_text,
+            add_help_option=False,
+            context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
         )
+        self._module = module
+        self._attribute = attribute
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        # The real command owns all nested parsing, including --help.
+        ctx.args = list(args)
+        return []
+
+    def invoke(self, ctx: click.Context):
+        import importlib
+
+        try:
+            command = getattr(importlib.import_module(self._module), self._attribute)
+        except ModuleNotFoundError as exc:
+            optional = {"PIL", "cv2", "numpy", "onnxruntime", "rapidocr_onnxruntime"}
+            if exc.name not in optional:
+                raise
+            raise click.ClickException(
+                'Game Observatory dependencies are not installed. '
+                'Run: pip install "omnicompany[game-observatory]"'
+            ) from None
+        result = command.main(
+            args=list(ctx.args),
+            prog_name=ctx.command_path,
+            standalone_mode=False,
+        )
+        # With standalone_mode=False Click converts a nested ``Exit(code)`` into
+        # the integer code.  Propagate non-zero results through the lazy wrapper;
+        # otherwise a fail-closed nested command is displayed as FAIL while the
+        # top-level ``omni`` process incorrectly exits zero.
+        if isinstance(result, int) and not isinstance(result, bool) and result != 0:
+            raise click.exceptions.Exit(result)
+        return result
+
+
+cmd_game = _LazyCommand(
+    "game",
+    "omnicompany.cli.commands.game",
+    "cmd_game",
+    "Game Observatory commands; implementation loads only when invoked.",
+)
+cmd_inquiry = _LazyCommand(
+    "inquiry",
+    "omnicompany.cli.commands.inquiry",
+    "cmd_inquiry",
+    "User inquiry workflow; implementation loads only when invoked.",
+)
+cmd_testmap = _LazyCommand(
+    "testmap",
+    "omnicompany.cli.commands.testmap",
+    "cmd_testmap",
+    "Feature-to-test ledger; implementation loads only when invoked.",
+)
 
 # 统一命令组（执行 + 观测 + 管理）
 from .unified import (
@@ -232,13 +291,19 @@ cli.add_command(cmd_inquiry)
 
 # ── 守护检查 ──
 cli.add_command(cmd_guardian)
+cli.add_command(cmd_cleanup)  # 核验后删除 .omni/tmp 下的目录；safety hook 拦下递归删除时指向这里
 cli.add_command(cmd_home)  # Remote home node via key-only SSH and allowlisted commands.
+# 桌面派 Remote Execute Node 的控制端入口 —— 和 cmd_home(SSH 派)是两套设施, 不共用代码。
+cli.add_command(cmd_desktop_node)
 cli.add_command(cmd_debt)
 
 # ── 注册体系查询 ──
 cli.add_command(cmd_registry)
+cli.add_command(cmd_material)
+cli.add_command(cmd_learning_observatory)
 # 统一引用解析器 (2026-07-02): target-architecture.md 3.2 节 —— 双链/URI/裸id → 真源 + 回指自检
 cli.add_command(cmd_resolve)
+cli.add_command(cmd_share)
 cli.add_command(cmd_game)
 
 # ── 语义文件系统(所有产出皆 material)──
@@ -249,6 +314,10 @@ cli.add_command(cmd_who)
 cli.add_command(cmd_whoami)  # CLI-PHASE3 alias 跟 plan 命名一致
 cli.add_command(cmd_session)
 cli.add_command(cmd_plan)  # plan binding manager (list / current / use / show)
+cli.add_command(cmd_todo)  # 会话提出但未立 plan 的请求 (2026-08-20 用户: 会话里提的不能丢)
+cli.add_command(cmd_taskline)  # 任务线一等实体 (2026-08-21 用户: 绑一个项目/多 plan/多 todo, 可 fork/拆分)
+cli.add_command(cmd_tbus)  # 个人任务总线桥 (2026-09-01 用户: task-core CLI 信封, 不上 MCP)
+cli.add_command(cmd_inbox)  # 收件箱 (2026-09-04: 消息不另立实体, 动作全落 task 信封)
 
 # ── 创建 / 沙盒 (8 种 kind 实例创建 + 沙盒指引) ──
 cli.add_command(cmd_new)
@@ -292,14 +361,20 @@ cli.add_command(cmd_docauthor)
 
 # ── Claude Code wrapper (ROADMAP 5b · 2026-05-02) ──
 cli.add_command(cmd_cc)
+cli.add_command(cmd_litework)
+cli.add_command(cmd_codex_capacity_retry)
 
 # External agent workers (Codex / Claude Code)
 cli.add_command(cmd_worker)
 
 # Distributed progressive context resolver
 cli.add_command(cmd_context)
+cli.add_command(cmd_skill)
 
-# OmniChat session manager (chat session CRUD + plan binding + CC/Codex db browser)
+# Legacy OmniChat history compatibility. Hidden from product discovery: new work
+# is created through the CLI-first ``omni agent`` control plane.
+cmd_chat.hidden = True
+cmd_chat.deprecated = True
 cli.add_command(cmd_chat)
 
 # 公开调研管线导航 + 统一研究库查询 (2026-06-14)
@@ -312,6 +387,8 @@ cli.add_command(cmd_decisions)
 cli.add_command(cmd_ledger)
 # token 记账 v1 (2026-07-03): claude/codex 会话用量 + 内部调用账三路归并, overnight-run.md 第六节
 cli.add_command(cmd_token_ledger)
+# LLM 人事系统 (2026-08-17): 四档归因 blame / 反向查询 sessions / 事件查看 events / 客观计数 stats
+cli.add_command(cmd_hr)
 # AI 推带跳转的提醒到铃铛 (2026-06-27): 我做完东西推一条, 用户点了直达对应页面
 cli.add_command(cmd_notify)
 
@@ -319,15 +396,21 @@ cli.add_command(cmd_notify)
 cli.add_command(cmd_refs)
 
 # 机器级 agent 注册表 + 总控派发路由 (2026-06-21): 统一身份(项目-角色-名字)/位置/在做啥;
-# 一条消息 → 跳转已活跃窗口 / 发给 poof 窗格 / 带项目新起 / 最强模型新起 / 问用户。
+# 一条消息 → 跳转已活跃窗口 / 发给托管窗格 / 带项目新起 / 最强模型新起 / 问用户。
 cli.add_command(cmd_agents)
+cli.add_command(cmd_coordination)
 cli.add_command(cmd_dispatch)
-cli.add_command(cmd_notes)  # 操控 poof 笔记元素(经文件桥)· 2026-06-22
+cli.add_command(cmd_notes)  # 操控 Canvas 札记元素(经文件桥)· 2026-06-22
+cli.add_command(cmd_canvas)  # 会话札记材料画布外部操控(读写样式/位置/视野/高亮, cb 桥)· 2026-08-12
 cli.add_command(cmd_task)  # task 一等对象 + 投递观测介入兜底 · 2026-06-25 (WORK-LIFECYCLE-AND-DISPATCH)
 
 # (omni board 三态 lane 工作板已于 2026-06-12 退役 — 项目唯一权威见 omni project / core/projects_registry)
 cli.add_command(cmd_progress)
+cmd_convos.hidden = True
+cmd_convos.deprecated = True
 cli.add_command(cmd_convos)
+cli.add_command(cmd_handoff)  # 跨会话/跨 CLI 交接: 交接文档 + 继承会话谱系 · 2026-08-10
+cli.add_command(cmd_convflow)  # 惯例性工作流 preview/run/gate/commit-effects(demogame change 面同构) · 2026-08-17
 cli.add_command(cmd_workflow)
 
 # 驾驶舱免重启更新 (2026-06-11): ui/ext 热更新触发 + dashboard 进程重启 (不碰 ccdaemon)
@@ -335,6 +418,7 @@ cli.add_command(cmd_dashboard)
 
 # 项目注册表 (2026-06-12): 首页项目工作板数据源, 用户+总控共同入口
 cli.add_command(cmd_project)
+cli.add_command(cmd_workstream)
 
 # 治理部门 (2026-06-12): 计划治理(归属/汉化/格式) + 工作历史整理(原进化部门重组), 便宜模型干活
 cli.add_command(cmd_governance)
@@ -354,6 +438,9 @@ cli.add_command(cmd_plan_complete_gate)  # 计划完成硬闸查询面(allow/ref
 try:
     from .commands.boss_sight import register_boss_sight_commands
     register_boss_sight_commands(cli, cmd_worker=cmd_worker, cmd_plan=cmd_plan)
+    from .commands.boss_sight import cmd_agent
+    from .commands.agent_control import register_agent_control_commands
+    register_agent_control_commands(cmd_agent)
 except Exception as _e:  # noqa: BLE001
     import logging
     logging.getLogger(__name__).warning("boss_sight cli register failed: %s", _e)

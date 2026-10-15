@@ -6,7 +6,9 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('rounded-xl border bg-card text-card-foreground shadow-sm', className)}
+      className={cn(// 2026-08-06 蓝图: 圆角柔光卡 → 厚框纸件(2px 白色绘图线 + 纸叠纸硬错位影 + 锐角)。
+// G 没有柔光阴影, 只有纸压着纸的硬错位。
+'rounded-[2px] border-2 border-[color:var(--fp-border)] bg-card text-card-foreground shadow-[var(--fp-bp-shadow-sm)]', className)}
       {...props}
     />
   )

@@ -279,7 +279,7 @@ export function handleShellConnection(
 
         const shellCommand = buildShellCommand(data, dependencies);
         const resumeSessionId = resolveResumeSessionId(data, dependencies);
-        const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
+        const shell = os.platform() === 'win32' ? 'pwsh.exe' : 'bash';
         const shellArgs =
           os.platform() === 'win32' ? ['-Command', shellCommand] : ['-c', shellCommand];
         const termCols = readNumber(data.cols, 80);

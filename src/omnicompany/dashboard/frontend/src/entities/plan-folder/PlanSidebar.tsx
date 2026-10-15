@@ -73,7 +73,7 @@ const S: Record<string, any> = {
   sectionHead: (depth: number): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '4px 6px', cursor: 'pointer', userSelect: 'none' as const,
-    borderRadius: 7,
+    borderRadius: 2,
     transition: 'background 150ms cubic-bezier(0.175,0.885,0.32,1.1)',
   }),
   // 顶层目录 = 本区最重要信息 15px/650; 越深越收敛 13px。
@@ -94,22 +94,22 @@ const S: Record<string, any> = {
   card: (active: boolean): React.CSSProperties => ({
     display: 'flex', flexDirection: 'column', minWidth: 0,
     background: 'var(--fp-glass)', backdropFilter: GLASS, WebkitBackdropFilter: GLASS,
-    border: `1px solid ${active ? 'var(--fp-accent)' : 'var(--fp-border)'}`, borderRadius: 11, padding: 12,
+    border: `1px solid ${active ? 'var(--fp-accent)' : 'var(--fp-border)'}`, borderRadius: 3, padding: 12,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
     transition: 'border-color 150ms cubic-bezier(0.175,0.885,0.32,1.1)',
   }),
   cardTop: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
   // 标题 = 卡内主信息 15px/650 醒目。
-  cardTitle: { flex: 1, minWidth: 0, color: 'var(--fp-text)', fontWeight: 650, fontSize: 15, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, cursor: 'pointer' },
+  cardTitle: { flex: 1, minWidth: 0, color: 'var(--fp-text)', fontWeight: 500, fontSize: 15, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, cursor: 'pointer' },
   // 状态/分类徽章 = 微胶囊语义弱底, 不抢标题。
   badge: (color: string): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 999,
-    fontSize: 12, fontWeight: 600, color, background: 'rgba(255,255,255,0.06)', flexShrink: 0,
+    fontSize: 12, fontWeight: 500, color, background: 'rgba(255,255,255,0.06)', flexShrink: 0,
   }),
   // 卡内次信息 = 弱灰 12px 等宽。
   meta: { color: 'var(--fp-text-3)', fontSize: 12, marginTop: 8, fontFamily: MONO, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
   // 主操作 = 底部整宽显眼按钮。
-  primary: { marginTop: 10, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px solid var(--fp-border)', background: PRIMARY_BG, color: 'var(--fp-link)', borderRadius: 7, padding: '6px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 550, fontFamily: SANS, transition: 'all 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
+  primary: { marginTop: 10, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px solid var(--fp-border)', background: PRIMARY_BG, color: 'var(--fp-link)', borderRadius: 2, padding: '6px 10px', cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: SANS, transition: 'all 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
   // 展开后的文件列表 = 最次级 12px 弱灰等宽路径感。
   fileWrap: { marginTop: 8, borderTop: '1px solid var(--fp-border-subtle)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 1 },
   fileRow: (active: boolean): React.CSSProperties => ({
@@ -117,7 +117,7 @@ const S: Record<string, any> = {
     color: active ? 'var(--fp-accent)' : 'var(--fp-text-3)',
     background: active ? ACCENT_WEAK : 'transparent',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
-    fontSize: 12, fontFamily: MONO, borderRadius: 6,
+    fontSize: 12, fontFamily: MONO, borderRadius: 2,
     transition: 'background 150ms cubic-bezier(0.175,0.885,0.32,1.1), color 150ms cubic-bezier(0.175,0.885,0.32,1.1)',
   }),
   fileEmpty: { padding: '3px 6px', color: 'var(--fp-text-3)', fontSize: 12, fontFamily: MONO },

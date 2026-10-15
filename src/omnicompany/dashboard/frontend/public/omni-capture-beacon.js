@@ -1,7 +1,7 @@
 /* 统一捕获 · omni 表面信标
- * 任何 omni 网页(驾驶舱 / vilo demo / narrative_studio …)include 本脚本即成为"可被 poof 截图认出"的表面。
+ * 任何 omni 网页(驾驶舱 / vilo demo / narrative_studio …)include 本脚本即成为可被截图设施识别的表面。
  * 做的事: 周期性把"我是谁(url/title/dpr) + 当前可见的 [data-omni-uri] 实体的视口矩形(CSS px)"
- * 上报给 dashboard 的 /api/boss-sight/captures/surface。poof 截图时用屏幕矩形跟这些做几何相交。
+ * 上报给 dashboard 的 /api/boss-sight/captures/surface。截图时用屏幕矩形跟这些做几何相交。
  * 见 plan docs/plans/dashboard/[2026-06-27]UNIVERSAL-CAPTURE。
  *
  * 用法: <script src="/omni-capture-beacon.js" defer></script>(同源)
@@ -81,6 +81,34 @@
     };
   }
   var hoverEl = null;
+  var hoverKey = "";
+  var reportInFlight = false;
+  var reportQueued = false;
+  // 失败退避: 连续失败次数 + 退避到期时间戳(ms epoch)。链路差时 fetch 失败往往比成功快得多,
+  // 若无此闸门, mousemove(140~200ms 节流)/scroll/resize/MutationObserver 各自触发的 report()
+  // 会在同一秒内反复打同一个失败端点(实锤: 2026-08-16 observe 273 事件 262 错误, 无退避)。
+  var reportFailStreak = 0;
+  var reportBackoffUntil = 0;
+  var reportNextAllowedAt = 0;
+  var MIN_REPORT_INTERVAL_MS = 5000;
+  var IDLE_MODE_KEY = "omni.dashboard.idle.v1";
+
+  function dashboardIdle() {
+    if (typeof document !== "undefined" && document.hidden) return true;
+    try {
+      return window.localStorage.getItem(IDLE_MODE_KEY) === "1" &&
+        typeof document.hasFocus === "function" && !document.hasFocus();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function elementKey(info) {
+    return [
+      info.tag, info.id, info.cls, info.text, info.selector,
+      info.x, info.y, info.w, info.h, info.omni_uri
+    ].join("\u001f");
+  }
 
   // 内容原子采集: 叶子且有文本 / 媒体交互替换元素 / 埋点元素, 视口内、有可见框。给"选区里有哪些元素"做几何切分。
   // 只在结构变化(初始/间隔/滚动/尺寸/DOM 变更)时重算并缓存, 鼠标移动不重算 —— 保证移动轻量。
@@ -112,6 +140,14 @@
   function recompute() { try { contentEls = collectContent(); } catch (e) { contentEls = []; } }
 
   function report() {
+    // 后台标签页暂停上报(省电+不占连接池); 恢复可见时 visibilitychange 处理器补一次。
+    if (dashboardIdle()) return;
+    // 退避窗口内: 丢弃本次触发(不排队、不占坑), 等下一个自然触发(interval/交互)或窗口到期后再试。
+    if (Date.now() < reportBackoffUntil || Date.now() < reportNextAllowedAt) return;
+    if (reportInFlight) {
+      reportQueued = true;
+      return;
+    }
     var body;
     try {
       body = JSON.stringify({
@@ -125,14 +161,36 @@
         hover: hoverEl
       });
     } catch (e) { return; }
+    reportInFlight = true;
+    reportNextAllowedAt = Date.now() + MIN_REPORT_INTERVAL_MS;
     try {
       fetch(DASH + "/api/boss-sight/captures/surface", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: body,
         keepalive: true
-      }).catch(function () {});
-    } catch (e) {}
+      }).then(function (response) {
+        if (!response.ok) {
+          reportFailStreak += 1;
+          reportBackoffUntil = Date.now() + Math.min(60000, 1000 * Math.pow(2, reportFailStreak - 1));
+          return;
+        }
+        reportFailStreak = 0;
+        reportBackoffUntil = 0;
+      }, function () {
+        // 失败: 指数退避, 1s/2s/4s/... 封顶 60s。成功路径节奏不受影响(streak 清零后退避恒为 0)。
+        reportFailStreak += 1;
+        reportBackoffUntil = Date.now() + Math.min(60000, 1000 * Math.pow(2, reportFailStreak - 1));
+      }).then(function () {
+        reportInFlight = false;
+        if (reportQueued) {
+          reportQueued = false;
+          report();
+        }
+      });
+    } catch (e) {
+      reportInFlight = false;
+    }
   }
 
   var t = null;
@@ -153,18 +211,33 @@
     lastMove = now;
     var el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el) return;
-    hoverEl = elementInfo(el);
-    hoverEl.cx = e.clientX; hoverEl.cy = e.clientY;
+    var nextHover = elementInfo(el);
+    var nextKey = elementKey(nextHover);
+    nextHover.cx = e.clientX; nextHover.cy = e.clientY;
+    hoverEl = nextHover;
+    if (nextKey === hoverKey) return;
+    hoverKey = nextKey;
     scheduleHover(); // 轻量: 只推悬停, 不重算内容原子
+  }
+
+  function onVisibilityChange() { // 从后台标签页恢复可见时补一次上报, 不等下一个 interval/交互
+    if (!dashboardIdle()) { recompute(); report(); }
+  }
+
+  function onFocusChange() {
+    if (!dashboardIdle()) { recompute(); report(); }
   }
 
   function start() {
     recompute();
     report();
-    setInterval(function () { recompute(); report(); }, 1500);
+    setInterval(function () { recompute(); report(); }, 5000);
     window.addEventListener("mousemove", onMove, true);
     window.addEventListener("scroll", schedule, true);
     window.addEventListener("resize", schedule);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocusChange);
+    window.addEventListener("blur", onFocusChange);
     try {
       new MutationObserver(schedule).observe(document.body, {
         subtree: true, childList: true,

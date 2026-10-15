@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Languages } from 'lucide-react';
 
 import { languages } from '../../../i18n/languages';
+import { BlueprintSelect } from '../../../components/BlueprintSelect';
 
 type LanguageSelectorProps = {
   compact?: boolean;
@@ -21,10 +22,11 @@ type LanguageSelectorProps = {
 export default function LanguageSelector({ compact = false }: LanguageSelectorProps) {
   const { i18n, t } = useTranslation('settings');
 
-  const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLanguage = event.target.value;
+  // 2026-08-06: 原生 select → 蓝图自绘件, 回调直接收 value(不再从 event.target 取)。
+  const handleLanguageChange = (newLanguage: string) => {
     i18n.changeLanguage(newLanguage);
   };
+  const options = languages.map((lang) => ({ value: lang.value, label: lang.nativeName }));
 
   // Compact style for QuickSettingsPanel
   if (compact) {
@@ -34,17 +36,14 @@ export default function LanguageSelector({ compact = false }: LanguageSelectorPr
           <Languages className="h-4 w-4 text-muted-foreground" />
           {t('account.language')}
         </span>
-        <select
+        <BlueprintSelect
           value={i18n.language}
           onChange={handleLanguageChange}
-          className="w-[100px] rounded-lg border border-input bg-card p-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          {languages.map((lang) => (
-            <option key={lang.value} value={lang.value}>
-              {lang.nativeName}
-            </option>
-          ))}
-        </select>
+          options={options}
+          label={t('account.language')}
+          aria-label={t('account.language')}
+          style={{ width: 100 }}
+        />
       </div>
     );
   }
@@ -60,17 +59,14 @@ export default function LanguageSelector({ compact = false }: LanguageSelectorPr
           {t('account.languageDescription')}
         </div>
       </div>
-      <select
+      <BlueprintSelect
         value={i18n.language}
         onChange={handleLanguageChange}
-        className="w-36 rounded-lg border border-input bg-card p-2 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-      >
-        {languages.map((lang) => (
-          <option key={lang.value} value={lang.value}>
-            {lang.nativeName}
-          </option>
-        ))}
-      </select>
+        options={options}
+        label={t('account.languageLabel')}
+        aria-label={t('account.languageLabel')}
+        style={{ width: 144 }}
+      />
     </div>
   );
 }

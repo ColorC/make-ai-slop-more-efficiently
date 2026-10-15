@@ -4,7 +4,7 @@
 
 复用 dashboard.ccdaemon.import_routes 的扫盘 / transcript 抽取, 但:
 - load_full_transcript: 用更大的 cap (默认 600K / 单条 30K), 完整审计要看全对话, 不是 60K 截断版.
-- find_conversation_by_session_id: 给定 session_id 在 _scan_claude/_scan_codex 里匹配拿 file 路径.
+- find_conversation_by_session_id: 给定 session_id 在 scan_claude/scan_codex 里匹配拿 file 路径.
 - discover_plan_conversations: 给 --against-plan 用. 三层:
     1. data/cc_sessions.json 里 active_plan==plan_id 的会话(跑过 ccdaemon 的, 少).
     2. 兜底: grep 全部 ~/.claude/projects/** + ~/.codex/sessions/** jsonl 找提到该 plan
@@ -33,19 +33,19 @@ def find_conversation_by_session_id(session_id: str, provider: str | None = None
     返回 import_routes 扫描条目 dict {provider, session_id, cwd, mtime, preview, file}, 找不到 None.
     provider 可选 ('claude_code'|'codex'), 缩小匹配范围.
     """
-    from omnicompany.dashboard.ccdaemon.import_routes import _scan_claude, _scan_codex
+    from omnicompany.dashboard.ccdaemon.api import scan_claude, scan_codex
 
     items: list[dict] = []
     if provider in (None, "claude_code"):
         try:
-            items.extend(_scan_claude())
+            items.extend(scan_claude())
         except Exception:  # noqa: BLE001
-            logger.debug("_scan_claude failed", exc_info=True)
+            logger.debug("scan_claude failed", exc_info=True)
     if provider in (None, "codex"):
         try:
-            items.extend(_scan_codex())
+            items.extend(scan_codex())
         except Exception:  # noqa: BLE001
-            logger.debug("_scan_codex failed", exc_info=True)
+            logger.debug("scan_codex failed", exc_info=True)
 
     # 精确匹配优先, 再前缀匹配 (session_id 可能被用户截短)
     for it in items:
@@ -129,10 +129,10 @@ def load_full_transcript(
     完整审计要看整段对话(用户每条指示 + agent 落地动作), 60K 截断会丢尾部指示.
     返回 (messages, truncated). messages=[{role:'user'|'assistant', text}].
     """
-    from omnicompany.dashboard.ccdaemon.import_routes import _extract_transcript
+    from omnicompany.dashboard.ccdaemon.api import extract_transcript
 
     prov = "codex" if provider == "codex" else "claude"
-    return _extract_transcript(prov, Path(file_path), cap_chars=cap_chars, per_msg=per_msg)
+    return extract_transcript(prov, Path(file_path), cap_chars=cap_chars, per_msg=per_msg)
 
 
 # ────────────────────────────────────────────────────────────────────────
@@ -281,7 +281,7 @@ def load_plan_md(plan_id: str) -> tuple[str, dict]:
     plan_id 形如 `<cat>/[date]NAME` 或 `<cat>/<proj>/[date]NAME`.
     """
     from omnicompany.core.config import omni_workspace_root
-    from omnicompany.dashboard.controlplane.plans import parse_plan_frontmatter
+    from omnicompany.core.plans_catalogue import parse_plan_frontmatter
 
     plans_root = omni_workspace_root() / "docs" / "plans"
     plan_md = plans_root / plan_id / "plan.md"

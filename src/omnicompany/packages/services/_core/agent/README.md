@@ -82,22 +82,19 @@ agent 是 omnicompany 的 **AgentNodeLoop Routerization 新家**. 它是 `AGENT-
 
 技术架构详述见 [DESIGN.md](DESIGN.md), 操作手册见 [SKILL.md](SKILL.md).
 
-## T8 spawn surface
+## 统一 Agent Worker 发起面
 
-`spawn_surface.py` is the authority for agent launch paths. There are four
-canonical launch entries:
+产品层只创建 **Agent Worker**，统一入口是 `omni agent start|send|resume` 和
+`POST /cc/agent-workers`。省略项目字段得到 `binding_kind=unbound`；带
+project/workstream/plan 得到业务绑定 Worker。外部实现当前统一为真实 CLI/PT​​Y，
+结构化 `chat` 创建入口已封存为只读历史兼容。
 
-- `agent_tool`: in-loop sub-agent spawn through `AgentRouter` / the `Agent` tool.
-- `external_worker_run`: synchronous audited Codex/Claude worker runs through
-  `ExternalAgentRunRequest` and `omni worker run`.
-- `controller_spawn`: async BOSS SIGHT plan-bound workers through
-  `spawn_subagent` / `omni worker spawn`.
-- `workflow_run`: deterministic workflow orchestration that reuses existing
-  worker/controller surfaces.
+`spawn_surface.py` 仍负责描述调用来源（in-loop agent tool、同步外包 run、
+controller spawn、workflow run），但这些只是发起者/执行策略，不再是四种产品会话。
+Controller 的 standalone spawn 和 fork 最终也落到同一 Agent Worker 控制面。
 
-`AgentNodeLoop` is the implementation base, not a fifth launch command.
-`ExternalAgentWorkerNode` and `build_external_agent_subagent_registry` are
-adapters over the same surfaces.
+`AgentNodeLoop` 是内置 Agent Worker 的实现基类；CLI 是外部 Agent Worker runtime。
+二者共享 Team/Worker 语义、父子关系、binding、预算路由、生命周期事件和评审协议。
 
 ## 想了解更多
 

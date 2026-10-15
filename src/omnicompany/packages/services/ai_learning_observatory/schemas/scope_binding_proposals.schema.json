@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Conversation work item Plan binding proposals",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "string"},
+    "session_id": {"type": "string"},
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {"type": "string"},
+          "plan_id": {"type": "string"},
+          "state": {"type": "string", "enum": ["candidate", "unknown"]},
+          "rationale": {"type": "string"},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["work_item_id", "plan_id", "state", "rationale", "evidence_refs"]
+      }
+    }
+  },
+  "required": ["schema_version", "session_id", "proposals"]
+}

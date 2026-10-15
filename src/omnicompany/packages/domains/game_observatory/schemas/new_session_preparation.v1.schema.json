@@ -1,0 +1,1420 @@
+{
+  "$defs": {
+    "AccountActionIntentV1": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "minLength": 1,
+          "title": "Category",
+          "type": "string"
+        },
+        "game_internal": {
+          "title": "Game Internal",
+          "type": "boolean"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "impersonates_real_person": {
+          "default": false,
+          "title": "Impersonates Real Person",
+          "type": "boolean"
+        },
+        "involves_real_money": {
+          "default": false,
+          "title": "Involves Real Money",
+          "type": "boolean"
+        },
+        "submits_external_personal_identity": {
+          "default": false,
+          "title": "Submits External Personal Identity",
+          "type": "boolean"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "summary",
+        "game_internal"
+      ],
+      "title": "AccountActionIntentV1",
+      "type": "object"
+    },
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "GuardedBatchActionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "account_action_intent": {
+          "$ref": "#/$defs/AccountActionIntentV1"
+        },
+        "action": {
+          "$ref": "#/$defs/NormalizedAction"
+        },
+        "expectation": {
+          "$ref": "#/$defs/GuardedBatchExpectationV1"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "lightweight_guard_checks": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Lightweight Guard Checks",
+          "type": "array"
+        },
+        "locator_id": {
+          "minLength": 1,
+          "title": "Locator Id",
+          "type": "string"
+        },
+        "recovery_action": {
+          "minLength": 1,
+          "title": "Recovery Action",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "sequence",
+        "locator_id",
+        "action",
+        "account_action_intent",
+        "expectation",
+        "lightweight_guard_checks",
+        "recovery_action"
+      ],
+      "title": "GuardedBatchActionV1",
+      "type": "object"
+    },
+    "GuardedBatchExpectationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "effective_when": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Effective When",
+          "type": "array"
+        },
+        "expected_business_change": {
+          "minLength": 1,
+          "title": "Expected Business Change",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "visual_change",
+            "visual_no_change"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "min_visual_distance": {
+          "default": 0.02,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Min Visual Distance",
+          "type": "number"
+        },
+        "stop_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Stop Conditions",
+          "type": "array"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "kind",
+        "expected_business_change",
+        "effective_when",
+        "stop_conditions"
+      ],
+      "title": "GuardedBatchExpectationV1",
+      "type": "object"
+    },
+    "GuardedBatchLocatorV1": {
+      "additionalProperties": false,
+      "properties": {
+        "board_cell": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Board Cell"
+        },
+        "bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelRect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "fixed_source_pixel",
+            "runtime_recognized_board_cell"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "point": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcePixelPoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "recognition_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recognition Requirements",
+          "type": "array"
+        },
+        "source_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Artifact Ids",
+          "type": "array"
+        },
+        "source_evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Evidence Step Ids",
+          "type": "array"
+        },
+        "target_name": {
+          "minLength": 1,
+          "title": "Target Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "target_name",
+        "source_evidence_step_ids",
+        "source_artifact_ids"
+      ],
+      "title": "GuardedBatchLocatorV1",
+      "type": "object"
+    },
+    "GuardedBatchRoutePreparationV1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "execution_status": {
+                "const": "live_validated"
+              }
+            },
+            "required": [
+              "execution_status"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "blocking_reasons": {
+                    "maxItems": 0
+                  },
+                  "executable": {
+                    "const": true
+                  },
+                  "execution_authorization": {
+                    "const": "benchmark"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "blocking_reasons": {
+                    "minItems": 1
+                  },
+                  "executable": {
+                    "const": false
+                  },
+                  "execution_authorization": {
+                    "const": "none"
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "validation_evidence_refs": {
+                "minItems": 1
+              },
+              "validation_skill_run_ids": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "validation_evidence_refs",
+              "validation_skill_run_ids"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "activation_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Activation Requirements",
+          "type": "array"
+        },
+        "batch_end_checkpoint": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Batch End Checkpoint",
+          "type": "array"
+        },
+        "blocking_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Reasons",
+          "type": "array"
+        },
+        "candidate_id": {
+          "minLength": 1,
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "chain_kind": {
+          "enum": [
+            "high_repetition",
+            "semi_fixed"
+          ],
+          "title": "Chain Kind",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "executable": {
+          "title": "Executable",
+          "type": "boolean"
+        },
+        "execution_authorization": {
+          "enum": [
+            "none",
+            "single_live_validation",
+            "benchmark"
+          ],
+          "title": "Execution Authorization",
+          "type": "string"
+        },
+        "execution_business_measurement_mode": {
+          "default": "canonical_per_action",
+          "enum": [
+            "canonical_per_action",
+            "incremental_checkpoints_with_canonical_terminal"
+          ],
+          "title": "Execution Business Measurement Mode",
+          "type": "string"
+        },
+        "execution_capture_mode": {
+          "default": "canonical_per_action",
+          "enum": [
+            "canonical_per_action",
+            "guarded_batch_checkpoints"
+          ],
+          "title": "Execution Capture Mode",
+          "type": "string"
+        },
+        "execution_status": {
+          "enum": [
+            "not_executed",
+            "dry_run_only",
+            "ready_for_live_validation",
+            "live_validated"
+          ],
+          "title": "Execution Status",
+          "type": "string"
+        },
+        "failure_branch": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Failure Branch",
+          "type": "array"
+        },
+        "forbidden_actions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Forbidden Actions",
+          "type": "array"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "high_repetition_target_per_minute": {
+          "exclusiveMinimum": 0,
+          "title": "High Repetition Target Per Minute",
+          "type": "number"
+        },
+        "locators": {
+          "items": {
+            "$ref": "#/$defs/GuardedBatchLocatorV1"
+          },
+          "minItems": 1,
+          "title": "Locators",
+          "type": "array"
+        },
+        "planned_actions": {
+          "items": {
+            "$ref": "#/$defs/GuardedBatchActionV1"
+          },
+          "title": "Planned Actions",
+          "type": "array"
+        },
+        "recovery_branch": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Recovery Branch",
+          "type": "array"
+        },
+        "required_consecutive_terminal_frames": {
+          "default": 2,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Required Consecutive Terminal Frames",
+          "type": "integer"
+        },
+        "route_id": {
+          "minLength": 1,
+          "title": "Route Id",
+          "type": "string"
+        },
+        "route_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Route Version",
+          "type": "integer"
+        },
+        "sample_interval_seconds": {
+          "default": 0.25,
+          "exclusiveMinimum": 0,
+          "maximum": 2,
+          "title": "Sample Interval Seconds",
+          "type": "number"
+        },
+        "semi_fixed_target_per_minute": {
+          "exclusiveMinimum": 0,
+          "title": "Semi Fixed Target Per Minute",
+          "type": "number"
+        },
+        "settle_timeout_seconds": {
+          "default": 4.0,
+          "exclusiveMinimum": 0,
+          "maximum": 10,
+          "title": "Settle Timeout Seconds",
+          "type": "number"
+        },
+        "source_state_guard": {
+          "$ref": "#/$defs/GuardedBatchSourceStateV1"
+        },
+        "success_branch": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Success Branch",
+          "type": "array"
+        },
+        "terminal_receipt_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Terminal Receipt Requirements",
+          "type": "array"
+        },
+        "validation_evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "title": "Validation Evidence Refs",
+          "type": "array"
+        },
+        "validation_skill_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Validation Skill Run Ids",
+          "type": "array"
+        },
+        "wall_clock_boundary": {
+          "minLength": 1,
+          "title": "Wall Clock Boundary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "route_id",
+        "game_id",
+        "environment_id",
+        "chain_kind",
+        "execution_status",
+        "execution_authorization",
+        "executable",
+        "activation_requirements",
+        "source_state_guard",
+        "locators",
+        "batch_end_checkpoint",
+        "terminal_receipt_requirements",
+        "wall_clock_boundary",
+        "success_branch",
+        "failure_branch",
+        "recovery_branch",
+        "forbidden_actions",
+        "high_repetition_target_per_minute",
+        "semi_fixed_target_per_minute"
+      ],
+      "title": "GuardedBatchRoutePreparationV1",
+      "type": "object"
+    },
+    "GuardedBatchSourceStateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_action_reserve": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Checkpoint Action Reserve",
+          "type": "integer"
+        },
+        "forbidden_surface_signals": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Forbidden Surface Signals",
+          "type": "array"
+        },
+        "generator_locator_id": {
+          "minLength": 1,
+          "title": "Generator Locator Id",
+          "type": "string"
+        },
+        "minimum_empty_cells": {
+          "minimum": 0,
+          "title": "Minimum Empty Cells",
+          "type": "integer"
+        },
+        "minimum_energy": {
+          "minimum": 0,
+          "title": "Minimum Energy",
+          "type": "integer"
+        },
+        "minimum_session_action_budget": {
+          "minimum": 1,
+          "title": "Minimum Session Action Budget",
+          "type": "integer"
+        },
+        "reference_artifact_id": {
+          "minLength": 1,
+          "title": "Reference Artifact Id",
+          "type": "string"
+        },
+        "required_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Required Conditions",
+          "type": "array"
+        },
+        "required_surface": {
+          "minLength": 1,
+          "title": "Required Surface",
+          "type": "string"
+        },
+        "source_evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Source Evidence Refs",
+          "type": "array"
+        },
+        "source_mismatch_action": {
+          "const": "reject_without_device_action",
+          "default": "reject_without_device_action",
+          "title": "Source Mismatch Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "required_surface",
+        "source_evidence_refs",
+        "reference_artifact_id",
+        "generator_locator_id",
+        "minimum_empty_cells",
+        "minimum_energy",
+        "minimum_session_action_budget",
+        "required_conditions",
+        "forbidden_surface_signals"
+      ],
+      "title": "GuardedBatchSourceStateV1",
+      "type": "object"
+    },
+    "NextStatePredictionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "current_state_condition": {
+          "minLength": 1,
+          "title": "Current State Condition",
+          "type": "string"
+        },
+        "disconfirming_signals": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Disconfirming Signals",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "expected_signals": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Expected Signals",
+          "type": "array"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "predicted_next_state": {
+          "minLength": 1,
+          "title": "Predicted Next State",
+          "type": "string"
+        },
+        "proposed_observation": {
+          "minLength": 1,
+          "title": "Proposed Observation",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.next-state-prediction.v1",
+          "default": "game-observatory.next-state-prediction.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Source Evidence Refs",
+          "type": "array"
+        },
+        "source_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Fact Ids",
+          "type": "array"
+        },
+        "system_id": {
+          "minLength": 1,
+          "title": "System Id",
+          "type": "string"
+        },
+        "unknown_question_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Unknown Question Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "game_id",
+        "environment_id",
+        "system_id",
+        "unknown_question_ids",
+        "source_fact_ids",
+        "source_evidence_refs",
+        "current_state_condition",
+        "proposed_observation",
+        "predicted_next_state",
+        "expected_signals",
+        "disconfirming_signals",
+        "created_at"
+      ],
+      "title": "NextStatePredictionV1",
+      "type": "object"
+    },
+    "NormalizedAction": {
+      "properties": {
+        "axis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Axis"
+        },
+        "button": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Button"
+        },
+        "duration_ms": {
+          "default": 250,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "keycode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keycode"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Package"
+        },
+        "pinch_direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "in",
+                "out"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Direction"
+        },
+        "pinch_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinch Percent"
+        },
+        "pinch_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Pinch Steps",
+          "type": "integer"
+        },
+        "pressed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressed"
+        },
+        "seconds": {
+          "default": 0.5,
+          "title": "Seconds",
+          "type": "number"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "two_finger_offset_x": {
+          "default": 0,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset X",
+          "type": "integer"
+        },
+        "two_finger_offset_y": {
+          "default": 50,
+          "maximum": 4096,
+          "minimum": -4096,
+          "title": "Two Finger Offset Y",
+          "type": "integer"
+        },
+        "two_finger_steps": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 2,
+          "title": "Two Finger Steps",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "tap",
+            "swipe",
+            "pinch",
+            "two_finger_swipe",
+            "text",
+            "key",
+            "launch",
+            "force_stop",
+            "wait",
+            "back",
+            "home",
+            "mouse_move",
+            "mouse_button",
+            "gamepad_button",
+            "gamepad_axis",
+            "reset"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": -1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "x": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X"
+        },
+        "x2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X2"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "y2": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y2"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NormalizedAction",
+      "type": "object"
+    },
+    "PredictionAdjudicationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "adjudicated_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adjudicated At"
+        },
+        "disposition": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "corrected",
+            "refuted"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "explanation": {
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "model_change_summary": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Change Summary"
+        },
+        "next_action": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Action"
+        },
+        "observed_outcome": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Outcome"
+        },
+        "prediction_id": {
+          "minLength": 1,
+          "title": "Prediction Id",
+          "type": "string"
+        },
+        "resulting_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Resulting Fact Ids",
+          "type": "array"
+        },
+        "schema": {
+          "const": "game-observatory.prediction-adjudication.v1",
+          "default": "game-observatory.prediction-adjudication.v1",
+          "title": "Schema",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "prediction_id",
+        "game_id",
+        "environment_id",
+        "disposition",
+        "explanation"
+      ],
+      "title": "PredictionAdjudicationV1",
+      "type": "object"
+    },
+    "SourcePixelPoint": {
+      "properties": {
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "SourcePixelPoint",
+      "type": "object"
+    },
+    "SourcePixelRect": {
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "title": "SourcePixelRect",
+      "type": "object"
+    },
+    "ValidationQuestionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "authorization_state": {
+          "enum": [
+            "ready_for_new_session",
+            "adjudicated",
+            "blocked_pending_authorization"
+          ],
+          "title": "Authorization State",
+          "type": "string"
+        },
+        "failure_condition": {
+          "minLength": 1,
+          "title": "Failure Condition",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "observation_plan": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Observation Plan",
+          "type": "array"
+        },
+        "preconditions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Preconditions",
+          "type": "array"
+        },
+        "prediction_id": {
+          "minLength": 1,
+          "title": "Prediction Id",
+          "type": "string"
+        },
+        "priority": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "recovery_action": {
+          "minLength": 1,
+          "title": "Recovery Action",
+          "type": "string"
+        },
+        "success_condition": {
+          "minLength": 1,
+          "title": "Success Condition",
+          "type": "string"
+        },
+        "unknown_question_id": {
+          "minLength": 1,
+          "title": "Unknown Question Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "unknown_question_id",
+        "prediction_id",
+        "priority",
+        "preconditions",
+        "observation_plan",
+        "success_condition",
+        "failure_condition",
+        "recovery_action",
+        "authorization_state"
+      ],
+      "title": "ValidationQuestionV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adjudications": {
+      "items": {
+        "$ref": "#/$defs/PredictionAdjudicationV1"
+      },
+      "minItems": 1,
+      "title": "Adjudications",
+      "type": "array"
+    },
+    "current_phase_allowed_operations": {
+      "items": {
+        "enum": [
+          "read_model",
+          "read_evidence",
+          "generate_contract",
+          "validate_contract"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Current Phase Allowed Operations",
+      "type": "array"
+    },
+    "current_phase_forbidden_actions": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Current Phase Forbidden Actions",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "guarded_batch_route": {
+      "$ref": "#/$defs/GuardedBatchRoutePreparationV1"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "predictions": {
+      "items": {
+        "$ref": "#/$defs/NextStatePredictionV1"
+      },
+      "minItems": 1,
+      "title": "Predictions",
+      "type": "array"
+    },
+    "preparation_device_action_count": {
+      "const": 0,
+      "default": 0,
+      "title": "Preparation Device Action Count",
+      "type": "integer"
+    },
+    "preparation_resource_spend": {
+      "const": 0,
+      "default": 0,
+      "title": "Preparation Resource Spend",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "game-observatory.new-session-preparation.v1",
+      "default": "game-observatory.new-session-preparation.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_model_sha256": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "minProperties": 1,
+      "title": "Source Model Sha256",
+      "type": "object"
+    },
+    "successor_route_path": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Successor Route Path"
+    },
+    "validation_questions": {
+      "items": {
+        "$ref": "#/$defs/ValidationQuestionV1"
+      },
+      "minItems": 1,
+      "title": "Validation Questions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "game_id",
+    "environment_id",
+    "generated_at",
+    "source_model_sha256",
+    "current_phase_allowed_operations",
+    "current_phase_forbidden_actions",
+    "predictions",
+    "adjudications",
+    "validation_questions",
+    "guarded_batch_route"
+  ],
+  "title": "NewSessionPreparationV1",
+  "type": "object"
+}

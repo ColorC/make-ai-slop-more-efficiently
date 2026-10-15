@@ -1,0 +1,44 @@
+{
+  "name": "@omni/material-core",
+  "version": "0.3.0",
+  "type": "module",
+  "description": "One Material package: identity, View, canvas/note semantics, wiki projection, display and process plugins.",
+  "license": "MIT",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "bin": { "material-lint": "./cli.mjs" },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./note": {
+      "types": "./note.ts",
+      "import": "./note.ts"
+    },
+    "./contract/material.schema.json": "./contract/material.schema.json"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "cli.mjs",
+    "formats.js",
+    "classification.js",
+    "lint.js",
+    "note.ts",
+    "domains.js",
+    "presets.js",
+    "merge.js",
+    "plugin-slots.js",
+    "workflow.js",
+    "contract",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

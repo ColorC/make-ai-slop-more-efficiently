@@ -1,5 +1,6 @@
-// team 图编辑器主体(2026-07 首屏拆包, 从 index.tsx 拆出): reactflow/dagre/CodeFileEditor
-// 全部住这里, 经 index.tsx 的 React.lazy 按需加载; 本文件不挂注册, 只默认导出 Editor。
+// team 图编辑器(呈现层)。2026-08-06 从 index.tsx 真正拆出并经 index.tsx 懒加载 ——
+// 本文件此前是一份 2026-07 复制出来、无人 import 的陈旧副本(与本体分叉 18 天), 现已由
+// 当前 index.tsx 的实际内容重建。只默认导出 Editor, 不挂注册。拆分缘由见 teamTypes.ts 头注。
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // team 图布局用成熟库 dagre(@dagrejs/dagre): 主线程同步跑、无 Web Worker, 自带去环/分层/减交叉,
 // 并直接给出每条边的走线折点。是 ReactFlow 官方推荐的分层布局方案。
@@ -9,2966 +10,124 @@ import dagre from '@dagrejs/dagre'
 import ReactFlow, { BaseEdge, Background, Controls, MarkerType, MiniMap, Panel, Position, useNodesState, type Edge as FlowEdge, type Node as FlowNode, type NodeChange as FlowNodeChange } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { ExternalLink, PanelRightClose, PanelRightOpen } from 'lucide-react'
-import type { EntityType } from '../types'
-import type { TeamEntity } from './index'
 import CodeFileEditor, { type CodeFileDetail } from '../../shell/CodeFileEditor'
 import EmptyState from '../../shell/EmptyState'
 import { colors, fonts } from '../../shell/tokens'
-import { Segmented } from '../../components/Segmented'
 import { usePanels } from '../../stores/panelsStore'
-
-interface TeamBuilderSummary {
-  name: string
-  spec_id: string
-  nodes: number
-  edges: number
-  entry: string
-}
-
-interface TeamDefinitionRef {
-  entity_type: EntityType
-  entity_id: string
-  file_path: string
-  design_md_path: string | null
-  has_design_md: boolean
-  label: string
-  symbol: string | null
-  line_start: number | null
-  line_end: number | null
-  summary: string | null
-  source_excerpt: string | null
-  material: {
-    id: string
-    name: string
-    description: string
-    parent: string | null
-    kind: string | null
-    tags: string[]
-    fields: Array<{ name: string; type: string | null; description: string; required: boolean }>
-    required: string[]
-  } | null
-  worker: {
-    class_name: string
-    description: string
-    format_in: string | string[] | null
-    format_in_mode: string | null
-    format_out: string | null
-    /** 固定 prompt(NODE_PROMPT 等);动态拼接段后端已用 {…} 占位。无则 null */
-    prompt: { attr: string; text: string } | null
-  } | null
-}
-
-interface TeamGraphNode {
-  id: string
-  label: string
-  kind: string
-  maturity: string
-  format_in: string[]
-  format_out: string | null
-  validator_kind: string | null
-  validator_id: string | null
-  method: string | null
-  description: string
-  is_entry: boolean
-  definition: TeamDefinitionRef | null
-}
-
-interface TeamGraphEdge {
-  id: string
-  source: string
-  target: string
-  condition: string | null
-  feedback: boolean
-  material_id: string | null
-  source_format: string | null
-  target_format: string[]
-}
-
-interface TeamGraphMaterial {
-  id: string
-  producers: string[]
-  consumers: string[]
-  is_external_input: boolean
-  is_terminal_output: boolean
-  definition: TeamDefinitionRef | null
-}
-
-interface TeamGraphData {
-  team_id: string
-  source_path: string
-  definition: TeamDefinitionRef | null
-  spec_id: string
-  name: string
-  description: string
-  purpose: string
-  entry: string
-  tags: string[]
-  builders: TeamBuilderSummary[]
-  selected_builder: string
-  nodes: TeamGraphNode[]
-  edges: TeamGraphEdge[]
-  materials: TeamGraphMaterial[]
-  health: {
-    warnings: string[]
-    builder_errors: Record<string, string>
-    soft_nodes: number
-    hard_nodes: number
-    feedback_edges: number
-    external_inputs: number
-    terminal_outputs: number
-  }
-}
-
-interface TeamRunSummary {
-  trace_id: string
-  task_desc: string | null
-  source: string
-  domains: string[]
-  started_at: string | null
-  ended_at: string | null
-  event_count: number
-  matched_event_count: number
-  matched_nodes: string[]
-  total_nodes: number
-  tool_calls: number
-  llm_calls: number
-  agent_turns: number
-  status: 'running' | 'finished' | 'error' | 'missing'
-  verdict_counts: Record<string, number>
-  last_event: string | null
-}
-
-interface TeamRunNodeStatus {
-  node_id: string
-  event_count: number
-  first_at: string | null
-  last_at: string | null
-  event_types: Record<string, number>
-  verdict_counts: Record<string, number>
-}
-
-interface TeamRunTimelineEvent {
-  id: string
-  timestamp: string | null
-  event_type: string
-  source: string
-  node_ids: string[]
-  description: string
-  verdict: string | null
-  format_in: string[]
-  format_out: string[]
-  input_signal: string
-  output_signal: string
-  diagnosis: string
-  tool_calls: any[] | null
-}
-
-interface TeamRunDetail {
-  team_id: string
-  spec_id: string
-  selected_builder: string
-  trace_id: string
-  summary: TeamRunSummary
-  active_nodes: string[]
-  inactive_nodes: string[]
-  node_statuses: TeamRunNodeStatus[]
-  material_observations: Array<{
-    node_id: string
-    event_type: string
-    timestamp: string | null
-    inputs: string[]
-    outputs: string[]
-    verdict: string | null
-  }>
-  timeline: TeamRunTimelineEvent[]
-}
-
-type ResourceKind = 'workspace' | 'database' | 'external'
-
-interface TeamResourceHint {
-  id: ResourceKind
-  label: string
-  description: string
-  workers: string[]
-  evidence: string[]
-  confidence: '演示推断' | '运行推断'
-}
-
-interface TeamDoctorFinding {
-  id: string
-  check_id: string
-  level: 'blocking' | 'degrading' | 'advisory' | 'info' | string
-  severity: string
-  location: string
-  target_kind: 'node' | 'edge' | 'material' | 'team' | 'unknown' | string
-  target_id: string
-  node_ids: string[]
-  edge_ids: string[]
-  material_ids: string[]
-  observation: string
-  implication: string
-  cross_refs: string[]
-}
-
-interface TeamDoctorHealth {
-  team_id: string
-  spec_id: string
-  selected_builder: string
-  source_path: string
-  status: 'healthy' | 'degraded' | 'unhealthy' | string
-  passed: boolean
-  counts: {
-    blocking: number
-    degrading: number
-    advisory: number
-    info: number
-    total: number
-  }
-  checks: Array<{ id: string; description: string; default_on: boolean }>
-  findings: TeamDoctorFinding[]
-}
-
-interface TeamMaterializationLink {
-  material_id: string
-  direction: string
-  confidence: string
-  basis: string
-  registration_status: string
-  resource_kind: string
-  target: string
-  target_key: string
-  normalized_target: string
-  candidate_kind: string
-  candidate_reason: string
-  promotion_hint: string
-  candidate_material_id: string
-  matched_material_ids: string[]
-  human_title: string
-  human_summary: string
-  evidence_summary: string
-  target_title: string
-  target_summary: string
-  target_excerpt: string
-  target_exists: boolean
-  rel_path: string
-  content_kind: string
-  bytes: number | null
-  evidence: string[]
-}
-
-interface TeamMaterializationLinkGroup {
-  id: string
-  linkKind: 'resource' | 'inferred'
-  worker_id: string
-  label: string
-  summary: string
-  evidence_summary: string
-  count: number
-  links: TeamMaterializationLink[]
-  sample_targets: string[]
-  matched_material_ids: string[]
-}
-
-interface TeamMaterializationWorkerRun {
-  worker_id: string
-  status: string
-  parse_status: string
-  provider: string
-  run_id: string
-  rel_path: string
-  changed_files: string[]
-  observed_read_targets: string[]
-  material_io_links: TeamMaterializationLink[]
-  produced_content_materials: TeamMaterializationLink[]
-  resource_material_links: TeamMaterializationLink[]
-  inferred_material_read_links: TeamMaterializationLink[]
-  static_field_access: {
-    input_field_reads: Record<string, string[]>
-    missing_input_required: Record<string, string[]>
-    missing_output_required: string[]
-    output_field_writes: string[]
-  }
-}
-
-interface TeamMaterializationReviewIssue {
-  worker_id: string
-  severity: string
-  category: string
-  issue: string
-  fix_hint: string
-  format_in: string[]
-  required_not_read: string[]
-}
-
-interface TeamBuilderMaterialization {
-  available: boolean
-  reason?: string
-  run_id: string
-  summary_path: string
-  provider: string
-  started_at_local: string
-  team_name: string
-  review: {
-    kind: string
-    verdict: string
-    critical_count: number
-    warning_count: number
-    diagnosis: string
-    issues: TeamMaterializationReviewIssue[]
-  }
-  counts: {
-    worker_success_count: number
-    worker_fail_count: number
-    compile_fail_count: number
-    declared_material_links: number
-    generated_candidates: number
-    resource_candidates: number
-    workers_with_missing_required: number
-  }
-  worker_runs: TeamMaterializationWorkerRun[]
-}
-
-interface MaterialAttributionReportLink {
-  kind: string
-  kind_label: string
-  title: string
-  material_id: string
-  direction: string
-  confidence: string
-  registration_status: string
-  resource_kind: string
-  target: string
-  rel_path: string
-  summary: string
-  evidence_summary: string
-  target_summary: string
-  target_excerpt: string
-  promotion_hint: string
-  matched_material_ids?: string[]
-  declared_material_ids?: string[]
-  evidence: string[]
-  source_filter: {
-    worker: string
-    material: string
-    target: string
-  }
-}
-
-interface MaterialAttributionQualityGate {
-  id: string
-  name: string
-  status: 'pass' | 'warning' | 'fail' | string
-  summary: string
-  evidence: string[]
-}
-
-interface MaterialAttributionWorkerReport {
-  worker_id: string
-  worker_name: string
-  status: 'pass' | 'warning' | 'fail' | string
-  summary: string
-  declared_io: MaterialAttributionReportLink[]
-  generated_artifacts: MaterialAttributionReportLink[]
-  read_clues: MaterialAttributionReportLink[]
-  confirmed_reads: MaterialAttributionReportLink[]
-  field_contract: {
-    status: string
-    summary: string
-    input_field_reads: Record<string, string[]>
-    missing_input_required: Record<string, string[]>
-    missing_output_required: string[]
-    output_field_writes: string[]
-  }
-  risks: string[]
-  next_actions: string[]
-}
-
-interface MaterialAttributionReadGroup {
-  id: string
-  worker_id: string
-  group_kind: 'tool_clues' | 'unconfirmed' | 'confirmed' | string
-  status: 'evidence' | 'candidate' | 'confirmed' | string
-  title: string
-  summary: string
-  decision: string
-  next_action: string
-  count: number
-  material_count: number
-  sample_targets: string[]
-  sample_material_ids: string[]
-  evidence: string[]
-  source_filter: {
-    worker: string
-    material: string
-    target: string
-  }
-}
-
-interface MaterialAttributionReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  provider: string
-  started_at_local: string
-  summary: string
-  verdict: 'pass' | 'warning' | 'fail' | string
-  quality_gates: MaterialAttributionQualityGate[]
-  counts: {
-    workers: number
-    declared_io: number
-    generated_artifacts: number
-    read_clues: number
-    confirmed_reads: number
-    read_groups?: number
-    unconfirmed_read_clues?: number
-    field_contract_failures: number
-    review_issues: number
-  }
-  worker_reports: MaterialAttributionWorkerReport[]
-  read_groups?: MaterialAttributionReadGroup[]
-  open_questions: Array<{ worker_id: string; summary: string; next_action: string }>
-  source: {
-    summary_path: string
-    materialization_endpoint: string
-  }
-}
-
-interface TeamBuilderTestReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  summary: string
-  verdict: 'pass' | 'warning' | 'fail' | string
-  quality_gates: MaterialAttributionQualityGate[]
-  counts: {
-    files: number
-    python_files: number
-    worker_files: number
-    syntax_failures: number
-    nodes: number
-    bindings: number
-    executed_workers?: number
-    stubbed_workers?: number
-    skipped_workers?: number
-    failed_workers?: number
-    doctor_findings?: number
-  }
-  smoke: {
-    team_id: string
-    entry: string
-    nodes: string[]
-    binding_keys: string[]
-    missing_bindings: string[]
-    error: string
-  }
-  worker_run_smoke?: {
-    status: 'pass' | 'warning' | 'fail' | string
-    executed_workers: Array<{
-      worker_id: string
-      kind: string
-      input_materials?: string[]
-      output_material?: string
-      diagnosis?: string
-      output_summary?: unknown
-    }>
-    stubbed_workers?: Array<{
-      worker_id: string
-      kind: string
-      input_materials?: string[]
-      output_material?: string
-      diagnosis?: string
-      output_summary?: unknown
-      stub?: string
-      llm_stub_calls?: TeamBuilderLlmStubCall[]
-    }>
-    skipped_workers: Array<{
-      worker_id: string
-      reason: string
-      summary?: string
-      missing_inputs?: string[]
-    }>
-    failed_workers: Array<{
-      worker_id: string
-      kind?: string
-      diagnosis?: string
-      input_materials?: string[]
-      output_material?: string
-    }>
-    seed_materials: string[]
-    produced_materials: string[]
-    llm_stub_calls?: TeamBuilderLlmStubCall[]
-    error: string
-  }
-  doctor_findings?: TeamDoctorFinding[]
-  contract_coverage?: {
-    available: boolean
-    verdict: 'pass' | 'warning' | 'fail' | string
-    status: string
-    summary: string
-    counts: {
-      available_contracts: number
-      matching_contracts: number
-      executed_contracts: number
-      missing_contracts: number
-    }
-    quality_gates: MaterialAttributionQualityGate[]
-    matching_contracts: Array<{
-      slug: string
-      pipeline_name?: string
-      path: string
-      mode?: string
-      status?: string
-    }>
-    available_contracts: Array<{
-      slug: string
-      pipeline_name?: string
-      path: string
-      mode?: string
-      status?: string
-    }>
-    latest_execution?: {
-      available?: boolean
-      verdict?: 'pass' | 'warning' | 'fail' | string
-      status?: string
-      summary?: string
-      counts?: {
-        matching_contracts?: number
-        executed_contracts?: number
-        passed_contracts?: number
-        failed_contracts?: number
-      }
-      contracts?: Array<{
-        slug?: string
-        pipeline_name?: string
-        path?: string
-        status?: string
-        returncode?: number
-        command?: string
-        stdout_tail?: string
-        stderr_tail?: string
-      }>
-    }
-    next_action: string
-    source?: {
-      contract_root?: string
-      contract_coverage_material?: string
-      contract_execution_material?: string
-    }
-  }
-  source: {
-    code_package_files: string
-    test_package_dir: string
-    report_material: string
-    doctor_findings_material?: string
-    contract_coverage_material?: string
-    contract_execution_material?: string
-  }
-}
-
-interface TeamBuilderLlmStubCall {
-  model?: string
-  max_tokens?: number
-  system_chars?: number
-  user_chars?: number
-  system_preview?: string
-  user_preview?: string
-  expected_output_keys?: string[]
-  stub_response_keys?: string[]
-  has_json_instruction?: boolean
-  has_chinese_instruction?: boolean
-}
-
-interface TeamBuilderRepairPlan {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'validation_gap' | 'repair_required' | 'unavailable' | string
-  summary: string
-  counts: {
-    actions: number
-    repair_required: number
-    validation_gap: number
-    observe_only: number
-    auto_safe: number
-  }
-  actions: Array<{
-    id: string
-    finding_id: string
-    check_id: string
-    level: string
-    location: string
-    category: string
-    auto_safe: boolean
-    observation: string
-    rationale: string
-    next_action: string
-    validation_actions?: Array<{
-      id: string
-      title: string
-      summary: string
-      action_kind: string
-      endpoint?: string
-      command?: string
-      expected_result?: string
-      safety?: string
-    }>
-    node_ids: string[]
-    material_ids: string[]
-  }>
-  source: {
-    repair_plan_material?: string
-    repair_safety_policy_endpoint?: string
-  }
-}
-
-interface TeamBuilderRepairSafetyPolicy {
-  available: boolean
-  run_id: string
-  version: string
-  summary: string
-  counts: {
-    rules: number
-    auto_safe_rules: number
-    patch_plan_only_rules: number
-    manual_or_none_rules: number
-  }
-  rules: Array<{
-    id: string
-    name: string
-    category: string
-    automation_level: string
-    auto_safe: boolean
-    next_action: string
-    rationale: string
-  }>
-  source: {
-    repair_safety_policy_material?: string
-  }
-}
-
-interface TeamBuilderRepairProbeReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'pass' | 'warning' | 'fail' | string
-  summary: string
-  counts: {
-    captured_failures: number
-    doctor_findings: number
-    repair_required: number
-    validation_gap: number
-    auto_safe: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  worker_run_smoke?: {
-    status: string
-    failed_workers: Array<{
-      worker_id: string
-      kind: string
-      diagnosis: string
-      input_materials?: string[]
-      output_material?: string
-    }>
-    executed_workers?: Array<{ worker_id: string; kind: string; diagnosis: string }>
-    error?: string
-  }
-  doctor_findings: TeamDoctorFinding[]
-  repair_plan: {
-    verdict: string
-    summary: string
-    counts: {
-      actions: number
-      repair_required: number
-      validation_gap: number
-      auto_safe: number
-    }
-    actions: TeamBuilderRepairPlan['actions']
-  }
-  source: {
-    probe_package_dir?: string
-    repair_probe_material?: string
-  }
-}
-
-interface TeamBuilderRepairDryRunReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'pass' | 'warning' | 'fail' | string
-  summary: string
-  counts: {
-    before_failures: number
-    before_findings: number
-    repair_required: number
-    patch_files: number
-    after_failures: number
-    after_findings: number
-    fixed_workers: number
-    auto_safe: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  patch_plan: {
-    id?: string
-    title?: string
-    summary?: string
-    finding_ids?: string[]
-    policy_rule_ids?: string[]
-    changed_files?: string[]
-    dry_run_applied?: boolean
-    scope?: string
-    auto_safe?: boolean
-    rationale?: string
-    verification_commands?: string[]
-    diff?: string
-  }
-  before?: {
-    worker_run_smoke?: {
-      status?: string
-      failed_workers?: Array<{ worker_id: string; kind: string; diagnosis: string }>
-      doctor_findings?: TeamDoctorFinding[]
-    }
-    repair_actions?: TeamBuilderRepairPlan['actions']
-  }
-  after?: {
-    worker_run_smoke?: {
-      status?: string
-      executed_workers?: Array<{ worker_id: string; kind: string; diagnosis: string }>
-      failed_workers?: Array<{ worker_id: string; kind: string; diagnosis: string }>
-      doctor_findings?: TeamDoctorFinding[]
-    }
-  }
-  source: {
-    probe_package_dir?: string
-    patched_file?: string
-    repair_dry_run_material?: string
-  }
-}
-
-interface TeamBuilderRepairPatchCandidatesReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'ready_for_manual_patch' | 'needs_locator_or_dry_run' | 'unavailable' | string
-  summary: string
-  counts: {
-    actions: number
-    candidates: number
-    source_located: number
-    source_missing?: number
-    dry_run_verified: number
-    auto_safe: number
-    manual_required?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  candidates: Array<{
-    id: string
-    status: 'source_located' | 'needs_source_locator' | 'not_applicable' | string
-    finding_id: string
-    check_id: string
-    worker_id: string
-    category: string
-    policy_rule_id: string
-    automation_level: string
-    auto_safe: boolean
-    summary: string
-    observation: string
-    next_action: string
-    source_candidates: Array<{
-      path: string
-      exists: boolean
-      material_ids?: string[]
-      excerpt?: string
-    }>
-    contract_sources?: Array<{
-      path: string
-      exists: boolean
-      material_ids?: string[]
-      excerpt?: string
-    }>
-    proposed_patch: {
-      mode: string
-      scope: string
-      changed_files: string[]
-      diff?: string
-      reason?: string
-    }
-    verification_commands: string[]
-    safety: {
-      dry_run_first: boolean
-      requires_human_confirmation: boolean
-      auto_apply_allowed: boolean
-      reason: string
-    }
-  }>
-  dry_run_reference?: {
-    verdict?: string
-    summary?: string
-    counts?: Record<string, any>
-    source?: Record<string, any>
-  }
-  source: {
-    repair_patch_candidates_material?: string
-    repair_plan_material?: string
-    test_report_endpoint?: string
-    repair_dry_run_endpoint?: string
-  }
-}
-
-interface TeamBuilderRepairApplyGateReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'ready_for_human_review' | 'blocked' | 'unavailable' | string
-  summary: string
-  counts: {
-    candidates: number
-    source_located: number
-    dry_run_verified: number
-    manual_required: number
-    auto_apply_allowed: number
-    review_items: number
-    apply_ready: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  review_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'ready_for_human_review' | 'blocked' | string
-    check_id?: string
-    worker_id: string
-    finding_id: string
-    policy_rule_id: string
-    changed_files: string[]
-    source_files: string[]
-    contract_files?: string[]
-    required_confirmations: string[]
-    verification_commands: string[]
-    apply_modes: Array<{
-      id: string
-      name: string
-      allowed: boolean
-      summary: string
-    }>
-    blocked_reasons: string[]
-    safety: {
-      auto_apply_allowed: boolean
-      requires_human_confirmation: boolean
-      reason: string
-    }
-  }>
-  source: {
-    repair_apply_gate_material?: string
-    repair_patch_candidates_endpoint?: string
-    repair_patch_candidates_material?: string
-  }
-}
-
-interface TeamBuilderRepairPatchDiffProposalReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'diff_ready' | 'needs_ai_or_human_diff' | 'blocked' | 'unavailable' | string
-  summary: string
-  counts: {
-    candidates: number
-    diff_ready: number
-    needs_ai_or_human_diff: number
-    blocked: number
-    unsafe_targets: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  proposals: Array<{
-    id: string
-    candidate_id: string
-    status: 'diff_ready' | 'needs_ai_or_human_diff' | 'blocked' | string
-    check_id: string
-    worker_id: string
-    finding_id: string
-    changed_files: string[]
-    diff?: string
-    diff_source?: string
-    reason: string
-    missing_requirements: string[]
-    patch_request: {
-      summary: string
-      context_files: string[]
-      verification_commands: string[]
-    }
-    safety: {
-      writes_files: boolean
-      applies_to_real_code: boolean
-      requires_human_confirmation: boolean
-      reason: string
-    }
-  }>
-  source: {
-    repair_patch_diff_proposal_material?: string
-    repair_patch_candidates_endpoint?: string
-    repair_apply_gate_endpoint?: string
-  }
-}
-
-interface TeamBuilderRepairApprovalReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'approved' | 'awaiting_approval' | 'stale_or_mismatch' | 'unavailable' | string
-  summary: string
-  counts: {
-    proposals: number
-    approvable: number
-    approved: number
-    awaiting_approval: number
-    stale_or_mismatch: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  approval_items: Array<{
-    candidate_id: string
-    proposal_id: string
-    status: 'approved' | 'awaiting_approval' | 'stale_or_mismatch' | 'not_approvable' | string
-    approval_valid: boolean
-    approvable: boolean
-    diff_sha256: string
-    approved_by?: string
-    approved_at?: string
-    summary: string
-    changed_files: string[]
-    stale_records: number
-  }>
-  source: {
-    repair_patch_diff_proposal_endpoint?: string
-    repair_approval_records_material?: string
-    repair_approval_report_material?: string
-  }
-}
-
-interface TeamBuilderRepairExecutionReadinessReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'waiting_for_patch_diff' | 'awaiting_explicit_approval' | 'ready_for_explicit_apply' | 'blocked' | 'unavailable' | string
-  summary: string
-  counts: {
-    candidates: number
-    review_ready: number
-    diff_ready: number
-    approval_recorded: number
-    execution_ready: number
-    blocked: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  execution_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'waiting_for_patch_diff' | 'awaiting_explicit_approval' | 'ready_for_explicit_apply' | 'blocked' | string
-    check_id: string
-    worker_id: string
-    finding_id: string
-    changed_files: string[]
-    contract_files?: string[]
-    review_item_status: string
-    has_diff: boolean
-    approval_recorded: boolean
-    missing_requirements: string[]
-    verification_commands: string[]
-    safety: {
-      auto_apply_allowed: boolean
-      requires_explicit_approval: boolean
-      reason: string
-    }
-  }>
-  source: {
-    repair_execution_readiness_material?: string
-    repair_apply_gate_endpoint?: string
-    repair_patch_candidates_endpoint?: string
-  }
-}
-
-interface TeamBuilderRepairApplyPreviewReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'preview_ready' | 'blocked' | 'unavailable' | string
-  summary: string
-  counts: {
-    items: number
-    preview_ready: number
-    blocked: number
-    files_written: number
-    files_previewed?: number
-    multi_file_preview_ready?: number
-    real_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  preview_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'preview_ready' | 'blocked' | string
-    changed_files: string[]
-    file_count?: number
-    multi_file?: boolean
-    before_preview_files: string[]
-    after_preview_files: string[]
-    file_previews?: Array<{
-      changed_file: string
-      before_preview_file: string
-      after_preview_file: string
-      before_sha256: string
-      after_sha256: string
-      diff_sha256: string
-    }>
-    blocked_reasons: string[]
-    diff_sha256: string
-    safety: {
-      scope: string
-      writes_real_files: boolean
-      requires_final_apply_confirmation: boolean
-      reason: string
-    }
-  }>
-  source: {
-    repair_apply_preview_material?: string
-    repair_execution_readiness_endpoint?: string
-  }
-}
-
-interface TeamBuilderRepairApplyExecutionReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'ready_for_explicit_apply' | 'applied' | 'blocked' | 'stale_or_mismatch' | 'unavailable' | string
-  summary: string
-  counts: {
-    items: number
-    preview_ready: number
-    applied: number
-    blocked: number
-    stale_or_mismatch: number
-    real_writes: number
-    file_set_ready?: number
-    file_set_applied?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  apply_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'ready_for_explicit_apply' | 'applied' | 'blocked' | 'stale_or_mismatch' | string
-    summary: string
-    changed_files: string[]
-    preview_status: string
-    diff_sha256: string
-    applied_at?: string
-    applied_by?: string
-    target_current_sha256?: string
-    applied_after_sha256?: string
-    file_set?: boolean
-    file_count?: number
-    file_records?: TeamBuilderRepairFileRecord[]
-    real_writes: number
-    blocked_reasons: string[]
-  }>
-  records: Array<{
-    id: string
-    candidate_id: string
-    applied: boolean
-    applied_by: string
-    applied_at: string
-    reason: string
-    diff_sha256: string
-    changed_file: string
-    changed_files?: string[]
-    before_sha256: string
-    after_sha256: string
-    after_preview_file: string
-    file_set?: boolean
-    file_count?: number
-    file_records?: TeamBuilderRepairFileRecord[]
-    real_writes: number
-  }>
-  source: {
-    repair_apply_preview_endpoint?: string
-    repair_apply_execution_records_material?: string
-    repair_apply_execution_report_material?: string
-  }
-}
-
-interface TeamBuilderRepairPostApplyVerificationReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'awaiting_verification' | 'pass' | 'fail' | 'unavailable' | string
-  summary: string
-  counts: {
-    applied: number
-    verified: number
-    pending: number
-    failed: number
-    contract_failed?: number
-    doctor_findings?: number
-    repair_required?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  verification_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'pending_verification' | 'pass' | 'fail' | string
-    summary: string
-    changed_files: string[]
-    required_commands: string[]
-  }>
-  source: {
-    repair_apply_execution_endpoint?: string
-    repair_post_apply_verification_material?: string
-  }
-}
-
-interface TeamBuilderRepairOutcomeReconciliationReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'pass' | 'awaiting_verification' | 'missing_baseline' | 'partial' | 'regression' | 'unavailable' | string
-  summary: string
-  counts: {
-    applied: number
-    reconciled: number
-    missing_baseline: number
-    resolved_findings: number
-    introduced_findings: number
-    persistent_findings: number
-    pending_verification: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  reconciliation_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'reconciled' | 'pending_verification' | 'missing_baseline' | 'partial' | 'regression' | string
-    summary: string
-    changed_file: string
-    changed_files?: string[]
-    file_set?: boolean
-    file_count?: number
-    diff_sha256: string
-    before: {
-      doctor_verdict: string
-      doctor_findings: number
-      repair_verdict: string
-      repair_required: number
-      closure_verdict: string
-    }
-    after: {
-      doctor_verdict: string
-      doctor_findings: number
-      repair_verdict: string
-      repair_required: number
-      closure_verdict: string
-    }
-    resolved_findings: Array<{ key: string; check_id: string; observation: string }>
-    introduced_findings: Array<{ key: string; check_id: string; observation: string }>
-    persistent_findings: Array<{ key: string; check_id: string; observation: string }>
-  }>
-  source: {
-    repair_apply_execution_endpoint?: string
-    repair_post_apply_verification_endpoint?: string
-    repair_outcome_reconciliation_material?: string
-  }
-}
-
-interface TeamBuilderRepairRollbackReadinessReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'ready_for_explicit_rollback' | 'stale_or_mismatch' | 'missing_before_snapshot' | 'blocked' | 'unavailable' | string
-  summary: string
-  counts: {
-    applied: number
-    rollback_ready: number
-    blocked: number
-    stale_or_mismatch: number
-    missing_before_snapshot: number
-    real_writes: number
-    file_set_ready?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  rollback_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'ready_for_explicit_rollback' | 'stale_or_mismatch' | 'missing_before_snapshot' | 'blocked' | string
-    summary: string
-    changed_file: string
-    changed_files?: string[]
-    file_set?: boolean
-    file_count?: number
-    file_records?: TeamBuilderRepairFileRecord[]
-    diff_sha256: string
-    applied_at?: string
-    applied_by?: string
-    before_sha256: string
-    after_sha256: string
-    current_sha256: string
-    before_preview_file: string
-    before_snapshot_sha256: string
-    target_scope_safe: boolean
-    current_matches_after: boolean
-    before_snapshot_valid: boolean
-    blocked_reasons: string[]
-  }>
-  source: {
-    repair_apply_execution_endpoint?: string
-    repair_rollback_readiness_material?: string
-  }
-}
-
-interface TeamBuilderRepairRollbackExecutionReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'ready_for_explicit_rollback' | 'rolled_back' | 'blocked' | 'stale_or_mismatch' | 'unavailable' | string
-  summary: string
-  counts: {
-    items: number
-    ready: number
-    rolled_back: number
-    blocked: number
-    stale_or_mismatch: number
-    real_writes: number
-    file_set_ready?: number
-    file_set_rolled_back?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  rollback_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'ready_for_explicit_rollback' | 'rolled_back' | 'blocked' | 'stale_or_mismatch' | string
-    summary: string
-    changed_file: string
-    changed_files?: string[]
-    file_set?: boolean
-    file_count?: number
-    file_records?: TeamBuilderRepairFileRecord[]
-    before_sha256: string
-    after_sha256: string
-    current_sha256: string
-    rolled_back_at?: string
-    rolled_back_by?: string
-    rollback_from_sha256: string
-    rollback_to_sha256: string
-    real_writes: number
-    blocked_reasons: string[]
-  }>
-  records: Array<{
-    id: string
-    candidate_id: string
-    rolled_back: boolean
-    rolled_back_by: string
-    rolled_back_at: string
-    reason: string
-    changed_file: string
-    changed_files?: string[]
-    file_set?: boolean
-    file_count?: number
-    file_records?: TeamBuilderRepairFileRecord[]
-    rollback_from_sha256: string
-    rollback_to_sha256: string
-    real_writes: number
-  }>
-  source: {
-    repair_rollback_readiness_endpoint?: string
-    repair_rollback_execution_records_material?: string
-    repair_rollback_execution_report_material?: string
-  }
-}
-
-interface TeamBuilderRepairRollbackPostVerificationReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'awaiting_verification' | 'pass' | 'fail' | 'unavailable' | string
-  summary: string
-  counts: {
-    rolled_back: number
-    verified: number
-    pending: number
-    failed: number
-    doctor_findings?: number
-    repair_required?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  verification_items: Array<{
-    id: string
-    candidate_id: string
-    status: 'pending_verification' | 'pass' | 'fail' | string
-    summary: string
-    changed_files: string[]
-    required_commands: string[]
-  }>
-  source: {
-    repair_rollback_execution_endpoint?: string
-    repair_rollback_post_verification_material?: string
-  }
-}
-
-interface TeamBuilderRepairClosureRollupReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'action_required' | 'blocked' | 'unavailable' | string
-  summary: string
-  counts: {
-    stages: number
-    pending_stages: number
-    failed_stages: number
-    repair_required: number
-    validation_gap: number
-    candidates: number
-    review_items: number
-    diff_ready: number
-    approved: number
-    execution_ready: number
-    preview_ready: number
-    applied: number
-    apply_real_writes: number
-    post_apply_pending: number
-    post_apply_failed: number
-    reconciled: number
-    rollback_ready: number
-    rolled_back: number
-    rollback_real_writes: number
-    rollback_post_pending: number
-    rollback_post_failed: number
-    multi_candidate_count?: number
-    multi_file_candidate_count?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  stages: Array<{
-    id: string
-    name: string
-    status: string
-    summary: string
-    endpoint: string
-    counts: Record<string, number>
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  generalization?: {
-    summary: string
-    candidate_count: number
-    multi_file_candidate_count: number
-    single_file_execution_limit: boolean
-    blockers: string[]
-    next_validation: string
-  }
-  source: {
-    repair_closure_rollup_material?: string
-  }
-}
-
-interface TeamBuilderRepairFileRecord {
-  changed_file: string
-  before_sha256?: string
-  after_sha256?: string
-  current_sha256?: string
-  before_preview_file?: string
-  after_preview_file?: string
-  before_snapshot_sha256?: string
-  rollback_from_sha256?: string
-  rollback_to_sha256?: string
-  after_apply_sha256?: string
-  after_rollback_sha256?: string
-  diff_sha256?: string
-  target_scope_safe?: boolean
-  current_matches_after?: boolean
-  before_snapshot_valid?: boolean
-}
-
-interface TeamBuilderRepairGeneralizationTrialReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'guarded_trial_ready' | 'unavailable' | string
-  summary: string
-  counts: {
-    candidate_count: number
-    multi_file_candidate_count: number
-    contract_target_count: number
-    blocked_for_real_apply: number
-    scratch_preview_required: number
-    real_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  trial_cases: Array<{
-    id: string
-    name: string
-    status: string
-    summary: string
-    evidence: string[]
-  }>
-  controlled_candidates: Array<{
-    id: string
-    priority: number
-    title: string
-    summary: string
-    changed_files: string[]
-    risk: string
-    expected_handling: string
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-    post_endpoint?: string
-    required_confirmations?: string[]
-    approval_requirements?: string[]
-    safety_note?: string
-  }>
-  source: {
-    repair_generalization_trial_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealGeneratedFileSetTrialReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'pass' | 'fail' | 'unavailable' | string
-  summary: string
-  counts: {
-    changed_files: number
-    files_previewed: number
-    files_applied: number
-    files_rolled_back: number
-    before_failures: number
-    post_apply_passed: number
-    rollback_restored: number
-    scratch_generated_writes: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  changed_files: string[]
-  file_records: TeamBuilderRepairFileRecord[]
-  smoke: {
-    before_worker?: { status?: string; failed_workers?: unknown[] }
-    after_apply_worker?: { status?: string; failed_workers?: unknown[]; executed_workers?: unknown[] }
-    after_rollback_worker?: { status?: string; failed_workers?: unknown[] }
-  }
-  source: {
-    trial_package_dir?: string
-    repair_real_generated_file_set_trial_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunCandidate {
-  run_id: string
-  team_name: string
-  classification: string
-  summary: string
-  counts: {
-    critical: number
-    warnings: number
-    failed_workers: number
-    doctor_findings: number
-    repair_required: number
-    validation_gap: number
-    patch_candidates: number
-    source_files: number
-  }
-  source_ready: boolean
-  doctor_ready: boolean
-  candidate_ready: boolean
-  evidence: string[]
-  source_files: string[]
-  materials: Array<{
-    label: string
-    path: string
-    available: boolean
-  }>
-}
-
-interface TeamBuilderRepairRealRunCandidateScanReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'candidate_ready' | 'failure_candidate_needs_doctor' | 'validation_gap_only' | 'no_real_failure_candidate' | 'unavailable' | string
-  summary: string
-  counts: {
-    runs_scanned: number
-    failure_candidates: number
-    repair_ready_candidates: number
-    validation_gap_runs: number
-    clean_runs: number
-    source_ready_candidates: number
-    doctor_ready_candidates: number
-    patch_candidate_sets: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  candidates: TeamBuilderRepairRealRunCandidate[]
-  run_summaries: TeamBuilderRepairRealRunCandidate[]
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-    post_endpoint?: string
-    required_confirmations?: string[]
-    approval_requirements?: string[]
-    safety_note?: string
-  }>
-  source: {
-    scan_material?: string
-    materialization_root?: string
-    latest_run?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunReplayPlanReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'repair_plan_ready' | 'no_failed_candidate' | 'no_repair_action' | 'unavailable' | string
-  summary: string
-  counts: {
-    code_review_issues: number
-    repair_required: number
-    source_located: number
-    source_missing: number
-    diffs_generated: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  findings: Array<{
-    id: string
-    check_id: string
-    level: string
-    severity: string
-    target_kind: string
-    target_id: string
-    location: string
-    category: string
-    observation: string
-    implication: string
-    source_file: string
-    required_not_read: string[]
-    format_in: string[]
-    evidence: string[]
-  }>
-  repair_actions: Array<{
-    id: string
-    finding_id: string
-    category: string
-    automation_level: string
-    auto_safe: boolean
-    worker_id: string
-    changed_files: string[]
-    required_input_fields: string[]
-    proposed_change: string
-    verification: string[]
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    candidate_scan_endpoint?: string
-    code_review_report?: string
-    candidate_run_dir?: string
-    replay_plan_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunDiffRecord {
-  id: string
-  action_id: string
-  worker_id: string
-  changed_file: string
-  required_input_fields: string[]
-  change_summary: string[]
-  diff: string
-  diff_sha256: string
-  before_sha256: string
-  after_sha256: string
-  before_preview_file: string
-  after_preview_file: string
-}
-
-interface TeamBuilderRepairRealRunDiffPreviewReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'diff_preview_ready' | 'blocked' | 'no_repair_actions' | string
-  summary: string
-  counts: {
-    repair_actions: number
-    diff_ready: number
-    files_previewed: number
-    blocked: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  diff_records: TeamBuilderRepairRealRunDiffRecord[]
-  blocked_items: Array<{
-    action_id?: string
-    changed_file?: string
-    reason: string
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    replay_plan_endpoint?: string
-    candidate_run_dir?: string
-    diff_preview_material?: string
-    preview_root?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunDiffReviewItem {
-  id: string
-  record_id: string
-  worker_id: string
-  status: 'ready_for_explicit_review' | 'blocked' | string
-  summary: string
-  changed_file: string
-  change_summary: string[]
-  required_input_fields: string[]
-  target_scope_safe: boolean
-  source_matches_before: boolean
-  current_source_sha256: string
-  before_sha256: string
-  after_sha256: string
-  diff_sha256: string
-  before_preview_file: string
-  after_preview_file: string
-  risk_notes: string[]
-  review_questions: string[]
-  evidence_links: string[]
-  blocked_reasons: string[]
-}
-
-interface TeamBuilderRepairRealRunDiffReviewReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'review_ready' | 'blocked' | 'no_diff_preview' | string
-  summary: string
-  counts: {
-    diff_records: number
-    ready_for_review: number
-    blocked: number
-    requires_explicit_approval: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  review_items: TeamBuilderRepairRealRunDiffReviewItem[]
-  blocked_items: Array<{
-    record_id?: string
-    changed_file?: string
-    reasons?: string[]
-    reason?: string
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    diff_preview_endpoint?: string
-    diff_preview_material?: string
-    diff_review_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunApplyGateItem {
-  id: string
-  review_item_id: string
-  record_id: string
-  worker_id: string
-  status: 'ready_for_explicit_apply_preview' | 'blocked' | string
-  summary: string
-  changed_file: string
-  required_input_fields: string[]
-  diff_sha256: string
-  before_sha256: string
-  after_sha256: string
-  current_source_sha256: string
-  before_preview_file: string
-  after_preview_file: string
-  required_confirmations: string[]
-  post_apply_verification: string[]
-  rollback_requirement: string
-  blocked_reasons: string[]
-}
-
-interface TeamBuilderRepairRealRunApplyGateReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'ready_for_explicit_apply_preview' | 'blocked' | 'no_review_ready_diff' | string
-  summary: string
-  counts: {
-    review_items: number
-    apply_preview_ready: number
-    blocked: number
-    required_confirmation_tokens: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  apply_items: TeamBuilderRepairRealRunApplyGateItem[]
-  blocked_items: Array<{
-    review_item_id?: string
-    changed_file?: string
-    reasons: string[]
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    diff_review_endpoint?: string
-    diff_review_material?: string
-    apply_gate_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunApplyPreviewItem {
-  id: string
-  apply_item_id: string
-  worker_id: string
-  status: 'preview_ready' | 'blocked' | string
-  summary: string
-  changed_files: string[]
-  file_set: boolean
-  file_count: number
-  before_preview_files: string[]
-  after_preview_files: string[]
-  file_records: TeamBuilderRepairFileRecord[]
-  required_confirmations: string[]
-  post_apply_verification: string[]
-  rollback_requirement: string
-  blocked_reasons: string[]
-  safety: {
-    scope: string
-    writes_real_files: boolean
-    requires_final_apply_confirmation: boolean
-    reason: string
-  }
-}
-
-interface TeamBuilderRepairRealRunApplyPreviewReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'preview_ready' | 'blocked' | 'no_apply_gate_ready_item' | string
-  summary: string
-  counts: {
-    apply_items: number
-    preview_ready: number
-    files_previewed: number
-    blocked: number
-    required_confirmation_tokens: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  preview_items: TeamBuilderRepairRealRunApplyPreviewItem[]
-  blocked_items: Array<{
-    apply_item_id?: string
-    changed_file?: string
-    reasons: string[]
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    apply_gate_endpoint?: string
-    apply_gate_material?: string
-    apply_preview_material?: string
-    preview_root?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunApplyExecutionItem {
-  id: string
-  apply_item_id: string
-  worker_id: string
-  status: 'ready_for_explicit_apply' | 'applied' | 'blocked' | 'stale_or_mismatch' | string
-  summary: string
-  changed_files: string[]
-  file_set: boolean
-  file_count: number
-  file_records: TeamBuilderRepairFileRecord[]
-  required_confirmations: string[]
-  applied_at?: string
-  applied_by?: string
-  real_writes: number
-  blocked_reasons: string[]
-}
-
-interface TeamBuilderRepairRealRunApplyExecutionReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'ready_for_explicit_apply' | 'applied' | 'blocked' | 'stale_or_mismatch' | string
-  summary: string
-  counts: {
-    items: number
-    ready: number
-    applied: number
-    blocked: number
-    stale_or_mismatch: number
-    real_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  apply_items: TeamBuilderRepairRealRunApplyExecutionItem[]
-  records: Array<{
-    id: string
-    apply_item_id: string
-    applied: boolean
-    applied_by: string
-    applied_at: string
-    real_writes: number
-    file_records: TeamBuilderRepairFileRecord[]
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    apply_preview_endpoint?: string
-    apply_execution_records_material?: string
-    apply_execution_report_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunPostApplyVerificationItem {
-  id: string
-  apply_item_id: string
-  worker_id: string
-  status: 'pending_verification' | 'verified' | 'failed' | string
-  summary: string
-  changed_files: string[]
-  required_fields_checked?: number
-  missing_required_fields?: string[]
-  required_commands?: string[]
-}
-
-interface TeamBuilderRepairRealRunPostApplyVerificationReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'awaiting_apply' | 'awaiting_replay_verification' | 'pass' | 'warning' | 'fail' | string
-  summary: string
-  counts: {
-    applied: number
-    verified: number
-    pending: number
-    failed: number
-    warnings: number
-    ready: number
-    real_repo_writes: number
-    fields_checked?: number
-    missing_required_fields?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  verification_items: TeamBuilderRepairRealRunPostApplyVerificationItem[]
-  field_checks?: Array<{
-    changed_file: string
-    required_fields: string[]
-    missing_fields: string[]
-    status: string
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    apply_execution_endpoint?: string
-    post_apply_verification_material?: string
-    code_package_files?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunOutcomeReconciliationReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'awaiting_apply' | 'awaiting_verification' | 'pass' | 'warning' | 'partial' | 'regression' | 'missing_baseline' | string
-  summary: string
-  counts: {
-    applied: number
-    reconciled: number
-    missing_baseline: number
-    resolved_findings: number
-    introduced_findings: number
-    persistent_findings: number
-    pending_verification: number
-    warnings: number
-    ready: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  reconciliation_items: Array<{
-    id: string
-    apply_item_id: string
-    worker_id: string
-    status: 'reconciled' | 'reconciled_with_warnings' | 'pending_verification' | 'missing_baseline' | 'partial' | 'regression' | string
-    summary: string
-    changed_files: string[]
-    file_set: boolean
-    file_count: number
-    before: {
-      baseline_findings: number
-      repair_required: number
-      replay_plan_verdict: string
-    }
-    after: {
-      verification_verdict: string
-      missing_required_fields: number
-      failed_gates: number
-      warning_gates: number
-    }
-    resolved_findings: Array<{ key: string; check_id: string; observation: string }>
-    introduced_findings: Array<{ key: string; check_id: string; observation: string }>
-    persistent_findings: Array<{ key: string; check_id: string; observation: string }>
-    warnings?: Array<{ key: string; summary: string }>
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    apply_execution_endpoint?: string
-    post_apply_verification_endpoint?: string
-    replay_plan_endpoint?: string
-    outcome_reconciliation_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunRollbackReadinessReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'awaiting_apply' | 'ready_for_explicit_rollback' | 'blocked' | 'stale_or_mismatch' | 'missing_before_snapshot' | string
-  summary: string
-  counts: {
-    applied: number
-    rollback_ready: number
-    blocked: number
-    stale_or_mismatch: number
-    missing_before_snapshot: number
-    ready: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  rollback_items: Array<{
-    id: string
-    apply_item_id: string
-    worker_id: string
-    status: 'ready_for_explicit_rollback' | 'blocked' | 'stale_or_mismatch' | 'missing_before_snapshot' | string
-    summary: string
-    changed_files: string[]
-    file_set: boolean
-    file_count: number
-    file_records: TeamBuilderRepairFileRecord[]
-    applied_at: string
-    applied_by: string
-    real_writes: number
-    blocked_reasons: string[]
-  }>
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    apply_execution_endpoint?: string
-    outcome_reconciliation_endpoint?: string
-    real_run_rollback_readiness_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunRollbackExecutionReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'awaiting_apply' | 'ready_for_explicit_rollback' | 'rolled_back' | 'blocked' | 'stale_or_mismatch' | string
-  summary: string
-  counts: {
-    items: number
-    ready: number
-    rolled_back: number
-    blocked: number
-    stale_or_mismatch: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  rollback_items: Array<{
-    id: string
-    apply_item_id: string
-    worker_id: string
-    status: 'ready_for_explicit_rollback' | 'rolled_back' | 'blocked' | 'stale_or_mismatch' | string
-    summary: string
-    changed_files: string[]
-    file_set: boolean
-    file_count: number
-    file_records: TeamBuilderRepairFileRecord[]
-    rolled_back_at: string
-    rolled_back_by: string
-    real_writes: number
-    blocked_reasons: string[]
-  }>
-  records: Array<{
-    id: string
-    apply_item_id: string
-    rolled_back: boolean
-    rolled_back_by: string
-    rolled_back_at: string
-    real_writes: number
-    file_records: TeamBuilderRepairFileRecord[]
-  }>
-  source: {
-    rollback_readiness_endpoint?: string
-    rollback_execution_records_material?: string
-    rollback_execution_report_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunRollbackPostVerificationReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'awaiting_apply' | 'awaiting_verification' | 'pass' | 'fail' | string
-  summary: string
-  counts: {
-    rolled_back: number
-    verified: number
-    pending: number
-    failed: number
-    real_repo_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  verification_items: Array<{
-    id: string
-    apply_item_id: string
-    worker_id: string
-    status: 'pending_verification' | 'pass' | 'fail' | string
-    summary: string
-    changed_files: string[]
-    required_commands?: string[]
-    file_checks?: Array<{
-      changed_file: string
-      current_sha256: string
-      expected_before_sha256: string
-      matches_before: boolean
-    }>
-  }>
-  source: {
-    rollback_execution_endpoint?: string
-    rollback_post_verification_material?: string
-  }
-}
-
-interface TeamBuilderRepairRealRunClosureRollupReport {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'clean' | 'action_required' | 'blocked' | string
-  summary: string
-  counts: {
-    stages: number
-    pending_stages: number
-    failed_stages: number
-    failure_candidates: number
-    repair_required: number
-    ready_to_apply: number
-    applied: number
-    apply_real_writes: number
-    verified: number
-    reconciled: number
-    rollback_ready: number
-    rolled_back: number
-    rollback_verified: number
-    rollback_real_writes: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  stages: Array<{
-    id: string
-    name: string
-    status: string
-    summary: string
-    endpoint: string
-    counts: Record<string, number>
-  }>
-  approval_packet?: {
-    available: boolean
-    status: string
-    title: string
-    summary: string
-    post_endpoint: string
-    approval_requirements: string[]
-    required_confirmations: string[]
-    payload_template?: Record<string, unknown>
-    decision_dossier?: {
-      title: string
-      decision_question: string
-      why_now: string
-      write_scope: string
-      expected_effect: string
-      do_not_use_as_completion: string
-      post_approval_sequence: string[]
-      human_review_focus: string[]
-    }
-    post_preflight?: {
-      available: boolean
-      status: 'ready_to_post' | 'blocked' | 'not_ready' | string
-      summary: string
-      conditions: Array<{
-        id: string
-        name: string
-        status: 'pass' | 'warning' | 'fail' | string
-        summary: string
-        evidence: string[]
-      }>
-      blockers: string[]
-    }
-    auto_apply_policy?: {
-      available: boolean
-      verdict: string
-      eligible: boolean
-      summary: string
-      counts: {
-        candidate_items: number
-        eligible_items: number
-        blocked_items: number
-        total_changed_files: number
-        max_apply_items: number
-        max_changed_files: number
-        required_field_checks: number
-        missing_required_fields: number
-        real_repo_writes: number
-      }
-      blockers: string[]
-      warnings: string[]
-      execute_endpoint: string
-      required_confirmation: string
-    }
-    apply_rehearsal?: {
-      available: boolean
-      verdict: string
-      summary: string
-      counts: {
-        ready: number
-        passed: number
-        blocked: number
-        scratch_writes: number
-        real_repo_writes: number
-        required_field_checks?: number
-        missing_required_fields?: number
-        files_without_required_contract?: number
-      }
-      material: string
-      rehearsal_root: string
-    }
-    execution_playbook?: {
-      available: boolean
-      status: string
-      title: string
-      summary: string
-      safety_note: string
-      steps: Array<{
-        id: string
-        order: number
-        method: 'GET' | 'POST' | string
-        endpoint: string
-        title: string
-        summary: string
-        writes_target_files: boolean
-        can_execute_now: boolean
-        required_confirmations: string[]
-        payload_template?: Record<string, unknown>
-        expected_next_verdict: string
-      }>
-    }
-    items: Array<{
-      apply_item_id: string
-      worker_id: string
-      status: string
-      summary: string
-      changed_files: string[]
-      file_count: number
-      file_records: Array<{
-        changed_file: string
-        before_sha256: string
-        after_sha256: string
-        current_sha256: string
-        before_preview_file?: string
-        after_preview_file?: string
-      }>
-      required_confirmations: string[]
-      required_input_fields?: string[]
-      problem_statement?: string
-      impact_summary?: string
-      intended_change?: string
-      change_summary?: string[]
-      review_questions?: string[]
-      risk_notes?: string[]
-      evidence_links?: Array<{
-        label: string
-        kind: 'endpoint' | 'material' | 'file' | string
-        target: string
-        summary: string
-      }>
-      post_apply_verification: string[]
-      rollback_requirement: string
-    }>
-    safety_checks: string[]
-    safety_note: string
-  }
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-    post_endpoint?: string
-    required_confirmations?: string[]
-    approval_requirements?: string[]
-    safety_note?: string
-  }>
-  source: {
-    real_run_closure_rollup_material?: string
-  }
-}
-
-interface TeamBuilderReadClueResolutionPlan {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'pass' | 'warning' | 'fail' | 'unavailable' | string
-  summary: string
-  counts: {
-    read_clues: number
-    confirmed: number
-    confirmed_read_edges?: number
-    unresolved: number
-    candidate_materialized?: number
-    candidate_materials?: number
-    unexpanded?: number
-    tool_scope_confirmed?: number
-    tool_read_confirmed_materials?: number
-    content_mention_path_clues?: number
-    content_mention_path_materials?: number
-    auto_expandable: number
-    trace_replay_required?: number
-    manual_review?: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  actions: TeamBuilderReadClueResolutionAction[]
-  content_mention_actions?: TeamBuilderReadClueResolutionAction[]
-  source: {
-    material_report_endpoint?: string
-    read_clue_resolution_plan_material?: string
-  }
-}
-
-interface TeamBuilderReadClueResolutionAction {
-    id: string
-    worker_id: string
-    title: string
-    target: string
-    category: string
-    automation_level: string
-    status: string
-    evidence_summary: string
-    reason: string
-    next_action: string
-    review_target?: string
-    review_summary?: string
-    review_examples?: Array<{
-      path: string
-      kind?: string
-      line?: number
-      excerpt?: string
-      material_ids?: string[]
-    }>
-    material_id_hits?: string[]
-    candidate_materials?: Array<{
-      id: string
-      worker_id?: string
-      material_id: string
-      path?: string
-      line?: number
-      kind?: string
-      confidence?: string
-      status?: string
-      basis?: string
-      excerpt?: string
-      needs_confirmation?: boolean
-    }>
-    tool_confirmation?: {
-      status?: string
-      summary?: string
-      matching_events?: Array<{
-        index?: number
-        tool?: string
-        targets?: string[]
-      }>
-      confirmed_materials?: Array<{
-        material_id: string
-        path?: string
-        kind?: string
-        tool?: string
-        event_index?: number
-        evidence_kind?: string
-        basis?: string
-      }>
-    }
-    raw_evidence?: string[]
-}
-
-interface TeamBuilderMaterialGapValidation {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'pass' | 'warning' | 'fail' | 'unavailable' | string
-  summary: string
-  counts: {
-    groups: number
-    targets: number
-    resolved_targets: number
-    relocated_targets?: number
-    material_id_hits: number
-    missing_targets: number
-  }
-  groups: Array<{
-    id: string
-    worker_id: string
-    title: string
-    status: string
-    summary: string
-    targets: Array<{
-      target: string
-      status: string
-      resolution_kind?: string
-      resolution_note?: string
-      resolved_paths: string[]
-      material_ids: string[]
-      decision: string
-      examples?: Array<{
-        path: string
-        kind?: string
-        line?: number
-        excerpt?: string
-        material_ids?: string[]
-      }>
-    }>
-  }>
-  source: {
-    material_report_endpoint?: string
-    material_gap_validation_material?: string
-  }
-}
-
-interface TeamBuilderClosureStatus {
-  available: boolean
-  run_id: string
-  team_name: string
-  verdict: 'pass' | 'warning' | 'fail' | string
-  summary: string
-  stages: MaterialAttributionQualityGate[]
-  missing: string[]
-  source: {
-    closure_status_material?: string
-  }
-}
-
-interface TeamBuilderHighStandardAudit {
-  available: boolean
-  run_id: string
-  team_name: string
-  verdict: 'complete' | 'in_progress' | string
-  completion_ready: boolean
-  summary: string
-  deliverables: Array<{
-    id: string
-    name: string
-    status: 'pass' | 'warning' | 'fail' | string
-    summary: string
-    evidence: string[]
-    endpoint: string
-    next_action?: string
-  }>
-  quality_gates: MaterialAttributionQualityGate[]
-  prompt_to_artifact_checklist?: {
-    objective: string
-    completion_rule: string
-    status: 'complete' | 'not_complete' | string
-    items: Array<{
-      id: string
-      requirement: string
-      artifact: string
-      status: 'pass' | 'warning' | 'fail' | string
-      evidence: string[]
-      covered_by_tests: string[]
-      conclusion: string
-      gap: string
-    }>
-    uncovered_or_incomplete: string[]
-  }
-  missing: string[]
-  boundary_notes?: string[]
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    high_standard_audit_material?: string
-  }
-}
-
-interface TeamBuilderProviderCoverageAudit {
-  available: boolean
-  run_id: string
-  verdict: 'comparison_ready' | 'needs_more_evidence' | string
-  comparison_ready: boolean
-  summary: string
-  counts: {
-    runs_scanned: number
-    same_input_trials_scanned?: number
-    tracked_external_providers: number
-    external_providers_with_real_runs: number
-    external_providers_with_evidence?: number
-    internal_model_records: number
-    team_types_seen: number
-    provider_team_type_counts?: Record<string, number>
-  }
-  providers: Array<{
-    provider: string
-    label: string
-    role: string
-    status: 'pass' | 'warning' | 'fail' | 'missing' | string
-    summary: string
-    runs: number
-    successful_workers: number
-    failed_workers: number
-    compile_failures: number
-    critical_reviews: number
-    same_input_trials?: number
-    trial_successful_workers?: number
-    trial_failed_workers?: number
-    trial_parse_failures?: number
-    passing_evidence?: number
-    latest_run_id: string
-    latest_trial_id?: string
-    team_type_count?: number
-    team_names?: string[]
-  }>
-  internal_models: Array<{
-    provider: string
-    label: string
-    role: string
-    status: 'pass' | 'warning' | 'fail' | 'missing' | string
-    summary: string
-    runs: number
-  }>
-  missing: string[]
-  boundary_notes?: string[]
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-  }>
-  source: {
-    provider_coverage_material?: string
-  }
-}
-
-interface TeamBuilderProviderSameInputTrialPlan {
-  available: boolean
-  run_id: string
-  title?: string
-  verdict: 'ready_for_explicit_trial' | 'blocked' | string
-  ready: boolean
-  baseline_run_id: string
-  team_name: string
-  baseline_provider: string
-  target_provider: string
-  permission: string
-  model_policy: string
-  timeout_s: number
-  summary: string
-  counts: {
-    workers: number
-    materials: number
-    baseline_external_runs: number
-    missing: number
-  }
-  workers: Array<{
-    worker_id: string
-    cn_name: string
-    impl_type: string
-    format_in: string | string[]
-    format_out: string
-    baseline_provider: string
-    baseline_status: string
-    baseline_prompt_chars: number
-    baseline_rel_path: string
-  }>
-  missing: string[]
-  safety_gates: Array<{
-    id: string
-    name?: string
-    status: 'pass' | 'warning' | 'fail' | string
-    summary: string
-    evidence?: string[]
-  }>
-  command: string
-  next_actions: Array<{
-    id: string
-    title: string
-    summary: string
-    endpoint: string
-    command?: string
-  }>
-  source: {
-    same_input_trial_plan_material?: string
-    baseline_summary?: string
-    trial_root?: string
-  }
-}
-
-interface TeamBuilderLlmReplayPlan {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'ready_for_controlled_replay' | 'blocked' | 'no_llm_call' | 'unavailable' | string
-  summary: string
-  counts: {
-    calls: number
-    ready: number
-    blocked: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  actions: Array<{
-    id: string
-    worker_id: string
-    call_index: number
-    model: string
-    max_tokens?: number
-    status: 'ready' | 'blocked' | string
-    missing_contract: string[]
-    expected_output_keys: string[]
-    stub_response_keys: string[]
-    system_chars: number
-    user_chars: number
-    system_preview: string
-    user_preview: string
-    human_summary: string
-    next_action: string
-  }>
-  execution_preflight?: {
-    status: string
-    enabled: boolean
-    can_execute: boolean
-    has_the_company_api_key: boolean
-    models: string[]
-    summary: string
-    next_action: string
-  }
-  source: {
-    llm_replay_plan_material?: string
-  }
-}
-
-interface TeamBuilderLlmReplayResult {
-  available: boolean
-  reason?: string
-  run_id: string
-  team_name: string
-  verdict: 'pass' | 'warning' | 'fail' | 'blocked_by_switch' | 'not_run' | 'unavailable' | string
-  summary: string
-  counts: {
-    planned_calls: number
-    executed_workers: number
-    executed_llm_workers: Array<{ worker_id: string; kind?: string }>
-    failed_workers: number
-    contract_failures: number
-  }
-  quality_gates: MaterialAttributionQualityGate[]
-  executed_workers?: Array<{
-    worker_id: string
-    kind: string
-    is_llm_worker?: boolean
-    diagnosis?: string
-    output_material?: string
-    output_summary?: Record<string, any>
-  }>
-  failed_workers?: Array<{
-    worker_id: string
-    kind: string
-    diagnosis?: string
-  }>
-  contract_failures?: string[]
-  source: {
-    llm_replay_result_material?: string
-  }
-}
-
-async function fetchDetail(id: string): Promise<CodeFileDetail> {
-  const r = await fetch(`/api/teams/${id}`)
-  if (!r.ok) throw new Error(`读取 team 详情失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchGraph(id: string, builder: string | null): Promise<TeamGraphData> {
-  const suffix = builder ? `?builder=${encodeURIComponent(builder)}` : ''
-  const r = await fetch(`/api/team-graph/${id}${suffix}`)
-  if (!r.ok) throw new Error(`读取 team 结构图失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchRuns(id: string, builder: string | null): Promise<TeamRunSummary[]> {
-  const params = new URLSearchParams({ limit: '12' })
-  if (builder) params.set('builder', builder)
-  const r = await fetch(`/api/team-runs/${id}?${params}`)
-  if (!r.ok) throw new Error(`读取 team 运行轨迹失败：${r.status}`)
-  const d = await r.json() as { items: TeamRunSummary[] }
-  return d.items
-}
-
-async function fetchRunDetail(id: string, traceId: string, builder: string | null): Promise<TeamRunDetail> {
-  const params = new URLSearchParams({ trace_id: traceId })
-  if (builder) params.set('builder', builder)
-  const r = await fetch(`/api/team-run-detail/${id}?${params}`)
-  if (!r.ok) throw new Error(`读取 team 单次运行详情失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchDoctorHealth(id: string, builder: string | null): Promise<TeamDoctorHealth> {
-  const params = new URLSearchParams()
-  if (builder) params.set('builder', builder)
-  const suffix = params.toString() ? `?${params}` : ''
-  const r = await fetch(`/api/team-doctor/${id}${suffix}`)
-  if (!r.ok) throw new Error(`读取 team 健康诊断失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchMaterializationLatest(): Promise<TeamBuilderMaterialization> {
-  const r = await fetch('/api/team-builder-materialization/latest')
-  if (!r.ok) throw new Error(`读取 material 化实战结果失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchMaterialAttributionReportLatest(): Promise<MaterialAttributionReport> {
-  const r = await fetch('/api/team-builder-materialization/report/latest')
-  if (!r.ok) throw new Error(`读取 material 归因报告失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderTestReportLatest(): Promise<TeamBuilderTestReport> {
-  const r = await fetch('/api/team-builder-materialization/test-report/latest')
-  if (!r.ok) throw new Error(`读取生成包测试报告失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairPlanLatest(): Promise<TeamBuilderRepairPlan> {
-  const r = await fetch('/api/team-builder-materialization/repair-plan/latest')
-  if (!r.ok) throw new Error(`读取修复准备计划失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairProbeLatest(): Promise<TeamBuilderRepairProbeReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-probe/latest')
-  if (!r.ok) throw new Error(`读取故障修复探针失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairDryRunLatest(): Promise<TeamBuilderRepairDryRunReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-dry-run/latest')
-  if (!r.ok) throw new Error(`读取修复干跑探针失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairPatchCandidatesLatest(): Promise<TeamBuilderRepairPatchCandidatesReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-patch-candidates/latest')
-  if (!r.ok) throw new Error(`读取候选补丁计划失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairApplyGateLatest(): Promise<TeamBuilderRepairApplyGateReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-apply-gate/latest')
-  if (!r.ok) throw new Error(`读取修复应用门失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairPatchDiffProposalLatest(): Promise<TeamBuilderRepairPatchDiffProposalReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-patch-diff-proposal/latest')
-  if (!r.ok) throw new Error(`读取补丁 diff proposal 失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairApprovalLatest(): Promise<TeamBuilderRepairApprovalReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-approval/latest')
-  if (!r.ok) throw new Error(`读取修复批准记录失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairExecutionReadinessLatest(): Promise<TeamBuilderRepairExecutionReadinessReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-execution-readiness/latest')
-  if (!r.ok) throw new Error(`读取修复执行就绪失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairApplyPreviewLatest(): Promise<TeamBuilderRepairApplyPreviewReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-apply-preview/latest')
-  if (!r.ok) throw new Error(`读取修复应用预览失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairApplyExecutionLatest(): Promise<TeamBuilderRepairApplyExecutionReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-apply-execution/latest')
-  if (!r.ok) throw new Error(`读取修复真实应用记录失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairPostApplyVerificationLatest(): Promise<TeamBuilderRepairPostApplyVerificationReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-post-apply-verification/latest')
-  if (!r.ok) throw new Error(`读取修复应用后验证失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairOutcomeReconciliationLatest(): Promise<TeamBuilderRepairOutcomeReconciliationReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-outcome-reconciliation/latest')
-  if (!r.ok) throw new Error(`读取修复前后对账失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRollbackReadinessLatest(): Promise<TeamBuilderRepairRollbackReadinessReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-rollback-readiness/latest')
-  if (!r.ok) throw new Error(`读取修复回滚就绪失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRollbackExecutionLatest(): Promise<TeamBuilderRepairRollbackExecutionReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-rollback-execution/latest')
-  if (!r.ok) throw new Error(`读取修复回滚执行记录失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRollbackPostVerificationLatest(): Promise<TeamBuilderRepairRollbackPostVerificationReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-rollback-post-verification/latest')
-  if (!r.ok) throw new Error(`读取修复回滚后验证失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairClosureRollupLatest(): Promise<TeamBuilderRepairClosureRollupReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-closure-rollup/latest')
-  if (!r.ok) throw new Error(`读取修复闭环总览失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairGeneralizationTrialLatest(): Promise<TeamBuilderRepairGeneralizationTrialReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-generalization-trial/latest')
-  if (!r.ok) throw new Error(`读取修复泛化试验失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealGeneratedFileSetTrialLatest(): Promise<TeamBuilderRepairRealGeneratedFileSetTrialReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-generated-file-set-trial/latest')
-  if (!r.ok) throw new Error(`读取真实 generated worker 文件集试验失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunCandidateScanLatest(): Promise<TeamBuilderRepairRealRunCandidateScanReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-candidate-scan/latest')
-  if (!r.ok) throw new Error(`读取真实 run 候选扫描失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunReplayPlanLatest(): Promise<TeamBuilderRepairRealRunReplayPlanReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-replay-plan/latest')
-  if (!r.ok) throw new Error(`读取真实 run 消解计划失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunDiffPreviewLatest(): Promise<TeamBuilderRepairRealRunDiffPreviewReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-diff-preview/latest')
-  if (!r.ok) throw new Error(`读取真实 run diff 预览失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunDiffReviewLatest(): Promise<TeamBuilderRepairRealRunDiffReviewReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-diff-review/latest')
-  if (!r.ok) throw new Error(`读取真实 run diff 审阅门失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunApplyGateLatest(): Promise<TeamBuilderRepairRealRunApplyGateReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-apply-gate/latest')
-  if (!r.ok) throw new Error(`读取真实 run 显式应用门失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunApplyPreviewLatest(): Promise<TeamBuilderRepairRealRunApplyPreviewReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-apply-preview/latest')
-  if (!r.ok) throw new Error(`读取真实 run 文件集应用预览失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunApplyExecutionLatest(): Promise<TeamBuilderRepairRealRunApplyExecutionReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-apply-execution/latest')
-  if (!r.ok) throw new Error(`读取真实 run 显式应用执行失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunPostApplyVerificationLatest(): Promise<TeamBuilderRepairRealRunPostApplyVerificationReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-post-apply-verification/latest')
-  if (!r.ok) throw new Error(`读取真实 run 应用后回放验证失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunOutcomeReconciliationLatest(): Promise<TeamBuilderRepairRealRunOutcomeReconciliationReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-outcome-reconciliation/latest')
-  if (!r.ok) throw new Error(`读取真实 run 修复结果对账失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunRollbackReadinessLatest(): Promise<TeamBuilderRepairRealRunRollbackReadinessReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-rollback-readiness/latest')
-  if (!r.ok) throw new Error(`读取真实 run 回滚就绪失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunRollbackExecutionLatest(): Promise<TeamBuilderRepairRealRunRollbackExecutionReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-rollback-execution/latest')
-  if (!r.ok) throw new Error(`读取真实 run 回滚执行失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunRollbackPostVerificationLatest(): Promise<TeamBuilderRepairRealRunRollbackPostVerificationReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-rollback-post-verification/latest')
-  if (!r.ok) throw new Error(`读取真实 run 回滚后验证失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairRealRunClosureRollupLatest(): Promise<TeamBuilderRepairRealRunClosureRollupReport> {
-  const r = await fetch('/api/team-builder-materialization/repair-real-run-closure-rollup/latest')
-  if (!r.ok) throw new Error(`读取真实 run 闭环总览失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderRepairSafetyPolicyLatest(): Promise<TeamBuilderRepairSafetyPolicy> {
-  const r = await fetch('/api/team-builder-materialization/repair-safety-policy/latest')
-  if (!r.ok) throw new Error(`读取修复安全策略失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderReadClueResolutionLatest(): Promise<TeamBuilderReadClueResolutionPlan> {
-  const r = await fetch('/api/team-builder-materialization/read-clue-resolution/latest')
-  if (!r.ok) throw new Error(`读取读取线索消解计划失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderMaterialGapValidationLatest(): Promise<TeamBuilderMaterialGapValidation> {
-  const r = await fetch('/api/team-builder-materialization/material-gap-validation/latest')
-  if (!r.ok) throw new Error(`读取 material 缺口验证失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderClosureStatusLatest(): Promise<TeamBuilderClosureStatus> {
-  const r = await fetch('/api/team-builder-materialization/closure/latest')
-  if (!r.ok) throw new Error(`读取闭环状态失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderHighStandardAuditLatest(): Promise<TeamBuilderHighStandardAudit> {
-  const r = await fetch('/api/team-builder-materialization/high-standard-audit/latest')
-  if (!r.ok) throw new Error(`读取高标准目标审计失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderProviderCoverageAuditLatest(): Promise<TeamBuilderProviderCoverageAudit> {
-  const r = await fetch('/api/team-builder-materialization/provider-coverage/latest')
-  if (!r.ok) throw new Error(`读取 provider 覆盖审计失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderProviderSameInputTrialPlanLatest(): Promise<TeamBuilderProviderSameInputTrialPlan> {
-  const r = await fetch('/api/team-builder-materialization/provider-same-input-trial/latest')
-  if (!r.ok) throw new Error(`读取 provider 同口径试验计划失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderLlmReplayPlanLatest(): Promise<TeamBuilderLlmReplayPlan> {
-  const r = await fetch('/api/team-builder-materialization/llm-replay-plan/latest')
-  if (!r.ok) throw new Error(`读取 LLM 回放计划失败：${r.status}`)
-  return r.json()
-}
-
-async function fetchTeamBuilderLlmReplayResultLatest(): Promise<TeamBuilderLlmReplayResult> {
-  const r = await fetch('/api/team-builder-materialization/llm-replay-result/latest')
-  if (!r.ok) throw new Error(`读取 LLM 回放结果失败：${r.status}`)
-  return r.json()
-}
+import { BlueprintSelect } from '../../components/BlueprintSelect'
+import type {
+  MaterialAttributionReport,
+  MaterialAttributionWorkerReport,
+  ResourceKind,
+  TeamBuilderClosureStatus,
+  TeamBuilderHighStandardAudit,
+  TeamBuilderLlmReplayPlan,
+  TeamBuilderLlmReplayResult,
+  TeamBuilderMaterialGapValidation,
+  TeamBuilderMaterialization,
+  TeamBuilderProviderCoverageAudit,
+  TeamBuilderProviderSameInputTrialPlan,
+  TeamBuilderReadClueResolutionPlan,
+  TeamBuilderRepairApplyExecutionReport,
+  TeamBuilderRepairApplyGateReport,
+  TeamBuilderRepairApplyPreviewReport,
+  TeamBuilderRepairApprovalReport,
+  TeamBuilderRepairClosureRollupReport,
+  TeamBuilderRepairDryRunReport,
+  TeamBuilderRepairExecutionReadinessReport,
+  TeamBuilderRepairFileRecord,
+  TeamBuilderRepairGeneralizationTrialReport,
+  TeamBuilderRepairOutcomeReconciliationReport,
+  TeamBuilderRepairPatchCandidatesReport,
+  TeamBuilderRepairPatchDiffProposalReport,
+  TeamBuilderRepairPlan,
+  TeamBuilderRepairPostApplyVerificationReport,
+  TeamBuilderRepairProbeReport,
+  TeamBuilderRepairRealGeneratedFileSetTrialReport,
+  TeamBuilderRepairRealRunApplyExecutionReport,
+  TeamBuilderRepairRealRunApplyGateReport,
+  TeamBuilderRepairRealRunApplyPreviewReport,
+  TeamBuilderRepairRealRunCandidateScanReport,
+  TeamBuilderRepairRealRunClosureRollupReport,
+  TeamBuilderRepairRealRunDiffPreviewReport,
+  TeamBuilderRepairRealRunDiffReviewReport,
+  TeamBuilderRepairRealRunOutcomeReconciliationReport,
+  TeamBuilderRepairRealRunPostApplyVerificationReport,
+  TeamBuilderRepairRealRunReplayPlanReport,
+  TeamBuilderRepairRealRunRollbackExecutionReport,
+  TeamBuilderRepairRealRunRollbackPostVerificationReport,
+  TeamBuilderRepairRealRunRollbackReadinessReport,
+  TeamBuilderRepairRollbackExecutionReport,
+  TeamBuilderRepairRollbackPostVerificationReport,
+  TeamBuilderRepairRollbackReadinessReport,
+  TeamBuilderRepairSafetyPolicy,
+  TeamBuilderTestReport,
+  TeamDefinitionRef,
+  TeamDoctorFinding,
+  TeamDoctorHealth,
+  TeamEntity,
+  TeamGraphData,
+  TeamGraphMaterial,
+  TeamGraphNode,
+  TeamMaterializationLink,
+  TeamMaterializationLinkGroup,
+  TeamMaterializationReviewIssue,
+  TeamMaterializationWorkerRun,
+  TeamResourceHint,
+  TeamRunDetail,
+  TeamRunNodeStatus,
+  TeamRunSummary,
+} from './teamTypes'
+import {
+  fetchDetail,
+  fetchDoctorHealth,
+  fetchGraph,
+  fetchMaterialAttributionReportLatest,
+  fetchMaterializationLatest,
+  fetchRunDetail,
+  fetchRuns,
+  fetchTeamBuilderClosureStatusLatest,
+  fetchTeamBuilderHighStandardAuditLatest,
+  fetchTeamBuilderLlmReplayPlanLatest,
+  fetchTeamBuilderLlmReplayResultLatest,
+  fetchTeamBuilderMaterialGapValidationLatest,
+  fetchTeamBuilderProviderCoverageAuditLatest,
+  fetchTeamBuilderProviderSameInputTrialPlanLatest,
+  fetchTeamBuilderReadClueResolutionLatest,
+  fetchTeamBuilderRepairApplyExecutionLatest,
+  fetchTeamBuilderRepairApplyGateLatest,
+  fetchTeamBuilderRepairApplyPreviewLatest,
+  fetchTeamBuilderRepairApprovalLatest,
+  fetchTeamBuilderRepairClosureRollupLatest,
+  fetchTeamBuilderRepairDryRunLatest,
+  fetchTeamBuilderRepairExecutionReadinessLatest,
+  fetchTeamBuilderRepairGeneralizationTrialLatest,
+  fetchTeamBuilderRepairOutcomeReconciliationLatest,
+  fetchTeamBuilderRepairPatchCandidatesLatest,
+  fetchTeamBuilderRepairPatchDiffProposalLatest,
+  fetchTeamBuilderRepairPlanLatest,
+  fetchTeamBuilderRepairPostApplyVerificationLatest,
+  fetchTeamBuilderRepairProbeLatest,
+  fetchTeamBuilderRepairRealGeneratedFileSetTrialLatest,
+  fetchTeamBuilderRepairRealRunApplyExecutionLatest,
+  fetchTeamBuilderRepairRealRunApplyGateLatest,
+  fetchTeamBuilderRepairRealRunApplyPreviewLatest,
+  fetchTeamBuilderRepairRealRunCandidateScanLatest,
+  fetchTeamBuilderRepairRealRunClosureRollupLatest,
+  fetchTeamBuilderRepairRealRunDiffPreviewLatest,
+  fetchTeamBuilderRepairRealRunDiffReviewLatest,
+  fetchTeamBuilderRepairRealRunOutcomeReconciliationLatest,
+  fetchTeamBuilderRepairRealRunPostApplyVerificationLatest,
+  fetchTeamBuilderRepairRealRunReplayPlanLatest,
+  fetchTeamBuilderRepairRealRunRollbackExecutionLatest,
+  fetchTeamBuilderRepairRealRunRollbackPostVerificationLatest,
+  fetchTeamBuilderRepairRealRunRollbackReadinessLatest,
+  fetchTeamBuilderRepairRollbackExecutionLatest,
+  fetchTeamBuilderRepairRollbackPostVerificationLatest,
+  fetchTeamBuilderRepairRollbackReadinessLatest,
+  fetchTeamBuilderRepairSafetyPolicyLatest,
+  fetchTeamBuilderTestReportLatest,
+} from './teamApi'
 
 // ── frostpane 呈现层 (重建, 2026-06-29) ───────────────────────────────────
 // 准则: 外壳(顶栏/右侧栏/卡片/浮层)= 磨砂玻璃; 大滚动区(图布局画布/源码摘录)= 安静近实色 var(--fp-solid),
@@ -2995,18 +154,19 @@ const S = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 16,
-    padding: '8px 16px',
+    padding: '10px 16px',
     borderBottom: `1px solid ${colors.border}`,
-    background: 'transparent', // G.7:私有格纸清除,透出 #bp-grid 统一连续网格
-    backgroundAttachment: 'local',
+    background: GLASS_BG,
+    backdropFilter: GLASS_BLUR,
+    WebkitBackdropFilter: GLASS_BLUR,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
     flexShrink: 0,
   },
   // 标题 = 最醒目层: 16px / 650, 主文本色
   title: {
-    fontSize: 14,
-    fontWeight: 650,
+    fontSize: 13,
+    fontWeight: 500,
     letterSpacing: '-0.01em',
-    fontFamily: 'var(--fp-bp-font-display)',
     color: colors.text,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -3035,7 +195,7 @@ const S = {
     height: 28,
     minWidth: 70,
     padding: '0 12px',
-    borderRadius: 7,
+    borderRadius: 2,
     cursor: 'pointer',
     fontFamily: fonts.ui,
     fontSize: 13,
@@ -3053,8 +213,7 @@ const S = {
     minWidth: 0,
     minHeight: 0,
     position: 'relative' as const,
-    background: 'transparent', // G.7:私有格纸清除,透出 #bp-grid 统一连续网格
-    backgroundAttachment: 'local',
+    background: 'var(--fp-bg)',
   },
   // 右侧栏 = 玻璃外壳: 磨砂 + 左缘描边 + 内高光; 放宽内边距呼吸
   side: {
@@ -3062,8 +221,11 @@ const S = {
     minWidth: 360,
     maxWidth: '42%',
     overflow: 'auto',
-    borderLeft: '2px solid var(--fp-border)',
-    background: 'var(--fp-surface)',
+    borderLeft: `1px solid ${colors.border}`,
+    background: GLASS_BG,
+    backdropFilter: GLASS_BLUR,
+    WebkitBackdropFilter: GLASS_BLUR,
+    boxShadow: 'inset 1px 0 0 rgba(255,255,255,.06)',
     padding: 16,
   },
   sideTopBar: {
@@ -3080,12 +242,12 @@ const S = {
     right: 12,
     zIndex: 20,
     height: 30,
-    border: '1px dashed var(--fp-border-strong)',
-    borderRadius: 3,
-    background: 'var(--fp-bp-tracing)',
-    backdropFilter: 'var(--fp-bp-tracing-blur)',
-    WebkitBackdropFilter: 'var(--fp-bp-tracing-blur)',
-    boxShadow: 'var(--fp-bp-shadow-sm)',
+    border: `1px solid ${colors.border}`,
+    borderRadius: 2,
+    background: GLASS_BG,
+    backdropFilter: GLASS_BLUR,
+    WebkitBackdropFilter: GLASS_BLUR,
+    boxShadow: GLASS_SHADOW,
     color: colors.textSecondary,
     cursor: 'pointer',
     display: 'inline-flex',
@@ -3108,7 +270,7 @@ const S = {
     textTransform: 'uppercase' as const,
     letterSpacing: '.05em',
     marginBottom: 10,
-    fontWeight: 600,
+    fontWeight: 500,
   },
   metricRow: {
     display: 'grid',
@@ -3118,7 +280,7 @@ const S = {
   // 度量卡 = 安静近实色小卡, 圆角 7
   metric: {
     border: `1px solid ${colors.border}`,
-    borderRadius: 7,
+    borderRadius: 2,
     padding: '10px 12px',
     background: QUIET_SURFACE,
     minWidth: 0,
@@ -3126,7 +288,7 @@ const S = {
   // 度量值 = 该卡最重信息: 18 / 650 醒目
   metricValue: {
     fontSize: 18,
-    fontWeight: 650,
+    fontWeight: 500,
     letterSpacing: '-0.01em',
     color: colors.text,
   },
@@ -3142,7 +304,7 @@ const S = {
     background: colors.bgCard,
     color: colors.text,
     border: `1px solid ${colors.border}`,
-    borderRadius: 7,
+    borderRadius: 2,
     padding: '0 10px',
     fontFamily: fonts.mono,
     fontSize: 13,
@@ -3168,10 +330,10 @@ const S = {
   runButton: (active: boolean): React.CSSProperties => ({
     width: '100%',
     textAlign: 'left' as const,
-    border: `1px solid ${active ? '#36c275' : colors.border}`,
-    borderRadius: 7,
+    border: `1px solid ${active ? 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' : colors.border}`,
+    borderRadius: 2,
     padding: 12,
-    background: active ? '#0f2a1a' : QUIET_SURFACE,
+    background: active ? 'color-mix(in srgb, var(--fp-ok) 14%, transparent)' : QUIET_SURFACE,
     color: colors.textSecondary,
     cursor: 'pointer',
     fontFamily: fonts.ui,
@@ -3183,8 +345,10 @@ const S = {
     border: `1px solid ${colors.border}`,
     borderRadius: 3,
     padding: 12,
-    background: 'var(--fp-bp-paper-2)',
-    boxShadow: 'var(--fp-bp-shadow-sm)',
+    background: GLASS_BG,
+    backdropFilter: GLASS_BLUR,
+    WebkitBackdropFilter: GLASS_BLUR,
+    boxShadow: GLASS_SHADOW,
     display: 'grid',
     gap: 8,
   },
@@ -3199,7 +363,7 @@ const S = {
   // 资源卡 = 暖色虚线标注 (区别于材料), 玻璃外壳
   resourceCard: {
     border: `1px dashed #b98b42`,
-    borderRadius: 11,
+    borderRadius: 3,
     padding: 12,
     background: 'rgba(36,28,12,0.5)',
     backdropFilter: GLASS_BLUR,
@@ -3213,8 +377,10 @@ const S = {
     border: `1px solid ${colors.border}`,
     borderRadius: 3,
     padding: 12,
-    background: 'var(--fp-bp-paper-2)',
-    boxShadow: 'var(--fp-bp-shadow-sm)',
+    background: GLASS_BG,
+    backdropFilter: GLASS_BLUR,
+    WebkitBackdropFilter: GLASS_BLUR,
+    boxShadow: GLASS_SHADOW,
     display: 'grid',
     gap: 8,
   },
@@ -3225,7 +391,7 @@ const S = {
     margin: 0,
     padding: 10,
     border: `1px solid ${colors.border}`,
-    borderRadius: 7,
+    borderRadius: 2,
     background: colors.bg,
     color: colors.textSecondary,
     fontFamily: fonts.mono,
@@ -3242,7 +408,7 @@ const S = {
     overflow: 'auto',
     padding: 16,
     border: `1px solid ${colors.border}`,
-    borderRadius: 11,
+    borderRadius: 3,
     background: 'var(--fp-glass)',
     backdropFilter: GLASS_BLUR,
     WebkitBackdropFilter: GLASS_BLUR,
@@ -3256,7 +422,7 @@ const S = {
     minWidth: 0,
     color: colors.text,
     fontSize: 15,
-    fontWeight: 650,
+    fontWeight: 500,
     letterSpacing: '-0.01em',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -3266,7 +432,7 @@ const S = {
     width: 26,
     height: 26,
     border: `1px solid ${colors.border}`,
-    borderRadius: 7,
+    borderRadius: 2,
     background: 'rgba(255,255,255,.04)',
     color: colors.textMuted,
     cursor: 'pointer',
@@ -3533,19 +699,19 @@ const RESOURCE_META: Record<ResourceKind, { label: string; description: string; 
     label: '工作区文件',
     description: '聚合展示 worker 在实战或静态线索中接触过的工作区文件、目录或命令；这只是线索，不等于已确认 material。',
     tone: '#d09a45',
-    background: '#171208',
+    background: 'color-mix(in srgb, var(--fp-err) 14%, transparent)',
   },
   database: {
     label: '数据库/事件库',
     description: '聚合展示 worker 可能通过 SQL、SQLite、事件库或查询接口读取到的数据资料。',
     tone: '#55b8d8',
-    background: '#08141a',
+    background: 'var(--fp-bp-paper-2)',
   },
   external: {
     label: '外部代理/接口',
     description: '表示 worker 可能调用 Claude Code、Codex、HTTP API 或其他外部资源。',
     tone: '#b2a7ff',
-    background: '#111025',
+    background: 'var(--fp-bp-paper-2)',
   },
 }
 
@@ -3654,9 +820,9 @@ function hasFailedVerdict(status: TeamRunNodeStatus | undefined): boolean {
 }
 
 function doctorTone(level: string | undefined): { border: string; background: string; label: string } | null {
-  if (level === 'blocking') return { border: '#e05252', background: '#2a1111', label: '阻断' }
-  if (level === 'degrading') return { border: '#ff9f43', background: '#2a1d0d', label: '降级' }
-  if (level === 'advisory') return { border: 'var(--fp-accent)', background: '#242610', label: '建议' }
+  if (level === 'blocking') return { border: 'color-mix(in srgb, var(--fp-err) 45%, transparent)', background: 'color-mix(in srgb, var(--fp-err) 14%, transparent)', label: '阻断' }
+  if (level === 'degrading') return { border: 'color-mix(in srgb, var(--fp-warn) 45%, transparent)', background: 'color-mix(in srgb, var(--fp-warn) 14%, transparent)', label: '降级' }
+  if (level === 'advisory') return { border: 'var(--fp-accent)', background: 'color-mix(in srgb, var(--fp-ok) 14%, transparent)', label: '建议' }
   return null
 }
 
@@ -3750,8 +916,8 @@ function SourceDataLink({ href, label = '原始记录' }: { href: string; label?
         minHeight: 22,
         padding: '2px 6px',
         border: `1px solid ${colors.border}`,
-        borderRadius: 4,
-        background: '#10151b',
+        borderRadius: 3,
+        background: 'var(--fp-bp-solid)',
         color: colors.textSecondary,
         fontSize: 13,
         textDecoration: 'none',
@@ -3796,9 +962,9 @@ function MaterializationLinks({ title, links, emptyText, limit = 6, workerId }: 
             const title = materializationHumanTitle(link)
             const summary = materializationHumanSummary(link)
             return (
-              <div key={`${name}-${index}`} style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 8, background: colors.bg }}>
+              <div key={`${name}-${index}`} style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 8, background: colors.bg }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
-                  <span style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>{title}</span>
+                  <span style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>{title}</span>
                   <span style={{ color: tone, fontSize: 13, whiteSpace: 'nowrap' }}>{linkKindLabel(link)}</span>
                 </div>
                 <div style={{ marginTop: 5, color: colors.textSecondary, fontSize: 13, lineHeight: 1.45, overflowWrap: 'anywhere' }}>{summary}</div>
@@ -3822,7 +988,7 @@ function MaterializationLinks({ title, links, emptyText, limit = 6, workerId }: 
                   </div>
                 )}
                 {(link.matched_material_ids || []).length > 0 && (
-                  <div style={{ marginTop: 6, color: '#78d98b', fontSize: 13, overflowWrap: 'anywhere' }}>
+                  <div style={{ marginTop: 6, color: 'var(--fp-ok)', fontSize: 13, overflowWrap: 'anywhere' }}>
                     命中 material：{(link.matched_material_ids || []).join('、')}
                   </div>
                 )}
@@ -3862,7 +1028,7 @@ function FieldAccessBlock({ run }: { run: TeamMaterializationWorkerRun }) {
           : '没有静态写入'}
       />
       {(missingInput.length > 0 || missingOutput.length > 0) ? (
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.5, overflowWrap: 'anywhere' }}>
           {missingInput.map(([materialId, fields]) => (
             <div key={materialId}>{zhMaterialName(materialId)} 缺少读取字段：{fields.join('、')}</div>
           ))}
@@ -3884,7 +1050,7 @@ function MaterialLinkChips({ label, description, links, limit = 3, workerId }: {
 }) {
   return (
     <div style={{ display: 'grid', gap: 4 }}>
-      <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{label}</div>
+      <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{label}</div>
       <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.4 }}>{description}</div>
       {links.length === 0 ? (
         <div style={{ color: colors.textFaint, fontSize: 13 }}>无</div>
@@ -3908,7 +1074,7 @@ function MaterialLinkChips({ label, description, links, limit = 3, workerId }: {
                   maxWidth: '100%',
                   padding: '2px 7px',
                   border: `1px solid ${tone}`,
-                  borderRadius: 4,
+                  borderRadius: 3,
                   background: colors.bg,
                   color: colors.textSecondary,
                   fontFamily: fonts.mono,
@@ -3918,7 +1084,7 @@ function MaterialLinkChips({ label, description, links, limit = 3, workerId }: {
                   textDecoration: 'none',
                 }}
               >
-                <span style={{ color: tone, fontFamily: fonts.ui, fontWeight: 700 }}>{linkKindLabel(link)}</span>
+                <span style={{ color: tone, fontFamily: fonts.ui, fontWeight: 500 }}>{linkKindLabel(link)}</span>
                 <span>{linkDisplayName(link).replace(`${zhDirection(link.direction)} `, '')}</span>
                 <ExternalLink size={11} strokeWidth={1.8} />
               </a>
@@ -3938,13 +1104,13 @@ function MaterializationExplanation() {
     ['实战读取线索', '运行中接触过的文件、目录、命令或查询。它回答“为什么怀疑读过资料”, 但不等于已经确认 material。'],
   ]
   return (
-    <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', display: 'grid', gap: 7, marginTop: 8 }}>
+    <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', display: 'grid', gap: 7, marginTop: 8 }}>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.45 }}>
         这是 TeamBuilder 的审阅视图: 用最近一次生成审查回答「worker 声明要读写什么、实际产出了什么、运行时接触过哪些资料线索、为什么这么判断」。
       </div>
       {items.map(([name, desc]) => (
         <div key={name} style={{ display: 'grid', gridTemplateColumns: '92px minmax(0, 1fr)', gap: 8, alignItems: 'start' }}>
-          <span style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>{name}</span>
+          <span style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>{name}</span>
           <span style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{desc}</span>
         </div>
       ))}
@@ -4396,30 +1562,30 @@ function MaterialAttributionReportPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>material 归因报告读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>material 归因报告读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在整理 material 归因报告...</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无 material 归因报告。'}</div>
       </div>
     )
   }
   const tone = attributionStatusTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-material-attribution-report>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-material-attribution-report>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>material 归因报告</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>material 归因报告</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhAttributionStatus(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -4433,9 +1599,9 @@ function MaterialAttributionReportPanel({ report, error, loading }: {
       </div>
       <div style={{ display: 'grid', gap: 6 }}>
         {report.quality_gates.slice(0, 6).map((gate) => (
-          <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
               <span style={{ color: attributionStatusTone(gate.status), fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{gate.summary}</div>
@@ -4444,13 +1610,13 @@ function MaterialAttributionReportPanel({ report, error, loading }: {
       </div>
       {(report.read_groups || []).length > 0 && (
         <div style={{ display: 'grid', gap: 7 }} data-material-attribution-read-groups>
-          <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>读取归因分组</div>
+          <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>读取归因分组</div>
           {(report.read_groups || []).slice(0, 8).map((group) => {
             const groupTone = readGroupTone(group.status)
             return (
-              <div key={group.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px solid ${groupTone}`, borderRadius: 5, background: colors.bg }}>
+              <div key={group.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px solid ${groupTone}`, borderRadius: 2, background: colors.bg }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
-                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650, overflowWrap: 'anywhere' }}>{group.title}</span>
+                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500, overflowWrap: 'anywhere' }}>{group.title}</span>
                   <span style={{ color: groupTone, fontSize: 13, whiteSpace: 'nowrap' }}>{zhReadGroupStatus(group.status)}</span>
                 </div>
                 <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.45 }}>{group.summary}</div>
@@ -4483,7 +1649,7 @@ function MaterialAttributionReportPanel({ report, error, loading }: {
         </div>
       )}
       {report.open_questions.length > 0 && (
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>
           仍需确认：{report.open_questions[0].summary}
         </div>
       )}
@@ -4498,30 +1664,30 @@ function TeamBuilderReadClueResolutionPanel({ plan, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>读取线索消解计划读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>读取线索消解计划读取失败：{error}</div>
       </div>
     )
   }
   if (!plan) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在整理读取线索消解计划...</div>
       </div>
     )
   }
   if (!plan.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{plan.reason || '暂无读取线索消解计划。'}</div>
       </div>
     )
   }
   const tone = attributionStatusTone(plan.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-read-clue-resolution>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-read-clue-resolution>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>读取线索消解</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>读取线索消解</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhAttributionStatus(plan.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{plan.summary}</div>
@@ -4542,12 +1708,12 @@ function TeamBuilderReadClueResolutionPanel({ plan, error, loading }: {
       </div>
       {(plan.content_mention_actions || []).length > 0 && (
         <div style={{ display: 'grid', gap: 6 }}>
-          <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>内容提及解释层</div>
+          <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>内容提及解释层</div>
           {(plan.content_mention_actions || []).slice(0, 4).map((action) => (
-            <div key={action.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid #8cc7c1`, borderRadius: 5, background: colors.bg }}>
+            <div key={action.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid #8cc7c1`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650, overflowWrap: 'anywhere' }}>{action.worker_id} / {action.title || action.target}</span>
-                <span style={{ color: '#8cc7c1', fontSize: 13, whiteSpace: 'nowrap' }}>不作为缺口</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500, overflowWrap: 'anywhere' }}>{action.worker_id} / {action.title || action.target}</span>
+                <span style={{ color: 'var(--fp-ok)', fontSize: 13, whiteSpace: 'nowrap' }}>不作为缺口</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{action.reason}</div>
               {action.review_target && (
@@ -4556,7 +1722,7 @@ function TeamBuilderReadClueResolutionPanel({ plan, error, loading }: {
                 </div>
               )}
               {(action.tool_confirmation?.confirmed_materials || []).length > 0 && (
-                <div style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+                <div style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
                   {(action.tool_confirmation?.confirmed_materials || []).slice(0, 3).map((candidate) => (
                     <div key={`${action.id}-${candidate.material_id}`} style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
                       内容提及：{zhMaterialName(candidate.material_id)} / {candidate.material_id}
@@ -4572,10 +1738,10 @@ function TeamBuilderReadClueResolutionPanel({ plan, error, loading }: {
       {plan.actions.length > 0 ? (
         <div style={{ display: 'grid', gap: 6 }}>
           {plan.actions.slice(0, 4).map((action) => (
-            <div key={action.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={action.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650, overflowWrap: 'anywhere' }}>{action.worker_id} / {action.title || action.target}</span>
-                <span style={{ color: '#ffb74d', fontSize: 13, whiteSpace: 'nowrap' }}>{zhReadClueCategory(action.category)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500, overflowWrap: 'anywhere' }}>{action.worker_id} / {action.title || action.target}</span>
+                <span style={{ color: 'var(--fp-warn)', fontSize: 13, whiteSpace: 'nowrap' }}>{zhReadClueCategory(action.category)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{action.reason}</div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{action.next_action}</div>
@@ -4595,8 +1761,8 @@ function TeamBuilderReadClueResolutionPanel({ plan, error, loading }: {
                 </div>
               )}
               {(action.candidate_materials || []).length > 0 && (
-                <div style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
-                  <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>候选 material（等待真实工具事件确认）</div>
+                <div style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
+                  <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>候选 material（等待真实工具事件确认）</div>
                   {(action.candidate_materials || []).slice(0, 4).map((candidate) => (
                     <div key={candidate.id || `${action.id}-${candidate.material_id}-${candidate.path || ''}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
                       {zhMaterialName(candidate.material_id)} / {candidate.material_id}
@@ -4607,10 +1773,10 @@ function TeamBuilderReadClueResolutionPanel({ plan, error, loading }: {
                 </div>
               )}
               {action.tool_confirmation && (
-                <div style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: 'var(--fp-solid)' }}>
+                <div style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: 'var(--fp-solid)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>工具事件确认</span>
-                    <span style={{ color: action.tool_confirmation.status === 'scope_and_read_confirmed' ? '#78d98b' : '#ffb74d', fontSize: 13 }}>
+                    <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>工具事件确认</span>
+                    <span style={{ color: action.tool_confirmation.status === 'scope_and_read_confirmed' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>
                       {action.tool_confirmation.status || '未知'}
                     </span>
                   </div>
@@ -4667,30 +1833,30 @@ function TeamBuilderMaterialGapValidationPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>material 缺口验证读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>material 缺口验证读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在验证待确认 material 线索...' : '暂无 material 缺口验证报告。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无 material 缺口验证报告。'}</div>
       </div>
     )
   }
   const tone = attributionStatusTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-material-gap-validation>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-material-gap-validation>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>material 缺口验证</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>material 缺口验证</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhAttributionStatus(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -4702,14 +1868,14 @@ function TeamBuilderMaterialGapValidationPanel({ report, error, loading }: {
         <span style={S.pill}>缺失 {report.counts.missing_targets}</span>
       </div>
       {report.groups.slice(0, 3).map((group) => (
-        <div key={group.id} style={{ display: 'grid', gap: 6, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={group.id} style={{ display: 'grid', gap: 6, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650, overflowWrap: 'anywhere' }}>{zhWorkerName(group.worker_id)} / {group.title}</span>
-            <span style={{ color: group.status === 'partial' ? '#ffb74d' : colors.textMuted, fontSize: 13 }}>{group.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500, overflowWrap: 'anywhere' }}>{zhWorkerName(group.worker_id)} / {group.title}</span>
+            <span style={{ color: group.status === 'partial' ? 'var(--fp-warn)' : colors.textMuted, fontSize: 13 }}>{group.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{group.summary}</div>
           {group.targets.slice(0, 4).map((target) => (
-            <div key={`${group.id}-${target.target}`} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={`${group.id}-${target.target}`} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
                 {target.target}
               </div>
@@ -4753,21 +1919,21 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>生成包测试报告读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>生成包测试报告读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在整理生成包测试报告...</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无生成包测试报告。'}</div>
       </div>
     )
@@ -4779,9 +1945,9 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
   const contractCoverage = report.contract_coverage
   const contractTone = attributionStatusTone(contractCoverage?.verdict || 'warning')
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-test-report>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-test-report>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>生成包测试报告</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>生成包测试报告</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhAttributionStatus(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -4797,9 +1963,9 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
         <span style={S.pill}>doctor finding {report.counts.doctor_findings ?? 0}</span>
       </div>
       {runSmoke && (
-        <div style={{ border: `1px solid ${runTone}`, borderRadius: 5, padding: 8, display: 'grid', gap: 7, background: colors.bg }} data-worker-run-smoke>
+        <div style={{ border: `1px solid ${runTone}`, borderRadius: 2, padding: 8, display: 'grid', gap: 7, background: colors.bg }} data-worker-run-smoke>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>worker 业务运行</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>worker 业务运行</span>
             <span style={{ color: runTone, fontSize: 13 }}>{zhAttributionStatus(runSmoke.status)}</span>
           </div>
           {runSmoke.executed_workers.length > 0 && (
@@ -4843,7 +2009,7 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
           {runSmoke.failed_workers.length > 0 && (
             <div style={{ display: 'grid', gap: 4 }}>
               {runSmoke.failed_workers.slice(0, 3).map((worker) => (
-                <div key={`failed-${worker.worker_id}`} style={{ color: '#ff8a80', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
+                <div key={`failed-${worker.worker_id}`} style={{ color: 'var(--fp-err)', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
                   失败：<span>{worker.worker_id}</span> / {worker.diagnosis || worker.kind || '未知错误'}
                 </div>
               ))}
@@ -4857,9 +2023,9 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
         </div>
       )}
       {contractCoverage?.available && (
-        <div style={{ border: `1px solid ${contractTone}`, borderRadius: 5, padding: 8, display: 'grid', gap: 7, background: colors.bg }} data-team-builder-contract-coverage>
+        <div style={{ border: `1px solid ${contractTone}`, borderRadius: 2, padding: 8, display: 'grid', gap: 7, background: colors.bg }} data-team-builder-contract-coverage>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>contract 覆盖</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>contract 覆盖</span>
             <span style={{ color: contractTone, fontSize: 13 }}>{zhAttributionStatus(contractCoverage.verdict)}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.45 }}>{contractCoverage.summary}</div>
@@ -4895,9 +2061,9 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
             下一步：{contractCoverage.next_action}
           </div>
           {contractCoverage.latest_execution?.available && (
-            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 5, padding: 7, display: 'grid', gap: 5, background: '#05070a' }} data-team-builder-contract-execution>
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 7, display: 'grid', gap: 5, background: 'var(--fp-bp-solid)' }} data-team-builder-contract-execution>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>contract 执行结果</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>contract 执行结果</span>
                 <span style={{ color: attributionStatusTone(contractCoverage.latest_execution.verdict || 'warning'), fontSize: 13 }}>
                   {zhAttributionStatus(contractCoverage.latest_execution.verdict || 'warning')}
                 </span>
@@ -4927,9 +2093,9 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
         </div>
       )}
       {doctorFindings.length > 0 && (
-        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 5, padding: 8, display: 'grid', gap: 6, background: colors.bg }} data-team-builder-test-findings>
+        <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 8, display: 'grid', gap: 6, background: colors.bg }} data-team-builder-test-findings>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>doctor 发现</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>doctor 发现</span>
             <span style={{ color: colors.textMuted, fontSize: 13 }}>{doctorFindings.length} 条</span>
           </div>
           {doctorFindings.slice(0, 3).map((finding) => (
@@ -4946,9 +2112,9 @@ function TeamBuilderTestReportPanel({ report, error, loading }: {
       )}
       <div style={{ display: 'grid', gap: 6 }}>
         {report.quality_gates.map((gate) => (
-          <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
               <span style={{ color: attributionStatusTone(gate.status), fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{gate.summary}</div>
@@ -4972,30 +2138,30 @@ function TeamBuilderRepairPlanPanel({ plan, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复准备计划读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复准备计划读取失败：{error}</div>
       </div>
     )
   }
   if (!plan) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在整理修复准备计划...</div>
       </div>
     )
   }
   if (!plan.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{plan.reason || '暂无修复准备计划。'}</div>
       </div>
     )
   }
   const tone = repairPlanTone(plan.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-plan>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-plan>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复准备计划</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复准备计划</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairPlanVerdict(plan.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{plan.summary}</div>
@@ -5006,19 +2172,19 @@ function TeamBuilderRepairPlanPanel({ plan, error, loading }: {
         <span style={S.pill}>自动安全 {plan.counts.auto_safe}</span>
       </div>
       {plan.actions.slice(0, 3).map((action) => (
-        <div key={action.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={action.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{zhRepairActionCategory(action.category)} / {action.location}</span>
-            <span style={{ color: action.auto_safe ? '#78d98b' : colors.textMuted, fontSize: 13 }}>{action.auto_safe ? '可自动' : '不自动'}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{zhRepairActionCategory(action.category)} / {action.location}</span>
+            <span style={{ color: action.auto_safe ? 'var(--fp-ok)' : colors.textMuted, fontSize: 13 }}>{action.auto_safe ? '可自动' : '不自动'}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{action.next_action}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.4 }}>{action.rationale}</div>
           {(action.validation_actions || []).length > 0 && (
             <div style={{ display: 'grid', gap: 4, marginTop: 3 }} data-team-builder-validation-actions>
               {(action.validation_actions || []).slice(0, 3).map((validation) => (
-                <div key={validation.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+                <div key={validation.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{validation.title}</span>
+                    <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{validation.title}</span>
                     <span style={{ color: colors.textFaint, fontSize: 13, whiteSpace: 'nowrap' }}>{validation.action_kind}</span>
                   </div>
                   <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{validation.summary}</div>
@@ -5046,21 +2212,21 @@ function TeamBuilderRepairProbePanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>故障修复探针读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>故障修复探针读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在执行故障修复探针...' : '暂无故障修复探针结果。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无故障修复探针结果。'}</div>
       </div>
     )
@@ -5068,9 +2234,9 @@ function TeamBuilderRepairProbePanel({ report, error, loading }: {
   const tone = attributionStatusTone(report.verdict)
   const failedWorkers = report.worker_run_smoke?.failed_workers || []
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-probe>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-probe>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>故障修复探针</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>故障修复探针</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhAttributionStatus(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5084,9 +2250,9 @@ function TeamBuilderRepairProbePanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 3).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5095,8 +2261,8 @@ function TeamBuilderRepairProbePanel({ report, error, loading }: {
         })}
       </div>
       {failedWorkers.slice(0, 2).map((worker) => (
-        <div key={worker.worker_id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{zhWorkerName(worker.worker_id)} / {worker.worker_id}</div>
+        <div key={worker.worker_id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{zhWorkerName(worker.worker_id)} / {worker.worker_id}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{worker.diagnosis}</div>
           {worker.output_material && <div style={{ color: colors.textFaint, fontSize: 13, overflowWrap: 'anywhere' }}>输出 material：{worker.output_material}</div>}
         </div>
@@ -5120,21 +2286,21 @@ function TeamBuilderRepairDryRunPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复干跑探针读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复干跑探针读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在执行修复干跑探针...' : '暂无修复干跑探针结果。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复干跑探针结果。'}</div>
       </div>
     )
@@ -5142,9 +2308,9 @@ function TeamBuilderRepairDryRunPanel({ report, error, loading }: {
   const tone = attributionStatusTone(report.verdict)
   const diffText = report.patch_plan.diff || ''
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-dry-run>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-dry-run>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复干跑探针</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复干跑探针</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhAttributionStatus(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5164,9 +2330,9 @@ function TeamBuilderRepairDryRunPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 5).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5174,8 +2340,8 @@ function TeamBuilderRepairDryRunPanel({ report, error, loading }: {
           )
         })}
       </div>
-      <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
-        <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{report.patch_plan.title || '补丁计划'}</div>
+      <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
+        <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{report.patch_plan.title || '补丁计划'}</div>
         <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.patch_plan.summary || '-'}</div>
         <div style={{ color: colors.textFaint, fontSize: 13, overflowWrap: 'anywhere' }}>
           文件：{(report.patch_plan.changed_files || []).join('、') || '-'}
@@ -5186,7 +2352,7 @@ function TeamBuilderRepairDryRunPanel({ report, error, loading }: {
           </div>
         )}
         {diffText && (
-          <pre style={{ margin: 0, padding: 7, borderRadius: 4, background: '#050708', color: colors.textMuted, fontSize: 13, lineHeight: 1.35, maxHeight: 150, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
+          <pre style={{ margin: 0, padding: 7, borderRadius: 3, background: 'var(--fp-bp-solid)', color: colors.textMuted, fontSize: 13, lineHeight: 1.35, maxHeight: 150, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
             {diffText}
           </pre>
         )}
@@ -5207,21 +2373,21 @@ function TeamBuilderRepairPatchCandidatesPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>候选补丁计划读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>候选补丁计划读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在整理候选补丁计划...' : '暂无候选补丁计划。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无候选补丁计划。'}</div>
       </div>
     )
@@ -5229,9 +2395,9 @@ function TeamBuilderRepairPatchCandidatesPanel({ report, error, loading }: {
   const tone = repairPatchCandidateTone(report.verdict)
   const dryCounts = report.dry_run_reference?.counts || {}
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-patch-candidates>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-patch-candidates>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>候选补丁计划</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>候选补丁计划</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairPatchVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5246,9 +2412,9 @@ function TeamBuilderRepairPatchCandidatesPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5263,10 +2429,10 @@ function TeamBuilderRepairPatchCandidatesPanel({ report, error, loading }: {
               ? `${zhWorkerName(candidate.worker_id)} / ${candidate.worker_id}`
               : 'team 级 contract 失败'
             return (
-              <div key={candidate.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }} data-team-builder-repair-patch-candidate>
+              <div key={candidate.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }} data-team-builder-repair-patch-candidate>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{candidateTitle}</span>
-                  <span style={{ color: candidate.status === 'source_located' ? '#78d98b' : '#ffb74d', fontSize: 13 }}>{zhRepairPatchCandidateStatus(candidate.status)}</span>
+                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{candidateTitle}</span>
+                  <span style={{ color: candidate.status === 'source_located' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairPatchCandidateStatus(candidate.status)}</span>
                 </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{candidate.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
@@ -5293,8 +2459,8 @@ function TeamBuilderRepairPatchCandidatesPanel({ report, error, loading }: {
                 </div>
               )}
               {(candidate.contract_sources || []).length > 0 && (
-                <div style={{ display: 'grid', gap: 4, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-                  <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>失败 contract 定义</div>
+                <div style={{ display: 'grid', gap: 4, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+                  <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>失败 contract 定义</div>
                   {(candidate.contract_sources || []).slice(0, 3).map((source) => (
                     <div key={source.path} style={{ display: 'grid', gap: 2 }}>
                       <div style={{ color: source.exists ? colors.textSecondary : colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
@@ -5310,7 +2476,7 @@ function TeamBuilderRepairPatchCandidatesPanel({ report, error, loading }: {
                 </div>
               )}
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{candidate.next_action}</div>
-              <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>
+              <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>
                 安全边界：{candidate.safety.reason}
               </div>
               {candidate.verification_commands.length > 0 && (
@@ -5328,8 +2494,8 @@ function TeamBuilderRepairPatchCandidatesPanel({ report, error, loading }: {
         </div>
       )}
       {report.dry_run_reference && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>受控干跑参考：{zhAttributionStatus(report.dry_run_reference.verdict || '')}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>受控干跑参考：{zhAttributionStatus(report.dry_run_reference.verdict || '')}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{report.dry_run_reference.summary || '-'}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>
             修复前失败 {dryCounts.before_failures ?? '-'}；补丁文件 {dryCounts.patch_files ?? '-'}；修复后失败 {dryCounts.after_failures ?? '-'}；修复后诊断 {dryCounts.after_findings ?? '-'}
@@ -5353,30 +2519,30 @@ function TeamBuilderRepairApplyGatePanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复应用门读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复应用门读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在整理修复应用门...' : '暂无修复应用门。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复应用门。'}</div>
       </div>
     )
   }
   const tone = repairApplyGateTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-apply-gate>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-apply-gate>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复应用门</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复应用门</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairApplyGateVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5391,9 +2557,9 @@ function TeamBuilderRepairApplyGatePanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 5).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5408,10 +2574,10 @@ function TeamBuilderRepairApplyGatePanel({ report, error, loading }: {
               ? `${zhWorkerName(item.worker_id)} / ${item.worker_id}`
               : 'team 级 contract 失败'
             return (
-              <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+              <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{itemTitle}</span>
-                  <span style={{ color: item.status === 'ready_for_human_review' ? '#ffb74d' : '#ff7b7b', fontSize: 13 }}>{item.status === 'ready_for_human_review' ? '待人工审阅' : '阻断'}</span>
+                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{itemTitle}</span>
+                  <span style={{ color: item.status === 'ready_for_human_review' ? 'var(--fp-warn)' : 'var(--fp-err)', fontSize: 13 }}>{item.status === 'ready_for_human_review' ? '待人工审阅' : '阻断'}</span>
                 </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>finding：{item.finding_id}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{item.changed_files.join('、') || '-'}</div>
@@ -5427,14 +2593,14 @@ function TeamBuilderRepairApplyGatePanel({ report, error, loading }: {
                 ))}
               </div>
               {item.blocked_reasons.length > 0 && (
-                <div style={{ color: '#ff7b7b', fontSize: 13, lineHeight: 1.35 }}>
+                <div style={{ color: 'var(--fp-err)', fontSize: 13, lineHeight: 1.35 }}>
                   阻断原因：{item.blocked_reasons.join('；')}
                 </div>
               )}
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
                 回查：{item.verification_commands.join('；') || '-'}
               </div>
-              <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
+              <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
             </div>
             )
           })}
@@ -5461,30 +2627,30 @@ function TeamBuilderRepairPatchDiffProposalPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>补丁 diff proposal 读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>补丁 diff proposal 读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在整理补丁 diff proposal...' : '暂无补丁 diff proposal。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无补丁 diff proposal。'}</div>
       </div>
     )
   }
   const tone = repairPatchDiffProposalTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-patch-diff-proposal>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-patch-diff-proposal>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>补丁 diff proposal</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>补丁 diff proposal</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairPatchDiffProposalVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5499,9 +2665,9 @@ function TeamBuilderRepairPatchDiffProposalPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5516,25 +2682,25 @@ function TeamBuilderRepairPatchDiffProposalPanel({ report, error, loading }: {
               ? `${zhWorkerName(proposal.worker_id)} / ${proposal.worker_id}`
               : 'team 级 contract 失败'
             return (
-              <div key={proposal.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+              <div key={proposal.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{title}</span>
-                  <span style={{ color: proposal.status === 'blocked' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairPatchDiffProposalStatus(proposal.status)}</span>
+                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{title}</span>
+                  <span style={{ color: proposal.status === 'blocked' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairPatchDiffProposalStatus(proposal.status)}</span>
                 </div>
                 <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{proposal.changed_files.join('、') || '-'}</div>
                 <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{proposal.reason}</div>
                 {proposal.missing_requirements.length > 0 && (
-                  <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>还缺：{proposal.missing_requirements.join('；')}</div>
+                  <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>还缺：{proposal.missing_requirements.join('；')}</div>
                 )}
                 {proposal.diff && (
-                  <pre style={{ margin: 0, maxHeight: 140, overflow: 'auto', whiteSpace: 'pre-wrap', color: colors.textSecondary, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 5, padding: 7, fontSize: 13, lineHeight: 1.35 }}>
+                  <pre style={{ margin: 0, maxHeight: 140, overflow: 'auto', whiteSpace: 'pre-wrap', color: colors.textSecondary, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 7, fontSize: 13, lineHeight: 1.35 }}>
                     {proposal.diff}
                   </pre>
                 )}
                 {proposal.patch_request?.context_files?.length > 0 && (
                   <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>上下文：{proposal.patch_request.context_files.join('、')}</div>
                 )}
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>{proposal.safety.reason}</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{proposal.safety.reason}</div>
               </div>
             )
           })}
@@ -5561,30 +2727,30 @@ function TeamBuilderRepairApprovalPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复批准记录读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复批准记录读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在读取修复批准记录...' : '暂无修复批准记录。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复批准记录。'}</div>
       </div>
     )
   }
   const tone = repairApprovalTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-approval>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-approval>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复批准记录</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复批准记录</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairApprovalVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5599,9 +2765,9 @@ function TeamBuilderRepairApprovalPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5612,10 +2778,10 @@ function TeamBuilderRepairApprovalPanel({ report, error, loading }: {
       {report.approval_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 6 }}>
           {report.approval_items.slice(0, 3).map((item) => (
-            <div key={item.candidate_id} style={{ display: 'grid', gap: 4, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.candidate_id} style={{ display: 'grid', gap: 4, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'stale_or_mismatch' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairApprovalStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'stale_or_mismatch' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairApprovalStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>diff sha256：{item.diff_sha256 || '-'}</div>
@@ -5648,30 +2814,30 @@ function TeamBuilderRepairExecutionReadinessPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复执行就绪读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复执行就绪读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查修复执行就绪状态...' : '暂无修复执行就绪检查。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复执行就绪检查。'}</div>
       </div>
     )
   }
   const tone = repairExecutionReadinessTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-execution-readiness>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-execution-readiness>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复执行就绪</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复执行就绪</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairExecutionReadinessVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5686,9 +2852,9 @@ function TeamBuilderRepairExecutionReadinessPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 5).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5703,10 +2869,10 @@ function TeamBuilderRepairExecutionReadinessPanel({ report, error, loading }: {
               ? `${zhWorkerName(item.worker_id)} / ${item.worker_id}`
               : 'team 级 contract 失败'
             return (
-              <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+              <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{itemTitle}</span>
-                  <span style={{ color: item.status === 'blocked' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairExecutionItemStatus(item.status)}</span>
+                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{itemTitle}</span>
+                  <span style={{ color: item.status === 'blocked' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairExecutionItemStatus(item.status)}</span>
                 </div>
                 <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>finding：{item.finding_id}</div>
                 <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{item.changed_files.join('、') || '-'}</div>
@@ -5714,14 +2880,14 @@ function TeamBuilderRepairExecutionReadinessPanel({ report, error, loading }: {
                   <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>失败 contract：{(item.contract_files || []).join('、')}</div>
                 )}
                 {item.missing_requirements.length > 0 && (
-                  <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>
+                  <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>
                     还缺：{item.missing_requirements.join('；')}
                   </div>
                 )}
                 <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
                   回查：{item.verification_commands.join('；') || '-'}
                 </div>
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
               </div>
             )
           })}
@@ -5748,30 +2914,30 @@ function TeamBuilderRepairApplyPreviewPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复应用预览读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复应用预览读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在生成修复应用预览...' : '暂无修复应用预览。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复应用预览。'}</div>
       </div>
     )
   }
   const tone = repairApplyPreviewTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-apply-preview>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-apply-preview>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复应用预览</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复应用预览</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairApplyPreviewVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5792,9 +2958,9 @@ function TeamBuilderRepairApplyPreviewPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5805,14 +2971,14 @@ function TeamBuilderRepairApplyPreviewPanel({ report, error, loading }: {
       {report.preview_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 7 }}>
           {report.preview_items.slice(0, 3).map((item) => (
-            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'blocked' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairApplyPreviewStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'blocked' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairApplyPreviewStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{item.changed_files.join('、') || '-'}</div>
               {item.multi_file && (
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>多文件候选：当前只生成 scratch 文件集预览，真实应用仍需单独扩展。</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>多文件候选：当前只生成 scratch 文件集预览，真实应用仍需单独扩展。</div>
               )}
               {item.before_preview_files.length > 0 && (
                 <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>预览前：{item.before_preview_files.join('、')}</div>
@@ -5826,9 +2992,9 @@ function TeamBuilderRepairApplyPreviewPanel({ report, error, loading }: {
                 </div>
               )}
               {item.blocked_reasons.length > 0 && (
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
               )}
-              <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
+              <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
             </div>
           ))}
         </div>
@@ -5867,8 +3033,8 @@ function TeamBuilderRepairFileRecordList({ records, mode }: {
   return (
     <div style={{ display: 'grid', gap: 4 }}>
       {visibleRecords.map((record, index) => (
-        <div key={`${record.changed_file}:${index}`} style={{ display: 'grid', gap: 2, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650, overflowWrap: 'anywhere' }}>{record.changed_file}</div>
+        <div key={`${record.changed_file}:${index}`} style={{ display: 'grid', gap: 2, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500, overflowWrap: 'anywhere' }}>{record.changed_file}</div>
           {mode === 'apply' ? (
             <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
               before {repairShortSha(record.before_sha256)} → after {repairShortSha(record.after_sha256)}
@@ -5905,30 +3071,30 @@ function TeamBuilderRepairApplyExecutionPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复真实应用记录读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复真实应用记录读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查修复真实应用记录...' : '暂无修复真实应用记录。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复真实应用记录。'}</div>
       </div>
     )
   }
   const tone = repairApplyExecutionTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-apply-execution>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-apply-execution>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复真实应用</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复真实应用</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairApplyExecutionVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -5945,9 +3111,9 @@ function TeamBuilderRepairApplyExecutionPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -5958,15 +3124,15 @@ function TeamBuilderRepairApplyExecutionPanel({ report, error, loading }: {
       {report.apply_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 7 }}>
           {report.apply_items.slice(0, 3).map((item) => (
-            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'blocked' || item.status === 'stale_or_mismatch' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairApplyExecutionStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'blocked' || item.status === 'stale_or_mismatch' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairApplyExecutionStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{item.changed_files.join('、') || '-'}</div>
               {(item.file_set || (item.file_count || 0) > 1) && (
-                <div style={{ color: '#78d98b', fontSize: 13, lineHeight: 1.35 }}>
+                <div style={{ color: 'var(--fp-ok)', fontSize: 13, lineHeight: 1.35 }}>
                   文件集修复：共 {item.file_count || item.changed_files.length} 个文件；真实应用必须额外携带 confirm_file_set_write。
                 </div>
               )}
@@ -5975,7 +3141,7 @@ function TeamBuilderRepairApplyExecutionPanel({ report, error, loading }: {
                 <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>执行人：{item.applied_by} {item.applied_at ? ` / ${item.applied_at}` : ''}</div>
               )}
               {item.blocked_reasons.length > 0 && (
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
               )}
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>diff sha：{item.diff_sha256 || '-'}</div>
             </div>
@@ -6003,30 +3169,30 @@ function TeamBuilderRepairPostApplyVerificationPanel({ report, error, loading }:
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>应用后验证读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>应用后验证读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查应用后验证...' : '暂无应用后验证。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无应用后验证。'}</div>
       </div>
     )
   }
   const tone = repairPostApplyVerificationTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-post-apply-verification>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-post-apply-verification>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>应用后验证</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>应用后验证</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairPostApplyVerificationVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6041,9 +3207,9 @@ function TeamBuilderRepairPostApplyVerificationPanel({ report, error, loading }:
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6054,10 +3220,10 @@ function TeamBuilderRepairPostApplyVerificationPanel({ report, error, loading }:
       {report.verification_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 7 }}>
           {report.verification_items.slice(0, 3).map((item) => (
-            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'fail' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairPostApplyVerificationStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'fail' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairPostApplyVerificationStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{item.changed_files.join('、') || '-'}</div>
@@ -6087,30 +3253,30 @@ function TeamBuilderRepairOutcomeReconciliationPanel({ report, error, loading }:
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>补丁前后对账读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>补丁前后对账读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查补丁前后对账...' : '暂无补丁前后对账。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无补丁前后对账。'}</div>
       </div>
     )
   }
   const tone = repairOutcomeReconciliationTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-outcome-reconciliation>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-outcome-reconciliation>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>补丁前后对账</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>补丁前后对账</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairOutcomeReconciliationVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6126,9 +3292,9 @@ function TeamBuilderRepairOutcomeReconciliationPanel({ report, error, loading }:
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6139,27 +3305,27 @@ function TeamBuilderRepairOutcomeReconciliationPanel({ report, error, loading }:
       {report.reconciliation_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 7 }}>
           {report.reconciliation_items.slice(0, 3).map((item) => (
-            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'regression' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairOutcomeReconciliationStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'regression' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairOutcomeReconciliationStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{(item.changed_files && item.changed_files.length > 0 ? item.changed_files : [item.changed_file]).filter(Boolean).join('、') || '-'}</div>
               {(item.file_set || (item.file_count || 0) > 1) && (
-                <div style={{ color: '#78d98b', fontSize: 13, lineHeight: 1.35 }}>文件集对账：共 {item.file_count || item.changed_files?.length || 0} 个文件。</div>
+                <div style={{ color: 'var(--fp-ok)', fontSize: 13, lineHeight: 1.35 }}>文件集对账：共 {item.file_count || item.changed_files?.length || 0} 个文件。</div>
               )}
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>
                 doctor：{item.before.doctor_findings} → {item.after.doctor_findings}；repair required：{item.before.repair_required} → {item.after.repair_required}
               </div>
               {item.resolved_findings.length > 0 && (
-                <div style={{ color: '#78d98b', fontSize: 13, lineHeight: 1.35 }}>已消除：{item.resolved_findings.map((finding) => finding.check_id).join('、')}</div>
+                <div style={{ color: 'var(--fp-ok)', fontSize: 13, lineHeight: 1.35 }}>已消除：{item.resolved_findings.map((finding) => finding.check_id).join('、')}</div>
               )}
               {item.introduced_findings.length > 0 && (
-                <div style={{ color: '#ff7b7b', fontSize: 13, lineHeight: 1.35 }}>新增：{item.introduced_findings.map((finding) => finding.check_id).join('、')}</div>
+                <div style={{ color: 'var(--fp-err)', fontSize: 13, lineHeight: 1.35 }}>新增：{item.introduced_findings.map((finding) => finding.check_id).join('、')}</div>
               )}
               {item.persistent_findings.length > 0 && (
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>残留：{item.persistent_findings.map((finding) => finding.check_id).join('、')}</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>残留：{item.persistent_findings.map((finding) => finding.check_id).join('、')}</div>
               )}
             </div>
           ))}
@@ -6186,30 +3352,30 @@ function TeamBuilderRepairRollbackReadinessPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>回滚就绪读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>回滚就绪读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查回滚就绪...' : '暂无回滚就绪检查。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无回滚就绪检查。'}</div>
       </div>
     )
   }
   const tone = repairRollbackReadinessTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-rollback-readiness>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-rollback-readiness>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>回滚就绪检查</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>回滚就绪检查</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairRollbackReadinessVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6226,9 +3392,9 @@ function TeamBuilderRepairRollbackReadinessPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6239,15 +3405,15 @@ function TeamBuilderRepairRollbackReadinessPanel({ report, error, loading }: {
       {report.rollback_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 7 }}>
           {report.rollback_items.slice(0, 3).map((item) => (
-            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'stale_or_mismatch' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairRollbackReadinessStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'stale_or_mismatch' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairRollbackReadinessStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{(item.changed_files && item.changed_files.length > 0 ? item.changed_files : [item.changed_file]).filter(Boolean).join('、') || '-'}</div>
               {(item.file_set || (item.file_count || 0) > 1) && (
-                <div style={{ color: '#78d98b', fontSize: 13, lineHeight: 1.35 }}>
+                <div style={{ color: 'var(--fp-ok)', fontSize: 13, lineHeight: 1.35 }}>
                   文件集回滚前置检查：共 {item.file_count || item.changed_files?.length || 0} 个文件；真实回滚必须额外携带 confirm_file_set_rollback。
                 </div>
               )}
@@ -6257,7 +3423,7 @@ function TeamBuilderRepairRollbackReadinessPanel({ report, error, loading }: {
                 当前匹配：{item.current_matches_after ? '是' : '否'}；before 可校验：{item.before_snapshot_valid ? '是' : '否'}；范围安全：{item.target_scope_safe ? '是' : '否'}
               </div>
               {item.blocked_reasons.length > 0 && (
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
               )}
             </div>
           ))}
@@ -6284,30 +3450,30 @@ function TeamBuilderRepairRollbackExecutionPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>回滚执行记录读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>回滚执行记录读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查回滚执行记录...' : '暂无回滚执行记录。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无回滚执行记录。'}</div>
       </div>
     )
   }
   const tone = repairRollbackExecutionTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-rollback-execution>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-rollback-execution>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>回滚执行记录</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>回滚执行记录</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairRollbackExecutionVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6325,9 +3491,9 @@ function TeamBuilderRepairRollbackExecutionPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 3).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6338,15 +3504,15 @@ function TeamBuilderRepairRollbackExecutionPanel({ report, error, loading }: {
       {report.rollback_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 7 }}>
           {report.rollback_items.slice(0, 3).map((item) => (
-            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'stale_or_mismatch' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairRollbackExecutionStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'stale_or_mismatch' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairRollbackExecutionStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{(item.changed_files && item.changed_files.length > 0 ? item.changed_files : [item.changed_file]).filter(Boolean).join('、') || '-'}</div>
               {(item.file_set || (item.file_count || 0) > 1) && (
-                <div style={{ color: '#78d98b', fontSize: 13, lineHeight: 1.35 }}>
+                <div style={{ color: 'var(--fp-ok)', fontSize: 13, lineHeight: 1.35 }}>
                   文件集回滚：共 {item.file_count || item.changed_files?.length || 0} 个文件；执行记录按文件保存 before/after 和回滚 sha。
                 </div>
               )}
@@ -6356,7 +3522,7 @@ function TeamBuilderRepairRollbackExecutionPanel({ report, error, loading }: {
               )}
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>回滚：{item.rollback_from_sha256 || '-'} → {item.rollback_to_sha256 || '-'}</div>
               {item.blocked_reasons.length > 0 && (
-                <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>阻断原因：{item.blocked_reasons.join('；')}</div>
               )}
             </div>
           ))}
@@ -6383,30 +3549,30 @@ function TeamBuilderRepairRollbackPostVerificationPanel({ report, error, loading
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>回滚后验证读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>回滚后验证读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查回滚后验证...' : '暂无回滚后验证。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无回滚后验证。'}</div>
       </div>
     )
   }
   const tone = repairRollbackPostVerificationTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-rollback-post-verification>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-rollback-post-verification>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>回滚后验证</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>回滚后验证</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairRollbackPostVerificationVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6422,9 +3588,9 @@ function TeamBuilderRepairRollbackPostVerificationPanel({ report, error, loading
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6435,10 +3601,10 @@ function TeamBuilderRepairRollbackPostVerificationPanel({ report, error, loading
       {report.verification_items.length > 0 ? (
         <div style={{ display: 'grid', gap: 7 }}>
           {report.verification_items.slice(0, 3).map((item) => (
-            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+            <div key={item.id} style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.candidate_id}</span>
-                <span style={{ color: item.status === 'fail' ? '#ff7b7b' : '#ffb74d', fontSize: 13 }}>{zhRepairRollbackPostVerificationStatus(item.status)}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.candidate_id}</span>
+                <span style={{ color: item.status === 'fail' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRepairRollbackPostVerificationStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标文件：{item.changed_files.join('、') || '-'}</div>
@@ -6468,30 +3634,30 @@ function TeamBuilderRepairClosureRollupPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复闭环总览读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复闭环总览读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在整理修复闭环总览...' : '暂无修复闭环总览。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复闭环总览。'}</div>
       </div>
     )
   }
   const tone = repairClosureRollupTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-closure-rollup>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-closure-rollup>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复闭环总览</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复闭环总览</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairClosureRollupVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6507,9 +3673,9 @@ function TeamBuilderRepairClosureRollupPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6525,9 +3691,9 @@ function TeamBuilderRepairClosureRollupPanel({ report, error, loading }: {
               ? '#78d98b'
               : '#ffb74d'
           return (
-            <div key={item.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={item.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.name}</span>
                 <span style={{ color: stageTone, fontSize: 13 }}>{zhRepairClosureStageStatus(item.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
@@ -6536,8 +3702,8 @@ function TeamBuilderRepairClosureRollupPanel({ report, error, loading }: {
         })}
       </div>
       {report.generalization && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }} data-team-builder-repair-generalization>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>泛化面</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }} data-team-builder-repair-generalization>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>泛化面</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
             <span style={S.pill}>候选 {report.generalization.candidate_count}</span>
             <span style={S.pill}>多文件候选 {report.generalization.multi_file_candidate_count}</span>
@@ -6545,7 +3711,7 @@ function TeamBuilderRepairClosureRollupPanel({ report, error, loading }: {
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.generalization.summary}</div>
           {report.generalization.blockers.length > 0 && (
-            <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.4 }}>
+            <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.4 }}>
               {report.generalization.blockers.slice(0, 3).join('；')}
             </div>
           )}
@@ -6553,8 +3719,8 @@ function TeamBuilderRepairClosureRollupPanel({ report, error, loading }: {
         </div>
       )}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>入口：{report.next_actions[0].endpoint}</div>
         </div>
@@ -6576,30 +3742,30 @@ function TeamBuilderRepairGeneralizationTrialPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复泛化试验读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复泛化试验读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在整理修复泛化试验...' : '暂无修复泛化试验。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无修复泛化试验。'}</div>
       </div>
     )
   }
   const tone = repairGeneralizationTrialTone(report.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-generalization-trial>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-generalization-trial>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复泛化试验</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复泛化试验</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRepairGeneralizationTrialVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6613,9 +3779,9 @@ function TeamBuilderRepairGeneralizationTrialPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6625,10 +3791,10 @@ function TeamBuilderRepairGeneralizationTrialPanel({ report, error, loading }: {
       </div>
       <div style={{ display: 'grid', gap: 5 }}>
         {report.controlled_candidates.slice(0, 3).map((candidate) => (
-          <div key={candidate.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+          <div key={candidate.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{candidate.priority}. {candidate.title}</span>
-              <span style={{ color: '#ffb74d', fontSize: 13 }}>{candidate.risk}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{candidate.priority}. {candidate.title}</span>
+              <span style={{ color: 'var(--fp-warn)', fontSize: 13 }}>{candidate.risk}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{candidate.summary}</div>
             <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{candidate.changed_files.join('；')}</div>
@@ -6637,8 +3803,8 @@ function TeamBuilderRepairGeneralizationTrialPanel({ report, error, loading }: {
         ))}
       </div>
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
           {report.next_actions[0].required_confirmations && report.next_actions[0].required_confirmations.length > 0 && (
             <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>确认 token：{report.next_actions[0].required_confirmations.join('、')}</div>
@@ -6672,30 +3838,30 @@ function TeamBuilderRepairRealGeneratedFileSetTrialPanel({ report, error, loadin
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 generated worker 文件集试验读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 generated worker 文件集试验读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在执行真实 generated worker 文件集试验...' : '暂无真实 generated worker 文件集试验。'}</div>
       </div>
     )
   }
   if (!report.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{report.reason || '暂无真实 generated worker 文件集试验。'}</div>
       </div>
     )
   }
   const tone = report.verdict === 'pass' ? '#78d98b' : report.verdict === 'fail' ? '#ff7b7b' : '#ffb74d'
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-generated-file-set-trial>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-generated-file-set-trial>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实 generated worker 文件集试验</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实 generated worker 文件集试验</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{report.verdict === 'pass' ? '通过' : report.verdict === 'fail' ? '失败' : report.verdict}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6712,9 +3878,9 @@ function TeamBuilderRepairRealGeneratedFileSetTrialPanel({ report, error, loadin
         {report.quality_gates.slice(0, 6).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6763,14 +3929,14 @@ function TeamBuilderRepairRealRunCandidateScanPanel({ report, error, loading }: 
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 候选扫描读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 候选扫描读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在扫描真实 TeamBuilder run...' : '暂无真实 run 候选扫描。'}</div>
       </div>
     )
@@ -6784,9 +3950,9 @@ function TeamBuilderRepairRealRunCandidateScanPanel({ report, error, loading }: 
         : colors.border
   const rows = report.candidates.length > 0 ? report.candidates : report.run_summaries.slice(0, 3)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-candidate-scan>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-candidate-scan>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实 run 修复候选扫描</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实 run 修复候选扫描</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhRealRunCandidateScanVerdict(report.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6802,9 +3968,9 @@ function TeamBuilderRepairRealRunCandidateScanPanel({ report, error, loading }: 
         {report.quality_gates.slice(0, 5).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6814,10 +3980,10 @@ function TeamBuilderRepairRealRunCandidateScanPanel({ report, error, loading }: 
       </div>
       <div style={{ display: 'grid', gap: 5 }}>
         {rows.map((candidate) => (
-          <div key={candidate.run_id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+          <div key={candidate.run_id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{candidate.run_id}</span>
-              <span style={{ color: candidate.candidate_ready ? '#78d98b' : '#ffb74d', fontSize: 13 }}>{zhRealRunCandidateClass(candidate.classification)}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{candidate.run_id}</span>
+              <span style={{ color: candidate.candidate_ready ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{zhRealRunCandidateClass(candidate.classification)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{candidate.summary}</div>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -6844,8 +4010,8 @@ function TeamBuilderRepairRealRunCandidateScanPanel({ report, error, loading }: 
         ))}
       </div>
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
           {report.next_actions[0].required_confirmations && report.next_actions[0].required_confirmations.length > 0 && (
             <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>确认 token：{report.next_actions[0].required_confirmations.join('、')}</div>
@@ -6879,23 +4045,23 @@ function TeamBuilderRepairRealRunReplayPlanPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 消解计划读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 消解计划读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在消解真实失败 run...' : '暂无真实 run 消解计划。'}</div>
       </div>
     )
   }
   const tone = report.verdict === 'repair_plan_ready' ? '#78d98b' : report.verdict === 'no_repair_action' ? '#ffb74d' : colors.border
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-replay-plan>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-replay-plan>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 消解计划</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 消解计划</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{report.verdict === 'repair_plan_ready' ? '修复计划就绪' : report.verdict}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6910,9 +4076,9 @@ function TeamBuilderRepairRealRunReplayPlanPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -6921,10 +4087,10 @@ function TeamBuilderRepairRealRunReplayPlanPanel({ report, error, loading }: {
         })}
       </div>
       {report.findings.slice(0, 2).map((finding) => (
-        <div key={finding.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 5, background: '#0b1015' }}>
+        <div key={finding.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{finding.target_id || finding.location}</span>
-            <span style={{ color: '#ffb74d', fontSize: 13 }}>{finding.category}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{finding.target_id || finding.location}</span>
+            <span style={{ color: 'var(--fp-warn)', fontSize: 13 }}>{finding.category}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{finding.implication}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>缺失字段：{finding.required_not_read.join('、') || '-'}</div>
@@ -6932,16 +4098,16 @@ function TeamBuilderRepairRealRunReplayPlanPanel({ report, error, loading }: {
         </div>
       ))}
       {report.repair_actions.slice(0, 2).map((action) => (
-        <div key={action.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>修复动作：{action.worker_id}</div>
+        <div key={action.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>修复动作：{action.worker_id}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{action.proposed_change}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>文件：{action.changed_files.join('；') || '-'}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>安全级别：{action.automation_level} / 自动安全 {action.auto_safe ? '是' : '否'}</div>
         </div>
       ))}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -6962,23 +4128,23 @@ function TeamBuilderRepairRealRunDiffPreviewPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run diff 预览读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run diff 预览读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在生成真实失败候选 diff 预览...' : '暂无真实 run diff 预览。'}</div>
       </div>
     )
   }
   const tone = report.verdict === 'diff_preview_ready' ? '#78d98b' : report.verdict === 'blocked' ? '#ff7b7b' : colors.border
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-diff-preview>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-diff-preview>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run diff 预览</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run diff 预览</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{report.verdict === 'diff_preview_ready' ? 'diff 可审阅' : report.verdict}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -6993,9 +4159,9 @@ function TeamBuilderRepairRealRunDiffPreviewPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7004,8 +4170,8 @@ function TeamBuilderRepairRealRunDiffPreviewPanel({ report, error, loading }: {
         })}
       </div>
       {report.diff_records.slice(0, 2).map((record) => (
-        <div key={record.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{record.worker_id}</div>
+        <div key={record.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{record.worker_id}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{record.change_summary.join('；')}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>文件：{record.changed_file}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>预览：{record.before_preview_file} 到 {record.after_preview_file}</div>
@@ -7013,13 +4179,13 @@ function TeamBuilderRepairRealRunDiffPreviewPanel({ report, error, loading }: {
         </div>
       ))}
       {report.blocked_items.length > 0 && (
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
           阻断：{report.blocked_items.slice(0, 3).map((item) => item.reason).join('；')}
         </div>
       )}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7040,23 +4206,23 @@ function TeamBuilderRepairRealRunDiffReviewPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run diff 审阅门读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run diff 审阅门读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败候选 diff 审阅门...' : '暂无真实 run diff 审阅门。'}</div>
       </div>
     )
   }
   const tone = report.verdict === 'review_ready' ? '#78d98b' : report.verdict === 'blocked' ? '#ff7b7b' : colors.border
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-diff-review>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-diff-review>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run diff 审阅门</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run diff 审阅门</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{report.verdict === 'review_ready' ? '可进入显式审阅' : report.verdict}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7071,9 +4237,9 @@ function TeamBuilderRepairRealRunDiffReviewPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7082,10 +4248,10 @@ function TeamBuilderRepairRealRunDiffReviewPanel({ report, error, loading }: {
         })}
       </div>
       {report.review_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id}</span>
-            <span style={{ color: item.status === 'ready_for_explicit_review' ? '#78d98b' : '#ffb74d', fontSize: 13 }}>{item.status === 'ready_for_explicit_review' ? '审阅条件已满足' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id}</span>
+            <span style={{ color: item.status === 'ready_for_explicit_review' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'ready_for_explicit_review' ? '审阅条件已满足' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>文件：{item.changed_file}</div>
@@ -7095,21 +4261,21 @@ function TeamBuilderRepairRealRunDiffReviewPanel({ report, error, loading }: {
             <div key={`${item.id}-risk-${index}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{note}</div>
           ))}
           {item.review_questions.length > 0 && (
-            <div style={{ color: '#ffcc80', fontSize: 13, lineHeight: 1.35 }}>审阅问题：{item.review_questions.slice(0, 2).join('；')}</div>
+            <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>审阅问题：{item.review_questions.slice(0, 2).join('；')}</div>
           )}
           {item.blocked_reasons.length > 0 && (
-            <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>阻断：{item.blocked_reasons.join('；')}</div>
+            <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>阻断：{item.blocked_reasons.join('；')}</div>
           )}
         </div>
       ))}
       {report.blocked_items.length > 0 && (
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
           审阅阻断：{report.blocked_items.slice(0, 3).map((item) => (item.reasons || [item.reason || '未知阻断']).join('、')).join('；')}
         </div>
       )}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7130,23 +4296,23 @@ function TeamBuilderRepairRealRunApplyGatePanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 显式应用门读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 显式应用门读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败 run 显式应用门...' : '暂无真实 run 显式应用门。'}</div>
       </div>
     )
   }
   const tone = report.verdict === 'ready_for_explicit_apply_preview' ? '#78d98b' : report.verdict === 'blocked' ? '#ff7b7b' : colors.border
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-apply-gate>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-apply-gate>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 显式应用门</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 显式应用门</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{report.verdict === 'ready_for_explicit_apply_preview' ? '可生成应用预览' : report.verdict}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7161,9 +4327,9 @@ function TeamBuilderRepairRealRunApplyGatePanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7172,10 +4338,10 @@ function TeamBuilderRepairRealRunApplyGatePanel({ report, error, loading }: {
         })}
       </div>
       {report.apply_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id}</span>
-            <span style={{ color: item.status === 'ready_for_explicit_apply_preview' ? '#78d98b' : '#ffb74d', fontSize: 13 }}>{item.status === 'ready_for_explicit_apply_preview' ? '应用预览前置通过' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id}</span>
+            <span style={{ color: item.status === 'ready_for_explicit_apply_preview' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'ready_for_explicit_apply_preview' ? '应用预览前置通过' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>文件：{item.changed_file}</div>
@@ -7185,13 +4351,13 @@ function TeamBuilderRepairRealRunApplyGatePanel({ report, error, loading }: {
             <div key={`${item.id}-verify-${index}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{step}</div>
           ))}
           {item.blocked_reasons.length > 0 && (
-            <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>阻断：{item.blocked_reasons.join('；')}</div>
+            <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>阻断：{item.blocked_reasons.join('；')}</div>
           )}
         </div>
       ))}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7212,23 +4378,23 @@ function TeamBuilderRepairRealRunApplyPreviewPanel({ report, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 文件集应用预览读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 文件集应用预览读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在生成真实失败 run 文件集应用预览...' : '暂无真实 run 文件集应用预览。'}</div>
       </div>
     )
   }
   const tone = report.verdict === 'preview_ready' ? '#78d98b' : report.verdict === 'blocked' ? '#ff7b7b' : colors.border
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-apply-preview>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-apply-preview>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 文件集应用预览</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 文件集应用预览</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{report.verdict === 'preview_ready' ? '预览已生成' : report.verdict}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7244,9 +4410,9 @@ function TeamBuilderRepairRealRunApplyPreviewPanel({ report, error, loading }: {
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7255,10 +4421,10 @@ function TeamBuilderRepairRealRunApplyPreviewPanel({ report, error, loading }: {
         })}
       </div>
       {report.preview_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id}</span>
-            <span style={{ color: item.status === 'preview_ready' ? '#78d98b' : '#ffb74d', fontSize: 13 }}>{item.status === 'preview_ready' ? '文件集预览就绪' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id}</span>
+            <span style={{ color: item.status === 'preview_ready' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'preview_ready' ? '文件集预览就绪' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{item.changed_files.join('、') || '-'}</div>
@@ -7272,15 +4438,15 @@ function TeamBuilderRepairRealRunApplyPreviewPanel({ report, error, loading }: {
           {item.post_apply_verification.slice(0, 2).map((step, index) => (
             <div key={`${item.id}-verify-${index}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{step}</div>
           ))}
-          <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
+          <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{item.safety.reason}</div>
           {item.blocked_reasons.length > 0 && (
-            <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>阻断：{item.blocked_reasons.join('；')}</div>
+            <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>阻断：{item.blocked_reasons.join('；')}</div>
           )}
         </div>
       ))}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7301,23 +4467,23 @@ function TeamBuilderRepairRealRunApplyExecutionPanel({ report, error, loading }:
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 显式应用执行读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 显式应用执行读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败 run 显式应用执行...' : '暂无真实 run 显式应用执行。'}</div>
       </div>
     )
   }
   const tone = report.verdict === 'applied' ? '#78d98b' : report.verdict === 'ready_for_explicit_apply' ? '#ffcc80' : report.verdict === 'stale_or_mismatch' || report.verdict === 'blocked' ? '#ff7b7b' : colors.border
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-apply-execution>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-apply-execution>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 显式应用执行</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 显式应用执行</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{report.verdict === 'ready_for_explicit_apply' ? '等待显式执行' : report.verdict === 'applied' ? '已显式应用' : report.verdict}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7332,9 +4498,9 @@ function TeamBuilderRepairRealRunApplyExecutionPanel({ report, error, loading }:
         {report.quality_gates.slice(0, 3).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7343,10 +4509,10 @@ function TeamBuilderRepairRealRunApplyExecutionPanel({ report, error, loading }:
         })}
       </div>
       {report.apply_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id}</span>
-            <span style={{ color: item.status === 'applied' ? '#78d98b' : item.status === 'ready_for_explicit_apply' ? '#ffcc80' : '#ffb74d', fontSize: 13 }}>{item.status === 'ready_for_explicit_apply' ? '等待 POST execute' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id}</span>
+            <span style={{ color: item.status === 'applied' ? 'var(--fp-ok)' : item.status === 'ready_for_explicit_apply' ? 'var(--fp-warn)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'ready_for_explicit_apply' ? '等待 POST execute' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{item.changed_files.join('、') || '-'}</div>
@@ -7359,8 +4525,8 @@ function TeamBuilderRepairRealRunApplyExecutionPanel({ report, error, loading }:
         </div>
       ))}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7381,14 +4547,14 @@ function TeamBuilderRepairRealRunPostApplyVerificationPanel({ report, error, loa
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 应用后回放验证读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 应用后回放验证读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败 run 应用后回放验证...' : '暂无真实 run 应用后回放验证。'}</div>
       </div>
     )
@@ -7396,9 +4562,9 @@ function TeamBuilderRepairRealRunPostApplyVerificationPanel({ report, error, loa
   const tone = report.verdict === 'pass' ? '#78d98b' : report.verdict === 'warning' || report.verdict === 'awaiting_apply' || report.verdict === 'awaiting_replay_verification' ? '#ffcc80' : report.verdict === 'fail' ? '#ff7b7b' : colors.border
   const label = report.verdict === 'awaiting_apply' ? '等待应用' : report.verdict === 'awaiting_replay_verification' ? '等待回放验证' : report.verdict === 'pass' ? '已通过' : report.verdict === 'warning' ? '有警告' : report.verdict
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-post-apply-verification>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-post-apply-verification>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 应用后回放验证</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 应用后回放验证</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{label}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7414,9 +4580,9 @@ function TeamBuilderRepairRealRunPostApplyVerificationPanel({ report, error, loa
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7425,21 +4591,21 @@ function TeamBuilderRepairRealRunPostApplyVerificationPanel({ report, error, loa
         })}
       </div>
       {report.verification_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id || item.apply_item_id}</span>
-            <span style={{ color: item.status === 'verified' ? '#78d98b' : item.status === 'failed' ? '#ff7b7b' : '#ffcc80', fontSize: 13 }}>{item.status === 'pending_verification' ? '等待验证' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id || item.apply_item_id}</span>
+            <span style={{ color: item.status === 'verified' ? 'var(--fp-ok)' : item.status === 'failed' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'pending_verification' ? '等待验证' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{item.changed_files.join('、') || '-'}</div>
           {item.missing_required_fields && item.missing_required_fields.length > 0 && (
-            <div style={{ color: '#ff7b7b', fontSize: 13, lineHeight: 1.35 }}>仍缺字段：{item.missing_required_fields.join('、')}</div>
+            <div style={{ color: 'var(--fp-err)', fontSize: 13, lineHeight: 1.35 }}>仍缺字段：{item.missing_required_fields.join('、')}</div>
           )}
         </div>
       ))}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7460,14 +4626,14 @@ function TeamBuilderRepairRealRunOutcomeReconciliationPanel({ report, error, loa
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 修复结果对账读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 修复结果对账读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败 run 修复结果对账...' : '暂无真实 run 修复结果对账。'}</div>
       </div>
     )
@@ -7475,9 +4641,9 @@ function TeamBuilderRepairRealRunOutcomeReconciliationPanel({ report, error, loa
   const tone = report.verdict === 'pass' ? '#78d98b' : report.verdict === 'warning' || report.verdict === 'awaiting_apply' || report.verdict === 'awaiting_verification' || report.verdict === 'partial' || report.verdict === 'missing_baseline' ? '#ffcc80' : report.verdict === 'regression' ? '#ff7b7b' : colors.border
   const label = report.verdict === 'awaiting_apply' ? '等待应用' : report.verdict === 'awaiting_verification' ? '等待验证' : report.verdict === 'pass' ? '对账通过' : report.verdict === 'warning' ? '有警告' : report.verdict === 'partial' ? '部分消解' : report.verdict === 'regression' ? '新增失败' : report.verdict
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-outcome-reconciliation>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-outcome-reconciliation>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 修复结果对账</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 修复结果对账</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{label}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7493,9 +4659,9 @@ function TeamBuilderRepairRealRunOutcomeReconciliationPanel({ report, error, loa
         {report.quality_gates.slice(0, 5).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7504,10 +4670,10 @@ function TeamBuilderRepairRealRunOutcomeReconciliationPanel({ report, error, loa
         })}
       </div>
       {report.reconciliation_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id || item.apply_item_id}</span>
-            <span style={{ color: item.status === 'regression' ? '#ff7b7b' : item.status === 'reconciled' ? '#78d98b' : '#ffcc80', fontSize: 13 }}>{item.status === 'reconciled_with_warnings' ? '已消解有警告' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id || item.apply_item_id}</span>
+            <span style={{ color: item.status === 'regression' ? 'var(--fp-err)' : item.status === 'reconciled' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'reconciled_with_warnings' ? '已消解有警告' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{item.changed_files.join('、') || '-'}</div>
@@ -7517,8 +4683,8 @@ function TeamBuilderRepairRealRunOutcomeReconciliationPanel({ report, error, loa
         </div>
       ))}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7539,14 +4705,14 @@ function TeamBuilderRepairRealRunRollbackReadinessPanel({ report, error, loading
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 回滚就绪读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 回滚就绪读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败 run 回滚就绪...' : '暂无真实失败 run 回滚就绪报告。'}</div>
       </div>
     )
@@ -7554,9 +4720,9 @@ function TeamBuilderRepairRealRunRollbackReadinessPanel({ report, error, loading
   const tone = report.verdict === 'clean' || report.verdict === 'ready_for_explicit_rollback' ? '#78d98b' : report.verdict === 'awaiting_apply' || report.verdict === 'missing_before_snapshot' ? '#ffcc80' : report.verdict === 'blocked' || report.verdict === 'stale_or_mismatch' ? '#ff7b7b' : colors.border
   const label = report.verdict === 'awaiting_apply' ? '等待应用' : report.verdict === 'ready_for_explicit_rollback' ? '可显式回滚' : report.verdict === 'clean' ? '无需回滚' : report.verdict === 'stale_or_mismatch' ? '记录不匹配' : report.verdict === 'missing_before_snapshot' ? '缺少快照' : report.verdict === 'blocked' ? '阻断' : report.verdict
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-rollback-readiness>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-rollback-readiness>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 回滚就绪</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 回滚就绪</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{label}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7571,9 +4737,9 @@ function TeamBuilderRepairRealRunRollbackReadinessPanel({ report, error, loading
         {report.quality_gates.slice(0, 5).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7582,21 +4748,21 @@ function TeamBuilderRepairRealRunRollbackReadinessPanel({ report, error, loading
         })}
       </div>
       {report.rollback_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id || item.apply_item_id}</span>
-            <span style={{ color: item.status === 'ready_for_explicit_rollback' ? '#78d98b' : '#ffcc80', fontSize: 13 }}>{item.status === 'ready_for_explicit_rollback' ? '可显式回滚' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id || item.apply_item_id}</span>
+            <span style={{ color: item.status === 'ready_for_explicit_rollback' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'ready_for_explicit_rollback' ? '可显式回滚' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{item.changed_files.join('、') || '-'}</div>
           {item.blocked_reasons.length > 0 && (
-            <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.35 }}>{item.blocked_reasons[0]}</div>
+            <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{item.blocked_reasons[0]}</div>
           )}
         </div>
       ))}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
         </div>
       )}
@@ -7617,14 +4783,14 @@ function TeamBuilderRepairRealRunRollbackExecutionPanel({ report, error, loading
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 回滚执行读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 回滚执行读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败 run 回滚执行...' : '暂无真实失败 run 回滚执行报告。'}</div>
       </div>
     )
@@ -7632,9 +4798,9 @@ function TeamBuilderRepairRealRunRollbackExecutionPanel({ report, error, loading
   const tone = report.verdict === 'clean' || report.verdict === 'rolled_back' ? '#78d98b' : report.verdict === 'awaiting_apply' || report.verdict === 'ready_for_explicit_rollback' ? '#ffcc80' : report.verdict === 'blocked' || report.verdict === 'stale_or_mismatch' ? '#ff7b7b' : colors.border
   const label = report.verdict === 'awaiting_apply' ? '等待应用' : report.verdict === 'ready_for_explicit_rollback' ? '等待显式回滚' : report.verdict === 'rolled_back' ? '已回滚' : report.verdict === 'clean' ? '未开启' : report.verdict === 'stale_or_mismatch' ? '记录不匹配' : report.verdict === 'blocked' ? '阻断' : report.verdict
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-rollback-execution>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-rollback-execution>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 显式回滚执行</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 显式回滚执行</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{label}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7648,9 +4814,9 @@ function TeamBuilderRepairRealRunRollbackExecutionPanel({ report, error, loading
         {report.quality_gates.slice(0, 3).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7659,10 +4825,10 @@ function TeamBuilderRepairRealRunRollbackExecutionPanel({ report, error, loading
         })}
       </div>
       {report.rollback_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id || item.apply_item_id}</span>
-            <span style={{ color: item.status === 'rolled_back' ? '#78d98b' : '#ffcc80', fontSize: 13 }}>{item.status === 'ready_for_explicit_rollback' ? '等待显式回滚' : item.status === 'rolled_back' ? '已回滚' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id || item.apply_item_id}</span>
+            <span style={{ color: item.status === 'rolled_back' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'ready_for_explicit_rollback' ? '等待显式回滚' : item.status === 'rolled_back' ? '已回滚' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{item.changed_files.join('、') || '-'}</div>
@@ -7685,14 +4851,14 @@ function TeamBuilderRepairRealRunRollbackPostVerificationPanel({ report, error, 
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 回滚后验证读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 回滚后验证读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在检查真实失败 run 回滚后验证...' : '暂无真实失败 run 回滚后验证报告。'}</div>
       </div>
     )
@@ -7700,9 +4866,9 @@ function TeamBuilderRepairRealRunRollbackPostVerificationPanel({ report, error, 
   const tone = report.verdict === 'clean' || report.verdict === 'pass' ? '#78d98b' : report.verdict === 'awaiting_apply' || report.verdict === 'awaiting_verification' ? '#ffcc80' : report.verdict === 'fail' ? '#ff7b7b' : colors.border
   const label = report.verdict === 'awaiting_apply' ? '等待应用' : report.verdict === 'awaiting_verification' ? '等待验证' : report.verdict === 'pass' ? '验证通过' : report.verdict === 'clean' ? '无需验证' : report.verdict === 'fail' ? '验证失败' : report.verdict
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-rollback-post-verification>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-rollback-post-verification>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 回滚后验证</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 回滚后验证</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{label}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7717,9 +4883,9 @@ function TeamBuilderRepairRealRunRollbackPostVerificationPanel({ report, error, 
         {report.quality_gates.slice(0, 3).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7728,10 +4894,10 @@ function TeamBuilderRepairRealRunRollbackPostVerificationPanel({ report, error, 
         })}
       </div>
       {report.verification_items.slice(0, 2).map((item) => (
-        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={item.id} style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id || item.apply_item_id}</span>
-            <span style={{ color: item.status === 'pass' ? '#78d98b' : item.status === 'fail' ? '#ff7b7b' : '#ffcc80', fontSize: 13 }}>{item.status === 'pending_verification' ? '等待验证' : item.status === 'pass' ? '通过' : item.status}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id || item.apply_item_id}</span>
+            <span style={{ color: item.status === 'pass' ? 'var(--fp-ok)' : item.status === 'fail' ? 'var(--fp-err)' : 'var(--fp-warn)', fontSize: 13 }}>{item.status === 'pending_verification' ? '等待验证' : item.status === 'pass' ? '通过' : item.status}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>目标：{item.changed_files.join('、') || '-'}</div>
@@ -7754,14 +4920,14 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>真实 run 闭环总览读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>真实 run 闭环总览读取失败：{error}</div>
       </div>
     )
   }
   if (!report) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在汇总真实失败 run 修复闭环...' : '暂无真实失败 run 闭环总览。'}</div>
       </div>
     )
@@ -7769,9 +4935,9 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
   const tone = report.verdict === 'clean' ? '#78d98b' : report.verdict === 'action_required' ? '#ffcc80' : report.verdict === 'blocked' ? '#ff7b7b' : colors.border
   const label = report.verdict === 'clean' ? '当前闭合' : report.verdict === 'action_required' ? '需要动作' : report.verdict === 'blocked' ? '阻断' : report.verdict
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-closure-rollup>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-real-run-closure-rollup>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实失败 run 修复闭环总览</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实失败 run 修复闭环总览</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{label}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{report.summary}</div>
@@ -7787,9 +4953,9 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
         {report.quality_gates.slice(0, 4).map((gate) => {
           const gateTone = attributionStatusTone(gate.status)
           return (
-            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+            <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
                 <span style={{ color: gateTone, fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -7799,10 +4965,10 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
       </div>
       <div style={{ display: 'grid', gap: 4 }}>
         {report.stages.slice(0, 7).map((stage) => (
-          <div key={stage.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={stage.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{stage.name}</span>
-              <span style={{ color: '#ffcc80', fontSize: 13 }}>{zhRepairClosureStageStatus(stage.status)}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{stage.name}</span>
+              <span style={{ color: 'var(--fp-warn)', fontSize: 13 }}>{zhRepairClosureStageStatus(stage.status)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{stage.summary}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -7812,8 +4978,8 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
         ))}
       </div>
       {report.approval_packet?.available && (
-        <div style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{report.approval_packet.title}</div>
+        <div style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{report.approval_packet.title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.approval_packet.summary}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <span style={S.pill}>审批项 {report.approval_packet.items.length}</span>
@@ -7821,13 +4987,13 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
             <span style={S.pill}>审批字段 {report.approval_packet.approval_requirements.length}</span>
           </div>
           {report.approval_packet.decision_dossier && (
-            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: 'var(--fp-bg)' }}>
-              <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{report.approval_packet.decision_dossier.title}</div>
+            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: 'var(--fp-bg)' }}>
+              <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{report.approval_packet.decision_dossier.title}</div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.approval_packet.decision_dossier.decision_question}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{report.approval_packet.decision_dossier.why_now}</div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>预期效果：{report.approval_packet.decision_dossier.expected_effect}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>写入范围：{report.approval_packet.decision_dossier.write_scope}</div>
-              <div style={{ color: '#ffcc80', fontSize: 13, lineHeight: 1.35 }}>{report.approval_packet.decision_dossier.do_not_use_as_completion}</div>
+              <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{report.approval_packet.decision_dossier.do_not_use_as_completion}</div>
               {report.approval_packet.decision_dossier.human_review_focus.length > 0 && (
                 <div style={{ display: 'grid', gap: 2 }}>
                   {report.approval_packet.decision_dossier.human_review_focus.slice(0, 3).map((item) => (
@@ -7845,10 +5011,10 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
             </div>
           )}
           {report.approval_packet.post_preflight?.available && (
-            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${report.approval_packet.post_preflight.status === 'ready_to_post' ? '#78d98b' : '#ffcc80'}`, borderRadius: 5, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-post-preflight>
+            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${report.approval_packet.post_preflight.status === 'ready_to_post' ? 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' : 'color-mix(in srgb, var(--fp-warn) 45%, transparent)'}`, borderRadius: 2, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-post-preflight>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>POST 前置检查</span>
-                <span style={{ color: report.approval_packet.post_preflight.status === 'ready_to_post' ? '#78d98b' : '#ffcc80', fontSize: 13 }}>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>POST 前置检查</span>
+                <span style={{ color: report.approval_packet.post_preflight.status === 'ready_to_post' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>
                   {report.approval_packet.post_preflight.status === 'ready_to_post' ? '可提交审批' : '有阻断'}
                 </span>
               </div>
@@ -7862,17 +5028,17 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
                 ))}
               </div>
               {report.approval_packet.post_preflight.blockers.length > 0 && (
-                <div style={{ color: '#ffcc80', fontSize: 13, lineHeight: 1.35 }}>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>
                   阻断：{report.approval_packet.post_preflight.blockers.slice(0, 2).join('；')}
                 </div>
               )}
             </div>
           )}
           {report.approval_packet.auto_apply_policy?.available && (
-            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${report.approval_packet.auto_apply_policy.eligible ? '#78d98b' : '#ffcc80'}`, borderRadius: 5, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-auto-apply-policy>
+            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${report.approval_packet.auto_apply_policy.eligible ? 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' : 'color-mix(in srgb, var(--fp-warn) 45%, transparent)'}`, borderRadius: 2, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-auto-apply-policy>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>低风险自动 apply 策略</span>
-                <span style={{ color: report.approval_packet.auto_apply_policy.eligible ? '#78d98b' : '#ffcc80', fontSize: 13 }}>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>低风险自动 apply 策略</span>
+                <span style={{ color: report.approval_packet.auto_apply_policy.eligible ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>
                   {report.approval_packet.auto_apply_policy.eligible ? '可自动 apply' : report.approval_packet.auto_apply_policy.verdict}
                 </span>
               </div>
@@ -7887,15 +5053,15 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>POST 入口：{report.approval_packet.auto_apply_policy.execute_endpoint}</div>
               <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>确认 token：{report.approval_packet.auto_apply_policy.required_confirmation}</div>
               {report.approval_packet.auto_apply_policy.blockers.length > 0 && (
-                <div style={{ color: '#ffcc80', fontSize: 13, lineHeight: 1.35 }}>
+                <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>
                   阻断：{report.approval_packet.auto_apply_policy.blockers.slice(0, 2).join('；')}
                 </div>
               )}
             </div>
           )}
           {report.approval_packet.apply_rehearsal?.available && (
-            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${report.approval_packet.apply_rehearsal.verdict === 'pass' ? '#78d98b' : '#ffcc80'}`, borderRadius: 5, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-apply-rehearsal>
-              <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>应用前演练：{report.approval_packet.apply_rehearsal.verdict === 'pass' ? '通过' : report.approval_packet.apply_rehearsal.verdict}</div>
+            <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${report.approval_packet.apply_rehearsal.verdict === 'pass' ? 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' : 'color-mix(in srgb, var(--fp-warn) 45%, transparent)'}`, borderRadius: 2, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-apply-rehearsal>
+              <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>应用前演练：{report.approval_packet.apply_rehearsal.verdict === 'pass' ? '通过' : report.approval_packet.apply_rehearsal.verdict}</div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.approval_packet.apply_rehearsal.summary}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <span style={S.pill}>待应用 {report.approval_packet.apply_rehearsal.counts.ready}</span>
@@ -7916,16 +5082,16 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
             </div>
           )}
           {report.approval_packet.execution_playbook?.available && (
-            <div style={{ display: 'grid', gap: 5, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-execution-playbook>
-              <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{report.approval_packet.execution_playbook.title}</div>
+            <div style={{ display: 'grid', gap: 5, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: 'var(--fp-bg)' }} data-team-builder-repair-real-run-execution-playbook>
+              <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{report.approval_packet.execution_playbook.title}</div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.approval_packet.execution_playbook.summary}</div>
-              <div style={{ color: '#ffcc80', fontSize: 13, lineHeight: 1.35 }}>{report.approval_packet.execution_playbook.safety_note}</div>
+              <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>{report.approval_packet.execution_playbook.safety_note}</div>
               <div style={{ display: 'grid', gap: 4 }}>
                 {report.approval_packet.execution_playbook.steps.slice(0, 5).map((step) => (
-                  <div key={step.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+                  <div key={step.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{step.order}. {step.title}</span>
-                      <span style={{ color: step.writes_target_files ? '#ffcc80' : '#78d98b', fontSize: 13 }}>{step.method}{step.writes_target_files ? ' 写目标文件' : ' 只读/验证'}</span>
+                      <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{step.order}. {step.title}</span>
+                      <span style={{ color: step.writes_target_files ? 'var(--fp-warn)' : 'var(--fp-ok)', fontSize: 13 }}>{step.method}{step.writes_target_files ? ' 写目标文件' : ' 只读/验证'}</span>
                     </div>
                     <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{step.summary}</div>
                     <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>入口：{step.endpoint}</div>
@@ -7939,10 +5105,10 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
             </div>
           )}
           {report.approval_packet.items.slice(0, 2).map((item) => (
-            <div key={item.apply_item_id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: 'var(--fp-bg)' }}>
+            <div key={item.apply_item_id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: 'var(--fp-bg)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.worker_id || item.apply_item_id}</span>
-                <span style={{ color: '#ffcc80', fontSize: 13 }}>等待批准</span>
+                <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.worker_id || item.apply_item_id}</span>
+                <span style={{ color: 'var(--fp-warn)', fontSize: 13 }}>等待批准</span>
               </div>
               <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
               {item.problem_statement && <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>问题：{item.problem_statement}</div>}
@@ -7988,7 +5154,7 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>确认 token：{report.approval_packet.required_confirmations.join('、')}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>审批字段：{report.approval_packet.approval_requirements.join('、')}</div>
           {report.approval_packet.payload_template && Object.keys(report.approval_packet.payload_template).length > 0 && (
-            <pre style={{ margin: 0, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 5, background: '#06090d', color: colors.textSecondary, fontSize: 13, lineHeight: 1.45, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+            <pre style={{ margin: 0, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 2, background: 'var(--fp-bp-solid)', color: colors.textSecondary, fontSize: 13, lineHeight: 1.45, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
               {JSON.stringify(report.approval_packet.payload_template, null, 2)}
             </pre>
           )}
@@ -7998,8 +5164,8 @@ function TeamBuilderRepairRealRunClosureRollupPanel({ report, error, loading }: 
         </div>
       )}
       {report.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{report.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{report.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{report.next_actions[0].summary}</div>
           {report.next_actions[0].required_confirmations && report.next_actions[0].required_confirmations.length > 0 && (
             <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>确认 token：{report.next_actions[0].required_confirmations.join('、')}</div>
@@ -8035,22 +5201,22 @@ function TeamBuilderRepairSafetyPolicyPanel({ policy, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>修复安全策略读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>修复安全策略读取失败：{error}</div>
       </div>
     )
   }
   if (!policy) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在整理修复安全策略...</div>
       </div>
     )
   }
   return (
-    <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-safety-policy>
+    <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-repair-safety-policy>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>修复安全策略</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>修复安全策略</div>
         <span style={S.pill}>{policy.version}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{policy.summary}</div>
@@ -8061,10 +5227,10 @@ function TeamBuilderRepairSafetyPolicyPanel({ policy, error, loading }: {
         <span style={S.pill}>人工/不动 {policy.counts.manual_or_none_rules}</span>
       </div>
       {policy.rules.slice(0, 4).map((rule) => (
-        <div key={rule.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={rule.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{rule.name}</span>
-            <span style={{ color: rule.auto_safe ? '#78d98b' : colors.textMuted, fontSize: 13 }}>{rule.automation_level}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{rule.name}</span>
+            <span style={{ color: rule.auto_safe ? 'var(--fp-ok)' : colors.textMuted, fontSize: 13 }}>{rule.automation_level}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{rule.next_action}</div>
         </div>
@@ -8085,31 +5251,31 @@ function TeamBuilderHighStandardAuditPanel({ audit, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-high-standard-audit>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>高标准目标审计读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-high-standard-audit>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>高标准目标审计读取失败：{error}</div>
       </div>
     )
   }
   if (!audit) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-high-standard-audit>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-high-standard-audit>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在审计 TeamBuilder 高标准闭环...' : '暂无高标准目标审计。'}</div>
       </div>
     )
   }
   const tone = audit.completion_ready ? '#78d98b' : '#ffcc80'
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-high-standard-audit>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-high-standard-audit>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>TeamBuilder 高标准目标审计</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>TeamBuilder 高标准目标审计</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{audit.completion_ready ? '可完成' : '仍在推进'}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{audit.summary}</div>
       <div style={{ display: 'grid', gap: 4 }}>
         {audit.deliverables.slice(0, 7).map((item) => (
-          <div key={item.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={item.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.name}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.name}</span>
               <span style={{ color: attributionStatusTone(item.status), fontSize: 13 }}>{zhAttributionStatus(item.status)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.summary}</div>
@@ -8122,9 +5288,9 @@ function TeamBuilderHighStandardAuditPanel({ audit, error, loading }: {
       </div>
       <div style={{ display: 'grid', gap: 4 }}>
         {audit.quality_gates.map((gate) => (
-          <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={gate.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{gate.name}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{gate.name}</span>
               <span style={{ color: attributionStatusTone(gate.status), fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{gate.summary}</div>
@@ -8132,10 +5298,10 @@ function TeamBuilderHighStandardAuditPanel({ audit, error, loading }: {
         ))}
       </div>
       {audit.prompt_to_artifact_checklist && (
-        <div style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }} data-team-builder-prompt-artifact-checklist>
+        <div style={{ display: 'grid', gap: 5, padding: '7px 8px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }} data-team-builder-prompt-artifact-checklist>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>目标到产物检查表</span>
-            <span style={{ color: audit.prompt_to_artifact_checklist.status === 'complete' ? '#78d98b' : '#ffcc80', fontSize: 13 }}>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>目标到产物检查表</span>
+            <span style={{ color: audit.prompt_to_artifact_checklist.status === 'complete' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>
               {audit.prompt_to_artifact_checklist.status === 'complete' ? '已覆盖' : '未完成'}
             </span>
           </div>
@@ -8143,13 +5309,13 @@ function TeamBuilderHighStandardAuditPanel({ audit, error, loading }: {
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35 }}>{audit.prompt_to_artifact_checklist.completion_rule}</div>
           <div style={{ display: 'grid', gap: 4 }}>
             {audit.prompt_to_artifact_checklist.items.slice(0, 8).map((item) => (
-              <div key={item.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: 'var(--fp-bg)' }}>
+              <div key={item.id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: 'var(--fp-bg)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{item.requirement}</span>
+                  <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{item.requirement}</span>
                   <span style={{ color: attributionStatusTone(item.status), fontSize: 13 }}>{zhAttributionStatus(item.status)}</span>
                 </div>
                 <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{item.conclusion}</div>
-                {item.gap && <div style={{ color: '#ffcc80', fontSize: 13, lineHeight: 1.35 }}>缺口：{item.gap}</div>}
+                {item.gap && <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.35 }}>缺口：{item.gap}</div>}
                 <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>产物：{item.artifact}</div>
                 {item.covered_by_tests.length > 0 && (
                   <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere' }}>验证：{item.covered_by_tests.slice(0, 3).join('、')}</div>
@@ -8161,7 +5327,7 @@ function TeamBuilderHighStandardAuditPanel({ audit, error, loading }: {
       )}
       {(audit.boundary_notes || []).length > 0 && (
         <div style={{ display: 'grid', gap: 3 }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>边界说明</div>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>边界说明</div>
           {(audit.boundary_notes || []).slice(0, 3).map((item, index) => (
             <div key={`${index}:${item}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>- {item}</div>
           ))}
@@ -8169,15 +5335,15 @@ function TeamBuilderHighStandardAuditPanel({ audit, error, loading }: {
       )}
       {audit.missing.length > 0 && (
         <div style={{ display: 'grid', gap: 3 }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>仍未完成</div>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>仍未完成</div>
           {audit.missing.slice(0, 4).map((item, index) => (
             <div key={`${index}:${item}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>- {item}</div>
           ))}
         </div>
       )}
       {audit.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{audit.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{audit.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{audit.next_actions[0].summary}</div>
           <SourceDataLink href={audit.next_actions[0].endpoint} label="下一步报告" />
         </div>
@@ -8204,23 +5370,23 @@ function TeamBuilderProviderCoverageAuditPanel({ audit, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-coverage-audit>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>Provider 覆盖审计读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-coverage-audit>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>Provider 覆盖审计读取失败：{error}</div>
       </div>
     )
   }
   if (!audit) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-coverage-audit>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-coverage-audit>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在审计 provider 覆盖...' : '暂无 provider 覆盖审计。'}</div>
       </div>
     )
   }
   const tone = audit.comparison_ready ? '#78d98b' : '#ffcc80'
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-provider-coverage-audit>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-provider-coverage-audit>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>Provider 覆盖审计</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>Provider 覆盖审计</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{audit.comparison_ready ? '对比就绪' : '证据不足'}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{audit.summary}</div>
@@ -8234,9 +5400,9 @@ function TeamBuilderProviderCoverageAuditPanel({ audit, error, loading }: {
       </div>
       <div style={{ display: 'grid', gap: 4 }}>
         {audit.providers.map((provider) => (
-          <div key={provider.provider} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={provider.provider} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{provider.label}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{provider.label}</span>
               <span style={{ color: attributionStatusTone(provider.status), fontSize: 13 }}>{zhProviderCoverageStatus(provider.status)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{provider.role}；{provider.summary}</div>
@@ -8250,9 +5416,9 @@ function TeamBuilderProviderCoverageAuditPanel({ audit, error, loading }: {
         ))}
       </div>
       {audit.internal_models.map((model) => (
-        <div key={model.provider} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={model.provider} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{model.label}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{model.label}</span>
             <span style={{ color: attributionStatusTone(model.status), fontSize: 13 }}>{zhProviderCoverageStatus(model.status)}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{model.role}</div>
@@ -8261,7 +5427,7 @@ function TeamBuilderProviderCoverageAuditPanel({ audit, error, loading }: {
       ))}
       {(audit.boundary_notes || []).length > 0 && (
         <div style={{ display: 'grid', gap: 3 }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>边界说明</div>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>边界说明</div>
           {(audit.boundary_notes || []).slice(0, 3).map((item: string, index: number) => (
             <div key={`${index}:${item}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>- {item}</div>
           ))}
@@ -8269,15 +5435,15 @@ function TeamBuilderProviderCoverageAuditPanel({ audit, error, loading }: {
       )}
       {audit.missing.length > 0 && (
         <div style={{ display: 'grid', gap: 3 }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>仍缺证据</div>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>仍缺证据</div>
           {audit.missing.slice(0, 4).map((item, index) => (
             <div key={`${index}:${item}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>- {item}</div>
           ))}
         </div>
       )}
       {audit.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{audit.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{audit.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{audit.next_actions[0].summary}</div>
           <SourceDataLink href={audit.next_actions[0].endpoint} label="下一步报告" />
         </div>
@@ -8299,23 +5465,23 @@ function TeamBuilderProviderSameInputTrialPlanPanel({ plan, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-same-input-trial>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>Provider 同口径试验计划读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-same-input-trial>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>Provider 同口径试验计划读取失败：{error}</div>
       </div>
     )
   }
   if (!plan) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-same-input-trial>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-provider-same-input-trial>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{loading ? '正在整理 Codex 同口径试验计划...' : '暂无 provider 同口径试验计划。'}</div>
       </div>
     )
   }
   const tone = plan.ready ? '#78d98b' : '#ffb74d'
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-provider-same-input-trial>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-provider-same-input-trial>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>{plan.title || 'Codex 同口径 TeamBuilder 试验计划'}</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>{plan.title || 'Codex 同口径 TeamBuilder 试验计划'}</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{plan.ready ? '可显式执行' : '被阻断'}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{plan.summary}</div>
@@ -8327,9 +5493,9 @@ function TeamBuilderProviderSameInputTrialPlanPanel({ plan, error, loading }: {
       </div>
       <div style={{ display: 'grid', gap: 4 }}>
         {plan.workers.slice(0, 4).map((worker) => (
-          <div key={worker.worker_id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={worker.worker_id} style={{ display: 'grid', gap: 3, padding: '5px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{worker.cn_name || worker.worker_id}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{worker.cn_name || worker.worker_id}</span>
               <span style={{ color: colors.textFaint, fontSize: 13 }}>{worker.baseline_status || '-'}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>{worker.worker_id}：{String(worker.format_in)} {'->'} {worker.format_out}</div>
@@ -8339,7 +5505,7 @@ function TeamBuilderProviderSameInputTrialPlanPanel({ plan, error, loading }: {
       </div>
       <div style={{ display: 'grid', gap: 4 }}>
         {plan.safety_gates.map((gate) => (
-          <div key={gate.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '4px 6px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={gate.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '4px 6px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <span style={{ color: colors.textMuted, fontSize: 13 }}>{gate.name || gate.id}</span>
             <span style={{ color: attributionStatusTone(gate.status), fontSize: 13 }}>{zhAttributionStatus(gate.status)}</span>
           </div>
@@ -8347,21 +5513,21 @@ function TeamBuilderProviderSameInputTrialPlanPanel({ plan, error, loading }: {
       </div>
       {plan.command && (
         <div style={{ display: 'grid', gap: 3 }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>显式执行命令</div>
-          <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere', padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>{plan.command}</div>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>显式执行命令</div>
+          <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35, overflowWrap: 'anywhere', padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>{plan.command}</div>
         </div>
       )}
       {plan.missing.length > 0 && (
         <div style={{ display: 'grid', gap: 3 }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>阻断项</div>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>阻断项</div>
           {plan.missing.slice(0, 4).map((item, index) => (
             <div key={`${index}:${item}`} style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.35 }}>- {item}</div>
           ))}
         </div>
       )}
       {plan.next_actions.length > 0 && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>下一步：{plan.next_actions[0].title}</div>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+          <div style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>下一步：{plan.next_actions[0].title}</div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{plan.next_actions[0].summary}</div>
           <SourceDataLink href={plan.next_actions[0].endpoint} label="复查报告" />
         </div>
@@ -8383,31 +5549,31 @@ function TeamBuilderClosureStatusPanel({ status, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>闭环状态读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>闭环状态读取失败：{error}</div>
       </div>
     )
   }
   if (!status) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在整理闭环状态...</div>
       </div>
     )
   }
   const tone = attributionStatusTone(status.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-closure-status>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-closure-status>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>TeamBuilder 闭环状态</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>TeamBuilder 闭环状态</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhAttributionStatus(status.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{status.summary}</div>
       <div style={{ display: 'grid', gap: 6 }}>
         {status.stages.map((stage) => (
-          <div key={stage.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+          <div key={stage.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{stage.name}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{stage.name}</span>
               <span style={{ color: attributionStatusTone(stage.status), fontSize: 13 }}>{zhAttributionStatus(stage.status)}</span>
             </div>
             <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{stage.summary}</div>
@@ -8417,7 +5583,7 @@ function TeamBuilderClosureStatusPanel({ status, error, loading }: {
       {status.missing.length > 0 && (
         <div style={{ display: 'grid', gap: 4 }}>
           {status.missing.slice(0, 4).map((item) => (
-            <div key={item} style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>缺口：{item}</div>
+            <div key={item} style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>缺口：{item}</div>
           ))}
         </div>
       )}
@@ -8437,30 +5603,30 @@ function TeamBuilderLlmReplayPlanPanel({ plan, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>LLM 回放计划读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>LLM 回放计划读取失败：{error}</div>
       </div>
     )
   }
   if (!plan) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在整理 LLM 回放计划...</div>
       </div>
     )
   }
   if (!plan.available) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }}>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>{plan.reason || '暂无 LLM 回放计划。'}</div>
       </div>
     )
   }
   const tone = llmReplayPlanTone(plan.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-llm-replay-plan>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-llm-replay-plan>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>LLM 回放计划</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>LLM 回放计划</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhLlmReplayVerdict(plan.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{plan.summary}</div>
@@ -8470,10 +5636,10 @@ function TeamBuilderLlmReplayPlanPanel({ plan, error, loading }: {
         <span style={S.pill}>阻断 {plan.counts.blocked}</span>
       </div>
       {plan.execution_preflight && (
-        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div style={{ display: 'grid', gap: 4, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>执行前置条件</span>
-            <span style={{ color: plan.execution_preflight.can_execute ? '#78d98b' : '#ffb74d', fontSize: 13 }}>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>执行前置条件</span>
+            <span style={{ color: plan.execution_preflight.can_execute ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>
               {plan.execution_preflight.can_execute ? '可执行' : '未满足'}
             </span>
           </div>
@@ -8487,10 +5653,10 @@ function TeamBuilderLlmReplayPlanPanel({ plan, error, loading }: {
         </div>
       )}
       {plan.actions.slice(0, 3).map((action) => (
-        <div key={action.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
+        <div key={action.id} style={{ display: 'grid', gap: 3, padding: '6px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{action.worker_id} / {action.model || '未声明模型'}</span>
-            <span style={{ color: action.status === 'ready' ? '#78d98b' : '#ff7b7b', fontSize: 13 }}>{action.status === 'ready' ? '可回放' : '阻断'}</span>
+            <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{action.worker_id} / {action.model || '未声明模型'}</span>
+            <span style={{ color: action.status === 'ready' ? 'var(--fp-ok)' : 'var(--fp-err)', fontSize: 13 }}>{action.status === 'ready' ? '可回放' : '阻断'}</span>
           </div>
           <div style={{ color: colors.textMuted, fontSize: 13, lineHeight: 1.4 }}>{action.human_summary}</div>
           <div style={{ color: colors.textFaint, fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
@@ -8515,30 +5681,30 @@ function TeamBuilderLlmReplayResultPanel({ result, error, loading }: {
 }) {
   if (error) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-llm-replay-result>
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>LLM 回放结果读取失败：{error}</div>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-llm-replay-result>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>LLM 回放结果读取失败：{error}</div>
       </div>
     )
   }
   if (loading && !result) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-llm-replay-result>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-llm-replay-result>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>正在读取 LLM 回放结果...</div>
       </div>
     )
   }
   if (!result) {
     return (
-      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-llm-replay-result>
+      <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 9, background: 'var(--fp-bg)', marginTop: 8 }} data-team-builder-llm-replay-result>
         <div style={{ color: colors.textMuted, fontSize: 13 }}>暂无 LLM 回放结果。</div>
       </div>
     )
   }
   const tone = llmReplayResultTone(result.verdict)
   return (
-    <div style={{ border: `1px solid ${tone}`, borderRadius: 6, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-llm-replay-result>
+    <div style={{ border: `1px solid ${tone}`, borderRadius: 2, padding: 10, background: 'var(--fp-bg)', display: 'grid', gap: 8, marginTop: 8 }} data-team-builder-llm-replay-result>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>真实 LLM 回放结果</div>
+        <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>真实 LLM 回放结果</div>
         <span style={{ ...S.pill, color: tone, borderColor: tone }}>{zhLlmReplayResultVerdict(result.verdict)}</span>
       </div>
       <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>{result.summary || result.reason || '暂无结果说明。'}</div>
@@ -8552,9 +5718,9 @@ function TeamBuilderLlmReplayResultPanel({ result, error, loading }: {
       {result.counts.executed_llm_workers?.length > 0 && (
         <div style={{ display: 'grid', gap: 4 }}>
           {result.counts.executed_llm_workers.slice(0, 4).map((worker) => (
-            <div key={`${worker.worker_id}:${worker.kind || ''}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '5px 7px', border: `1px solid ${colors.border}`, borderRadius: 5, background: colors.bg }}>
-              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 650 }}>{worker.worker_id}</span>
-              <span style={{ color: worker.kind === 'pass' ? '#78d98b' : '#ffb74d', fontSize: 13 }}>{worker.kind || '未知'}</span>
+            <div key={`${worker.worker_id}:${worker.kind || ''}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '5px 7px', border: `1px solid ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+              <span style={{ color: colors.textSecondary, fontSize: 15, fontWeight: 500 }}>{worker.worker_id}</span>
+              <span style={{ color: worker.kind === 'pass' ? 'var(--fp-ok)' : 'var(--fp-warn)', fontSize: 13 }}>{worker.kind || '未知'}</span>
             </div>
           ))}
         </div>
@@ -8562,14 +5728,14 @@ function TeamBuilderLlmReplayResultPanel({ result, error, loading }: {
       {result.failed_workers && result.failed_workers.length > 0 && (
         <div style={{ display: 'grid', gap: 4 }}>
           {result.failed_workers.slice(0, 3).map((worker) => (
-            <div key={`${worker.worker_id}:${worker.diagnosis || ''}`} style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
+            <div key={`${worker.worker_id}:${worker.diagnosis || ''}`} style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
               {worker.worker_id}：{worker.diagnosis || worker.kind}
             </div>
           ))}
         </div>
       )}
       {result.contract_failures && result.contract_failures.length > 0 && (
-        <div style={{ color: '#ffb74d', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.4, overflowWrap: 'anywhere' }}>
           {result.contract_failures.slice(0, 4).join('；')}
         </div>
       )}
@@ -8779,7 +5945,7 @@ function TeamMaterializationSection({ selectedNode, selectedMaterial, materializ
     return (
       <div style={S.section} data-team-materialization>
         <div style={S.label}>最近一次生成审查</div>
-        <div style={{ color: '#ffb74d', fontSize: 13, overflowWrap: 'anywhere' }}>{materializationError}</div>
+        <div style={{ color: 'var(--fp-warn)', fontSize: 13, overflowWrap: 'anywhere' }}>{materializationError}</div>
       </div>
     )
   }
@@ -8893,14 +6059,14 @@ function TeamMaterializationSection({ selectedNode, selectedMaterial, materializ
             const issues = reviewIssuesForWorker(materialization, run.worker_id)
             const reportForWorker = materializationReportForWorker(materialReport, run.worker_id)
             return (
-              <div key={run.worker_id} style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 10, background: colors.bg }}>
+              <div key={run.worker_id} style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10, background: colors.bg }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>{zhWorkerName(run.worker_id)}</div>
+                    <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>{zhWorkerName(run.worker_id)}</div>
                     <div style={{ marginTop: 3, color: colors.textMuted, fontFamily: fonts.mono, fontSize: 13, overflowWrap: 'anywhere' }}>{run.worker_id}</div>
                   </div>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                    <span style={{ color: run.status === 'succeeded' ? '#78d98b' : '#ff7b7b', fontSize: 13 }}>{zhGenerationStatus(run.status)}</span>
+                    <span style={{ color: run.status === 'succeeded' ? 'var(--fp-ok)' : 'var(--fp-err)', fontSize: 13 }}>{zhGenerationStatus(run.status)}</span>
                     <SourceDataLink href={materializationRawHref({ worker: run.worker_id })} label="原始记录" />
                   </span>
                 </div>
@@ -8914,7 +6080,7 @@ function TeamMaterializationSection({ selectedNode, selectedMaterial, materializ
                       字段契约：{reportForWorker.field_contract.summary}
                     </div>
                     {reportForWorker.risks.slice(0, 2).map((risk) => (
-                      <div key={risk} style={{ color: '#ffb74d' }}>风险：{risk}</div>
+                      <div key={risk} style={{ color: 'var(--fp-warn)' }}>风险：{risk}</div>
                     ))}
                     {reportForWorker.next_actions[0] && (
                       <div style={{ color: colors.textMuted }}>下一步：{reportForWorker.next_actions[0]}</div>
@@ -8953,7 +6119,7 @@ function TeamMaterializationSection({ selectedNode, selectedMaterial, materializ
                   </div>
                 )}
                 {issues.length > 0 && (
-                  <div style={{ marginTop: 8, color: '#ffb74d', fontSize: 13, lineHeight: 1.45 }}>
+                  <div style={{ marginTop: 8, color: 'var(--fp-warn)', fontSize: 13, lineHeight: 1.45 }}>
                     {issues.map((issue) => (
                       <div key={`${issue.category}-${issue.issue}`} style={{ display: 'grid', gap: 5 }}>
                         <div>{issue.issue}</div>
@@ -8981,10 +6147,10 @@ function TeamMaterializationSection({ selectedNode, selectedMaterial, materializ
 }
 
 function nodeColor(node: TeamGraphNode): { background: string; border: string } {
-  if (node.is_entry) return { background: '#132033', border: colors.accent }
-  if (node.validator_kind === 'hard') return { background: '#11251a', border: '#2f8f4e' }
-  if (node.validator_kind === 'soft') return { background: '#211c34', border: '#7761d8' }
-  if (node.kind === 'transformer') return { background: '#102a30', border: '#02b8cc' }
+  if (node.is_entry) return { background: 'var(--fp-bp-paper-2)', border: colors.accent }
+  if (node.validator_kind === 'hard') return { background: 'color-mix(in srgb, var(--fp-ok) 14%, transparent)', border: 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' }
+  if (node.validator_kind === 'soft') return { background: 'var(--fp-bp-paper-2)', border: 'var(--fp-border)' }
+  if (node.kind === 'transformer') return { background: 'var(--fp-bp-paper-2)', border: 'var(--fp-border)' }
   return { background: colors.bgCard, border: colors.border }
 }
 
@@ -9661,11 +6827,7 @@ const TEAM_EDGE_TYPES = { elk: ElkRoutedEdge }
 function DefinitionButton({ definition, title, compact = false }: { definition: TeamDefinitionRef | null; title: string; compact?: boolean }) {
   const openTab = usePanels((state) => state.openTab)
   if (!definition) {
-    // 节点卡(compact)不再每卡一句占位话 —— 缩为一枚空心点(缺入口才显示,title/aria 兜底);
-    // 侧栏键值行保留文字形态(它是详情语境)。
-    return compact
-      ? <span title="暂无定义入口" aria-label="暂无定义入口" style={{ width: 8, height: 8, borderRadius: '50%', border: `1.5px solid ${colors.border}`, display: 'inline-block', flexShrink: 0 }} />
-      : <span style={{ color: colors.textFaint, fontSize: 13 }}>暂无定义入口</span>
+    return <span style={{ color: colors.textFaint, fontSize: 13 }}>暂无定义入口</span>
   }
   return (
     <button
@@ -9681,15 +6843,14 @@ function DefinitionButton({ definition, title, compact = false }: { definition: 
       }}
       style={{
         border: `1px solid ${colors.border}`,
-        background: 'var(--fp-bp-paper-2)',
+        background: 'var(--fp-bp-solid)',
         color: colors.textSecondary,
-        height: compact ? 22 : 26,
-        padding: compact ? '0 7px' : '0 9px',
-        borderRadius: 3,
-        fontSize: 12,
+        height: compact ? 20 : 24,
+        padding: compact ? '0 6px' : '0 8px',
+        borderRadius: 2,
+        fontSize: compact ? 10 : 11,
         cursor: 'pointer',
-        fontFamily: fonts.mono,
-        flexShrink: 0,
+        fontFamily: fonts.ui,
       }}
     >
       定义
@@ -9775,7 +6936,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
             label: (
               <div data-team-materialization-node data-team-materialization-worker-node style={{ width: '100%', maxWidth: '100%', height: '100%', minWidth: 0, overflow: 'hidden', fontFamily: fonts.ui }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                  <div title={`${zhWorkerName(run.worker_id)} / ${run.worker_id}`} style={{ fontSize: 15, fontWeight: 650, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div title={`${zhWorkerName(run.worker_id)} / ${run.worker_id}`} style={{ fontSize: 15, fontWeight: 500, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {zhWorkerName(run.worker_id)}
                   </div>
                   <span style={{ fontSize: 13, color: borderColor, whiteSpace: 'nowrap' }}>{zhGenerationStatus(run.status)}</span>
@@ -9797,9 +6958,9 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
           style: {
             width: MATERIALIZATION_WORKER_NODE_WIDTH,
             height: MATERIALIZATION_WORKER_NODE_HEIGHT,
-            borderRadius: 7,
+            borderRadius: 2,
             border: `${selected ? 2 : 1}px solid ${borderColor}`,
-            background: '#10182a',
+            background: 'var(--fp-bp-paper-2)',
             color: colors.text,
             boxShadow: selected ? '0 0 0 1px rgba(228,242,34,.35)' : 'none',
             overflow: 'hidden',
@@ -9831,12 +6992,12 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
             label: (
               <div data-team-materialization-node style={{ width: '100%', maxWidth: '100%', height: '100%', minWidth: 0, overflow: 'hidden', fontFamily: fonts.ui }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                  <div style={{ fontSize: 13, color: tone, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 13, color: tone, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {materializationLinkKindLabel(visualNode.linkKind, link)}
                   </div>
                   <span style={{ fontSize: 13, color: colors.textMuted, whiteSpace: 'nowrap' }}>{zhConfidence(link.confidence)}</span>
                 </div>
-                <div title={`${title} / ${target}`} style={{ marginTop: 5, fontSize: 15, fontWeight: 650, color: colors.text, ...lineClamp(2) }}>
+                <div title={`${title} / ${target}`} style={{ marginTop: 5, fontSize: 15, fontWeight: 500, color: colors.text, ...lineClamp(2) }}>
                   {title}
                 </div>
                 <div style={{ marginTop: 5, fontSize: 13, color: colors.textSecondary, lineHeight: 1.35, ...lineClamp(2) }}>
@@ -9854,7 +7015,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
           style: {
             width: MATERIALIZATION_LINK_NODE_WIDTH,
             height: MATERIALIZATION_LINK_NODE_HEIGHT,
-            borderRadius: 7,
+            borderRadius: 2,
             border: `${selected ? 2 : 1}px ${link.registration_status === 'generated-candidate' ? 'solid' : 'dashed'} ${selected ? 'var(--fp-accent)' : tone}`,
             background: linkBackground,
             color: colors.text,
@@ -9879,12 +7040,12 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
             label: (
               <div data-team-materialization-node data-team-materialization-group-node style={{ width: '100%', maxWidth: '100%', height: '100%', minWidth: 0, overflow: 'hidden', fontFamily: fonts.ui }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                  <div style={{ fontSize: 13, color: tone, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 13, color: tone, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {group.linkKind === 'resource' ? '读取线索组' : '确认读取组'}
                   </div>
                   <span style={{ fontSize: 13, color: colors.textMuted, whiteSpace: 'nowrap' }}>{group.count} 条</span>
                 </div>
-                <div title={group.label} style={{ marginTop: 5, fontSize: 15, fontWeight: 650, color: colors.text, ...lineClamp(2) }}>
+                <div title={group.label} style={{ marginTop: 5, fontSize: 15, fontWeight: 500, color: colors.text, ...lineClamp(2) }}>
                   {group.label}
                 </div>
                 <div style={{ marginTop: 5, fontSize: 13, color: colors.textSecondary, lineHeight: 1.35, ...lineClamp(2) }}>
@@ -9901,7 +7062,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
           style: {
             width: MATERIALIZATION_LINK_GROUP_NODE_WIDTH,
             height: MATERIALIZATION_LINK_GROUP_NODE_HEIGHT,
-            borderRadius: 7,
+            borderRadius: 2,
             border: `${selected ? 2 : 1}px dashed ${selected ? 'var(--fp-accent)' : tone}`,
             background,
             color: colors.text,
@@ -9927,7 +7088,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
             label: (
               <div data-team-resource-node style={{ width: '100%', maxWidth: '100%', height: '100%', minWidth: 0, overflow: 'hidden', fontFamily: fonts.ui }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                  <div style={{ fontSize: 15, fontWeight: 650, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {resource.label}
                   </div>
                   <span style={{ fontSize: 13, color: meta.tone, whiteSpace: 'nowrap' }}>{resource.confidence}</span>
@@ -9949,7 +7110,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
           style: {
             width: RESOURCE_NODE_WIDTH,
             height: RESOURCE_NODE_HEIGHT,
-            borderRadius: 7,
+            borderRadius: 2,
             border: `1px dashed ${meta.tone}`,
             background: meta.background,
             color: colors.text,
@@ -9966,8 +7127,8 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
         const activeInRun = activeMaterialIds.has(material.id)
         const doctorFinding = highestDoctorFinding(doctorByMaterial.get(material.id) || [])
         const doctor = doctorTone(doctorFinding?.level)
-        const borderColor = selected ? 'var(--fp-accent)' : doctor ? doctor.border : activeInRun ? '#36c275' : '#7b6b43'
-        const background = doctor ? doctor.background : activeInRun ? '#102416' : '#16130d'
+        const borderColor = selected ? 'var(--fp-accent)' : doctor ? doctor.border : activeInRun ? 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' : 'color-mix(in srgb, var(--fp-warn) 45%, transparent)'
+        const background = doctor ? doctor.background : activeInRun ? 'color-mix(in srgb, var(--fp-ok) 14%, transparent)' : 'color-mix(in srgb, var(--fp-err) 14%, transparent)'
         const opacity = hasRunOverlay && !activeInRun && !doctor ? 0.5 : 1
         const title = zhMaterialName(material.id)
 
@@ -9980,7 +7141,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
             label: (
             <div data-team-node-content style={{ width: '100%', maxWidth: '100%', height: '100%', minWidth: 0, overflow: 'hidden', fontFamily: fonts.ui }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                  <div style={{ fontSize: 15, fontWeight: 650, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {title}
                   </div>
                   <DefinitionButton definition={material.definition} title={title} compact />
@@ -9997,7 +7158,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
           style: {
             width: MATERIAL_NODE_WIDTH,
             height: MATERIAL_NODE_HEIGHT,
-            borderRadius: 7,
+            borderRadius: 2,
             border: `${selected || activeInRun ? 2 : 1}px solid ${borderColor}`,
             background,
             color: colors.text,
@@ -10017,8 +7178,8 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
       const failedInRun = hasFailedVerdict(nodeStatus)
       const doctorFinding = highestDoctorFinding(doctorByNode.get(node.id) || [])
       const doctor = doctorTone(doctorFinding?.level)
-      const borderColor = selected ? 'var(--fp-accent)' : doctor ? doctor.border : failedInRun ? '#e05252' : activeInRun ? '#36c275' : tone.border
-      const background = doctor ? doctor.background : failedInRun ? '#2a1111' : activeInRun ? '#0f2a1a' : tone.background
+      const borderColor = selected ? 'var(--fp-accent)' : doctor ? doctor.border : failedInRun ? 'color-mix(in srgb, var(--fp-err) 45%, transparent)' : activeInRun ? 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' : tone.border
+      const background = doctor ? doctor.background : failedInRun ? 'color-mix(in srgb, var(--fp-err) 14%, transparent)' : activeInRun ? 'color-mix(in srgb, var(--fp-ok) 14%, transparent)' : tone.background
       const opacity = hasRunOverlay && !activeInRun && !doctor ? 0.42 : 1
       const title = zhWorkerName(node)
       const inputText = node.format_in.map(zhMaterialName).join('、') || '-'
@@ -10034,11 +7195,11 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
           label: (
             <div data-team-node-content style={{ width: '100%', maxWidth: '100%', height: '100%', minWidth: 0, overflow: 'hidden', fontFamily: fonts.ui }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <div title={`${title} / ${node.id}`} style={{ fontSize: 15, fontWeight: 650, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div title={`${title} / ${node.id}`} style={{ fontSize: 15, fontWeight: 500, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {title}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, color: node.validator_kind === 'hard' ? '#72d68a' : '#b2a7ff', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 13, color: node.validator_kind === 'hard' ? 'var(--fp-ok)' : 'var(--fp-link)', whiteSpace: 'nowrap' }}>
                     {doctor ? doctor.label : zhValidatorKind(node.validator_kind || node.kind)}
                   </span>
                   <DefinitionButton definition={node.definition} title={title} compact />
@@ -10047,7 +7208,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
               <div style={{ marginTop: 4, fontFamily: fonts.mono, fontSize: 13, color: colors.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {node.label && node.label !== node.id ? `${node.id} / ${node.label}` : node.id}
               </div>
-              <div title={summaryText} style={{ marginTop: 6, color: colors.textSecondary, fontSize: 13, lineHeight: 1.38, ...lineClamp(1) }}>
+              <div title={summaryText} style={{ marginTop: 6, color: colors.textSecondary, fontSize: 13, lineHeight: 1.38, ...lineClamp(2) }}>
                 {summaryText}
               </div>
               <div style={{ marginTop: 9, display: 'grid', gridTemplateColumns: '38px minmax(0, 1fr)', columnGap: 7, rowGap: 6, alignItems: 'start' }}>
@@ -10066,7 +7227,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
         style: {
           width: GRAPH_NODE_WIDTH,
           height: GRAPH_NODE_HEIGHT,
-          borderRadius: 8,
+          borderRadius: 2,
           border: `${selected || activeInRun || failedInRun ? 2 : 1}px solid ${borderColor}`,
           background,
           color: colors.text,
@@ -10100,7 +7261,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
             : edge.kind === 'materialization-owner'
               ? '#b2a7ff'
               : '#78d98b'
-        : resourceMeta ? resourceMeta.tone : doctor ? doctor.border : activeEdge ? '#36c275' : edge.kind === 'producer' ? '#7b6b43' : '#5e6ad2'
+        : resourceMeta ? resourceMeta.tone : doctor ? doctor.border : activeEdge ? 'color-mix(in srgb, var(--fp-ok) 45%, transparent)' : edge.kind === 'producer' ? 'color-mix(in srgb, var(--fp-warn) 45%, transparent)' : 'var(--fp-border)'
       // 被拖动节点的边: 丢掉 dagre 走线点, 让 ElkRoutedEdge 用实时句柄直连跟手; 其余边保留 dagre 走线。
       const edgeDragging = draggedIds.has(edge.source) || draggedIds.has(edge.target)
       const routePts = edgeDragging ? undefined : elkRoutes?.get(edge.id)
@@ -10114,7 +7275,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
         animated: activeEdge,
         label: materializationEdge ? materializationEdgeLabel(edge) : edge.kind === 'resource' ? '资源线索' : edge.kind === 'producer' ? undefined : zhMaterialName(edge.material_id),
         labelStyle: { fill: colors.textMuted, fontSize: 13, fontFamily: fonts.mono },
-        labelBgStyle: { fill: '#090a0b', fillOpacity: 0.86 },
+        labelBgStyle: { fill: 'var(--fp-text-3)', fillOpacity: 0.86 },
         markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
         style: {
           stroke,
@@ -10208,22 +7369,22 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
       }}
       proOptions={{ hideAttribution: true }}
     >
-      <Background color="rgba(190,220,255,.16)" gap={26} />
+      <Background color="#1b1d20" gap={18} />
       <MiniMap
         pannable
         zoomable
         nodeStrokeWidth={2}
         nodeColor={(node) => String(node.style?.background || '#15181d')}
         nodeStrokeColor={(node) => String(node.style?.borderColor || '#343944')}
-        maskColor="rgba(9,26,62,.66)"
+        maskColor="rgba(0,0,0,.62)"
         style={{
           width: 132,
           height: 92,
           right: 12,
           bottom: 46,
-          background: '#0d2450',
+          background: 'var(--fp-bp-solid)',
           border: `1px solid ${colors.border}`,
-          borderRadius: 3,
+          borderRadius: 2,
         }}
       />
       <Controls showInteractive={false} />
@@ -10236,7 +7397,7 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
             border: `1px solid ${colors.border}`,
             background: 'rgba(7, 9, 11, 0.94)',
             color: colors.textSecondary,
-            borderRadius: 6,
+            borderRadius: 2,
             padding: '5px 11px',
             fontSize: 13,
             cursor: 'pointer',
@@ -10255,14 +7416,14 @@ function TeamGraphCanvas({ graph, selectedItemId, onSelectItem, runDetail, docto
               width: 260,
               padding: 10,
               border: `1px solid ${colors.border}`,
-              borderRadius: 7,
+              borderRadius: 2,
               background: 'rgba(7, 9, 11, 0.94)',
               color: colors.text,
               fontFamily: fonts.ui,
               boxShadow: '0 14px 36px rgba(0,0,0,.36)',
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 650, color: colors.text }}>实战归因层</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: colors.text }}>实战归因层</div>
             <div style={{ marginTop: 5, fontFamily: fonts.mono, fontSize: 13, color: colors.textMuted, overflowWrap: 'anywhere' }}>
               {materializationForGraph.run_id}
             </div>
@@ -10327,7 +7488,7 @@ function WorkerPromptBlock({ prompt }: { prompt: { attr: string; text: string } 
         <button
           type="button"
           onClick={copy}
-          style={{ border: `1px solid ${colors.border}`, background: '#11151a', color: colors.textSecondary, height: 22, padding: '0 8px', borderRadius: 5, cursor: 'pointer', fontSize: 15 }}
+          style={{ border: `1px solid ${colors.border}`, background: 'var(--fp-bp-solid)', color: colors.textSecondary, height: 22, padding: '0 8px', borderRadius: 2, cursor: 'pointer', fontSize: 15 }}
         >{copied ? '已复制' : '复制'}</button>
       </div>
       <pre style={S.sourceExcerpt}>{shown}{long && !expanded ? '\n…' : ''}</pre>
@@ -10335,7 +7496,7 @@ function WorkerPromptBlock({ prompt }: { prompt: { attr: string; text: string } 
         <button
           type="button"
           onClick={(event) => { event.stopPropagation(); setExpanded((value) => !value) }}
-          style={{ justifySelf: 'start', border: 'none', background: 'transparent', color: colors.accent || '#6cb6ff', cursor: 'pointer', fontSize: 15, padding: 0 }}
+          style={{ justifySelf: 'start', border: 'none', background: 'transparent', color: colors.accent || 'var(--fp-link)', cursor: 'pointer', fontSize: 15, padding: 0 }}
         >{expanded ? '收起' : `展开全部(${lines.length} 行)`}</button>
       )}
     </div>
@@ -10387,10 +7548,10 @@ function DefinitionDetail({ definition, kind, presentation = 'card' }: {
             <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>
               <div style={S.label}>字段</div>
               {definition.material.fields.slice(0, 10).map((field) => (
-                <div key={field.name} style={{ border: `1px solid ${colors.border}`, borderRadius: 4, padding: 7, background: colors.bg }}>
+                <div key={field.name} style={{ border: `1px solid ${colors.border}`, borderRadius: 3, padding: 7, background: colors.bg }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                     <span style={{ fontFamily: fonts.mono, color: colors.text, fontSize: 13 }}>{field.name}</span>
-                    <span style={{ color: field.required ? '#ffb74d' : colors.textMuted, fontSize: 13 }}>{field.required ? '必填' : '可选'}{field.type ? ` · ${field.type}` : ''}</span>
+                    <span style={{ color: field.required ? 'var(--fp-warn)' : colors.textMuted, fontSize: 13 }}>{field.required ? '必填' : '可选'}{field.type ? ` · ${field.type}` : ''}</span>
                   </div>
                   {field.description && <div style={{ marginTop: 4, color: colors.textMuted, fontSize: 13, lineHeight: 1.45 }}>{field.description}</div>}
                 </div>
@@ -10773,10 +7934,6 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
   llmReplayResultLoading: boolean
 }) {
   const warnings = graph.health.warnings
-  // 面板节渐进披露(2026-07-19 G): 运行轨迹/资源空间线索/材料清单默认折叠,
-  // 节头整行可点(aria-expanded + 计数),把面板信息密度降到"扫一眼"级。
-  const [closedSections, setClosedSections] = useState<Record<string, boolean>>({ runs: true, resources: true, materials: true })
-  const toggleSection = (k: string) => setClosedSections((p) => ({ ...p, [k]: !p[k] }))
   const materials = graph.materials.slice(0, 12)
   const selectedNodeStatus = selectedNode
     ? runDetail?.node_statuses.find((status) => status.node_id === selectedNode.id)
@@ -10802,24 +7959,22 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
           <PanelRightClose size={15} strokeWidth={1.8} />
         </button>
       </div>
-      {graph.builders.length > 1 ? (
-        <select value={builderValue} onChange={(e) => onBuilderChange(e.target.value)} style={S.select}>
-          {graph.builders.map((builder) => (
-            <option key={builder.name} value={builder.name}>
-              {builder.name}（{builder.nodes} 节点 / {builder.edges} 连接）
-            </option>
-          ))}
-        </select>
-      ) : (
-        // 单构建器时下拉是死交互 —— 降级为静态标题 + ⊢N·M⊣ 计数(虚线测量件)。
-        <div data-team-builder-static style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px dashed var(--fp-border)', borderRadius: 3, padding: '6px 10px' }}>
-          <span style={{ flex: 1, minWidth: 0, fontFamily: fonts.mono, fontSize: 12, color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{builderValue}</span>
-          <span className="v2-count" style={{ flex: 'none' }}>{graph.nodes.length}·{graph.edges.length}</span>
-        </div>
-      )}
+      {/* 2026-08-06: 原生 select 展开是系统黑弹层, 换蓝图自绘件。 */}
+      <BlueprintSelect
+        value={builderValue}
+        onChange={onBuilderChange}
+        style={{ width: '100%' }}
+        label="builder"
+        aria-label="选择 builder"
+        options={graph.builders.map((builder) => ({
+          value: builder.name,
+          label: builder.name,
+          hint: `${builder.nodes} 节点 / ${builder.edges} 连接`,
+        }))}
+      />
 
       {isSmoke && (
-        <div style={{ ...S.section, color: '#ffb74d', fontSize: 13 }}>
+        <div style={{ ...S.section, color: 'var(--fp-warn)', fontSize: 13 }}>
           这个 team 只保留为冒烟测试样本，不能代表真实 TeamBuilder 的能力。
         </div>
       )}
@@ -10827,39 +7982,25 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
       <div style={S.section}>
         <div style={S.label}>结构概览</div>
         <Kv name="中文代称" value={zhTeamName(graph)} />
-        <Kv name="中文说明" value={<span title={teamZhDescription(graph)} style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{teamZhDescription(graph)}</span>} />
+        <Kv name="中文说明" value={teamZhDescription(graph)} />
         <Kv name="定义入口" value={<DefinitionButton definition={graph.definition} title={zhTeamName(graph)} />} />
         <div style={S.metricRow}>
           <div style={S.metric}><div style={S.metricValue}>{graph.nodes.length}</div><div style={S.metricName}>节点</div></div>
           <div style={S.metric}><div style={S.metricValue}>{graph.edges.length}</div><div style={S.metricName}>连接</div></div>
           <div style={S.metric}><div style={S.metricValue}>{graph.materials.length}</div><div style={S.metricName}>材料</div></div>
         </div>
-        {/* 边/节点构成 chips:零值类目自动隐藏(0 是噪音),有值类目才占版面 */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-          {([
-            ['硬规则', graph.health.hard_nodes],
-            ['模型判断', graph.health.soft_nodes],
-            ['反馈边', graph.health.feedback_edges],
-            ['外部输入', graph.health.external_inputs],
-            ['最终输出', graph.health.terminal_outputs],
-          ] as [string, number][]).filter(([, n]) => n > 0).map(([k, n]) => (
-            <span key={k} style={S.pill}>{k} {n}</span>
-          ))}
-        </div>
+        <Kv name="硬规则" value={graph.health.hard_nodes} />
+        <Kv name="模型判断" value={graph.health.soft_nodes} />
+        <Kv name="反馈边" value={graph.health.feedback_edges} />
+        <Kv name="外部输入" value={graph.health.external_inputs} />
+        <Kv name="最终输出" value={graph.health.terminal_outputs} />
       </div>
 
       <div style={S.section}>
         <div style={S.label}>健康诊断</div>
         {doctorError ? (
-          <div style={{ color: '#ffb74d', fontSize: 13, overflowWrap: 'anywhere' }}>{doctorError}</div>
+          <div style={{ color: 'var(--fp-warn)', fontSize: 13, overflowWrap: 'anywhere' }}>{doctorError}</div>
         ) : doctorHealth ? (
-          doctorHealth.counts.total === 0 ? (
-            // 全绿 = 一行状态徽标;有问题才展开统计卡+findings 明细。
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }} data-doctor-summary>
-              <span className="v2-status st-ok"><i className="led" aria-hidden />{zhDoctorStatus(doctorHealth.status)}</span>
-              <span style={{ color: colors.textFaint, fontSize: 12, fontFamily: fonts.mono }}>检查项 {doctorHealth.checks.filter((check) => check.default_on).length} · 问题 0</span>
-            </div>
-          ) : (
           <>
             <div style={S.metricRow} data-doctor-summary>
               <div style={S.metric}><div style={S.metricValue}>{doctorHealth.counts.total}</div><div style={S.metricName}>问题</div></div>
@@ -10873,7 +8014,7 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
                 {doctorHealth.findings.slice(0, 5).map((finding) => {
                   const tone = doctorTone(finding.level)
                   return (
-                    <div key={finding.id} style={{ border: `1px solid ${tone?.border || colors.border}`, borderRadius: 6, padding: 8, background: colors.bg }}>
+                    <div key={finding.id} style={{ border: `1px solid ${tone?.border || colors.border}`, borderRadius: 2, padding: 8, background: colors.bg }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                         <span style={{ fontFamily: fonts.mono, fontSize: 13, color: colors.text }}>{finding.check_id}</span>
                         <span style={{ fontSize: 13, color: tone?.border || colors.textMuted }}>{zhDoctorLevel(finding.level)}</span>
@@ -10892,7 +8033,6 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
               <div style={{ marginTop: 8, color: colors.textMuted, fontSize: 13 }}>当前构建器没有诊断问题。</div>
             )}
           </>
-          )
         ) : (
           <div style={{ color: colors.textMuted, fontSize: 13 }}>{doctorLoading ? '正在加载诊断结果...' : '暂无诊断数据。'}</div>
         )}
@@ -11026,15 +8166,9 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
       )}
 
       <div style={S.section}>
-        <button type="button" aria-expanded={!closedSections.runs} data-team-section-toggle="runs" onClick={() => toggleSection('runs')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'transparent', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>
-          <span style={{ ...S.label, marginBottom: 0, flex: 1 }}>运行轨迹</span>
-          {runs.length > 0 && <span style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textFaint }}>{runs.length} 条</span>}
-          <span style={{ color: colors.textFaint, fontSize: 12 }} aria-hidden>{closedSections.runs ? '▸' : '▾'}</span>
-        </button>
-        {!closedSections.runs && (<>
+        <div style={S.label}>运行轨迹</div>
         {runsError ? (
-          <div style={{ color: '#ffb74d', fontSize: 13, overflowWrap: 'anywhere' }}>{runsError}</div>
+          <div style={{ color: 'var(--fp-warn)', fontSize: 13, overflowWrap: 'anywhere' }}>{runsError}</div>
         ) : runs.length === 0 ? (
           <div style={{ color: colors.textMuted, fontSize: 13 }}>事件库里没有找到匹配的运行记录。</div>
         ) : (
@@ -11050,7 +8184,7 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                   <span style={{ fontFamily: fonts.mono, fontSize: 13, color: colors.text }}>{shortTrace(run.trace_id)}</span>
-                  <span style={{ fontSize: 13, color: run.status === 'error' ? '#ff7b7b' : '#78d98b' }}>{zhRunStatus(run.status)}</span>
+                  <span style={{ fontSize: 13, color: run.status === 'error' ? 'var(--fp-err)' : 'var(--fp-ok)' }}>{zhRunStatus(run.status)}</span>
                 </div>
                 <div style={{ marginTop: 4, fontSize: 13, color: colors.textMuted }}>
                   {run.matched_nodes.length}/{run.total_nodes} 节点，{run.tool_calls} 工具，{run.llm_calls} 模型调用，{run.agent_turns} 轮次
@@ -11077,17 +8211,10 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
           </div>
         )}
         {runLoading && <div style={{ marginTop: 8, color: colors.textMuted, fontSize: 13 }}>正在加载运行叠加层...</div>}
-        </>)}
       </div>
 
       <div style={S.section} data-team-resource-hints>
-        <button type="button" aria-expanded={!closedSections.resources} data-team-section-toggle="resources" onClick={() => toggleSection('resources')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'transparent', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>
-          <span style={{ ...S.label, marginBottom: 0, flex: 1 }}>资源空间线索</span>
-          {resourceHints.length > 0 && <span style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textFaint }}>{resourceHints.length} 条</span>}
-          <span style={{ color: colors.textFaint, fontSize: 12 }} aria-hidden>{closedSections.resources ? '▸' : '▾'}</span>
-        </button>
-        {!closedSections.resources && (<>
+        <div style={S.label}>资源空间线索</div>
         {resourceHints.length === 0 ? (
           <div style={{ color: colors.textMuted, fontSize: 13 }}>暂未从名称、说明或工具参数里推断出额外资源空间。</div>
         ) : (
@@ -11097,7 +8224,7 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
               return (
                 <div key={hint.id} style={{ ...S.resourceCard, borderColor: meta.tone, background: meta.background }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>{hint.label}</span>
+                    <span style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>{hint.label}</span>
                     <span style={{ color: meta.tone, fontSize: 13 }}>{hint.confidence}</span>
                   </div>
                   <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.45 }}>{hint.description}</div>
@@ -11115,7 +8242,6 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
             })}
           </div>
         )}
-        </>)}
       </div>
 
       <div style={{ ...S.section, display: 'none' }} aria-hidden="true">
@@ -11200,18 +8326,12 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
       </div>
 
       <div style={S.section}>
-        <button type="button" aria-expanded={!closedSections.materials} data-team-section-toggle="materials" onClick={() => toggleSection('materials')}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'transparent', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textAlign: 'left' }}>
-          <span style={{ ...S.label, marginBottom: 0, flex: 1 }}>材料清单</span>
-          {materials.length > 0 && <span style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.textFaint }}>{materials.length} 项</span>}
-          <span style={{ color: colors.textFaint, fontSize: 12 }} aria-hidden>{closedSections.materials ? '▸' : '▾'}</span>
-        </button>
-        {!closedSections.materials && (
+        <div style={S.label}>材料清单</div>
         <div style={{ display: 'grid', gap: 10 }}>
           {materials.map((material) => (
             <div key={material.id} style={S.materialCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <div style={{ color: colors.text, fontSize: 15, fontWeight: 650 }}>{zhMaterialName(material.id)}</div>
+                <div style={{ color: colors.text, fontSize: 15, fontWeight: 500 }}>{zhMaterialName(material.id)}</div>
                 <DefinitionButton definition={material.definition} title={zhMaterialName(material.id)} compact />
               </div>
               <div style={S.materialId}>{material.id}</div>
@@ -11230,7 +8350,6 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
             </div>
           ))}
         </div>
-        )}
       </div>
 
       {(warnings.length > 0 || Object.keys(graph.health.builder_errors || {}).length > 0) && (
@@ -11238,10 +8357,10 @@ function GraphSidePanel({ graph, selectedNode, selectedMaterial, builderValue, o
           <div style={S.label}>告警</div>
           <div style={{ display: 'grid', gap: 6 }}>
             {warnings.map((warning) => (
-              <div key={warning} style={{ color: '#ffb74d', fontSize: 13, overflowWrap: 'anywhere' }}>{warning}</div>
+              <div key={warning} style={{ color: 'var(--fp-warn)', fontSize: 13, overflowWrap: 'anywhere' }}>{warning}</div>
             ))}
             {Object.entries(graph.health.builder_errors || {}).map(([name, error]) => (
-              <div key={name} style={{ color: '#ffb74d', fontSize: 13, overflowWrap: 'anywhere' }}>{name}: {error}</div>
+              <div key={name} style={{ color: 'var(--fp-warn)', fontSize: 13, overflowWrap: 'anywhere' }}>{name}: {error}</div>
             ))}
           </div>
         </div>
@@ -11387,9 +8506,7 @@ function TeamGraphView({ graph, entity, builderValue, onBuilderChange }: {
   const [llmReplayResultError, setLlmReplayResultError] = useState<string | null>(null)
   const [llmReplayResultLoading, setLlmReplayResultLoading] = useState(false)
   const showTeamBuilderMaterialization = entity.id === 'services/_core/team_builder/team'
-  // 窄屏(≤1024)默认收起右栏成「右侧栏」浮钮,画布全宽(analysis 形态 Top1:
-  // 面板定宽 390 吃掉 834 视口 43%,图退化为缩略区);desktop(>1024)维持 V1 默认展开。
-  const [sidePanelVisible, setSidePanelVisible] = useState(() => typeof window === 'undefined' || window.matchMedia('(min-width: 1025px)').matches)
+  const [sidePanelVisible, setSidePanelVisible] = useState(true)
   useEffect(() => {
     setSelectedItemId(null)
   }, [graph.team_id, graph.selected_builder, graph.entry])
@@ -12761,16 +9878,11 @@ const Editor: React.FC<{ entity: TeamEntity }> = ({ entity }) => {
           <div style={S.title}>{title}</div>
           <div style={S.subtitle}>{subtitle}</div>
         </div>
-        <Segmented
-          label="视图"
-          current={view}
-          onChange={(v) => setView(v as 'graph' | 'design' | 'source')}
-          items={[
-            { value: 'graph', label: '结构图' },
-            { value: 'design', label: '设计说明' },
-            { value: 'source', label: '源码' },
-          ]}
-        />
+        <div style={S.tabs}>
+          <button style={S.tab(view === 'graph')} onClick={() => setView('graph')}>结构图</button>
+          <button style={S.tab(view === 'design')} onClick={() => setView('design')}>设计说明</button>
+          <button style={S.tab(view === 'source')} onClick={() => setView('source')}>源码</button>
+        </div>
       </div>
 
       {view === 'graph' ? (

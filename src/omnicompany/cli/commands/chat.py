@@ -16,6 +16,8 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -27,11 +29,17 @@ import click
 
 
 def _repo_root() -> Path:
-    here = Path.cwd().resolve()
-    for d in (here, *here.parents):
-        if (d / "src" / "omnicompany").is_dir() and (d / "docs").is_dir():
-            return d
-    return Path(__file__).resolve().parents[4]
+    """omnicompany 仓库根 — 走 core.config 的唯一权威解析器。
+
+    原实现从 cwd 向上找 `src/omnicompany` + `docs` 双命中, 会被工作区根的
+    游离同名目录劫持 (见 cli/commands/plan.py 同一处修复)。
+    与 hooks/_shared.repo_root() 对齐。
+    """
+    try:
+        from omnicompany.core.config import omni_workspace_root
+        return omni_workspace_root()
+    except Exception:
+        return Path(__file__).resolve().parents[4]
 
 
 def _meta_store_path() -> Path:
@@ -48,7 +56,7 @@ def _read_meta_store() -> dict[str, dict[str, Any]]:
         # multiple browser-backed PTYs.  Reuse the daemon's cross-process lock
         # instead of briefly opening the replace target without FILE_SHARE_DELETE
         # on Windows (that used to make an unrelated writer lose its update).
-        from omnicompany.dashboard.ccdaemon.pty import _read_meta_store as read_store
+        from omnicompany.dashboard.ccdaemon.api import read_meta_store as read_store
 
         return read_store(use_cache=False)
     except (ImportError, json.JSONDecodeError, OSError, ValueError) as exc:
@@ -62,7 +70,7 @@ def _write_meta_store(store: dict[str, dict[str, Any]]) -> None:
         # patch, writes through a unique temp file and retries Windows replace
         # contention.  A failed registry update must fail the CLI command rather
         # than print success while silently dropping the session metadata.
-        from omnicompany.dashboard.ccdaemon.pty import _write_meta_store as write_store
+        from omnicompany.dashboard.ccdaemon.api import write_meta_store as write_store
 
         write_store(store)
     except (ImportError, OSError, ValueError) as exc:
@@ -91,11 +99,107 @@ def _truncate(text: str, max_len: int = 80) -> str:
 
 
 def _session_display_name(entry: dict[str, Any]) -> str:
-    name = entry.get("name") or ""
-    if name:
-        return name
+    # `name` is the explicit user override; provider/summary titles are the
+    # durable titles populated by the PTY daemon for CLI sessions.
+    for key in ("name", "display_title", "summary_title", "provider_title"):
+        name = entry.get(key) or ""
+        if name:
+            return str(name)
     sid = entry.get("id") or ""
     return sid[-12:] if len(sid) > 12 else sid
+
+
+def _live_session_meta() -> dict[str, dict[str, Any]]:
+    """Read the daemon's current observation, with durable history as fallback.
+
+    ``cc_sessions.json`` is a resumable history registry, not a process table:
+    an un-ended row may be disconnected or have been restored without its
+    provider runtime.  The two live endpoints are intentionally read
+    separately so the CLI can reconcile Omni PTYs, the LiteWork bridge and the
+    legacy structured-chat adapter without counting them as one undifferentiated
+    ``alive`` population.
+    """
+    try:
+        from omnicompany.dashboard.ccdaemon.api import lifecycle
+
+        status = lifecycle.read_status()
+        if not getattr(status, "alive", False) or not getattr(status, "port", None):
+            return {}
+        live: dict[str, dict[str, Any]] = {}
+        for endpoint in (
+            "/cc/sessions?include_recoverable=false",
+            "/cc/chat/sessions?limit=200&include_archived=true",
+        ):
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{status.port}{endpoint}", timeout=2
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                items = payload.get("items") or payload.get("sessions") or []
+                for item in items:
+                    if isinstance(item, dict) and item.get("id"):
+                        live[str(item["id"])] = item
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                continue
+        return live
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return {}
+
+
+_LIVE_RUNTIME_FIELDS = (
+    "origin", "lifecycle_owner", "creation_origin", "visibility",
+    "kind", "provider", "started_at", "ended_at", "logical_alive", "alive",
+    "runtime_alive", "process_alive", "processAlive", "running", "working",
+    "working_known", "state", "state_evidence_at", "observed_at", "observedAt",
+    "source", "session_id", "pty_id", "visible", "last_activity_at", "lastActivityAt",
+    "provider_session_id", "providerSessionId", "active_plan", "workstream", "topic",
+    "display_title", "summary_title", "provider_title",
+)
+
+
+def _with_live_runtime(entry: dict[str, Any], live: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    current = live.get(str(entry.get("id") or ""))
+    if not current:
+        return entry
+    merged = dict(entry)
+    for key in _LIVE_RUNTIME_FIELDS:
+        if key in current and current[key] is not None:
+            merged[key] = current[key]
+    return merged
+
+
+def _with_live_title(entry: dict[str, Any], live: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    return _with_live_runtime(entry, live)
+
+
+def _runtime_status(entry: dict[str, Any]) -> str:
+    """Return an observation status, never inferring liveness from ended_at alone."""
+    if entry.get("ended_at") is not None:
+        return "ended"
+    state = str(entry.get("state") or "").strip().lower()
+    if state in {"working", "idle", "waiting", "unknown"}:
+        return state
+    if entry.get("process_alive") or entry.get("runtime_alive"):
+        return "working" if entry.get("working") else "idle"
+    return "unknown"
+
+
+def _runtime_source(entry: dict[str, Any]) -> str:
+    return str(entry.get("source") or "durable-session-store")
+
+
+def _current_view_eligible(entry: dict[str, Any]) -> bool:
+    """Whether a live endpoint row belongs in the default current-session view.
+
+    The structured-chat adapter exposes resumable logical records through its
+    list endpoint even after the provider runtime is gone.  They remain
+    queryable history, but are not current user work.  PTY and LiteWork rows
+    retain their separate observation source/status contract, including
+    unknown state when that is all the runtime can prove.
+    """
+    if str(entry.get("kind") or "") != "chat":
+        return True
+    return bool(entry.get("runtime_alive") or entry.get("process_alive"))
 
 
 def _first_user_message(entry: dict[str, Any]) -> str:
@@ -168,6 +272,233 @@ def _read_jsonl_summary(path: Path, max_lines: int = 5000) -> list[dict[str, Any
     return lines
 
 
+def _read_jsonl_tail(path: Path, max_lines: int = 500, max_bytes: int = 8 * 1024 * 1024) -> list[dict[str, Any]]:
+    """Read the newest JSONL records without loading an unbounded transcript."""
+    if not path.is_file():
+        return []
+    try:
+        with path.open("rb") as f:
+            f.seek(0, os.SEEK_END)
+            end = f.tell()
+            f.seek(max(0, end - max_bytes))
+            payload = f.read()
+    except OSError:
+        return []
+
+    raw_lines = payload.splitlines()
+    if end > max_bytes and raw_lines:
+        raw_lines = raw_lines[1:]
+    records: list[dict[str, Any]] = []
+    for raw in raw_lines[-max_lines:]:
+        try:
+            record = json.loads(raw.decode("utf-8", errors="replace"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if isinstance(record, dict):
+            records.append(record)
+    return records
+
+
+def _json_value_text(value: Any) -> str:
+    """Extract displayable text from provider-specific content blocks."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(_json_value_text(item) for item in value)
+    if isinstance(value, dict):
+        for key in ("text", "thinking", "content", "message", "output", "result"):
+            if key in value:
+                text = _json_value_text(value[key])
+                if text:
+                    return text
+    return ""
+
+
+def _source_record_messages(record: dict[str, Any], source: Path) -> list[dict[str, Any]]:
+    """Normalize a Claude/Qoder-like JSONL record for ``chat show``."""
+    record_type = str(record.get("type") or "")
+    timestamp = str(record.get("timestamp") or "")
+    if record_type in {"user", "assistant"}:
+        message = record.get("message")
+        message = message if isinstance(message, dict) else {}
+        content = message.get("content", record.get("content"))
+        role = str(message.get("role") or record_type)
+        is_meta = bool(record.get("isMeta"))
+        text = _json_value_text(content)
+        if not text:
+            return []
+        return [{
+            "kind": "context_event" if is_meta else "text",
+            "role": "system" if is_meta else role,
+            "content": text,
+            "timestamp": timestamp,
+            "source": str(source),
+        }]
+
+    if record_type == "system":
+        text = str(record.get("content") or "")
+        if not text:
+            return []
+        return [{
+            "kind": "error" if record.get("level") == "error" or record.get("subtype") == "api_retry" else "context_event",
+            "role": "system",
+            "content": text,
+            "timestamp": timestamp,
+            "source": str(source),
+        }]
+
+    if record_type == "last-prompt":
+        text = str(record.get("lastPrompt") or "")
+        if not text:
+            return []
+        return [{
+            "kind": "context_event",
+            "role": "system",
+            "content": f"last prompt: {text}",
+            "timestamp": timestamp,
+            "source": str(source),
+        }]
+    return []
+
+
+def _source_messages(path: Path, *, tail: int = 500) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+    for record in _read_jsonl_tail(path, max_lines=tail):
+        messages.extend(_source_record_messages(record, path))
+    return messages
+
+
+def _normalize_match_text(value: Any) -> str:
+    return " ".join(str(value or "").split()).casefold()
+
+
+def _qoder_source_path(entry: dict[str, Any]) -> Path | None:
+    """Resolve Qoder transcripts, including old PTY/native-id mismatches.
+
+    The PTY registry stores a provider runtime id, while Qoder's durable
+    transcript uses its own project/session stem.  Prefer an exact stem, then
+    correlate the small transcript header by workspace, title/first prompt and
+    start time.  This avoids guessing from a global "latest file".
+    """
+    root = Path.home() / ".qoder" / "projects"
+    if not root.is_dir():
+        return None
+    ids = [
+        str(entry.get(key) or "").strip()
+        for key in ("provider_session_id", "claude_session_id", "id")
+    ]
+    ids = [value for value in ids if value]
+    files = [path for path in root.rglob("*.jsonl") if path.is_file()]
+    for native_id in ids:
+        exact = [path for path in files if path.stem == native_id]
+        if exact:
+            return max(exact, key=lambda path: path.stat().st_mtime)
+
+    expected_cwd = _normalize_match_text(entry.get("cwd"))
+    expected_title = _normalize_match_text(
+        entry.get("provider_title")
+        or entry.get("summary_title")
+        or entry.get("display_title")
+        or entry.get("name")
+    )
+    try:
+        expected_started = float(entry.get("started_at") or 0)
+    except (TypeError, ValueError):
+        expected_started = 0.0
+
+    ranked: list[tuple[int, float, Path]] = []
+    for path in files:
+        header = _read_jsonl_summary(path, max_lines=120)
+        if not header:
+            continue
+        cwd = ""
+        first_user = ""
+        first_timestamp = 0.0
+        for record in header:
+            if record.get("type") == "workspace-directories":
+                directories = record.get("directories")
+                if isinstance(directories, list) and directories:
+                    cwd = str(directories[0])
+                elif isinstance(directories, str):
+                    cwd = directories
+            if not first_user and record.get("type") == "user":
+                message = record.get("message") if isinstance(record.get("message"), dict) else {}
+                first_user = _json_value_text(message.get("content", record.get("content")))
+            if not first_timestamp and record.get("timestamp"):
+                raw_timestamp = record.get("timestamp")
+                try:
+                    first_timestamp = float(raw_timestamp) / 1000.0
+                except (TypeError, ValueError):
+                    try:
+                        first_timestamp = datetime.fromisoformat(str(raw_timestamp).replace("Z", "+00:00")).timestamp()
+                    except (TypeError, ValueError, OSError):
+                        first_timestamp = 0.0
+
+        score = 0
+        if expected_cwd and _normalize_match_text(cwd) == expected_cwd:
+            score += 40
+        if expected_title and (
+            expected_title == _normalize_match_text(first_user)
+            or expected_title in _normalize_match_text(first_user)
+            or _normalize_match_text(first_user) in expected_title
+        ):
+            score += 80
+        if expected_started and first_timestamp:
+            distance = abs(first_timestamp - expected_started)
+            if distance <= 120:
+                score += 60
+            elif distance <= 900:
+                score += 20
+        if score >= 60:
+            try:
+                mtime = path.stat().st_mtime
+            except OSError:
+                mtime = 0.0
+            ranked.append((score, mtime, path))
+
+    if not ranked:
+        return None
+    ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    if len(ranked) > 1 and ranked[0][0] == ranked[1][0] and ranked[0][0] < 100:
+        return None
+    return ranked[0][2]
+
+
+def _session_source_path(entry: dict[str, Any]) -> Path | None:
+    """Find a durable transcript for any session kind supported by OmniChat."""
+    provider = str(entry.get("provider") or "").strip().lower()
+    ids = [
+        str(entry.get(key) or "").strip()
+        for key in ("provider_session_id", "claude_session_id", "id")
+    ]
+    ids = [value for value in ids if value]
+    if provider == "qoder":
+        return _qoder_source_path(entry)
+    if provider == "claude_code":
+        root = _cc_projects_root()
+    elif provider == "codebuddy":
+        root = Path.home() / ".codebuddy" / "projects"
+    else:
+        return None
+    if not root.is_dir():
+        return None
+    for native_id in ids:
+        matches = [path for path in root.rglob(f"{native_id}.jsonl") if path.is_file()]
+        if matches:
+            return max(matches, key=lambda path: path.stat().st_mtime)
+    return None
+
+
+def _source_entry_fields(entry: dict[str, Any]) -> tuple[dict[str, Any], Path | None]:
+    source = _session_source_path(entry)
+    if source is None:
+        return entry, None
+    enriched = dict(entry)
+    enriched["conversation_source"] = str(source)
+    enriched["conversation_source_session_id"] = source.stem
+    return enriched, source
+
+
 def _jsonl_first_user_content(records: list[dict[str, Any]]) -> str:
     """Extract first user message content from JSONL records."""
     for rec in records:
@@ -231,30 +562,47 @@ def cmd_chat_id(as_json: bool) -> None:
 
 @cmd_chat.command("list")
 @click.option("--regex", "-r", "pattern", default=None, help="正则过滤 (匹配 id / name / plan / provider)")
-@click.option("--all", "show_all", is_flag=True, help="包含已结束的 session")
+@click.option("--all", "show_all", is_flag=True, help="包含全部持久历史（默认只显示当前观测）")
 @click.option("--json", "as_json", is_flag=True, help="JSON 格式输出")
 @click.option("--limit", "-n", type=int, default=50, help="最大条数 (默认 50)")
 def cmd_chat_list(pattern: str | None, show_all: bool, as_json: bool, limit: int) -> None:
     """列所有 OmniChat session (dashboard cc_sessions.json).
 
-    默认只显示活跃 session, --all 显示全部.
+    默认只显示 daemon 当前观测到的 session, --all 显示全部持久历史.
+    status/alive 取实时运行时证据；未结束但已断开/仅可恢复的历史会标为 unknown.
     --regex 对 id / name / active_plan / provider 做正则匹配.
     """
     store = _read_meta_store()
-    if not store:
+    live = _live_session_meta()
+    if not store and not live:
         click.echo("(no sessions found)")
         return
 
     rx = re.compile(pattern, re.IGNORECASE) if pattern else None
+    entries: dict[str, dict[str, Any]] = {
+        str(entry.get("id") or sid): dict(entry)
+        for sid, entry in store.items()
+    }
+    # Bridge/runtime rows are not guaranteed to have a durable cc_sessions.json
+    # record.  Keep them in the same user-facing command, but only as explicit
+    # live observations with their own source.
+    for sid, current in live.items():
+        entries.setdefault(sid, {"id": sid, **current})
 
     rows: list[dict[str, Any]] = []
-    for sid, entry in store.items():
-        if not show_all and entry.get("ended_at") is not None:
+    for sid, stored_entry in entries.items():
+        entry = _with_live_title(stored_entry, live)
+        current = live.get(str(entry.get("id") or sid))
+        status = _runtime_status(entry)
+        current_view_eligible = _current_view_eligible(entry)
+        if not show_all and current is None:
+            continue
+        if not show_all and (status == "ended" or not current_view_eligible):
             continue
         if rx:
             searchable = " ".join(filter(None, [
                 str(entry.get("id") or sid),
-                str(entry.get("name") or ""),
+                _session_display_name(entry),
                 str(entry.get("active_plan") or ""),
                 str(entry.get("provider") or ""),
                 str(entry.get("claude_session_id") or ""),
@@ -264,22 +612,41 @@ def cmd_chat_list(pattern: str | None, show_all: bool, as_json: bool, limit: int
                 continue
 
         first_msg = _first_user_message(entry)
+        logical_alive = entry.get("logical_alive")
+        if logical_alive is None:
+            logical_alive = entry.get("ended_at") is None
+        process_alive = entry.get("process_alive")
+        if process_alive is None:
+            process_alive = entry.get("runtime_alive")
         rows.append({
             "id": entry.get("id") or sid,
             "kind": entry.get("kind") or "pty",
-            "name": entry.get("name") or "",
+            "name": _session_display_name(entry),
             "provider": entry.get("provider") or "-",
             "active_plan": entry.get("active_plan") or "",
             "started_at": entry.get("started_at"),
             "ended_at": entry.get("ended_at"),
-            "status": "alive" if entry.get("ended_at") is None else "ended",
+            "status": status,
+            "alive": status in {"working", "idle"},
+            "logical_alive": bool(logical_alive),
+            "runtime_alive": bool(entry.get("runtime_alive", process_alive)),
+            "process_alive": bool(process_alive),
+            "working": bool(entry.get("working")),
+            "working_known": bool(entry.get("working_known")),
+            "state": entry.get("state") or status,
+            "observed_at": entry.get("observed_at") or entry.get("observedAt"),
+            "source": _runtime_source(entry),
+            "current_view": "current" if current_view_eligible else "logical-history",
             "model": entry.get("model") or "-",
             "claude_session_id": entry.get("claude_session_id") or "",
             "first_message": _truncate(first_msg, 60),
             "message_count": len(entry.get("event_history") or entry.get("history_summary") or []),
         })
 
-    rows.sort(key=lambda r: float(r.get("started_at") or 0), reverse=True)
+    rows.sort(
+        key=lambda r: float(r.get("observed_at") or r.get("started_at") or 0),
+        reverse=True,
+    )
     rows = rows[:limit]
 
     if as_json:
@@ -324,6 +691,8 @@ def cmd_chat_show(session_id: str, pattern: str | None, limit: int, as_json: boo
         click.echo(f"ERROR: no session matched {session_id!r}", err=True)
         click.echo("Use `omni chat list` to browse sessions.", err=True)
         sys.exit(2)
+    entry = _with_live_title(entry, _live_session_meta())
+    entry, source_path = _source_entry_fields(entry)
 
     if as_json and meta_only:
         click.echo(json.dumps(entry, ensure_ascii=False, indent=2))
@@ -332,14 +701,21 @@ def cmd_chat_show(session_id: str, pattern: str | None, limit: int, as_json: boo
     # show metadata header
     _safe_echo(f"session_id       : {entry.get('id')}")
     _safe_echo(f"kind             : {entry.get('kind') or 'pty'}")
-    _safe_echo(f"name             : {entry.get('name') or '-'}")
+    _safe_echo(f"name             : {_session_display_name(entry)}")
+    _safe_echo(f"provider_title   : {entry.get('provider_title') or '-'}")
+    _safe_echo(f"summary_title    : {entry.get('summary_title') or '-'}")
+    _safe_echo(f"display_title    : {entry.get('display_title') or '-'}")
     _safe_echo(f"provider         : {entry.get('provider') or '-'}")
     _safe_echo(f"model            : {entry.get('model') or '-'}")
     _safe_echo(f"active_plan      : {entry.get('active_plan') or '-'}")
     _safe_echo(f"claude_session_id: {entry.get('claude_session_id') or '-'}")
     _safe_echo(f"started_at       : {_ts_str(entry.get('started_at'))}")
     _safe_echo(f"ended_at         : {_ts_str(entry.get('ended_at'))}")
-    _safe_echo(f"status           : {'alive' if entry.get('ended_at') is None else 'ended'}")
+    _safe_echo(f"status           : {_runtime_status(entry)}")
+    _safe_echo(f"process_alive    : {bool(entry.get('process_alive', entry.get('runtime_alive')))}")
+    _safe_echo(f"working          : {bool(entry.get('working'))}")
+    _safe_echo(f"observation_source: {_runtime_source(entry)}")
+    _safe_echo(f"conversation_source: {source_path or '-'}")
 
     if meta_only:
         return
@@ -347,12 +723,19 @@ def cmd_chat_show(session_id: str, pattern: str | None, limit: int, as_json: boo
     # show messages
     rx = re.compile(pattern, re.IGNORECASE) if pattern else None
     messages = entry.get("event_history") or []
-    if not messages:
+    source_messages = _source_messages(source_path) if source_path else []
+    if source_messages and entry.get("kind") == "pty":
+        # PTY registry history is a compact UI buffer and is often empty (or
+        # stale after a restart).  The provider transcript is authoritative.
+        messages = source_messages
+    elif not messages:
         messages = [{"kind": "text", "role": m.get("role", "?"), "content": m.get("text", "")}
                     for m in (entry.get("history_summary") or [])]
+    if not messages and source_messages:
+        messages = source_messages
 
     _safe_echo(f"\n--- messages ({len(messages)} total) ---\n")
-    shown = 0
+    filtered_messages: list[dict[str, Any]] = []
     for msg in messages:
         kind = msg.get("kind", "?")
         if kind not in ("text", "thinking", "tool_use", "tool_result", "error", "context_event"):
@@ -360,6 +743,12 @@ def cmd_chat_show(session_id: str, pattern: str | None, limit: int, as_json: boo
         content = str(msg.get("content") or msg.get("text") or "")
         if rx and not rx.search(content):
             continue
+        filtered_messages.append(msg)
+
+    omitted = max(0, len(filtered_messages) - limit)
+    for msg in filtered_messages[-limit:]:
+        kind = msg.get("kind", "?")
+        content = str(msg.get("content") or msg.get("text") or "")
 
         role = msg.get("role", "")
         ts = msg.get("timestamp", "")
@@ -384,10 +773,8 @@ def cmd_chat_show(session_id: str, pattern: str | None, limit: int, as_json: boo
             prefix = f"{ts[:19]:19s} " if ts else ""
             _safe_echo(f"  {prefix}{label:22s} {content}")
 
-        shown += 1
-        if shown >= limit:
-            _safe_echo(f"\n  ... (truncated at {limit}, use --limit to show more)")
-            break
+    if omitted:
+        _safe_echo(f"\n  ... ({omitted} older messages omitted; showing latest {limit})")
 
 
 # ── chat search ──────────────────────────────────────────────────────────────
@@ -410,9 +797,11 @@ def cmd_chat_search(query: str, regex: bool, limit: int, as_json: bool) -> None:
 
     rx = re.compile(query, re.IGNORECASE) if regex else None
     query_lower = query.lower()
+    live = _live_session_meta()
     results: list[dict[str, Any]] = []
 
     for sid, entry in store.items():
+        entry = _with_live_title(entry, live)
         session_id = entry.get("id") or sid
         matches: list[dict[str, Any]] = []
 
@@ -423,8 +812,8 @@ def cmd_chat_search(query: str, regex: bool, limit: int, as_json: bool) -> None:
             if rx:
                 if rx.search(content):
                     matches.append(msg)
-            elif query_lower in content.lower():
-                matches.append(msg)
+                elif query_lower in content.lower():
+                    matches.append(msg)
 
         if not matches and not (entry.get("event_history")):
             for msg in entry.get("history_summary") or []:
@@ -435,10 +824,18 @@ def cmd_chat_search(query: str, regex: bool, limit: int, as_json: bool) -> None:
                 elif query_lower in text.lower():
                     matches.append({"kind": "text", "role": msg.get("role"), "content": text})
 
+        if not matches:
+            source_path = _session_source_path(entry)
+            source_messages = _source_messages(source_path, tail=1000) if source_path else []
+            for msg in source_messages:
+                content = str(msg.get("content") or "")
+                if (rx and rx.search(content)) or (not rx and query_lower in content.lower()):
+                    matches.append(msg)
+
         if matches:
             results.append({
                 "session_id": session_id,
-                "name": entry.get("name") or "",
+                "name": _session_display_name(entry),
                 "active_plan": entry.get("active_plan") or "",
                 "match_count": len(matches),
                 "first_match": _truncate(str(matches[0].get("content") or ""), 120),
@@ -551,9 +948,32 @@ def cmd_chat_plan_use(plan_query: str, session_id: str | None, as_json: bool) ->
         if not matched_key:
             click.echo(f"ERROR: no session matched {session_id!r}", err=True)
             sys.exit(2)
+        changed_ts = time.time()
         store[matched_key]["active_plan"] = plan_id
-        _write_meta_store({matched_key: {"active_plan": plan_id}})
+        _write_meta_store({matched_key: {
+            "active_plan": plan_id,
+            "active_plan_changed_ts": changed_ts,
+        }})
         actual_id = store[matched_key].get("id") or matched_key
+        try:
+            from omnicompany.core.plan_context_trigger import publish_plan_change
+            from omnicompany.packages.services._core.identity import (
+                bindings_by_session_key,
+                update_session_binding,
+            )
+
+            binding = bindings_by_session_key().get(f"pty:{matched_key}") or {}
+            trace_id = str(binding.get("trace_id") or matched_key)
+            update_session_binding(
+                trace_id,
+                pty_id=matched_key,
+                active_plan=plan_id,
+                active_plan_changed_ts=changed_ts,
+                source="cli_chat_plan_use",
+            )
+            publish_plan_change(matched_key, plan_id)
+        except OSError as exc:
+            click.echo(f"WARN: plan context trigger update failed: {exc}", err=True)
     else:
         # update current session (same logic as omni plan use)
         from omnicompany.packages.services._core.identity import (
@@ -576,7 +996,7 @@ def cmd_chat_plan_use(plan_query: str, session_id: str | None, as_json: bool) ->
         pty_id = meta.get("pty_id")
         if pty_id:
             try:
-                from omnicompany.dashboard.ccdaemon.pty import update_meta_field
+                from omnicompany.dashboard.ccdaemon.api import update_meta_field
                 update_meta_field(pty_id, active_plan=plan_id)
             except Exception as e:
                 click.echo(f"WARN: pty meta update failed: {e}", err=True)

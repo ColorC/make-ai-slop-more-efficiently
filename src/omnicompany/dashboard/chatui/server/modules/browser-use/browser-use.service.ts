@@ -2,6 +2,8 @@ import { createRequire } from 'node:module';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -19,6 +21,10 @@ const require = createRequire(import.meta.url);
 const __dirname = getModuleDir(import.meta.url);
 const IS_PLATFORM = process.env.VITE_IS_PLATFORM === 'true';
 const MAX_SESSIONS_PER_OWNER = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER || '3', 10);
+const MAX_TABS_PER_SESSION = Math.max(
+  1,
+  Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_MAX_TABS_PER_SESSION || '6', 10),
+);
 const SESSION_TTL_MS = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_SESSION_TTL_MS || String(30 * 60 * 1000), 10);
 const BROWSER_USE_SETTINGS_KEY = 'browser_use_settings';
 const BROWSER_USE_MCP_TOKEN_KEY = 'browser_use_mcp_token';
@@ -67,6 +73,10 @@ type RuntimeHandle = {
   context?: any;
   page?: any;
   browserPid: number | null;
+  // Only ephemeral facility Chromium receives a unique profile under the
+  // run directory. Persistent user profiles deliberately have no reclaim
+  // marker, so an orphan sweep can never target an ordinary user browser.
+  reclaimProfilePath: string | null;
   tracePath: string;
   harPath: string;
   screenshotPath: string;
@@ -102,6 +112,29 @@ const PROFILE_ROOT = path.join(os.homedir(), '.cloudcli', 'browser-use', 'profil
 const RUN_ROOT = path.join(os.homedir(), '.cloudcli', 'browser-use', 'runs');
 const MCP_SERVER_NAME = 'cloudcli-browser';
 const LEGACY_MCP_SERVER_NAMES = ['cloudcli-browser-use'];
+/* 用户 Chrome 登录态镜像模式：profileName 传此值时，走 PROFILE_ROOT/user-chrome-copy
+   镜像档 + 真实 chrome.exe + CDP（Chrome 136+ 默认档禁调试端口；ABE 仅同源 chrome 可解）。 */
+const USER_CHROME_MIRROR_PROFILE = 'user-chrome-mirror';
+/* 持久登录档模式（2026-08-06）：profileName 传此值时走 PROFILE_ROOT/agent-login。
+   与镜像档的区别是它**永不作为复制目标** —— 镜像档会被 chrome_cdp_facility refresh
+   的 robocopy 整体覆盖，扫码换来的登录态一跑 refresh 就没了，用户被反复要求重登。
+   扫码入口：pipeline/chrome_login_facility.mjs login [both|bilibili|xhs]。 */
+const AGENT_LOGIN_PROFILE = 'agent-login';
+const XHS_PRIVATE_MESSAGES_URL = process.env.CLOUDCLI_XHS_PRIVATE_MESSAGES_URL
+  || 'https://www.xiaohongshu.com/notification';
+/* 端口**不能写死**：2026-08-07 实测 Chrome 在 9333 上 bind 失败（WSAEACCES 10013），
+   因为该端口落在 Windows 保留端口区间（netsh interface ipv4 show excludedportrange，
+   本机 9262-9361 / 9362-9461 被排除）。现象是 chrome 进程在跑但 CDP 永远连不上。
+   实际端口由 chrome_login_facility 动态分配并写入下面这个 state 文件，此处读取复用。 */
+const AGENT_LOGIN_STATE_FILE = path.join(os.homedir(), '.cloudcli', 'browser-use', 'agent-login-state.json');
+
+function readAgentLoginState(): { cdpPort?: number; loggedIn?: string[] } {
+  try {
+    return JSON.parse(fs.readFileSync(AGENT_LOGIN_STATE_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
 const RUNTIME_READINESS_CACHE_TTL_MS = 30_000;
 const SESSION_SWEEP_INTERVAL_MS = Math.max(
   5_000,
@@ -118,11 +151,143 @@ function runPaths(runId: string) {
   const directory = path.join(RUN_ROOT, runId);
   return {
     directory,
+    browserProfilePath: path.join(directory, 'chromium-profile'),
     tracePath: path.join(directory, 'trace.zip'),
     harPath: path.join(directory, 'network.har'),
     screenshotPath: path.join(directory, 'latest.jpg'),
     debugInputPath: path.join(directory, 'debug-input.json'),
   };
+}
+
+type FacilityProcessReclaimResult = {
+  status: BrowserCleanupStatus;
+  details: string;
+};
+
+type FacilityOwnedProcess = {
+  pid: number;
+  parentPid: number;
+};
+
+function runDetachedCommand(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn(command, args, {
+      env,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += String(chunk); });
+    child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+    child.on('error', reject);
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+async function facilityOwnedProcesses(profilePath: string): Promise<FacilityOwnedProcess[]> {
+  if (process.platform !== 'win32') {
+    throw new Error('Process-tree reconciliation is currently implemented for Windows hosts only.');
+  }
+  // The profile path travels through the environment, never through the
+  // PowerShell source string. A process is eligible only if its own command
+  // line carries this exact per-run profile marker.
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    "$expected = [IO.Path]::GetFullPath($env:BROWSER_FACILITY_PROFILE_PATH).TrimEnd('\\').ToLowerInvariant()",
+    "$processes = @(Get-CimInstance -ClassName Win32_Process | Where-Object {",
+    "  $commandLine = [string]$_.CommandLine",
+    "  $commandLine.Length -gt 0 -and $commandLine.ToLowerInvariant().Contains($expected)",
+    "} | ForEach-Object { [pscustomobject]@{ pid = [int]$_.ProcessId; parentPid = [int]$_.ParentProcessId } })",
+    '@{ processes = $processes } | ConvertTo-Json -Compress',
+  ].join('; ');
+  const result = await runDetachedCommand('powershell.exe', [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    script,
+  ], {
+    ...process.env,
+    BROWSER_FACILITY_PROFILE_PATH: profilePath,
+  });
+  if (result.code !== 0) {
+    throw new Error(`Process ownership query exited ${result.code}.`);
+  }
+  const parsed = JSON.parse(result.stdout || '{}') as { processes?: unknown };
+  const values = Array.isArray(parsed.processes)
+    ? parsed.processes
+    : parsed.processes === undefined ? [] : [parsed.processes];
+  const unique = new Map<number, FacilityOwnedProcess>();
+  for (const value of values) {
+    if (!value || typeof value !== 'object') continue;
+    const candidate = value as Record<string, unknown>;
+    const pid = candidate.pid;
+    const parentPid = candidate.parentPid;
+    if (
+      typeof pid === 'number'
+      && Number.isSafeInteger(pid)
+      && pid > 0
+      && typeof parentPid === 'number'
+      && Number.isSafeInteger(parentPid)
+      && parentPid >= 0
+    ) {
+      unique.set(pid, { pid, parentPid });
+    }
+  }
+  return [...unique.values()];
+}
+
+async function facilityOwnedProcessIds(profilePath: string) {
+  return (await facilityOwnedProcesses(profilePath)).map(({ pid }) => pid);
+}
+
+async function facilityOwnedRootPid(profilePath: string): Promise<number | null> {
+  const processes = await facilityOwnedProcesses(profilePath);
+  const ids = new Set(processes.map(({ pid }) => pid));
+  return processes
+    .filter(({ parentPid }) => !ids.has(parentPid))
+    .sort((left, right) => left.pid - right.pid)[0]?.pid || null;
+}
+
+async function reclaimFacilityOwnedProcessTree(
+  profilePath: string,
+): Promise<FacilityProcessReclaimResult> {
+  try {
+    const pids = await facilityOwnedProcessIds(profilePath);
+    if (!pids.length) {
+      return {
+        status: 'reclaimed',
+        details: 'No process retained the facility-owned run profile marker.',
+      };
+    }
+    await Promise.all(pids.map((pid) => runDetachedCommand('taskkill.exe', [
+      '/PID',
+      String(pid),
+      '/T',
+      '/F',
+    ])));
+    const remaining = await facilityOwnedProcessIds(profilePath);
+    return remaining.length
+      ? {
+          status: 'unconfirmed',
+          details: `${remaining.length} facility-owned process(es) still retain the run profile marker.`,
+        }
+      : {
+          status: 'reclaimed',
+          details: `Reclaimed ${pids.length} facility-owned process root(s) by run profile marker.`,
+        };
+  } catch (error) {
+    return {
+      status: 'unconfirmed',
+      details: `Facility-owned process reconciliation failed: ${errorMessage(error)}`,
+    };
+  }
 }
 
 function ensureRunDirectory(runId: string) {
@@ -137,6 +302,52 @@ function leaseExpiry(now = Date.now()) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+/* user-chrome-mirror 模式 helpers：找空闲端口 + 轮询 CDP 就绪。 */
+function findFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+function waitForCdp(port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const attempt = async (): Promise<void> => {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        http.get(`http://127.0.0.1:${port}/json/version`, res => {
+          res.resume();
+          if (res.statusCode === 200) resolve();
+          else reject(new Error(`cdp status ${res.statusCode}`));
+        }).on('error', reject);
+      });
+    } catch (error) {
+      if (Date.now() > deadline) throw new Error(`waitForCdp timeout on ${port}: ${errorMessage(error)}`);
+      await new Promise<void>(resolve => setTimeout(resolve, 500));
+      return attempt();
+    }
+  };
+  return attempt();
+}
+
+/* 单次探测 CDP 是否已在监听（不重试）。用于 agent-login 持久档：
+   同一 user-data-dir 不允许并发两个 chrome 实例，已有实例必须复用而不是再拉一个。 */
+function cdpReachable(port: number, timeoutMs = 1500): Promise<boolean> {
+  return new Promise<boolean>(resolve => {
+    const request = http.get(`http://127.0.0.1:${port}/json/version`, res => {
+      res.resume();
+      resolve(res.statusCode === 200);
+    });
+    request.on('error', () => resolve(false));
+    request.setTimeout(timeoutMs, () => { request.destroy(); resolve(false); });
+  });
 }
 
 function browserProcessId(
@@ -440,11 +651,22 @@ const INSTALL_COMMAND_TIMEOUT_MS = Number.parseInt(
 
 function runCommand(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const useWindowsCommandHost = process.platform === 'win32';
+    const executable = useWindowsCommandHost
+      ? process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe'
+      : command;
+    const executableArgs = useWindowsCommandHost
+      ? ['/d', '/s', '/c', command, ...args]
+      : args;
+    const child = spawn(executable, executableArgs, {
       cwd: process.cwd(),
       env: process.env,
+      // Windows cannot execute npm.cmd directly with shell:false on current
+      // Node releases (spawn EINVAL). Dispatch the facility-owned constant
+      // command through ComSpec explicitly without enabling a generic shell.
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     const output: string[] = [];
     let settled = false;
@@ -582,6 +804,14 @@ async function closeHandle(
       .catch((error: unknown) => failures.push(`browser: ${errorMessage(error)}`));
   }
 
+  // A successful Playwright close is not sufficient evidence that every
+  // Chromium child actually exited. Always reconcile the exact per-run
+  // profile marker after close; persistent user profiles have no marker and
+  // therefore remain outside this facility-owned recovery path.
+  const postCloseReclaim = handle.reclaimProfilePath
+    ? await reclaimFacilityOwnedProcessTree(handle.reclaimProfilePath)
+    : null;
+
   const now = new Date().toISOString();
   for (const [kind, artifactPath] of [
     ['trace', handle.tracePath],
@@ -596,14 +826,16 @@ async function closeHandle(
       });
     }
   }
-  const status: BrowserCleanupStatus = failures.length > 0
-    ? 'unconfirmed'
-    : 'reclaimed';
+  const status: BrowserCleanupStatus = postCloseReclaim?.status
+    || (failures.length > 0 ? 'unconfirmed' : 'reclaimed');
   getBrowserRunLedger().recordCleanup(sessionId, {
     reason,
     status,
     browserPid: handle.browserPid,
-    details: failures.length ? failures.join('; ') : 'Context and browser closed.',
+    details: [
+      ...(failures.length ? failures : ['Context and browser closed.']),
+      ...(postCloseReclaim ? [`post-close ownership reconciliation: ${postCloseReclaim.details}`] : []),
+    ].join('; '),
     now,
   });
   return status;
@@ -642,11 +874,14 @@ async function expireStaleSessions(now = Date.now()): Promise<void> {
       now: nowIso,
       reason: 'Lease expired after the owning server stopped reporting.',
     });
+    const reclaim = await reclaimFacilityOwnedProcessTree(
+      runPaths(run.id).browserProfilePath,
+    );
     getBrowserRunLedger().recordCleanup(run.id, {
       reason: 'orphaned-lease',
-      status: 'unconfirmed',
+      status: reclaim.status,
       browserPid: run.browserPid,
-      details: 'No in-memory Playwright handle remained; process ownership requires host reconciliation.',
+      details: reclaim.details,
       now: nowIso,
     });
   }
@@ -848,6 +1083,18 @@ export const browserUseService = {
     };
 
     const activeOwnerSessions = ownerSessions(AGENT_OWNER_ID).filter((item) => item.status === 'ready');
+    const reusableProfileSession = profileName
+      ? activeOwnerSessions.find((item) => item.profileName === profileName)
+      : undefined;
+    if (reusableProfileSession) {
+      // A persistent profile maps to one real browser context. Creating more
+      // logical sessions only loses ownership and leaves tabs behind after a
+      // server restart, so reuse the live lease instead.
+      recordSessionAction(reusableProfileSession, 'reuse-profile-session', {
+        requestedPurpose: purpose,
+      });
+      return publicSession(reusableProfileSession);
+    }
     if (activeOwnerSessions.length >= MAX_SESSIONS_PER_OWNER) {
       throw new Error(`Browser is limited to ${MAX_SESSIONS_PER_OWNER} active agent sessions.`);
     }
@@ -887,6 +1134,7 @@ export const browserUseService = {
     let browserServer: any | undefined;
     let context: any | undefined;
     let page: any;
+    let chromeMirrorPid: number | null = null;
     const launchOptions = {
       headless: true,
       args: [
@@ -908,7 +1156,80 @@ export const browserUseService = {
     };
 
     try {
-      if (profileName) {
+      if (profileName === AGENT_LOGIN_PROFILE) {
+        // 持久登录档模式（2026-08-06）：真实、带界面的 chrome.exe + 独立目录
+        // agent-login + CDP。小红书的人机校验、cookie 解密和渲染链路都走
+        // Chrome 本身；Playwright 只通过 CDP 接管已经启动的页面。
+        // 该目录永不被复制覆盖，因此用户扫码一次即长期可用；续期见
+        // pipeline/chrome_login_facility.mjs keepalive。
+        const loginDir = path.join(PROFILE_ROOT, AGENT_LOGIN_PROFILE);
+        if (!fs.existsSync(path.join(loginDir, 'Local State'))) {
+          throw new Error(`agent-login: 持久登录档尚未建立——先运行 chrome_login_facility.mjs login 扫码一次（目录 ${loginDir}）`);
+        }
+        const chromeExe = process.env.CHROME_BIN || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+        // 同一 user-data-dir 不能同时跑两个实例：已有实例就直接复用它的调试端口。
+        // 端口取自 facility 写的 state；没有或已失效时才自己拉一个（并换端口重试，
+        // 因为固定端口可能落在 Windows 保留区间导致 bind 失败）。
+        const recordedPort = Number(readAgentLoginState().cdpPort || 0);
+        let cdpPort = recordedPort;
+        let ready = cdpPort > 0 && await cdpReachable(cdpPort);
+        for (let attempt = 0; attempt < 3 && !ready; attempt += 1) {
+          cdpPort = await findFreePort();
+          const chromeChild = spawn(chromeExe, [
+            `--user-data-dir=${loginDir}`,
+            `--remote-debugging-port=${cdpPort}`,
+            '--no-first-run', '--no-default-browser-check', '--disable-features=TranslateUI',
+            '--window-size=1440,900',
+            '--disable-dev-shm-usage',
+            'about:blank',
+          ], { detached: true, stdio: 'ignore', windowsHide: true });
+          chromeChild.unref();
+          chromeMirrorPid = chromeChild.pid ?? null;
+          try {
+            await waitForCdp(cdpPort, 20000);
+            ready = true;
+          } catch {
+            ready = false;
+          }
+        }
+        if (!ready) {
+          throw new Error('agent-login: 三次换端口均未开出 CDP（检查 Windows 保留端口区间与 chrome 可执行路径）');
+        }
+        browser = await readiness.playwright.chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
+        context = browser.contexts()[0] || await browser.newContext(contextOptions);
+        const retainedPages = context.pages();
+        page = retainedPages[0] || await context.newPage();
+        await Promise.all(retainedPages.slice(1).map((stalePage: any) => stalePage.close()));
+        if (page.url() !== 'about:blank') await page.goto('about:blank');
+      } else if (profileName === USER_CHROME_MIRROR_PROFILE) {
+        // 用户 Chrome 登录态镜像模式（2026-08-03 设施化）：
+        // Chrome 136+ 拒绝在默认 user-data-dir 上开 --remote-debugging-port，且
+        // App-Bound Encryption 的 cookies 只有同源 chrome.exe 能解（playwright 自带 chromium 不行）。
+        // 因此用 PROFILE_ROOT/user-chrome-copy 镜像档 + 真实 chrome.exe + 调试端口，再 connectOverCDP。
+        // 镜像由 chrome_cdp_facility.mjs 维护（refresh=优雅关闭日常 Chrome→复制→恢复），见
+        // bilibili_publish/ep02 video/pipeline/chrome_cdp_facility.mjs。
+        const mirrorDir = path.join(PROFILE_ROOT, 'user-chrome-copy');
+        if (!fs.existsSync(path.join(mirrorDir, 'Local State'))) {
+          throw new Error(`user-chrome-mirror: 镜像不存在——先运行 chrome_cdp_facility.mjs refresh 建立镜像（目录 ${mirrorDir}）`);
+        }
+        const cdpPort = await findFreePort();
+        const chromeExe = process.env.CHROME_BIN || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+        const chromeChild = spawn(chromeExe, [
+          `--user-data-dir=${mirrorDir}`,
+          `--remote-debugging-port=${cdpPort}`,
+          '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-features=TranslateUI',
+          'about:blank',
+        ], { detached: true, stdio: 'ignore', windowsHide: true });
+        chromeChild.unref();
+        chromeMirrorPid = chromeChild.pid ?? null;
+        await waitForCdp(cdpPort, 15000);
+        browser = await readiness.playwright.chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
+        context = browser.contexts()[0] || await browser.newContext(contextOptions);
+        const retainedPages = context.pages();
+        page = retainedPages[0] || await context.newPage();
+        await Promise.all(retainedPages.slice(1).map((stalePage: any) => stalePage.close()));
+        if (page.url() !== 'about:blank') await page.goto('about:blank');
+      } else if (profileName) {
         fs.mkdirSync(PROFILE_ROOT, { recursive: true });
         context = await readiness.playwright.chromium.launchPersistentContext(getProfilePath(profileName), {
           ...launchOptions,
@@ -916,13 +1237,23 @@ export const browserUseService = {
         });
         page = context.pages()[0] || await context.newPage();
       } else {
-        browserServer = await readiness.playwright.chromium.launchServer(launchOptions);
-        browser = await readiness.playwright.chromium.connect(browserServer.wsEndpoint());
-        context = await browser.newContext(contextOptions);
-        page = await context.newPage();
+        // Playwright owns --user-data-dir itself. launchServer explicitly
+        // rejects that flag, while an ephemeral persistent context gives this
+        // run the same isolated, command-line-verifiable profile identity.
+        context = await readiness.playwright.chromium.launchPersistentContext(
+          paths.browserProfilePath,
+          {
+            ...launchOptions,
+            ...contextOptions,
+          },
+        );
+        browser = context.browser?.();
+        page = context.pages()[0] || await context.newPage();
       }
       await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
-      const browserPid = browserProcessId(browserServer, browser, context);
+      const browserPid = browserProcessId(browserServer, browser, context)
+        ?? (profileName ? null : await facilityOwnedRootPid(paths.browserProfilePath))
+        ?? chromeMirrorPid;
       session.status = 'ready';
       session.runStatus = 'ready';
       session.message = 'Browser session is ready.';
@@ -932,6 +1263,7 @@ export const browserUseService = {
         context,
         page,
         browserPid,
+        reclaimProfilePath: profileName ? null : paths.browserProfilePath,
         tracePath: paths.tracePath,
         harPath: paths.harPath,
         screenshotPath: paths.screenshotPath,
@@ -955,6 +1287,7 @@ export const browserUseService = {
           context,
           page,
           browserPid: browserProcessId(browserServer, browser, context),
+          reclaimProfilePath: profileName ? null : paths.browserProfilePath,
           tracePath: paths.tracePath,
           harPath: paths.harPath,
           screenshotPath: paths.screenshotPath,
@@ -1066,6 +1399,39 @@ export const browserUseService = {
       session: publicSession(session),
       text: text.slice(0, 30_000),
     };
+  },
+
+  async xhsOpenPrivateMessages(sessionId?: string | null) {
+    const session = sessionId
+      ? await this.getAgentSession(sessionId)
+      : await this.createAgentSession({
+        profileName: AGENT_LOGIN_PROFILE,
+        purpose: 'Xiaohongshu private-message automation',
+      });
+    if (session.profileName !== AGENT_LOGIN_PROFILE) {
+      throw new Error('Xiaohongshu automation requires the persistent agent-login profile.');
+    }
+    await this.agentNavigate(session.id, XHS_PRIVATE_MESSAGES_URL);
+    return this.agentSnapshot(session.id);
+  },
+
+  async xhsReply(
+    sessionId: string,
+    input: { selector: string; text: string; send?: boolean; confirmSend?: boolean },
+  ) {
+    const session = await this.getAgentSession(sessionId);
+    if (session.profileName !== AGENT_LOGIN_PROFILE) {
+      throw new Error('Xiaohongshu automation requires the persistent agent-login profile.');
+    }
+    const send = input.send === true;
+    if (send && input.confirmSend !== true) {
+      throw new Error('Set confirmSend=true to send a Xiaohongshu reply; drafts never submit.');
+    }
+    return this.agentType(sessionId, {
+      selector: input.selector,
+      text: input.text,
+      submit: send,
+    });
   },
 
   async agentInspect(sessionId: string, selectors: string[]) {
@@ -1181,6 +1547,31 @@ export const browserUseService = {
         textLength: input.text?.length || 0,
         point,
       },
+    });
+    return publicSession(session);
+  },
+
+  async agentWheel(sessionId: string, input: {
+    deltaX?: number;
+    deltaY: number;
+    x?: number;
+    y?: number;
+  }) {
+    const session = await this.getAgentSession(sessionId);
+    const handle = handles.get(sessionId);
+    if (!handle?.page) {
+      throw new Error('Browser runtime handle is not available.');
+    }
+    if (typeof input.x === 'number' && typeof input.y === 'number') {
+      await handle.page.mouse.move(input.x, input.y);
+      session.cursor = { x: input.x, y: input.y, actor: 'agent' };
+    }
+    await handle.page.mouse.wheel(input.deltaX || 0, input.deltaY);
+    recordSessionAction(session, 'wheel', {
+      deltaX: input.deltaX || 0,
+      deltaY: input.deltaY,
+      x: input.x ?? null,
+      y: input.y ?? null,
     });
     return publicSession(session);
   },
@@ -1305,6 +1696,9 @@ export const browserUseService = {
     }
     const action = input.action || 'list';
     if (action === 'new') {
+      if (handle.context.pages().length >= MAX_TABS_PER_SESSION) {
+        throw new Error(`Browser is limited to ${MAX_TABS_PER_SESSION} tabs per agent session.`);
+      }
       const page = await handle.context.newPage();
       handles.set(sessionId, { ...handle, page });
       if (input.url) {

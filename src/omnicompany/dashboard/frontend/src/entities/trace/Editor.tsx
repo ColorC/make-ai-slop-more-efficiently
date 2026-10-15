@@ -113,7 +113,7 @@ const S: Record<string, any> = {
   // shadcn 风页签: 圆角矩形, 选中与内容同色无缝(同 surface, 无底边线), 未选中弱底凹陷。
   tab: (active: boolean): React.CSSProperties => ({
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '5px 12px', borderRadius: 7, border: '1px solid transparent',
+    padding: '5px 12px', borderRadius: 2, border: '1px solid transparent',
     background: active ? 'var(--fp-surface)' : 'transparent',
     color: active ? 'var(--fp-text)' : 'var(--fp-text-3)',
     cursor: 'pointer', fontSize: 13, fontWeight: active ? 600 : 500, fontFamily: 'inherit',
@@ -126,13 +126,13 @@ const S: Record<string, any> = {
   // 右侧详情 = 玻璃抽屉, 与左侧列表分层。
   detail: { width: 380, overflowY: 'auto', padding: 16, flexShrink: 0, ...GLASS, borderTop: 'none', borderRight: 'none', borderBottom: 'none' },
   evRow: (selected: boolean, color: string): React.CSSProperties => ({
-    padding: '5px 9px', borderRadius: 7, cursor: 'pointer',
+    padding: '5px 9px', borderRadius: 2, cursor: 'pointer',
     background: selected ? 'var(--fp-accent-weak)' : 'transparent',
     borderLeft: `3px solid ${color}`,
     transition: 'background 150ms var(--fp-ease)',
   }),
   treeRow: (selected: boolean, color: string, depth: number): React.CSSProperties => ({
-    padding: '5px 9px', borderRadius: 7, cursor: 'pointer',
+    padding: '5px 9px', borderRadius: 2, cursor: 'pointer',
     background: selected ? 'var(--fp-accent-weak)' : 'transparent',
     borderLeft: `3px solid ${color}`,
     marginLeft: depth * 16,
@@ -143,7 +143,7 @@ const S: Record<string, any> = {
   tlRow: (selected: boolean): React.CSSProperties => ({
     position: 'relative', height: 22, marginBottom: 2, cursor: 'pointer',
     background: selected ? 'var(--fp-accent-weak)' : 'transparent',
-    borderRadius: 4,
+    borderRadius: 3,
   }),
   tlLabel: { position: 'absolute' as const, left: 4, top: 3, color: 'var(--fp-text-2)', fontSize: 12, pointerEvents: 'none' as const, whiteSpace: 'nowrap' as const, zIndex: 2, textShadow: '0 0 2px rgba(0,0,0,.8)' },
   tlBar: (color: string, leftPct: number, widthPct: number): React.CSSProperties => ({
@@ -165,7 +165,7 @@ const S: Record<string, any> = {
     position: 'relative' as const, height: 24, marginBottom: 2,
     cursor: 'pointer',
     background: selected ? 'var(--fp-accent-weak)' : (expanded ? 'var(--fp-surface)' : 'transparent'),
-    borderRadius: 4,
+    borderRadius: 3,
     borderTop: expanded ? '1px solid var(--fp-border)' : 'none',
   }),
   tlGroupBar: (color: string, leftPct: number, widthPct: number): React.CSSProperties => ({
@@ -209,15 +209,15 @@ const S: Record<string, any> = {
   },
   zoomBtn: {
     background: 'transparent', color: 'var(--fp-text-3)', border: '1px solid var(--fp-border)',
-    borderRadius: 6, cursor: 'pointer', padding: '2px 7px', fontSize: 12, fontFamily: 'inherit',
+    borderRadius: 2, cursor: 'pointer', padding: '2px 7px', fontSize: 12, fontFamily: 'inherit',
     minWidth: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
     transition: 'color 150ms var(--fp-ease), border-color 150ms var(--fp-ease)',
   },
   // 段落标题 15px(比卡名小一档仍醒目), 非纯加粗堆叠。
-  sectionTitle: { color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 600, marginBottom: 6, marginTop: 10, letterSpacing: '-0.01em' },
-  detailHead: { color: 'var(--fp-text)', fontSize: 16, fontWeight: 650, marginBottom: 8, letterSpacing: '-0.01em', wordBreak: 'break-all' as const },
+  sectionTitle: { color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 500, marginBottom: 6, marginTop: 10, letterSpacing: '-0.01em' },
+  detailHead: { color: 'var(--fp-text)', fontSize: 16, fontWeight: 500, marginBottom: 8, letterSpacing: '-0.01em', wordBreak: 'break-all' as const },
   // payload mono 块: 安静实底, 长内容滚动。
-  pre: { background: 'var(--fp-solid)', padding: 10, borderRadius: 7, border: '1px solid var(--fp-border)', color: 'var(--fp-text-2)', whiteSpace: 'pre-wrap' as const, wordBreak: 'break-all' as const, fontSize: 13, maxHeight: 600, overflow: 'auto' },
+  pre: { background: 'var(--fp-solid)', padding: 10, borderRadius: 2, border: '1px solid var(--fp-border)', color: 'var(--fp-text-2)', whiteSpace: 'pre-wrap' as const, wordBreak: 'break-all' as const, fontSize: 13, maxHeight: 600, overflow: 'auto' },
   empty: { color: 'var(--fp-text-3)', fontSize: 13 },
 }
 
@@ -414,7 +414,7 @@ export default function TraceEditor({ entity }: { entity: TraceEntity }) {
             return (
               <div key={ev.id} data-ev-id={ev.id} style={S.evRow(selected?.id === ev.id, color)} onClick={() => setSelected(ev)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color, fontSize: 13, fontWeight: 600 }}>{ev.event_type}</span>
+                  <span style={{ color, fontSize: 13, fontWeight: 500 }}>{ev.event_type}</span>
                   <span style={{ color: 'var(--fp-text-3)', fontSize: 12 }}>{fmtTs(ev.timestamp)}</span>
                 </div>
                 <div style={{ color: 'var(--fp-text-2)', fontSize: 13, marginTop: 2 }}>{eventSummary(ev)}</div>
@@ -444,7 +444,7 @@ export default function TraceEditor({ entity }: { entity: TraceEntity }) {
                 </span>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color, fontSize: 13, fontWeight: 600 }}>{ev.event_type}</span>
+                    <span style={{ color, fontSize: 13, fontWeight: 500 }}>{ev.event_type}</span>
                     <span style={{ color: 'var(--fp-text-3)', fontSize: 12 }}>{fmtTs(ev.timestamp)}</span>
                   </div>
                   <div style={{ color: 'var(--fp-text-2)', fontSize: 13, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{eventSummary(ev)}</div>

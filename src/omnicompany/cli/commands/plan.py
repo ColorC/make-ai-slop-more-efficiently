@@ -34,11 +34,18 @@ FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
 
 def _repo_root() -> Path:
-    here = Path.cwd().resolve()
-    for d in (here, *here.parents):
-        if (d / "src" / "omnicompany").is_dir() and (d / "docs").is_dir():
-            return d
-    return Path(__file__).resolve().parents[4]
+    """omnicompany 仓库根 — 走 core.config 的唯一权威解析器。
+
+    原实现从 cwd 向上找 `src/omnicompany` + `docs` 双命中。工作区根
+    `C:/workspace/` 恰好也有游离的 `src/omnicompany/` 与 `docs/`,
+    于是第一跳就被劫持, `_plans_root()` 指向空目录, `omni plan list` 对
+    171 份 plan 报 "(no plans found)"。与 hooks/_shared.repo_root() 对齐。
+    """
+    try:
+        from omnicompany.core.config import omni_workspace_root
+        return omni_workspace_root()
+    except Exception:
+        return Path(__file__).resolve().parents[4]
 
 
 def _plans_root() -> Path:
@@ -61,6 +68,69 @@ def _parse_frontmatter(plan_md: Path) -> dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+
+
+# ── 中文标题读取面 (2026-08-20 用户裁定: 读取面全部显示中文) ──
+# 优先级: 治理覆盖表 title_zh > frontmatter title > 正文 H1 > slug 兜底。
+# slug 不变 —— 它是 wikilink 与治理覆盖表的稳定寻址键 (standards/concepts/plan.md §3.0)。
+_TITLE_ZH_CACHE: dict[str, str] | None = None
+
+
+def _title_zh_table() -> dict[str, str]:
+    global _TITLE_ZH_CACHE
+    if _TITLE_ZH_CACHE is None:
+        table: dict[str, str] = {}
+        gov = _repo_root() / "data" / "registry" / "plan_governance.json"
+        try:
+            raw = json.loads(gov.read_text(encoding="utf-8"))
+            for pid, entry in (raw.get("plans") or {}).items():
+                if isinstance(entry, dict) and entry.get("title_zh"):
+                    table[str(pid)] = str(entry["title_zh"])
+        except Exception:
+            pass
+        _TITLE_ZH_CACHE = table
+    return _TITLE_ZH_CACHE
+
+
+def _h1_title(plan_md: Path) -> str:
+    """存量无 frontmatter 的 plan (实测 83/165) 只有 H1, 从它取人读标题。"""
+    try:
+        for line in plan_md.read_text(encoding="utf-8", errors="replace").splitlines()[:60]:
+            if line.startswith("# "):
+                return line[2:].strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _display_title(plan_id: str, fm: dict[str, Any], plan_md: Path) -> str:
+    return (
+        _title_zh_table().get(plan_id)
+        or str(fm.get("title") or "").strip()
+        or _h1_title(plan_md)
+        or plan_id
+    )
+
+
+def _dwidth(text: str) -> int:
+    """终端显示宽度 (CJK 占两列), 用于对齐中文标题列。"""
+    import unicodedata
+    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in text)
+
+
+def _pad(text: str, width: int) -> str:
+    return text + " " * max(0, width - _dwidth(text))
+
+
+def _clip(text: str, width: int) -> str:
+    if _dwidth(text) <= width:
+        return text
+    out = ""
+    for c in text:
+        if _dwidth(out + c) > width - 1:
+            return out + "…"
+        out += c
+    return out
 
 
 def _walk_plans(root: Path) -> list[tuple[str, Path]]:
@@ -165,7 +235,8 @@ def cmd_plan() -> None:
 @click.option("--package", default=None,
               help="按 package 前缀过滤 (例 _infra, _infra/dashboard, service/guardian)")
 @click.option("--json", "as_json", is_flag=True, help="JSON 格式输出")
-def cmd_plan_list(package: str | None, as_json: bool) -> None:
+@click.option("--id", "show_id", is_flag=True, help="显示英文 plan_id (引用/复制时用)")
+def cmd_plan_list(package: str | None, as_json: bool, show_id: bool) -> None:
     """列 docs/plans/ 下所有非归档 plan."""
     plans = _walk_plans(_plans_root())
     if package:
@@ -177,7 +248,7 @@ def cmd_plan_list(package: str | None, as_json: bool) -> None:
         fm = _parse_frontmatter(p / "plan.md")
         rows.append({
             "plan_id": pid,
-            "title": fm.get("title") or "-",
+            "title": _display_title(pid, fm, p / "plan.md"),
             "status": fm.get("status") or "-",
             "work_type": fm.get("work_type") or "-",
             "date": str(fm.get("date") or "-"),
@@ -191,10 +262,83 @@ def cmd_plan_list(package: str | None, as_json: bool) -> None:
     if not rows:
         click.echo("(no plans found)")
         return
-    click.echo(f"{'date':12s}  {'status':10s}  {'work_type':22s}  plan_id")
+    tail = "plan_id" if show_id else "计划"
+    click.echo(f"{'date':12s}  {'status':10s}  {'work_type':22s}  {tail}")
     click.echo("-" * 100)
     for r in rows:
-        click.echo(f"{r['date']:12s}  {r['status']:10s}  {r['work_type']:22s}  {r['plan_id']}")
+        tail_val = r["plan_id"] if show_id else _clip(r["title"], 52)
+        click.echo(f"{r['date']:12s}  {r['status']:10s}  {r['work_type']:22s}  {tail_val}")
+
+
+@cmd_plan.command("groups")
+@click.option("--json", "as_json", is_flag=True, help="JSON 格式输出")
+def cmd_plan_groups(as_json: bool) -> None:
+    """列计划组 + 组内任务统计（只读 M3a 新模型 data/services/plan-groups/）。
+
+    这是 whatnow 迁移后的纯文件模型只读验证面；`omni task` 等既有命令仍走 :8230，
+    M3b 才切换真源。
+    """
+    pg_root = _repo_root() / "data" / "services" / "plan-groups"
+    rows: list[dict[str, Any]] = []
+    if pg_root.is_dir():
+        import yaml
+
+        for gdir in sorted(pg_root.iterdir()):
+            tasks_json = gdir / "tasks.json"
+            group_yaml = gdir / "group.yaml"
+            if not gdir.is_dir() or not tasks_json.is_file():
+                continue
+            meta: dict[str, Any] = {}
+            if group_yaml.is_file():
+                try:
+                    meta = yaml.safe_load(group_yaml.read_text(encoding="utf-8")) or {}
+                except Exception:
+                    meta = {}
+            try:
+                payload = json.loads(tasks_json.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            tasks = payload.get("tasks") or []
+            status_dist: dict[str, int] = {}
+            norm_dist: dict[str, int] = {}
+            from omnicompany.packages.services._core.lifecycle.plan_groups_store import (
+                normalize_status,
+            )
+            for t in tasks:
+                s = str(t.get("status"))
+                status_dist[s] = status_dist.get(s, 0) + 1
+                n = normalize_status(s)
+                norm_dist[n] = norm_dist.get(n, 0) + 1
+            rows.append({
+                "group_id": meta.get("id") or gdir.name,
+                "title": meta.get("title") or "-",
+                "status": meta.get("status") or "-",
+                "description": meta.get("description") or "",
+                "milestones": len(payload.get("milestones") or []),
+                "tasks": len(tasks),
+                "archived": sum(1 for t in tasks if t.get("archived")),
+                "status_dist": status_dist,
+                "norm_status_dist": norm_dist,
+            })
+
+    if as_json:
+        click.echo(json.dumps(rows, ensure_ascii=False, indent=2))
+        return
+    if not rows:
+        click.echo("(no plan groups found — run scripts/migrate-whatnow-to-plan-groups.py first)")
+        return
+    click.echo(f"{'group_id':14s}  {'status':8s}  {'里程碑':>4s}  {'任务':>5s}  {'归档':>4s}  title")
+    click.echo("-" * 90)
+    for r in rows:
+        click.echo(
+            f"{r['group_id']:14s}  {r['status']:8s}  {r['milestones']:>4d}  "
+            f"{r['tasks']:>5d}  {r['archived']:>4d}  {r['title']}"
+        )
+        top = sorted(r["status_dist"].items(), key=lambda kv: -kv[1])[:5]
+        click.echo(f"{'':14s}  status: " + ", ".join(f"{k}×{v}" for k, v in top))
+        # M3b: 归一化七态分布(TaskStore 层口径, VALID_STATUS 七态)
+        norm = sorted(r["norm_status_dist"].items(), key=lambda kv: -kv[1])
+        click.echo(f"{'':14s}  七态:   " + ", ".join(f"{k}×{v}" for k, v in norm))
 
 
 @cmd_plan.command("current")
@@ -221,8 +365,8 @@ def cmd_plan_current(as_json: bool) -> None:
         return
 
     fm = _parse_frontmatter(_plans_root() / plan_id / "plan.md")
+    click.echo(f"计划        : {_display_title(plan_id, fm, _plans_root() / plan_id / 'plan.md')}")
     click.echo(f"plan_id     : {plan_id}")
-    click.echo(f"title       : {fm.get('title') or '-'}")
     click.echo(f"status      : {fm.get('status') or '-'}")
     click.echo(f"work_type   : {fm.get('work_type') or '-'}")
     click.echo(f"trace_id    : {meta.get('trace_id')}")
@@ -250,12 +394,18 @@ def cmd_plan_use(plan_query: str) -> None:
         sys.exit(2)
 
     plan_id, plan_dir = resolved
+    # A plan's frontmatter is the authoritative project declaration.  SessionStart
+    # already applies it for new processes; applying the same value here keeps a
+    # live session consistent when the user switches plans without restarting.
+    plan_meta = _parse_frontmatter(plan_dir / "plan.md")
+    plan_project = str(plan_meta.get("project") or "").strip() or None
     meta = current_session_meta()
     record_active_session(
         trace_id=meta["trace_id"],
         claude_session_id=meta.get("claude_session_id"),
         pty_id=meta.get("pty_id"),
         active_plan=plan_id,
+        project=plan_project,
         cwd=meta.get("cwd") or os.getcwd(),
         source="cli_plan_use",
     )
@@ -265,13 +415,26 @@ def cmd_plan_use(plan_query: str) -> None:
     pty_id = meta.get("pty_id")
     if pty_id:
         try:
-            from omnicompany.dashboard.ccdaemon.pty import update_meta_field
+            from omnicompany.dashboard.ccdaemon.api import update_meta_field
             update_meta_field(pty_id, active_plan=plan_id)
         except Exception as e:
             click.echo(f"WARN: pty meta update failed: {e}", err=True)
 
     click.echo(f"OK active_plan = {plan_id}")
     click.echo(f"   plan_dir   = {plan_dir}")
+    project = plan_project or str(meta.get("project") or "")
+    if project:
+        from omnicompany.cli.commands.identity import _echo_project_peers, _project_peer_snapshot
+
+        _echo_project_peers(
+            _project_peer_snapshot(
+                project,
+                current_session_id=meta.get("session_id"),
+                current_pty_id=meta.get("pty_id"),
+                current_workstream=meta.get("workstream"),
+                current_task_id=meta.get("task_id"),
+            )
+        )
     click.echo("")
     click.echo("Note: a claude code already running in this session will see the new plan")
     click.echo("      on its NEXT SessionStart (i.e. after /clear or restart). The current")

@@ -13,31 +13,37 @@ from __future__ import annotations
 from typing import Any
 
 
-def _review_store():
-    """拿全局 MaterialStore 单例 (正确构造: 带 root + format_registry)。"""
-    from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
-    return get_store()
+# 旧 MaterialStore.list 默认口径(include_archived=False, include_internal=False):
+# 不返回归档件, 也不返回内部治理件(decision-candidate / 纯附件图 / wiki 投影)。
+_INTERNAL_KINDS = frozenset({"decision-candidate", "image", "aigc-image"})
 
 
-def _enum_val(v: Any) -> str:
-    return str(getattr(v, "value", v) or "")
+def _is_internal(material: dict[str, Any]) -> bool:
+    extra = material.get("extra") or {}
+    return (
+        str(material.get("kind") or "") in _INTERNAL_KINDS
+        or str(extra.get("reviewstage_visibility") or "").strip().lower() == "internal"
+        or str(extra.get("projection_role") or "").strip().lower() == "material_wiki_review"
+    )
 
 
 def _materials_for_plan(plan_id: str) -> list[dict[str, Any]]:
-    """该 plan 下的审阅材料 (用 store 内置 plan_id 过滤, 不自己重做)。"""
+    """该 plan 下的审阅材料 (review_store 读口, 不含归档/内部治理件, 与旧 store.list 默认口径一致)。"""
+    from omnicompany.packages.services._core import review_store
     try:
-        mats = _review_store().list(plan_id=plan_id)
+        mats = [m for m in review_store.list_materials(include_archived=False)
+                if str(m.get("source_plan_id") or "") == plan_id and not _is_internal(m)]
     except Exception:
         return []
     out = []
     for m in mats:
         out.append({
-            "id": getattr(m, "id", None) or getattr(m, "material_id", None),
-            "title": getattr(m, "title", None),
-            "kind": _enum_val(getattr(m, "kind", "")),
-            "tier": _enum_val(getattr(m, "tier", "")),
-            "status": _enum_val(getattr(m, "status", "")),
-            "source_subagent_id": getattr(m, "source_subagent_id", None),
+            "id": m.get("id"),
+            "title": m.get("title"),
+            "kind": str(m.get("kind") or ""),
+            "tier": str(m.get("tier") or ""),
+            "status": str(m.get("status") or ""),
+            "source_subagent_id": m.get("source_subagent_id"),
         })
     return out
 

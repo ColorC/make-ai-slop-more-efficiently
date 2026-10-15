@@ -33,7 +33,7 @@ def cmd_classify(path: str, model: str | None) -> None:
 @click.argument("path")
 @click.option("--model", default=None)
 @click.option("--force", is_flag=True, help="已注册也重跑(覆盖)")
-@click.option("--no-inbox", is_flag=True, help="置信不足也不推 human-inbox")
+@click.option("--no-inbox", is_flag=True, help="置信不足也不推 HumanBus 运行时人工复核队列")
 def cmd_materialize(path: str, model: str | None, force: bool, no_inbox: bool) -> None:
     """落盘钩子: 把一个产出文件分类→入册→写回语义字段(产出即 material)。"""
     from omnicompany.packages.services._core.semantic_fs.classify import materialize
@@ -46,7 +46,7 @@ def cmd_materialize(path: str, model: str | None, force: bool, no_inbox: bool) -
 @click.argument("directory")
 @click.option("--model", default=None)
 @click.option("--limit", type=int, default=None)
-@click.option("--inbox", is_flag=True, help="置信不足推 human-inbox")
+@click.option("--inbox", is_flag=True, help="置信不足推 HumanBus 运行时人工复核队列")
 def cmd_materialize_dir(directory: str, model: str | None, limit: int | None, inbox: bool) -> None:
     """扫一个产出目录, 把还没入册的文件批量 materialize。"""
     from omnicompany.packages.services._core.semantic_fs.classify import materialize_dir
@@ -107,7 +107,7 @@ def cmd_demogame_gap(from_json: str | None, model: str) -> None:
 @external_or_controller
 @click.option("--limit", type=int, default=40, help="单轮最多 materialize 多少新文件")
 @click.option("--model", default=None)
-@click.option("--inbox", is_flag=True, help="置信不足推 human-inbox")
+@click.option("--inbox", is_flag=True, help="置信不足推 HumanBus 运行时人工复核队列")
 def cmd_sweep(limit: int, model: str | None, inbox: bool) -> None:
     """每日自动纳管: 扫产出目录(docs/reports·data/reports·data/domains)把还没入册的产出文件自动变 material。"""
     from omnicompany.packages.services._core.semantic_fs.classify import sweep

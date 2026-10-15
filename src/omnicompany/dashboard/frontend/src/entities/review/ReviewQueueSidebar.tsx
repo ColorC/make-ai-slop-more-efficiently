@@ -54,7 +54,7 @@ const tabSm = (active: boolean): React.CSSProperties => ({
 })
 // frostpane: 图标按钮收成安静近无形, hover 才浮一层极淡玻璃(.iconbtn 手法)
 const iconBtn: React.CSSProperties = {
-  width: 30, height: 30, border: 0, background: 'transparent', color: 'var(--fp-text-3)', borderRadius: 7,
+  width: 30, height: 30, border: 0, background: 'transparent', color: 'var(--fp-text-3)', borderRadius: 2,
   cursor: 'pointer', display: 'inline-grid', placeItems: 'center', flexShrink: 0,
   transition: 'background var(--fp-t-fast) var(--fp-ease), color var(--fp-t-fast) var(--fp-ease)',
 }
@@ -64,7 +64,7 @@ const CARD_BASE: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', minWidth: 0,
   background: 'var(--fp-glass)',
   backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
-  border: `1px solid ${COLORS.border}`, borderRadius: 11, padding: 12,
+  border: `1px solid ${COLORS.border}`, borderRadius: 3, padding: 12,
   boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
   cursor: 'pointer', position: 'relative',
   transition: 'border-color var(--fp-t-fast) var(--fp-ease), transform var(--fp-t-fast) var(--fp-ease)',
@@ -74,7 +74,7 @@ const S = {
   list: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))', gap: 12 } as React.CSSProperties,
   cardTop: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } as React.CSSProperties,
   title: {
-    flex: 1, minWidth: 0, color: COLORS.text, fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em',
+    flex: 1, minWidth: 0, color: COLORS.text, fontSize: 15, fontWeight: 500, letterSpacing: '-0.01em',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   } as React.CSSProperties,
   sub: { color: COLORS.textDim, fontSize: 13, marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as React.CSSProperties,
@@ -85,7 +85,7 @@ const S = {
   } as React.CSSProperties,
   groupHead: {
     gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8,
-    fontSize: 12, fontWeight: 600, color: 'var(--fp-text-3)', letterSpacing: '.04em', textTransform: 'uppercase',
+    fontSize: 12, fontWeight: 500, color: 'var(--fp-text-3)', letterSpacing: '.04em', textTransform: 'uppercase',
     margin: '4px 0 0',
   } as React.CSSProperties,
 }
@@ -93,7 +93,7 @@ const S = {
 function statusBadge(status: MaterialStatus): React.CSSProperties {
   const c = statusColor(status)
   return {
-    flexShrink: 0, display: 'inline-flex', alignItems: 'center', fontSize: 12, fontWeight: 600,
+    flexShrink: 0, display: 'inline-flex', alignItems: 'center', fontSize: 12, fontWeight: 500,
     padding: '1px 8px', borderRadius: 999, lineHeight: 1.6,
     color: c, background: `color-mix(in srgb, ${c} 18%, transparent)`,
   }
@@ -201,7 +201,7 @@ export function ReviewQueueSidebar({ onOpenMaterial, headerActions }: { onOpenMa
 
       {/* 必验收待审 = 信号(只在真有未决必验收时冒出), 非标题 */}
       {stats && stats.mandatory_unaccepted > 0 && (
-        <div style={{ flexShrink: 0, padding: '6px 14px', fontSize: 13, color: COLORS.mandatory, fontWeight: 600 }} data-testid="stats-mandatory-unaccepted">
+        <div style={{ flexShrink: 0, padding: '6px 14px', fontSize: 13, color: COLORS.mandatory, fontWeight: 500 }} data-testid="stats-mandatory-unaccepted">
           ⚠ {stats.mandatory_unaccepted} 必验收待审
         </div>
       )}
@@ -223,7 +223,7 @@ export function ReviewQueueSidebar({ onOpenMaterial, headerActions }: { onOpenMa
             onClick={() => onBatchVerdict('accepted')}
             disabled={bulkIds.length === 0}
             style={{
-              marginLeft: 'auto', border: 0, borderRadius: 7, padding: '5px 14px', fontSize: 13, fontWeight: 600,
+              marginLeft: 'auto', border: 0, borderRadius: 2, padding: '5px 14px', fontSize: 13, fontWeight: 500,
               color: 'var(--fp-accent-fg)', cursor: bulkIds.length === 0 ? 'default' : 'pointer',
               background: bulkIds.length === 0 ? 'color-mix(in srgb, var(--fp-ok) 35%, transparent)' : COLORS.accepted,
               boxShadow: bulkIds.length === 0 ? 'none' : '0 2px 10px color-mix(in srgb, var(--fp-ok) 25%, transparent)',
@@ -250,7 +250,9 @@ export function ReviewQueueSidebar({ onOpenMaterial, headerActions }: { onOpenMa
             <span>没有待处理的材料。处理完的项从待办消失, 仍留在项目的材料轨迹里。</span>
           </div>
         ) : (
-          <div style={S.list}>
+          // 队列本身按 tier 分段, 每段内的卡片依次浮现(transform+opacity, 走合成器不触发 layout);
+          // 筛选/切档时 key 变化即重新挂载重播, 不再是整块列表瞬间替换。
+          <div style={S.list} className="mo-stagger">
             {TIER_ORDER.map((tier) => {
               const tierItems = groups[tier]
               if (tierItems.length === 0) return null
@@ -281,7 +283,7 @@ export function ReviewQueueSidebar({ onOpenMaterial, headerActions }: { onOpenMa
                           <Layers size={15} style={{ flexShrink: 0, color: 'var(--fp-violet)' }} />
                           <span style={{ ...S.title, flex: 'none', maxWidth: '40%' }}>{unit.project} · {KIND_LABELS[unit.kind]}</span>
                           <span style={{
-                            flexShrink: 0, fontSize: 12, fontWeight: 700, color: 'var(--fp-violet)', borderRadius: 999, padding: '1px 9px',
+                            flexShrink: 0, fontSize: 12, fontWeight: 500, color: 'var(--fp-violet)', borderRadius: 999, padding: '1px 9px',
                             background: 'color-mix(in srgb, var(--fp-violet) 14%, transparent)',
                             border: '1px solid color-mix(in srgb, var(--fp-violet) 38%, transparent)',
                           }}>{unit.items.length} 条</span>
@@ -293,7 +295,7 @@ export function ReviewQueueSidebar({ onOpenMaterial, headerActions }: { onOpenMa
                                 e.stopPropagation()
                                 setBulkIds((prev) => Array.from(new Set([...prev, ...unit.items.map((x) => x.id)])))
                               }}
-                              style={{ flexShrink: 0, border: `1px solid ${COLORS.border}`, background: 'transparent', color: 'var(--fp-text-2)', borderRadius: 6, padding: '3px 9px', fontSize: 12, cursor: 'pointer' }}
+                              style={{ flexShrink: 0, border: `1px solid ${COLORS.border}`, background: 'transparent', color: 'var(--fp-text-2)', borderRadius: 2, padding: '3px 9px', fontSize: 12, cursor: 'pointer' }}
                             >整组选择</button>
                           )}
                         </div>

@@ -7,6 +7,8 @@ import { authoredApi, type AuthoredNote } from '../../api/authoredClient'
 import { relTimeZh } from '../../lib/time'
 import KebabMenu, { type KebabItem } from '../../shared/view/ui/KebabMenu'
 import Composer from './Composer'
+import { BlueprintSelect } from '../../components/BlueprintSelect'
+import './authored.css'
 
 // 统一札记(评论·草稿·决策)集中管理面。一个 tab 看全部自撰内容: 列表+筛选+搜索+跳转+编辑+删除。
 export interface AuthoredEntity extends Entity {
@@ -16,7 +18,7 @@ export interface AuthoredEntity extends Entity {
 const SINGLE: AuthoredEntity = {
   type: 'authored',
   id: 'main',
-  title: '札记',
+  title: '画布',
   tags: ['boss-sight', 'authored'],
 }
 
@@ -113,7 +115,7 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
     authoredApi.update(selected.id, { content: draft, feedback_status: status || undefined, title }).then(load)
   }
   const onDelete = () => {
-    if (!selected || !window.confirm('删除这条札记？(软归档)')) return
+    if (!selected || !window.confirm('删除这条画布内容？(软归档)')) return
     authoredApi.remove(selected.id).then(load)
   }
   const onCopyPath = () => { if (selected?.json_path) navigator.clipboard?.writeText(selected.json_path) }
@@ -137,8 +139,9 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
   }
 
   // 字号层级靠 token(标题 17 / 正文 15 / 最弱 13 等宽弱灰, 禁 11)。颜色全 var(--fp-*)。
-  const sel: React.CSSProperties = { flex: 1, minWidth: 0, background: 'var(--fp-card)', color: 'var(--fp-text)', border: '1px solid var(--fp-border)', borderRadius: 6, padding: '6px 8px', fontSize: 13 }
-  const primary: React.CSSProperties = { background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', border: '1px solid var(--fp-accent)', borderRadius: 7, padding: '7px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
+  // 2026-08-06: 三个筛选下拉换蓝图自绘件后, sel 只剩排版职责(材质/边框由 .bps-btn 承担)。
+  const sel: React.CSSProperties = { flex: 1, minWidth: 0 }
+  const primary: React.CSSProperties = { background: 'var(--fp-bp-seal)', color: '#fff', border: '1px solid rgba(255,240,235,.55)', borderRadius: 2, padding: '7px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer' }
 
   // 低频操作收进共享 KebabMenu(⋯): 导出成品 / 复制路径 / 删除(危险)。主操作「保存」常显显眼。
   const kebabItems: KebabItem[] = selected ? [
@@ -168,20 +171,14 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
         <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, borderBottom: '1px solid var(--fp-border)' }}>
           <button type="button" data-testid="authored-new" onClick={() => { setComposing(true); setSelectedId(null) }} style={{ ...primary, padding: '9px 12px' }}>＋ 新建草稿</button>
           <input placeholder="搜索内容 / 对象 / 项目…" value={q} onChange={(e) => setQ(e.target.value)}
-                 style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-text)', fontSize: 15, outline: 'none' }} />
+                 style={{ padding: '7px 10px', borderRadius: 2, border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-text)', fontSize: 15, outline: 'none' }} />
           <div style={{ display: 'flex', gap: 6 }}>
-            <select value={fKind} onChange={(e) => setFKind(e.target.value)} style={sel}>
-              <option value="">全部对象</option>
-              {Object.entries(TARGET_KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <select value={fProject} onChange={(e) => setFProject(e.target.value)} style={sel}>
-              <option value="">全部项目</option>
-              {projects.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select value={fUses} onChange={(e) => setFUses(e.target.value)} style={sel}>
-              <option value="">全部用途</option>
-              {Object.entries(USES_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
+            <BlueprintSelect value={fKind} onChange={setFKind} style={sel} label="对象" aria-label="按对象筛选"
+              options={[{ value: '', label: '全部对象' }, ...Object.entries(TARGET_KIND_LABEL).map(([k, v]) => ({ value: k, label: v }))]} />
+            <BlueprintSelect value={fProject} onChange={setFProject} style={sel} label="项目" aria-label="按项目筛选"
+              options={[{ value: '', label: '全部项目' }, ...projects.map((p) => ({ value: p, label: p }))]} />
+            <BlueprintSelect value={fUses} onChange={setFUses} style={sel} label="用途" aria-label="按用途筛选"
+              options={[{ value: '', label: '全部用途' }, ...Object.entries(USES_LABEL).map(([k, v]) => ({ value: k, label: v }))]} />
           </div>
           <div style={{ color: 'var(--fp-text-3)', fontSize: 13 }}>{loading ? '加载中…' : `${items.length} 条`}</div>
         </div>
@@ -195,7 +192,7 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
                          borderBottom: '1px solid var(--fp-border-subtle)', cursor: 'pointer',
                          background: active ? 'var(--fp-accent-weak)' : 'transparent', color: 'var(--fp-text)' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <div style={{ flex: 1, fontWeight: 600, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ flex: 1, fontWeight: 500, fontSize: 15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {n.title?.trim() || n.content.slice(0, 46) || '(空)'}
                   </div>
                   {relTimeZh(n.updated_at || n.created_at) && (
@@ -223,7 +220,7 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
         )}
         {composing ? (
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '18px 28px 22px' }}>
-            <div style={{ fontWeight: 650, marginBottom: 14, fontSize: 18, letterSpacing: '-0.01em' }}>新建草稿</div>
+            <div style={{ fontWeight: 500, marginBottom: 14, fontSize: 18, letterSpacing: '-0.01em' }}>新建草稿</div>
             <Composer
               uses={['draft']}
               fill
@@ -259,19 +256,18 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
                 onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'Enter')) { e.preventDefault(); onSave() } }}
                 placeholder={(selected.content.slice(0, 46) || '给这条起个名字') + '（标题可选，留空用正文首行）'}
                 data-testid="authored-title-input"
-                style={{ width: '100%', boxSizing: 'border-box', background: 'var(--fp-bg-doc)', color: 'var(--fp-text)', border: '1px solid var(--fp-border)', borderRadius: 6, padding: '8px 12px', fontSize: 17, fontWeight: 600, outline: 'none' }}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'var(--fp-bg-doc)', color: 'var(--fp-text)', border: '1px solid var(--fp-border)', borderRadius: 2, padding: '8px 12px', fontSize: 17, fontWeight: 500, outline: 'none' }}
               />
 
               {/* 编辑器外壳 = 玻璃卡: 顶部工具栏(主操作显眼 + ⋯ 收低频) + 干净正文(占满剩余高度) */}
-              <div style={{ flex: 1, minHeight: 0, border: '1px solid var(--fp-border)', borderRadius: 11, background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, minHeight: 0, border: '1px solid var(--fp-border)', borderRadius: 3, background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderBottom: '1px solid var(--fp-border-subtle)' }}>
                   <div style={{ flex: 1 }} />
-                  <select value={status} onChange={(e) => setStatus(e.target.value)} title="反馈状态"
-                    style={{ background: 'var(--fp-card)', color: 'var(--fp-text)', border: '1px solid var(--fp-border)', borderRadius: 6, padding: '4px 6px', fontSize: 13, height: 30 }}>
-                    {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
+                  <BlueprintSelect value={status} onChange={setStatus} title="反馈状态" label="反馈状态"
+                    aria-label="反馈状态" data-testid="authored-status"
+                    options={Object.entries(STATUS_LABEL).map(([k, v]) => ({ value: k, label: v }))} />
                   <button onClick={onSave} title="保存(Ctrl/⌘+S)" data-testid="authored-save"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 14px', background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', border: 'none', borderRadius: 7, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 14px', background: 'var(--fp-bp-seal)', color: '#fff', border: '1px solid rgba(255,240,235,.55)', borderRadius: 2, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
                     <Save size={15} /> 保存
                   </button>
                   <KebabMenu items={kebabItems} testid="authored-more" iconSize={18} />
@@ -282,7 +278,7 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
                 {(selected.captures || []).length > 0 && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '0 16px 14px' }}>
                     {selected.captures!.map((c) => (
-                      <img key={c} src={`/api/boss-sight/captures/file?path=${encodeURIComponent(c)}`} alt="" style={{ maxHeight: 140, borderRadius: 7, border: '1px solid var(--fp-border)' }} />
+                      <img key={c} src={`/api/boss-sight/captures/file?path=${encodeURIComponent(c)}`} alt="" style={{ maxHeight: 140, borderRadius: 2, border: '1px solid var(--fp-border)' }} />
                     ))}
                   </div>
                 )}
@@ -298,19 +294,23 @@ const Panel: React.FC<{ entity: AuthoredEntity }> = () => {
   )
 }
 
-// 2026-06-28: 看板「笔记」面板 = overlay-shell BlockSuite 笔记(经 8210 同源 /lofa/overlay/app/)。
+// 2026-06-28: 看板「笔记」面板 = 唯一画布前端 notes-web。
+// 2026-08-18: 改挂 /api/embed/notes-web, 与 dashboard API 同一条鉴权路径(统一应用鉴权)。
 // 文字札记全面淘汰; 旧 Panel 不再用作面板, 但评审评论/草稿/决策仍走共用 authored 后端(Composer/NotesForTarget)。
 const OverlayNotesPanel: React.FC<{ entity: AuthoredEntity }> = () => (
-  <iframe
-    src="/lofa/overlay/app/"
-    title="overlay-shell 笔记"
-    style={{ width: '100%', height: '100%', border: 0, background: 'transparent' }}
-  />
+  <div className="au-shell" data-testid="overlay-notes-panel">
+    <div className="au-frame">
+      <iframe
+        src="/api/embed/notes-web/notes-web.html?bridge_prefix=/api/embed"
+        title="画布"
+      />
+    </div>
+  </div>
 )
 
 export const authoredRegistration: EntityRegistration<AuthoredEntity> = {
   resolver,
   renderer: { type: 'authored', Editor: OverlayNotesPanel },
-  label: '笔记',
+  label: '画布',
   icon: '✎',
 }

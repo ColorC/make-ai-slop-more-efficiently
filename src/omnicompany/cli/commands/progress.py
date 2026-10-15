@@ -31,7 +31,7 @@ def cmd_progress() -> None:
 @any_caller
 def cmd_progress_add(ref_type: str, ref_id: str, text: str) -> None:
     """记一条历史(自动记时间戳 + 所属 plan/project)。"""
-    from omnicompany.dashboard.boss_sight.progress import add_entry
+    from omnicompany.packages.services.boss_sight.progress import add_entry
 
     by = current_caller() or "human"
     entry = add_entry(ref_type, ref_id, text, by=by)
@@ -45,7 +45,7 @@ def cmd_progress_add(ref_type: str, ref_id: str, text: str) -> None:
 @any_caller
 def cmd_progress_list(ref_type: str | None, ref_id: str | None, as_json: bool) -> None:
     """列出历史(可按 plan/project 过滤), 按时间升序。"""
-    from omnicompany.dashboard.boss_sight.progress import list_entries
+    from omnicompany.packages.services.boss_sight.progress import list_entries
 
     entries = list_entries(ref_type, ref_id)
     if as_json:
@@ -66,7 +66,7 @@ def cmd_progress_list(ref_type: str | None, ref_id: str | None, as_json: bool) -
 @any_caller
 def cmd_progress_edit(entry_id: str, text: str) -> None:
     """改一条历史的文本。"""
-    from omnicompany.dashboard.boss_sight.progress import edit_entry
+    from omnicompany.packages.services.boss_sight.progress import edit_entry
 
     entry = edit_entry(entry_id, text)
     if entry is None:
@@ -80,7 +80,7 @@ def cmd_progress_edit(entry_id: str, text: str) -> None:
 @any_caller
 def cmd_progress_remove(entry_id: str) -> None:
     """删一条历史。"""
-    from omnicompany.dashboard.boss_sight.progress import remove_entry
+    from omnicompany.packages.services.boss_sight.progress import remove_entry
 
     ok = remove_entry(entry_id)
     click.echo(json.dumps({"ok": ok}, ensure_ascii=False))

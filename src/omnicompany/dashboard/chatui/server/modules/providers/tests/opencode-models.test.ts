@@ -71,3 +71,12 @@ test('OpenCode models provider formats frontend labels from provider-prefixed id
     },
   ]);
 });
+
+test('OpenCode models provider defaults to subscribed DeepSeek V4 Flash', () => {
+  const definition = buildOpenCodeDefinitionFromIds([
+    'opencode-go/deepseek-v4-pro',
+    'opencode-go/deepseek-v4-flash',
+  ]);
+
+  assert.equal(definition.DEFAULT, 'opencode-go/deepseek-v4-flash');
+});

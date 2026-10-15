@@ -16,10 +16,10 @@ const S: Record<string, any> = {
   // facet 切换条 = shadcn 风分段控件: 圆角胶囊容器(玻璃淡底), 选中页与内容同色无缝, 无底部分割线。
   facetBar: {
     display: 'inline-flex', alignSelf: 'flex-start', gap: 2, margin: '10px 14px 8px',
-    padding: 3, borderRadius: 9, background: 'var(--fp-surface)', border: '1px solid var(--fp-border-subtle)',
+    padding: 3, borderRadius: 3, background: 'var(--fp-surface)', border: '1px solid var(--fp-border-subtle)',
   },
   facetBtn: (active: boolean): React.CSSProperties => ({
-    padding: '4px 14px', borderRadius: 7, border: '1px solid transparent', cursor: 'pointer',
+    padding: '4px 14px', borderRadius: 2, border: '1px solid transparent', cursor: 'pointer',
     // 选中: 浮一层玻璃 + 高光描边(与内容同质无缝); 未选: 透明凹陷弱字。
     background: active ? 'var(--fp-glass)' : 'transparent',
     boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,.08)' : 'none',

@@ -79,6 +79,7 @@ class OmniParserRuntime:
     source_root: Path | None = None
     python_executable_override: Path | None = None
     daemon_test_mode: bool = False
+    daemon_idle_timeout_seconds: float = 900.0
 
     def __post_init__(self) -> None:
         self.store_root = self.store_root.resolve()
@@ -368,6 +369,8 @@ class OmniParserRuntime:
             assets["weights_hash"],
             "--box-threshold",
             str(box_threshold),
+            "--idle-timeout-seconds",
+            str(max(0.0, self.daemon_idle_timeout_seconds)),
         ]
         if self.daemon_test_mode:
             command.append("--fake-engine")

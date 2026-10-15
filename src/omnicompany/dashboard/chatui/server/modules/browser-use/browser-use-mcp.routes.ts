@@ -43,6 +43,17 @@ router.post('/tools/:toolName', async (req, res) => {
       case 'browser_take_screenshot':
         result = await browserUseService.agentSnapshot(sessionId);
         break;
+      case 'xhs_open_private_messages':
+        result = await browserUseService.xhsOpenPrivateMessages(sessionId || null);
+        break;
+      case 'xhs_reply':
+        result = await browserUseService.xhsReply(sessionId, {
+          selector: String(input.selector || ''),
+          text: String(input.text || ''),
+          send: input.send === true,
+          confirmSend: input.confirmSend === true,
+        });
+        break;
       case 'browser_inspect':
         result = await browserUseService.agentInspect(
           sessionId,

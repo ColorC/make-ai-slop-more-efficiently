@@ -14,7 +14,7 @@
        DEC-/BLF-/CMT-...      → decision 适配器 (决策库)
        mat_...                → review 适配器 (审阅材料库)
        p_... / whatnow 任务   → whatnow 适配器 (HTTP :8230)
-       poof-note:// / note-.. → note 适配器 (poof-notes index.json)
+       omni://note/ / legacy poof-note:// / note-.. → note 适配器 (overlay-note-store index.json)
        [YYYY-MM-DD]NAME 等    → plan 适配器 (docs/plans)
        存在的文件路径          → file 适配器
 
@@ -25,7 +25,8 @@
 "失真", 必须显式报出(result.verified=False + verify_note), 禁止静默返回一个坏结果。
 
 本模块是**纯确定性代码, 零 LLM 调用**。不 import dashboard 的网页框架(fastapi 等):
-审阅材料走 ``MaterialStore`` 干净直读, 不经 ``routes.get_store``(那条路径拖 fastapi)。
+审阅材料走 ``services._core.review_store`` 共享读口(HTTP 读画布, 不拖 fastapi),
+旧库 JSON 仅作迁移前材料的文件资产兜底直读。
 
 与既有引用设施的关系(后续收编):
   - dashboard/controlplane/notes.py 的 ``_extract_links`` 只解析裸 ``[[name]]``(fuzzy
@@ -175,9 +176,9 @@ def parse_reference(ref: str) -> ParsedReference:
     if s.lower().startswith("omni://"):
         return _parse_omni_uri(s)
 
-    # 3) poof-note:// 作为一种 URI 形式(note 适配器专属), 保留整串交给自动识别的 kind 提示
+    # 3) Legacy compatibility: retired clients may still send poof-note://.
     if s.lower().startswith("poof-note://"):
-        # poof-note://<id> 或 poof-note://note/<id>#block
+        # legacy poof-note://<id> 或 poof-note://note/<id>#block
         rest = s[len("poof-note://"):]
         pure, version, anchor = _strip_alias_anchor_version(rest)
         # 允许 note/<id> 形式, 取最后一段作 id
@@ -304,19 +305,19 @@ class MaterialAdapter(BaseAdapter):
     name = "material"
 
     def resolve(self, ref_id: str, parsed: ParsedReference) -> ResolveResult:
-        from .material_index import get_material_id_index
+        from .material_index import default_material_scopes, get_material_id_index
 
         res = self._new(ref_id, parsed)
         index = get_material_id_index()
         entry = index.lookup(ref_id)
         # 缺索引(从未 rebuild 过)时现场 rebuild 一次再查 —— 语义OS要求"缺索引时现场 rebuild"
         if entry is None and not index.index_path.exists():
-            self._rebuild(index)
+            self._rebuild(index, default_material_scopes)
             entry = index.lookup(ref_id)
         if entry is None:
             # 索引存在但没这条: 也尝试一次 rebuild(可能是新写的头还没进索引)
             if index.index_path.exists():
-                self._rebuild(index)
+                self._rebuild(index, default_material_scopes)
                 entry = index.lookup(ref_id)
         if entry is None:
             res.exists = False
@@ -335,14 +336,9 @@ class MaterialAdapter(BaseAdapter):
         }
         return res
 
-    def _rebuild(self, index) -> None:
+    def _rebuild(self, index, scope_factory) -> None:
         try:
-            scopes = [
-                self.workspace_root / "src" / "omnicompany",
-                self.workspace_root / "templates",
-                self.workspace_root / "docs",
-            ]
-            scopes = [s for s in scopes if s.exists()]
+            scopes = scope_factory(self.workspace_root)
             index.rebuild_from_headers(scopes, self.workspace_root)
         except Exception:
             pass
@@ -446,7 +442,7 @@ class DecisionAdapter(BaseAdapter):
         return True, f"决策存在, kind={rec.get('kind')} status={rec.get('status')}"
 
 
-# ── review 适配器: 审阅材料库(直读 MaterialStore, 不拖 fastapi)──────────────────
+# ── review 适配器: 审阅材料(review_store 画布读口 + 旧库 JSON 文件兜底)────────
 
 class ReviewAdapter(BaseAdapter):
     name = "review"
@@ -460,15 +456,15 @@ class ReviewAdapter(BaseAdapter):
         json_path = root / f"{ref_id}.json"
         res.location = str(json_path)
         try:
-            from omnicompany.dashboard.boss_sight.reviewstage.store import MaterialStore
-            store = MaterialStore(root=root)
-            m = store.get(ref_id)
+            from omnicompany.packages.services._core import review_store
+            m = review_store.get_material(ref_id)
         except Exception as e:  # noqa: BLE001
-            # store 不可用时回退直读 JSON(设计允许: "不行就直读 <id>.json")
+            # 画布读口不可用时回退直读旧库 JSON(设计允许: "不行就直读 <id>.json";
+            # 旧库数据目录仍是迁移前材料的文件资产真源, 只读)
             m = None
             if not json_path.is_file():
                 res.exists = False
-                res.error = f"审阅材料不存在, 且 store 不可用: {e}"
+                res.error = f"审阅材料不存在, 且读源不可用: {e}"
                 return res
         if m is None and json_path.is_file():
             # 直读兜底
@@ -491,16 +487,13 @@ class ReviewAdapter(BaseAdapter):
             res.exists = False
             res.error = f"审阅材料库里无此 id: {ref_id}"
             return res
-        kind = m.kind.value if hasattr(m.kind, "value") else m.kind
-        tier = m.tier.value if hasattr(m.tier, "value") else m.tier
-        status = m.status.value if hasattr(m.status, "value") else m.status
         res.exists = True
         res.meta = {
-            "title": m.title,
-            "kind": kind,
-            "tier": tier,
-            "status": status,
-            "file_relpath": m.file_relpath,
+            "title": m.get("title"),
+            "kind": m.get("kind"),
+            "tier": m.get("tier"),
+            "status": m.get("status"),
+            "file_relpath": m.get("file_relpath"),
         }
         return res
 
@@ -524,10 +517,20 @@ class WhatnowAdapter(BaseAdapter):
     BASE = "http://127.0.0.1:8230"
 
     def _fetch_board(self) -> tuple[Optional[dict], str]:
-        """拉 /api/board?archived=1(whatnow 无按 id 单查, 只能整树拉)。
+        """拉 board(whatnow 无按 id 单查, 只能整树拉)。
 
-        返回 (board, error)。服务不在时 board=None, error 明确写"服务未运行"。
+        M3b: OMNI_TASK_SSOT=plan-groups 时改读 plan-groups 文件真源(免服务)。
+        返回 (board, error)。whatnow 档服务不在时 board=None, error 明确写"服务未运行"。
         """
+        from omnicompany.packages.services._core.lifecycle.task import ssot_is_plan_groups
+
+        if ssot_is_plan_groups():
+            try:
+                from omnicompany.packages.services._core.lifecycle import plan_groups_store as pgs
+
+                return pgs.board(True), ""
+            except Exception as e:  # noqa: BLE001
+                return None, f"plan-groups 文件真源读取异常: {e}"
         url = self.BASE + "/api/board?archived=1"
         try:
             with urllib.request.urlopen(url, timeout=10) as r:
@@ -551,7 +554,11 @@ class WhatnowAdapter(BaseAdapter):
 
     def resolve(self, ref_id: str, parsed: ParsedReference) -> ResolveResult:
         res = self._new(ref_id, parsed)
-        res.location = f"{self.BASE}/api/board (task id={ref_id})"
+        from omnicompany.packages.services._core.lifecycle.task import ssot_is_plan_groups
+
+        res.location = (f"data/services/plan-groups/*/tasks.json (task id={ref_id})"
+                        if ssot_is_plan_groups()
+                        else f"{self.BASE}/api/board (task id={ref_id})")
         board, err = self._fetch_board()
         if board is None:
             res.exists = False
@@ -589,16 +596,19 @@ class WhatnowAdapter(BaseAdapter):
         return True, f"任务存在, status={task.get('status')}"
 
 
-# ── note 适配器: poof-notes index.json(只读)────────────────────────────────────
+# ── note 适配器: overlay-note-store index.json(只读)─────────────────────────────
 
 class NoteAdapter(BaseAdapter):
     name = "note"
 
     def _norm_id(self, ref_id: str) -> str:
         s = ref_id.strip()
+        if s.startswith("omni://note/"):
+            s = s[len("omni://note/"):]
         if s.startswith("poof-note://"):
             s = s[len("poof-note://"):]
             s = s.split("/")[-1]
+        s = s.split("#", 1)[0]
         return s.strip()
 
     def resolve(self, ref_id: str, parsed: ParsedReference) -> ResolveResult:
@@ -610,12 +620,12 @@ class NoteAdapter(BaseAdapter):
         res.location = str(src.index_path)
         if not src.available():
             res.exists = False
-            res.error = f"poof-notes 索引不可用: {src.index_path}"
+            res.error = f"overlay-note-store 索引不可用: {src.index_path}"
             return res
         note = src.get_note(note_id)
         if note is None:
             res.exists = False
-            res.error = f"poof 笔记不存在: {note_id}"
+            res.error = f"Material 札记不存在: {note_id}"
             return res
         md_abs = None
         if note.md_rel:
@@ -627,17 +637,17 @@ class NoteAdapter(BaseAdapter):
             "has_body": note.has_body,
             "md_rel": note.md_rel,
             "index_path": str(src.index_path),
-            "anchor": f"poof-note://{note.id}",
+            "anchor": f"omni://note/{note.id}",
         }
         return res
 
     def verify(self, result: ResolveResult) -> tuple[bool, str]:
         if not result.exists:
-            return False, "poof-notes 索引里无此笔记"
+            return False, "overlay-note-store 索引里无此札记"
         # index.json 必须在(廉价指纹)
         index_path = Path(result.meta.get("index_path") or "")
         if not index_path.is_file():
-            return False, f"poof-notes index.json 不存在: {index_path}(失真)"
+            return False, f"overlay-note-store index.json 不存在: {index_path}(失真)"
         # md 正文是懒导出的: 有则核对大小, 没有则如实说明(不算失真, 是尚未导出)
         if result.meta.get("has_body") and result.meta.get("md_rel"):
             md = Path(result.location)

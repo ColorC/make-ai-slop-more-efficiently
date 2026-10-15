@@ -36,7 +36,15 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
-      copied = true;
+      if (navigator.clipboard.readText) {
+        try {
+          copied = await navigator.clipboard.readText() === text;
+        } catch {
+          copied = false;
+        }
+      } else {
+        copied = true;
+      }
     }
   } catch {
     copied = false;

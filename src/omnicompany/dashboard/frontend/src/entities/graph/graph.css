@@ -17,7 +17,7 @@
 .gr-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none;
   padding: 6px 14px; border-bottom: 1px solid var(--fp-border-subtle);
   background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
-.gr-title { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); font-weight: 600;
+.gr-title { font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); font-weight: 500;
   letter-spacing: .14em; text-transform: uppercase; color: var(--fp-text-2); white-space: nowrap; }
 .gr-tools .v2-search { max-width: 240px; }
 .gr-tools .bp-dim { color: var(--fp-bp-brass-hi); }
@@ -46,7 +46,7 @@
   display: flex; flex-direction: column; }
 .gr-d-head { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px;
   border-bottom: 1px solid var(--fp-border-subtle); flex: none; }
-.gr-d-title { flex: 1; min-width: 0; font-weight: 650; font-size: var(--fp-fs-2);
+.gr-d-title { flex: 1; min-width: 0; font-weight: 500; font-size: var(--fp-fs-2);
   font-family: var(--fp-bp-font-display); color: var(--fp-text); overflow-wrap: anywhere; }
 .gr-d-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px 16px; }
 .gr-kv { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; padding: 4px 0;
@@ -68,7 +68,7 @@
 .gr-btn-primary { flex: 1; display: inline-flex; align-items: center; justify-content: center;
   gap: 7px; cursor: pointer; border: 2px solid var(--fp-border-strong); border-radius: var(--fp-r1);
   background: var(--fp-bp-paper-2); color: var(--fp-text); font-size: var(--fp-fs-3);
-  font-weight: 600; font-family: inherit; padding: 6px 12px; box-shadow: var(--fp-shadow-sm);
+  font-weight: 500; font-family: inherit; padding: 6px 12px; box-shadow: var(--fp-shadow-sm);
   transition: all var(--fp-t-fast); }
 .gr-btn-primary:hover { border-color: #fff; background: var(--fp-bg-overlay); }
 .gr-btn-primary:active { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(6,16,38,.5); }

@@ -15,6 +15,7 @@ import math
 import os
 import sys
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -82,8 +83,9 @@ _BOUNDED_MOTION_RECLASSIFICATION_ADVISORY = (
 class LiveStepRouteRuntime:
     """Reuse one facility, gateway, and device lease across a known route.
 
-    Evidence runs remain action-scoped.  The reusable boundary only removes
-    repeated process-local setup and lease churn between already-known actions.
+    Canonical actions normally retain action-scoped evidence runs.  A guarded
+    benchmark batch may explicitly defer manifestation so its per-action steps
+    share one run while retaining independent ActionRuns and screenshots.
     """
 
     facility: GameObservatory
@@ -95,6 +97,10 @@ class LiveStepRouteRuntime:
     environment_id: str | None = None
     session_id: str | None = None
     terminal_after_artifact_id: str | None = None
+    deferred_evidence_run_id: str | None = None
+    deferred_evidence_identity: tuple[object, ...] | None = None
+    facility_connection_session: Any | None = None
+    player_connection_session: Any | None = None
     last_released_lease: DeviceLease | None = None
     closed: bool = False
 
@@ -108,10 +114,40 @@ class LiveStepRouteRuntime:
     ) -> "LiveStepRouteRuntime":
         resolved_facility = facility or GameObservatory(root)
         resolved_player = player or AIPlayerStore(resolved_facility.store)
+        facility_session_factory = getattr(
+            resolved_facility.store, "reusable_connection_session", None
+        )
+        player_session_factory = getattr(
+            resolved_player, "reusable_connection_session", None
+        )
+        facility_session = (
+            facility_session_factory() if callable(facility_session_factory) else nullcontext()
+        )
+        player_session = (
+            player_session_factory() if callable(player_session_factory) else nullcontext()
+        )
+        facility_session.__enter__()
+        try:
+            player_session.__enter__()
+        except Exception:
+            facility_session.__exit__(*sys.exc_info())
+            raise
+        try:
+            gateway = resolved_facility.device_gateway()
+            bind_player = getattr(gateway, "bind_ai_player_store", None)
+            if callable(bind_player):
+                bind_player(resolved_player)
+        except Exception:
+            error_info = sys.exc_info()
+            player_session.__exit__(*error_info)
+            facility_session.__exit__(*error_info)
+            raise
         return cls(
             facility=resolved_facility,
             player=resolved_player,
-            gateway=resolved_facility.device_gateway(),
+            gateway=gateway,
+            facility_connection_session=facility_session,
+            player_connection_session=player_session,
         )
 
     def ensure_lease(
@@ -156,6 +192,55 @@ class LiveStepRouteRuntime:
         self.session_id = request.session_id
         return self.lease
 
+    def resolve_evidence_run(
+        self,
+        request: "LiveStepRequestV1",
+        *,
+        start: Any,
+    ) -> Any:
+        """Start or reuse exactly one run within an explicitly deferred batch."""
+
+        identity = _deferred_evidence_identity(request)
+        if self.deferred_evidence_run_id is not None:
+            if not (
+                request.defer_evidence_run_completion
+                or request.complete_deferred_evidence_run
+            ):
+                raise ValueError(
+                    "shared route runtime has an open deferred evidence run but the next "
+                    "step has no batch lifecycle declaration"
+                )
+            if self.deferred_evidence_identity != identity:
+                raise ValueError("deferred evidence run cannot cross its canonical batch scope")
+            opened = self.facility.store.get_evidence_run(self.deferred_evidence_run_id)
+            if opened is None or opened.status != "running":
+                raise ValueError("deferred evidence run is missing or no longer running")
+            return opened
+        if request.complete_deferred_evidence_run:
+            raise ValueError("no deferred evidence run exists for the terminal step")
+        opened = start()
+        if request.defer_evidence_run_completion:
+            self.deferred_evidence_run_id = opened.id
+            self.deferred_evidence_identity = identity
+        return opened
+
+    def settle_evidence_run(
+        self,
+        opened: Any,
+        *,
+        can_defer: bool,
+        complete: Any,
+    ) -> Any | None:
+        """Defer a healthy checkpoint or manifest and clear the shared binding."""
+
+        if can_defer:
+            return None
+        manifest = complete()
+        if self.deferred_evidence_run_id == opened.id:
+            self.deferred_evidence_run_id = None
+            self.deferred_evidence_identity = None
+        return manifest
+
     def yield_lease(self) -> DeviceLease | None:
         """Release request-scoped device ownership while keeping warm adapters.
 
@@ -168,6 +253,19 @@ class LiveStepRouteRuntime:
 
         if self.closed:
             return self.last_released_lease
+        if self.deferred_evidence_run_id is not None:
+            run_id = self.deferred_evidence_run_id
+            run = self.facility.store.get_evidence_run(run_id)
+            if run is not None and run.status in {"running", "paused"}:
+                EvidenceRecorder(self.facility.store, None).stop_run(
+                    run_id,
+                    reason=(
+                        "Guarded batch route runtime closed before its deferred "
+                        "canonical terminal step."
+                    ),
+                )
+            self.deferred_evidence_run_id = None
+            self.deferred_evidence_identity = None
         released = None
         if self.lease is not None:
             released = self.gateway.release(self.lease.token)
@@ -183,8 +281,19 @@ class LiveStepRouteRuntime:
     def close(self) -> DeviceLease | None:
         if self.closed:
             return self.last_released_lease
-        released = self.yield_lease()
-        self.closed = True
+        released = None
+        try:
+            released = self.yield_lease()
+        finally:
+            try:
+                if self.player_connection_session is not None:
+                    self.player_connection_session.__exit__(None, None, None)
+            finally:
+                if self.facility_connection_session is not None:
+                    self.facility_connection_session.__exit__(None, None, None)
+                self.player_connection_session = None
+                self.facility_connection_session = None
+                self.closed = True
         return released
 
 
@@ -228,7 +337,9 @@ class LiveStepRequestV1(_StrictModel):
     required_consecutive: int = Field(default=2, ge=1, le=4)
     settle_timeout_seconds: float = Field(default=4.0, gt=0, le=10)
     sample_interval_seconds: float = Field(default=0.25, gt=0, le=2)
-    capture_profile: Literal["full", "compact_static"] = "compact_static"
+    capture_profile: Literal[
+        "full", "compact_static", "guarded_batch_checkpoint"
+    ] = "compact_static"
     source_state_max_visual_distance: float = Field(default=0.08, gt=0, le=1)
     source_semantic_state_id: str | None = Field(default=None, min_length=1)
     source_state_observation_id: str | None = Field(default=None, min_length=1)
@@ -241,6 +352,8 @@ class LiveStepRequestV1(_StrictModel):
     before_surface_profile: SemanticSurfaceProfileV1 | None = None
     after_surface_profile: SemanticSurfaceProfileV1 | None = None
     defer_semantic_sedimentation: bool = False
+    defer_evidence_run_completion: bool = False
+    complete_deferred_evidence_run: bool = False
 
     @model_validator(mode="after")
     def keep_pointer_geometry_complete(self) -> "LiveStepRequestV1":
@@ -278,6 +391,18 @@ class LiveStepRequestV1(_StrictModel):
             raise ValueError("locator resolution provenance requires a skill replay version")
         if (self.before_surface_profile is None) != (self.after_surface_profile is None):
             raise ValueError("semantic surface profiles must describe both before and after roles")
+        if self.defer_evidence_run_completion and self.complete_deferred_evidence_run:
+            raise ValueError("a live step cannot defer and complete one evidence run")
+        if (
+            self.defer_evidence_run_completion
+            and self.capture_profile != "guarded_batch_checkpoint"
+        ):
+            raise ValueError("deferred evidence completion requires a guarded batch checkpoint")
+        if (
+            self.complete_deferred_evidence_run
+            and self.capture_profile != "compact_static"
+        ):
+            raise ValueError("a deferred evidence run requires a compact canonical terminal")
         return self
 
 
@@ -653,11 +778,80 @@ def _route_boundary_before_artifact_id(
 
     if (
         owns_route_runtime
-        or request.capture_profile != "compact_static"
+        or request.capture_profile
+        not in {"compact_static", "guarded_batch_checkpoint"}
         or request.dynamic_scene_profile is not None
     ):
         return None
     return runtime.terminal_after_artifact_id
+
+
+def _deferred_evidence_identity(request: LiveStepRequestV1) -> tuple[object, ...]:
+    """Return the immutable scope that one deferred batch run may not cross."""
+
+    return (
+        request.target_id,
+        request.environment_id,
+        request.session_id,
+        request.task_id,
+        request.viewport_width,
+        request.viewport_height,
+        request.game_id,
+        request.build_scope_id,
+        request.actor,
+    )
+
+
+def evaluate_checkpoint_live_effect(
+    *,
+    before_path: str | Path,
+    after_path: str | Path,
+    expectation: LiveStepExpectationV1,
+    target_bounds: SourcePixelRect | None,
+    elapsed_seconds: float,
+    runtime_limit_seconds: int,
+) -> EvidenceLiveEvaluation:
+    """Evaluate an intermediate guarded checkpoint from one bounded region only.
+
+    The independent typed business judge remains authoritative for effective
+    gameplay state.  This visual gate only rejects a checkpoint whose declared
+    local target did not change, avoiding repeated full-frame and structural
+    decoding that is reserved for the batch's canonical terminal.
+    """
+
+    region = expectation.region or target_bounds
+    distance = round(
+        (
+            regional_perceptual_frame_distance(before_path, after_path, region)
+            if region is not None
+            else perceptual_frame_distance(before_path, after_path)
+        ),
+        6,
+    )
+    expectation_met = (
+        distance >= expectation.min_visual_distance
+        if expectation.kind == "visual_change"
+        else distance < expectation.min_visual_distance
+    )
+    return EvidenceLiveEvaluation(
+        expectation_met=expectation_met,
+        stop_recommended=not expectation_met,
+        visual_distance=distance,
+        global_visual_distance=None,
+        evaluation_region=region,
+        target_effect=None,
+        expected_min_visual_distance=expectation.min_visual_distance,
+        elapsed_seconds=round(elapsed_seconds, 3),
+        runtime_limit_seconds=runtime_limit_seconds,
+        evaluation_source=(
+            "primary_visual_distance"
+            if expectation_met and expectation.kind == "visual_change"
+            else "visual_no_change"
+            if expectation_met
+            else "unmet"
+        ),
+        evaluator_version="guarded-batch-checkpoint-region.v1",
+    )
 
 
 def run_live_step(
@@ -668,6 +862,10 @@ def run_live_step(
 ) -> dict[str, object]:
     started = time.perf_counter()
     owns_route_runtime = route_runtime is None
+    if owns_route_runtime and (
+        request.defer_evidence_run_completion or request.complete_deferred_evidence_run
+    ):
+        raise ValueError("deferred evidence completion requires a shared route runtime")
     runtime = route_runtime or LiveStepRouteRuntime.create(root=root)
     facility = runtime.facility
     player = runtime.player
@@ -778,45 +976,51 @@ def run_live_step(
     )
     released = None
     try:
-        opened = gateway.start_evidence_run(
-            request.target_id,
-            lease.token,
-            viewport_width=request.viewport_width,
-            viewport_height=request.viewport_height,
-            game_id=request.game_id,
-            build_scope_id=request.build_scope_id,
-            scope_id=request.environment_id,
-            environment={
-                "caller": "ai-player-live-step",
-                "environment_id": request.environment_id,
-                "ai_player_session_id": request.session_id,
-                "task_id": request.task_id,
-                "actor": request.actor,
-                "pre_execution_expectation": request.expectation.summary,
-                "expected_change_kind": request.expectation.kind,
-                "expected_min_visual_distance": request.expectation.min_visual_distance,
-                "stop_conditions": request.expectation.stop_conditions,
-                "account_action_intent": request.account_action_intent.model_dump(mode="json"),
-                "max_runtime_seconds": request.max_runtime_seconds,
-                "source_state_guard": source_state_guard,
-                "expected_semantic_state_id": request.expected_semantic_state_id,
-                "skill_replay_version_id": request.skill_replay_version_id,
-                "locator_resolution": request.locator_resolution,
-                "defer_semantic_sedimentation": request.defer_semantic_sedimentation,
-                "expected_state_max_visual_distance": (request.expected_state_max_visual_distance),
-                "expected_state_reference_artifact_id": (
-                    request.expected_state_reference_artifact_id
-                ),
-                "expected_state_target_bounds": (
-                    request.target_bounds.model_dump(mode="json")
-                    if request.expected_semantic_state_id is not None
-                    and request.target_bounds is not None
-                    else None
-                ),
-                "device_gateway_lease_id": lease.id,
-                "device_gateway_lease_holder": lease.holder,
-                **external_owner_context,
-            },
+        opened = runtime.resolve_evidence_run(
+            request,
+            start=lambda: gateway.start_evidence_run(
+                request.target_id,
+                lease.token,
+                viewport_width=request.viewport_width,
+                viewport_height=request.viewport_height,
+                game_id=request.game_id,
+                build_scope_id=request.build_scope_id,
+                scope_id=request.environment_id,
+                environment={
+                    "caller": "ai-player-live-step",
+                    "environment_id": request.environment_id,
+                    "ai_player_session_id": request.session_id,
+                    "task_id": request.task_id,
+                    "actor": request.actor,
+                    "pre_execution_expectation": request.expectation.summary,
+                    "expected_change_kind": request.expectation.kind,
+                    "expected_change_measurement_scope": "visual_effect_only",
+                    "expected_min_visual_distance": request.expectation.min_visual_distance,
+                    "stop_conditions": request.expectation.stop_conditions,
+                    "account_action_intent": request.account_action_intent.model_dump(mode="json"),
+                    "max_runtime_seconds": request.max_runtime_seconds,
+                    "source_state_guard": source_state_guard,
+                    "expected_semantic_state_id": request.expected_semantic_state_id,
+                    "skill_replay_version_id": request.skill_replay_version_id,
+                    "locator_resolution": request.locator_resolution,
+                    "defer_semantic_sedimentation": request.defer_semantic_sedimentation,
+                    "expected_state_max_visual_distance": (
+                        request.expected_state_max_visual_distance
+                    ),
+                    "expected_state_reference_artifact_id": (
+                        request.expected_state_reference_artifact_id
+                    ),
+                    "expected_state_target_bounds": (
+                        request.target_bounds.model_dump(mode="json")
+                        if request.expected_semantic_state_id is not None
+                        and request.target_bounds is not None
+                        else None
+                    ),
+                    "device_gateway_lease_id": lease.id,
+                    "device_gateway_lease_holder": lease.holder,
+                    **external_owner_context,
+                },
+            ),
         )
         step = gateway.record_evidence_step(
             opened.id,
@@ -839,6 +1043,7 @@ def run_live_step(
             ),
             trusted_terminal_reference_artifact_id=(request.expected_state_reference_artifact_id),
             trusted_terminal_max_visual_distance=(request.expected_state_max_visual_distance),
+            source_state_guard=source_state_guard,
         )
         before = facility.store.get_artifact(str(step.before_frame_id))
         after = facility.store.get_artifact(str(step.after_frame_id))
@@ -848,15 +1053,22 @@ def run_live_step(
                 "terminal live step lacks before/after screenshot artifacts: "
                 f"step={step.id}; {details}"
             )
-        live_evaluation = evaluate_live_effect(
-            before_path=before.path,
-            after_path=after.path,
-            expectation=request.expectation,
-            target_bounds=request.target_bounds,
-            viewport_width=request.viewport_width,
-            viewport_height=request.viewport_height,
-            elapsed_seconds=time.perf_counter() - started,
-            runtime_limit_seconds=request.max_runtime_seconds,
+        evaluation_arguments = {
+            "before_path": before.path,
+            "after_path": after.path,
+            "expectation": request.expectation,
+            "target_bounds": request.target_bounds,
+            "elapsed_seconds": time.perf_counter() - started,
+            "runtime_limit_seconds": request.max_runtime_seconds,
+        }
+        live_evaluation = (
+            evaluate_checkpoint_live_effect(**evaluation_arguments)
+            if request.capture_profile == "guarded_batch_checkpoint"
+            else evaluate_live_effect(
+                **evaluation_arguments,
+                viewport_width=request.viewport_width,
+                viewport_height=request.viewport_height,
+            )
         )
         metadata = dict(step.metadata)
         if request.locator_resolution is not None:
@@ -872,7 +1084,18 @@ def run_live_step(
             )
         step = _promote_bounded_motion_terminal_if_proven(step, live_evaluation)
         facility.store.save_evidence_step(step)
-        manifest = gateway.complete_evidence_run(opened.id, lease.token)
+        step_can_defer = bool(
+            request.defer_evidence_run_completion
+            and step.status == "passed"
+            and not step.publication_issues()
+            and live_evaluation.expectation_met
+            and live_evaluation.elapsed_seconds <= request.max_runtime_seconds
+        )
+        manifest = runtime.settle_evidence_run(
+            opened,
+            can_defer=step_can_defer,
+            complete=lambda: gateway.complete_evidence_run(opened.id, lease.token),
+        )
         if not owns_route_runtime and step.status == "passed":
             runtime.terminal_after_artifact_id = str(step.after_frame_id)
     except Exception as exc:
@@ -884,6 +1107,9 @@ def run_live_step(
             )
         except Exception:  # noqa: BLE001 - never hide the primary action failure
             pass
+        if opened is not None and runtime.deferred_evidence_run_id == opened.id:
+            runtime.deferred_evidence_run_id = None
+            runtime.deferred_evidence_identity = None
         raise
     finally:
         if owns_route_runtime:
@@ -895,11 +1121,13 @@ def run_live_step(
     for artifact in artifacts:
         if artifact is not None:
             artifact_kinds[artifact.kind] = artifact_kinds.get(artifact.kind, 0) + 1
-    execution_completed = step.status != "running" and manifest is not None
+    manifest_deferred = manifest is None and runtime.deferred_evidence_run_id == opened.id
+    step_publishable = not step.publication_issues()
+    execution_completed = step.status != "running"
     result_ok = bool(
         execution_completed
         and step.status == "passed"
-        and manifest.publishable
+        and (manifest.publishable if manifest is not None else step_publishable)
         and live_evaluation.expectation_met
         and live_evaluation.elapsed_seconds <= request.max_runtime_seconds
     )
@@ -935,8 +1163,11 @@ def run_live_step(
         "locator_resolution": request.locator_resolution,
         "semantic_surface_profiles_persisted": (request.before_surface_profile is not None),
         "step_status": step.status,
-        "manifest_publishable": manifest.publishable,
-        "publication_issues": manifest.publication_issues,
+        "manifest_publishable": manifest.publishable if manifest is not None else None,
+        "manifest_deferred": manifest_deferred,
+        "publication_issues": (
+            manifest.publication_issues if manifest is not None else step.publication_issues()
+        ),
         "session_remaining_actions": (
             current_session.remaining_action_budget if current_session is not None else None
         ),

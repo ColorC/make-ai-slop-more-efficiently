@@ -46,7 +46,7 @@ export default function AgentStatusBar({ showTimeline, onToggleTimeline }: Statu
         gap: 12,
         padding: '4px 12px',
         background: 'var(--fp-bg)',
-        borderBottom: '1px solid #222',
+        borderBottom: '1px solid var(--fp-border-subtle)',
         fontSize: 14,
         fontFamily: 'Consolas, Menlo, monospace',
         flexShrink: 0,
@@ -61,7 +61,7 @@ export default function AgentStatusBar({ showTimeline, onToggleTimeline }: Statu
       {/* Trace ID */}
       {activeTraceId && (
         <span
-          style={{ color: '#555', cursor: 'pointer' }}
+          style={{ color: 'var(--fp-text-3)', cursor: 'pointer' }}
           title={activeTraceId}
           onClick={() => navigator.clipboard.writeText(activeTraceId)}
         >
@@ -70,11 +70,11 @@ export default function AgentStatusBar({ showTimeline, onToggleTimeline }: Statu
       )}
 
       {/* Turn counter */}
-      {currentTurn > 0 && <span style={{ color: '#555' }}>Turn {currentTurn}</span>}
+      {currentTurn > 0 && <span style={{ color: 'var(--fp-text-3)' }}>Turn {currentTurn}</span>}
 
       {/* Token usage */}
       {(totalPromptTokens > 0 || totalCompletionTokens > 0) && (
-        <span style={{ color: '#555' }}>
+        <span style={{ color: 'var(--fp-text-3)' }}>
           {((totalPromptTokens + totalCompletionTokens) / 1000).toFixed(1)}k tokens
         </span>
       )}
@@ -86,14 +86,16 @@ export default function AgentStatusBar({ showTimeline, onToggleTimeline }: Statu
         <button
           onClick={cancelAgent}
           style={{
-            background: '#3a1a1a',
-            border: '1px solid #5a2a2a',
-            borderRadius: 4,
-            color: '#ef5350',
+            background: 'color-mix(in srgb, var(--fp-err) 14%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--fp-err) 45%, transparent)',
+            borderRadius: 'var(--fp-bp-r1)',
+            color: 'var(--fp-err)',
             padding: '2px 8px',
             cursor: 'pointer',
-            fontSize: 14,
-            fontFamily: 'inherit',
+            fontSize: 'var(--fp-fs-4)',
+            fontFamily: 'var(--fp-font-mono)',
+            textTransform: 'uppercase',
+            letterSpacing: '.09em',
           }}
         >
           Stop
@@ -104,14 +106,16 @@ export default function AgentStatusBar({ showTimeline, onToggleTimeline }: Statu
           onClick={onToggleTimeline}
           title="Toggle event timeline"
           style={{
-            background: showTimeline ? '#1a2a1a' : 'transparent',
-            border: '1px solid #2a3a2a',
-            borderRadius: 4,
-            color: showTimeline ? '#66bb6a' : '#555',
+            background: showTimeline ? 'color-mix(in srgb, var(--fp-ok) 14%, transparent)' : 'transparent',
+            border: '1px solid color-mix(in srgb, var(--fp-ok) 45%, transparent)',
+            borderRadius: 'var(--fp-bp-r1)',
+            color: showTimeline ? 'var(--fp-ok)' : 'var(--fp-text-3)',
             padding: '2px 8px',
             cursor: 'pointer',
-            fontSize: 14,
-            fontFamily: 'inherit',
+            fontSize: 'var(--fp-fs-4)',
+            fontFamily: 'var(--fp-font-mono)',
+            textTransform: 'uppercase',
+            letterSpacing: '.09em',
           }}
         >
           Events
@@ -120,14 +124,16 @@ export default function AgentStatusBar({ showTimeline, onToggleTimeline }: Statu
       <button
         onClick={newSession}
         style={{
-          background: '#1a2a3a',
-          border: '1px solid #2a3a4a',
-          borderRadius: 4,
-          color: '#90caf9',
+          background: 'var(--fp-bp-paper-2)',
+          border: '1px solid var(--fp-border)',
+          borderRadius: 'var(--fp-bp-r1)',
+          color: 'var(--fp-link)',
           padding: '2px 8px',
           cursor: 'pointer',
-          fontSize: 14,
-          fontFamily: 'inherit',
+          fontSize: 'var(--fp-fs-4)',
+          fontFamily: 'var(--fp-font-mono)',
+          textTransform: 'uppercase',
+          letterSpacing: '.09em',
         }}
       >
         New

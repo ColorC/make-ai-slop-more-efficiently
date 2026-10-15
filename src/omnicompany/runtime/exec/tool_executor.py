@@ -151,7 +151,9 @@ class ToolExecutor:
                 return [p, "-c"], "git-bash"
 
         # 2. PowerShell (比 cmd 好, 支持部分 Unix 别名)
-        return ["powershell.exe", "-NoProfile", "-Command"], "powershell"
+        from omnicompany.runtime.powershell_runtime import resolve_powershell7
+
+        return [resolve_powershell7() or "pwsh.exe", "-NoProfile", "-Command"], "powershell7"
 
     @staticmethod
     def _kill_tree(pid: int) -> None:

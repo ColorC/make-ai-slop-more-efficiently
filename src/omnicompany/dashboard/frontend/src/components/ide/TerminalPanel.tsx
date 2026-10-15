@@ -30,16 +30,16 @@ export default function TerminalPanel() {
       }}
     >
       {terminalLines.length === 0 && (
-        <div style={{ color: '#444', padding: 12 }}>No terminal output yet</div>
+        <div style={{ color: 'var(--fp-text-3)', padding: 12 }}>No terminal output yet</div>
       )}
       {terminalLines.map((line, i) => (
         <div key={i} style={{ marginBottom: 8 }}>
-          <div style={{ color: '#66bb6a' }}>
+          <div style={{ color: 'var(--fp-ok)' }}>
             $ {line.command}
           </div>
           <pre
             style={{
-              color: line.exitCode !== undefined && line.exitCode !== 0 ? '#ef9a9a' : '#ccc',
+              color: line.exitCode !== undefined && line.exitCode !== 0 ? 'var(--fp-err)' : 'var(--fp-text)',
               margin: '2px 0 0 0',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
@@ -49,7 +49,7 @@ export default function TerminalPanel() {
             {line.output}
           </pre>
           {line.exitCode !== undefined && line.exitCode !== 0 && (
-            <div style={{ color: '#ef5350', fontSize: 14 }}>exit code: {line.exitCode}</div>
+            <div style={{ color: 'var(--fp-err)', fontSize: 14 }}>exit code: {line.exitCode}</div>
           )}
         </div>
       ))}

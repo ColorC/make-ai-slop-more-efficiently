@@ -40,14 +40,14 @@ export default function NavAudit() {
   const islands = rows.filter((r) => r.island)
 
   return (
-    <div style={{ height: '100%', overflow: 'auto', background: 'transparent', color: '#adbac7', padding: 16, fontFamily: 'system-ui' }}>
+    <div style={{ height: '100%', overflow: 'auto', background: 'transparent', color: 'var(--fp-text)', padding: 16, fontFamily: 'system-ui' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <strong style={{ fontSize: 16, color: 'var(--fp-text)' }}>🧭 可达性审计</strong>
         <span style={{ fontSize: 13, color: 'var(--fp-text-3)' }}>
           共 {rows.length} 个功能 · <span style={{ color: islands.length ? 'var(--fp-err)' : 'var(--fp-ok)' }}>{islands.length} 个疑似孤岛</span>
         </span>
         <button type="button" onClick={() => openTab({ type: 'project_board', id: 'main' }, '项目')}
-          style={{ marginLeft: 'auto', fontSize: 12, padding: '4px 12px', cursor: 'pointer', border: '1px solid var(--fp-border)', borderRadius: 6, background: 'var(--fp-accent)', color: '#fff' }}>
+          style={{ marginLeft: 'auto', fontSize: 12, padding: '4px 12px', cursor: 'pointer', border: '1px solid rgba(255,240,235,.55)', borderRadius: 2, background: 'var(--fp-bp-seal)', color: '#fff' }}>
           ← 返回项目主页
         </button>
       </div>
@@ -72,7 +72,7 @@ export default function NavAudit() {
                 {r.island ? '⚠ ' : ''}{r.label}
               </td>
               <td style={{ padding: '6px 8px', color: 'var(--fp-text-3)', fontFamily: 'Consolas, monospace', fontSize: 12 }}>{r.type}</td>
-              <td style={{ padding: '6px 8px', color: r.island ? 'var(--fp-err)' : '#adbac7' }}>
+              <td style={{ padding: '6px 8px', color: r.island ? 'var(--fp-err)' : 'var(--fp-text)' }}>
                 {r.island ? '未登记入口(疑似孤岛)— 需补一个从主页可达的入口' : r.via}
               </td>
               <td style={{ padding: '6px 8px', color: 'var(--fp-ok)' }}>rail 首页 ✓</td>

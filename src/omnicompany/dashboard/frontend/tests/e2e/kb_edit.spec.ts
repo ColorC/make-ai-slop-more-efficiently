@@ -1,20 +1,24 @@
 import { test, expect } from '@playwright/test'
-import { SHOTS, setupErrorLogging, gotoModule } from './helpers'
+import { SHOTS, setupErrorLogging, waitAppReady } from './helpers'
 
-// 用一个临时 note 测试 (注: 用自己生成的 round 1 计划文档作为可改可改回的 sandbox)
-const TEST_NOTE = 'plans/dashboard/[2026-05-01]WEB-FOUNDATION/usability_paths_round1'
+// 使用既有 Markdown 展示沙盒；涉及保存的用例会在同一用例末尾移除自己的标记。
+const TEST_NOTE = '_sandbox/kb_markdown_demo'
 
 test.beforeEach(async ({ page }) => {
   setupErrorLogging(page)
   await page.goto('/')
-  await gotoModule(page, 'kb')
+  await waitAppReady(page)
 })
 
 async function openNote(page: any, noteId: string) {
-  await page.getByPlaceholder('过滤...').fill(noteId.split('/').pop() || noteId)
-  await page.waitForTimeout(400)
-  await page.locator(`div[title="${noteId}"]`).first().click()
-  await page.waitForTimeout(500)
+  await page.keyboard.press('Control+k')
+  const search = page.getByPlaceholder('搜索 / 命令: 实体、材料或本机文件…')
+  await expect(search).toBeVisible({ timeout: 10_000 })
+  await search.fill(noteId)
+  const result = page.locator('[role="option"]').filter({ hasText: 'Note' }).filter({ hasText: noteId }).first()
+  await expect(result).toBeVisible({ timeout: 30_000 })
+  await result.click()
+  await expect(page.getByRole('button', { name: /只读/ })).toBeVisible({ timeout: 15_000 })
 }
 
 test('B9.1 默认进只读模式 + 三个模式按钮可见', async ({ page }) => {
@@ -37,6 +41,19 @@ test('B9.3 切到分屏模式 → Monaco + 预览 同时可见', async ({ page }
   await expect(page.locator('.monaco-editor').first()).toBeVisible({ timeout: 15000 })
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${SHOTS}/kb_edit_split.png`, fullPage: true })
+})
+
+test('B9.3a 切到画布 → 可创建思维导图节点且只进入未保存草稿', async ({ page }) => {
+  await openNote(page, TEST_NOTE)
+  await page.getByRole('button', { name: /画布/ }).click()
+  await expect(page.locator('.note-canvas')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByTitle('文字笔记')).toBeVisible()
+  await expect(page.getByTitle('流程图节点')).toBeVisible()
+
+  await page.getByTitle('思维导图根节点').click()
+  await expect(page.getByLabel('节点文字')).toHaveValue('中心主题')
+  await expect(page.locator('span[title*="未保存"]')).toBeVisible()
+  await page.screenshot({ path: `${SHOTS}/kb_note_canvas.png`, fullPage: true })
 })
 
 async function typeInMonaco(page: any, text: string) {

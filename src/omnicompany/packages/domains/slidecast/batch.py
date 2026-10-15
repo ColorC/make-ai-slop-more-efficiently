@@ -58,7 +58,7 @@ def batch(filters: list[str] | None = None, force: bool = False,
             failed.append(slug)
             print("  [err]", ((r.stderr or "") + (r.stdout or ""))[-300:])
 
-    print(f"\n== 发布到 colorc.cc 真源(新建 {len(generated)} 篇,增量重建)==")
+    print(f"\n== 发布到 example.com 真源(新建 {len(generated)} 篇,增量重建)==")
     P.publish(rebuild=generated)
     print(f"\n批量完成:新生成 {len(generated)} · 跳过 {len(skipped)} · 失败 {len(failed)}"
           + (f"  失败={failed}" if failed else ""))

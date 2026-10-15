@@ -13,7 +13,11 @@
 from __future__ import annotations
 
 import json
+import msvcrt
 import os
+import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -50,6 +54,37 @@ _LINK_SCALAR_RELS = ("parent",)
 
 class LibraryWriteError(Exception):
     """落库前自动校验不过(strict 模式)抛出。"""
+
+
+_WRITE_THREAD_LOCK = threading.RLock()
+
+
+@contextmanager
+def _record_write_lock(*, timeout_seconds: float = 5.0):
+    '''Serialize decision id allocation and append across threads and processes.'''
+    ensure_dirs()
+    lock_path = RECORDS_PATH.with_name(RECORDS_PATH.name + '.lock')
+    deadline = time.monotonic() + timeout_seconds
+    with _WRITE_THREAD_LOCK:
+        with lock_path.open('a+b') as handle:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b'0')
+                handle.flush()
+            handle.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise LibraryWriteError('decision records write lock timeout')
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def now_iso() -> str:
@@ -253,7 +288,7 @@ def validate_record(record: dict) -> list[str]:
 
 # ── 写 ───────────────────────────────────────────────────────────────────────
 
-def upsert(record: dict) -> tuple[dict, bool]:
+def _upsert_unlocked(record: dict) -> tuple[dict, bool]:
     """写入决策库。无 id 则生成;同 id 已存在→增量合并。返 (record, is_update)。
 
     OMNI_DECISIONS_STRICT_WRITE=1 时校验不过直接抛 LibraryWriteError;默认仍落库但打 validation 标记。
@@ -289,6 +324,11 @@ def upsert(record: dict) -> tuple[dict, bool]:
     with RECORDS_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     return record, is_update
+
+
+def upsert(record: dict) -> tuple[dict, bool]:
+    with _record_write_lock():
+        return _upsert_unlocked(record)
 
 
 def soft_delete(record_id: str) -> bool:

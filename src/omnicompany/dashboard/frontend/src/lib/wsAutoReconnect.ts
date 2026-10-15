@@ -60,6 +60,8 @@ export interface WsAutoReconnectHandle {
   send: (data: string | ArrayBuffer | Blob) => void
   /** 主动停止重连 (code=1000), 业务侧组件 unmount 时也要调. */
   close: (code?: number, reason?: string) => void
+  /** Drop the current socket and attach again immediately (fresh snapshot). */
+  reconnect: (reason?: string) => void
 }
 
 export function useWsAutoReconnect(opts: WsAutoReconnectOptions): WsAutoReconnectHandle {
@@ -230,6 +232,18 @@ export function useWsAutoReconnect(opts: WsAutoReconnectOptions): WsAutoReconnec
     setState('disconnected')
   }, [])
 
+  const reconnect = useCallback((reason = 'resync') => {
+    intentionalCloseRef.current = false
+    cleanupTimers()
+    const ws = wsRef.current
+    connectionGenerationRef.current += 1
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      try { ws.close(4001, reason) } catch { /* */ }
+    }
+    wsRef.current = null
+    connect(true, 0)
+  }, [connect])
+
   return {
     state,
     reconnectAttempts,
@@ -237,5 +251,6 @@ export function useWsAutoReconnect(opts: WsAutoReconnectOptions): WsAutoReconnec
     ws: wsRef.current,
     send,
     close,
+    reconnect,
   }
 }

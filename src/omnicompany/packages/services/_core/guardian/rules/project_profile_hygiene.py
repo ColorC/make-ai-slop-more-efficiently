@@ -280,6 +280,29 @@ def scan_project_profile_violations(project_root: Path) -> list[dict[str, str]]:
 
         allowed_dirs = _norm_set(_as_str_set(root_spec.get("allowed_root_dirs")))
         allowed_files = _norm_set(_as_str_set(root_spec.get("allowed_root_files")))
+        registry_source = root_spec.get("workspace_registry")
+        if registry_source is not None:
+            if not isinstance(registry_source, str) or not registry_source.strip():
+                issues.append(_issue(
+                    rule_id="PROJ-HYG-WORKSPACE-REGISTRY-INVALID", severity="HIGH",
+                    profile_root=root_label, rel_path="workspace_registry",
+                    message="workspace_registry must be a non-empty path string; this root was not scanned.",
+                ))
+                continue
+            registry_path = Path(registry_source)
+            if not registry_path.is_absolute():
+                registry_path = project_root / registry_path
+            try:
+                from ..workspace_pollution import load_workspace_registry_whitelist
+
+                allowed_dirs |= _norm_set(load_workspace_registry_whitelist(registry_path, scan_root))
+            except Exception as exc:  # fail closed: source corruption must not produce a clean root
+                issues.append(_issue(
+                    rule_id="PROJ-HYG-WORKSPACE-REGISTRY-INVALID", severity="HIGH",
+                    profile_root=root_label, rel_path=str(registry_path),
+                    message=f"workspace registry could not be loaded: {exc}; this root was not scanned.",
+                ))
+                continue
         if allowed_dirs or allowed_files:
             for entry in _iter_entries(scan_root):
                 if entry.is_dir():

@@ -9,7 +9,10 @@
 
 from __future__ import annotations
 
+import logging
 import os
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +21,7 @@ from fastapi.responses import FileResponse
 from PIL import Image
 from pydantic import BaseModel
 
+from omnicompany.core.project_assets import autostart_project_assets
 from omnicompany.core.projects_registry import (
     assets_dir,
     build_quests,
@@ -31,6 +35,33 @@ from omnicompany.core.projects_registry import (
 )
 
 projects_router = APIRouter(tags=["projects"])
+_log = logging.getLogger(__name__)
+
+_PROJECTS_BOARD_CACHE_TTL = max(
+    5.0,
+    float(os.environ.get("OMNI_PROJECTS_BOARD_CACHE_TTL_S") or 15.0),
+)
+_PROJECTS_BOARD_CACHE: dict[str, Any] = {
+    "payload": None,
+    "expires_at": 0.0,
+    "refreshing": False,
+}
+_PROJECTS_BOARD_CACHE_LOCK = threading.Lock()
+
+
+def _refresh_projects_board() -> None:
+    try:
+        payload = enrich_projects()
+        with _PROJECTS_BOARD_CACHE_LOCK:
+            _PROJECTS_BOARD_CACHE["payload"] = payload
+            _PROJECTS_BOARD_CACHE["expires_at"] = (
+                time.monotonic() + _PROJECTS_BOARD_CACHE_TTL
+            )
+    except Exception:  # noqa: BLE001 - preserve the last usable snapshot
+        _log.exception("project board background refresh failed")
+    finally:
+        with _PROJECTS_BOARD_CACHE_LOCK:
+            _PROJECTS_BOARD_CACHE["refreshing"] = False
 
 
 @projects_router.get("/projects")
@@ -39,7 +70,34 @@ def get_projects(fresh: bool = False) -> dict[str, Any]:
 
     fresh=1 = 用户点了刷新按钮: 穿透 index 解析缓存, 保证读到最新。
     """
-    return enrich_projects(fresh=fresh)
+    now = time.monotonic()
+    cached = _PROJECTS_BOARD_CACHE.get("payload")
+    if not fresh and cached is not None and now < _PROJECTS_BOARD_CACHE["expires_at"]:
+        return cached
+    if not fresh and cached is not None:
+        with _PROJECTS_BOARD_CACHE_LOCK:
+            if not _PROJECTS_BOARD_CACHE["refreshing"]:
+                _PROJECTS_BOARD_CACHE["refreshing"] = True
+                threading.Thread(
+                    target=_refresh_projects_board,
+                    daemon=True,
+                    name="projects-board-refresh",
+                ).start()
+        return cached
+
+    # FastAPI runs this synchronous endpoint in its worker pool. Coalesce cold
+    # starts across browser windows so only one request scans project indexes.
+    # Once a snapshot exists, expired reads take the stale-while-revalidate path
+    # above and never make the UI wait for disk or git activity scans.
+    with _PROJECTS_BOARD_CACHE_LOCK:
+        now = time.monotonic()
+        cached = _PROJECTS_BOARD_CACHE.get("payload")
+        if not fresh and cached is not None and now < _PROJECTS_BOARD_CACHE["expires_at"]:
+            return cached
+        payload = enrich_projects(fresh=fresh)
+        _PROJECTS_BOARD_CACHE["payload"] = payload
+        _PROJECTS_BOARD_CACHE["expires_at"] = now + _PROJECTS_BOARD_CACHE_TTL
+        return payload
 
 
 @projects_router.get("/project-views")
@@ -100,22 +158,30 @@ class ProjectUpsert(BaseModel):
     index_path: str | None = None
     bg: str | None = None
     icon: str | None = None
+    icon_url: str | None = None
     plan_categories: list[str] | None = None
     links: list[dict[str, str]] | None = None
     team_ids: list[str] | None = None
     primary_team_id: str | None = None
     pinned: bool | None = None
     by: str = "human"
+    auto_assets: bool = True
 
 
 @projects_router.post("/projects")
 def upsert_project(req: ProjectUpsert) -> dict[str, Any]:
-    fields = req.model_dump(exclude={"id", "by"}, exclude_none=True)
+    fields = req.model_dump(exclude={"id", "by", "auto_assets"}, exclude_none=True)
     try:
         item = set_project(req.id, by=req.by, **fields)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"ok": True, "project": item}
+    if not req.auto_assets:
+        assets = {"status": "skipped", "reason": "requested"}
+    elif getattr(item, "created", False):
+        assets = autostart_project_assets(req.id)
+    else:
+        assets = {"status": "skipped", "reason": "existing_project"}
+    return {"ok": True, "project": item, "assets": assets}
 
 
 @projects_router.post("/projects/remove")

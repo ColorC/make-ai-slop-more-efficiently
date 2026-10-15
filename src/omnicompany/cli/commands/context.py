@@ -478,4 +478,26 @@ def cmd_context_resolve(
         click.echo(f"missing/skipped: {result['missing_total']}")
 
 
-__all__ = ["cmd_context", "resolve_context"]
+@cmd_context.command("project")
+@click.argument("query")
+@click.option("--group", default=None, help="只在某分组里找")
+@click.option("--limit", type=click.IntRange(min=1, max=50), default=8, show_default=True)
+@click.option("--json", "as_json", is_flag=True, help="输出机器可读 JSON")
+def cmd_context_project(query: str, group: str | None, limit: int, as_json: bool) -> None:
+    """上下文冷启动的项目别名查找；等价于 omni project find。"""
+    from omnicompany.core.projects_registry import search_projects
+
+    matches = search_projects(query, limit=limit, group=group)
+    payload = {"query": query, "group": group, "matches": matches, "total": len(matches)}
+    if as_json:
+        click.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    if not matches:
+        click.echo(f"(没有找到项目: {query})")
+        return
+    for item in matches:
+        root = (item.get("roots") or [""])[0]
+        click.echo(f"{item['id']}  {item['name']}  [{root}]" if root else f"{item['id']}  {item['name']}")
+
+
+__all__ = ["cmd_context", "cmd_context_project", "resolve_context"]

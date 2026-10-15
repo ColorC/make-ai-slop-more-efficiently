@@ -18,6 +18,7 @@ import {
   type PendingPermission,
 } from './chatState'
 import './native_chat.css'
+import { BlueprintSelect } from '../../components/BlueprintSelect'
 
 const PERMISSION_MODES = [
   { value: 'default', label: '每次确认' },
@@ -28,8 +29,8 @@ const PERMISSION_MODES = [
 
 function providerDisplayName(provider?: string | null): string {
   const names: Record<string, string> = {
-    claude_code: 'Claude', codex: 'Codex', codebuddy: 'CodeBuddy', kimi: 'Kimi', opencode: 'OpenCode',
-    omni_agent: 'OmniAgent', controller: '总控',
+    claude_code: 'Claude', codex: 'Codex', codex_the_company: 'the_company API', codebuddy: 'CodeBuddy', kimi: 'Kimi', opencode: 'OpenCode',
+    dsh: 'DeepSeek Harness', omni_agent: 'OmniAgent', controller: '总控',
   }
   return names[String(provider || '')] || String(provider || 'Agent')
 }
@@ -204,15 +205,15 @@ export default function NativeChatPanel({ sessionId, initialMeta, title, onNewSe
           <strong>{title || meta?.name || (meta?.provider === 'controller' ? '总控对话' : '真实对话')}</strong>
           <span>{providerDisplayName(meta?.provider)} · {meta?.model || 'default'} · {sessionId.slice(-8)}</span>
         </div>
-        <select
+        <BlueprintSelect
           className="nc-mode"
           value={permissionMode}
-          onChange={(event) => onPermissionMode(event.target.value)}
+          onChange={onPermissionMode}
+          label="权限模式"
           aria-label="权限模式"
+          options={PERMISSION_MODES.map((mode) => ({ value: mode.value, label: mode.label }))}
           data-testid="native-chat-permission-mode"
-        >
-          {PERMISSION_MODES.map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
-        </select>
+        />
         <ConnectionStatus
           state={connection.state}
           reconnectAttempts={connection.reconnectAttempts}
@@ -226,10 +227,10 @@ export default function NativeChatPanel({ sessionId, initialMeta, title, onNewSe
         />
         <KebabMenu testid="native-chat-actions" items={[
           {
-            label: '活跃会话 / Multiagent',
+            label: '活跃会话',
             icon: <Activity size={15} />,
             testid: 'native-chat-open-multiagent',
-            onClick: () => usePanels.getState().openTab({ type: 'multiagent', id: 'main' }, '活跃会话'),
+            onClick: () => usePanels.getState().openTab({ type: 'multiagent', id: 'main' }, '会话'),
           },
           {
             label: '审阅',

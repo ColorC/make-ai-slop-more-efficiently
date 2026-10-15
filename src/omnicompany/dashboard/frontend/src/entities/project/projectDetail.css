@@ -1,107 +1,400 @@
-/* ============================================================
-   项目详情页(project) · 蓝图 G 页面形态(2026-07-19 阶段四第四波;
-   合同=TRIFORM-UX-REDESIGN-V2/demo/MAPPING.md + analysis/project.md):
-   · 页签内形态(G.3⑤): 页内不再叠大标题顶栏;hero 压缩为一条薄横幅(名称+三区 meta),
-     让 74vh 材料轨迹画布成为首屏主焦点。
-   · meta 行三区分组: 标签区(dashed chips) | 状态区(活跃色点+⊢时间+活跃对话) |
-     动作区(index 复制/打开 iconbtn + 外链 dashed chips) —— 不再 7 个异质信息同权混排。
-   · 8 枚内页签 → 蓝图分段轨(role=tablist 保留;hatch 选中+制图角缺口);计数=⊢N⊣ 尺寸标注,
-     空态页签置灰且不显示 0。
-   · 内容卡(ItemCard,三处复用)= v2-card 厚框纸件整卡可点,底部整宽「打开」按钮已杀,
-     次动作 kebab hover 才现;加载态=分区骨架(fp-skeleton)替代「加载中…」文字。
-   · 纹理分区铁律:hero/工具区=chrome;卡片/文字面平滑纸面禁纹理。
-   ============================================================ */
+/* 项目页 wiki 阅读器样式(bside 式: 安静、密度学 Linear、颜色只用于 actionable)。
+   2026-08-12 起用——此前本文件是未接线的"蓝图 G"草稿, 已被本版顶替。 */
 
-.pd-page { position: relative; height: 100%; overflow: auto; color: var(--fp-text);
-  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */
-  box-sizing: border-box; }
+.pd-root {
+  height: 100%;
+  min-width: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: 286px minmax(0, 1fr);
+  overflow: hidden;
+  container: project-detail / inline-size;
+  background: transparent; /* 刻意透出全局网格背景 */
+  color: var(--fp-text);
+  box-sizing: border-box;
+}
+.pd-root[data-rail-collapsed="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
 
-/* ── hero 薄横幅(图片背景+蓝图压暗层;名称衬线;meta 三区) ── */
-.pd-hero { position: relative; min-height: 112px; display: flex; align-items: flex-end;
-  border-bottom: 1px solid var(--fp-border-subtle); }
-.pd-hero-bg { position: absolute; inset: 0; }
-.pd-hero-overlay { position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(9,26,62,.94) 8%, rgba(9,26,62,.66) 56%, rgba(9,26,62,.3) 100%); }
-.pd-hero-inner { position: relative; padding: 16px 22px 12px; width: 100%; box-sizing: border-box; }
-.pd-name { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; color: #fff;
-  font-family: var(--fp-bp-font-display); text-shadow: 0 1px 4px rgba(4,10,24,.9); }
-.pd-desc { color: rgba(238,244,255,.86); font-size: var(--fp-fs-3); margin-top: 4px; line-height: 1.5;
-  text-shadow: 0 1px 3px rgba(4,10,24,.85); max-width: 860px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; }
-.pd-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
-.pd-meta .zone-sep { width: 1px; height: 16px; background: rgba(235,245,255,.3); flex: none; }
-/* 标签/外链 chip = 虚线测量件 */
-.pd-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px dashed rgba(235,245,255,.5);
-  border-radius: var(--fp-r1); padding: 2px 9px; font-size: var(--fp-fs-4); color: var(--fp-text-2);
-  background: rgba(13,36,80,.5); font-family: var(--fp-font-mono); letter-spacing: .04em;
-  text-decoration: none; }
-a.pd-chip:hover { border-style: solid; color: var(--fp-text); }
-.pd-chip .v2-iconbtn { width: 24px; height: 24px; }
-/* 状态区:活跃色点 + ⊢时间⊣ */
-.pd-act { display: inline-flex; align-items: center; gap: 6px; }
-.pd-act .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.pd-act .dot.hot { background: var(--fp-ok); }
-.pd-act .dot.warm { background: var(--fp-warn); }
-.pd-act .dot.cold { background: var(--fp-idle); }
+/* ── 窄左栏: 首页钉住不滚, 下面各区滚动; 一行一项, 无数量无装饰 ── */
+.pd-rail {
+  border-right: 1px solid color-mix(in srgb, #fff 38%, var(--fp-border));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--fp-solid) 88%, transparent);
+}
+.pd-rail-pin {
+  position: relative;
+  padding: 12px 8px 8px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+}
+.pd-rail-toggle {
+  display: none;
+}
+.pd-rail-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pd-rail-sec {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pd-rail-title {
+  font-size: 11px;
+  color: var(--fp-text-3);
+  letter-spacing: 0.06em;
+  padding: 0 8px 4px;
+}
+.pd-entry {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fp-text-2);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pd-entry span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pd-entry:hover {
+  background: var(--fp-surface);
+  color: var(--fp-text);
+}
+.pd-entry.active {
+  background: var(--fp-glass-2);
+  color: var(--fp-text);
+  box-shadow: inset 2px 0 0 var(--fp-accent);
+}
+.pd-entry.pd-group {
+  color: var(--fp-text-3);
+  font-weight: 500;
+}
+.pd-emoji {
+  font-size: 13px;
+  width: 15px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.pd-filter {
+  margin: 0 4px 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--fp-text);
+  background: var(--fp-surface);
+  border: 1px solid var(--fp-border-subtle);
+  border-radius: 0;
+  outline: none;
+}
+.pd-filter:focus {
+  border-color: var(--fp-border-strong);
+}
 
-/* ── 打开 Demo(全页唯一主操作): 虚线幽灵钮,focus/hover 黄铜环 ── */
-.pd-demobtn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-  border: 1px dashed var(--fp-border-strong); background: transparent; color: var(--fp-text);
-  border-radius: var(--fp-r1); padding: 6px 13px; font-size: var(--fp-fs-4); font-weight: 600;
-  font-family: var(--fp-font-mono); letter-spacing: .08em; text-transform: uppercase;
-  transition: all var(--fp-t-fast); }
-.pd-demobtn:hover { border-style: solid; border-color: var(--fp-bp-brass); box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); }
-.pd-demobtn:active { transform: translateY(1px); }
+/* ── 主区 ── */
+.pd-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pd-docbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+  font-size: 12.5px;
+  flex-wrap: wrap;
+}
+.pd-crumb {
+  color: var(--fp-text-3);
+}
+.pd-crumb-current {
+  color: var(--fp-text);
+  font-weight: 500;
+}
+.pd-crumb-sep {
+  color: var(--fp-text-3);
+  opacity: 0.55;
+}
+.pd-docbar-meta {
+  color: var(--fp-text-3);
+  font-size: 12px;
+  margin-left: 6px;
+}
+.pd-docbar-spacer {
+  flex: 1;
+}
+.pd-docbar-ops {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--fp-text-3);
+  font-size: 12px;
+}
+.pd-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  color: var(--fp-text-2);
+  background: var(--fp-surface);
+  border: 1px solid var(--fp-border);
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.pd-chip-btn:hover {
+  border-color: var(--fp-border-strong);
+  color: var(--fp-text);
+}
+.pd-chip-link {
+  text-decoration: none;
+}
+.pd-warn {
+  color: var(--fp-warn);
+  font-size: 12.5px;
+  padding: 8px 16px 0;
+}
 
-/* ── 内页签 = 蓝图分段轨(role=tablist 保留;hatch 选中+制图角缺口;空态置灰无 0) ── */
-.pd-tabs { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 2px;
-  border-radius: var(--fp-r1); background: var(--fp-solid); border: 1px solid var(--fp-border-subtle);
-  margin: 14px 0 14px; max-width: 100%; }
-.pd-tab { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent;
-  color: var(--fp-text-3); font-size: var(--fp-fs-4); padding: 4px 11px; border-radius: 2px;
-  cursor: pointer; font-family: var(--fp-font-mono); letter-spacing: .06em; white-space: nowrap;
-  transition: color var(--fp-t-fast), background var(--fp-t-fast); }
-.pd-tab:hover { color: var(--fp-text); }
-.pd-tab:active { transform: scale(.97); }
-.pd-tab[aria-selected="true"] { background: var(--fp-bp-hatch), var(--fp-surface); color: var(--fp-text);
-  box-shadow: inset 0 0 0 1px var(--fp-border-strong);
-  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
-.pd-tab .bp-dim { color: var(--fp-text-3); }
-.pd-tab[aria-selected="true"] .bp-dim { color: var(--fp-bp-brass-hi); }
-/* 空态页签:置灰,计数不渲染(0 是噪音) */
-.pd-tab.empty { opacity: .45; }
+.pd-body {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 16px 20px 36px;
+  box-sizing: border-box;
+}
 
-.pd-body { padding: 4px 22px 36px; }
-.pd-sec { color: transparent; -webkit-text-stroke: 1px rgba(235,245,255,.68); font-family: var(--fp-font-mono);
-  font-weight: 600; letter-spacing: .18em; text-transform: uppercase; font-size: 15px; margin: 22px 0 10px; }
-.pd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
-.pd-dim { color: var(--fp-text-3); font-size: var(--fp-fs-3); padding: 24px; text-align: center; }
-.pd-warn { color: var(--fp-warn); font-size: var(--fp-fs-3); padding: 8px 2px; }
+.pd-material-core {
+  height: 100%;
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #fff 48%, var(--fp-border));
+  border-radius: 0;
+  background: var(--fp-glass-2, rgba(9, 26, 62, 0.72));
+}
+.pd-material-core--embedded { min-height: 74vh; }
+.pd-body:has(.pd-material-core) { overflow: hidden; padding: 12px; }
 
-/* 材料轨迹画布 = 厚框图纸(2px 白框;内部是画布实体,不给格纸) */
-.pd-canvas { height: 74vh; background: var(--fp-solid); border: var(--fp-bp-frame-w) solid var(--fp-border);
-  border-radius: var(--fp-r2); box-shadow: var(--fp-shadow-sm); overflow: hidden; margin-top: 4px; }
+/* live 网页材料条目(web 类 wiki 本体): 整页直显, 顶到头撑满, 去正文 chrome */
+.pd-body:has(.pd-wiki-entry--live) { overflow: hidden; padding: 0; display: flex; }
+.pd-wiki-entry--live { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.pd-live-material { flex: 1; width: 100%; height: 100%; border: 0; display: block; background: #071f33; }
 
-/* ── ItemCard(计划/对话/管线/审阅/技能/文件 共用): 厚框纸件整卡可点 ── */
-.pd-icard { flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 14px; }
-.pd-icard .ic-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.pd-icard .ic-badge { display: inline-flex; align-items: center; gap: 4px; flex: none;
-  color: var(--fp-bp-brass-hi); font-size: var(--fp-fs-4); font-weight: 600;
-  font-family: var(--fp-font-mono); letter-spacing: .06em; text-transform: uppercase; }
-.pd-icard .ic-t { color: var(--fp-text); font-size: var(--fp-fs-2); font-weight: 600;
-  font-family: var(--fp-bp-font-display); flex: 1; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pd-icard .ic-meta { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pd-icard .kebab-wrap { opacity: 0; transition: opacity var(--fp-t-fast); flex: none; display: inline-flex; }
-.pd-icard:hover .kebab-wrap, .pd-icard .kebab-wrap:focus-within { opacity: 1; }
-@media (pointer: coarse) { .pd-icard .kebab-wrap { opacity: .7; } }
+/* ── 首页阅读器: 单栏限宽正文(玻璃面, 不透背后网格) + 右侧大纲 ── */
+.project-wiki-home {
+  min-width: 0;
+  container: project-wiki / inline-size;
+}
+.project-wiki-home--embedded {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 10px 28px;
+  box-sizing: border-box;
+  scrollbar-gutter: stable;
+}
+.pd-reader {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 24px;
+  align-items: start;
+}
+.pd-article {
+  min-width: 0;
+  max-width: 820px;
+  margin: 0 auto;
+  width: 100%;
+  background: var(--fp-glass-2, rgba(17, 22, 32, 0.82));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--fp-border-subtle);
+  border-radius: 0;
+  padding: 26px 34px 40px;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.pd-article .wiki-prose {
+  min-width: 0;
+  background: transparent;
+  font-size: 13.5px;
+}
+.pd-article .wiki-prose table {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+}
+.pd-article .wiki-prose :is(pre, table) {
+  scrollbar-width: thin;
+}
+.pd-article .wiki-prose :is(img, video, audio, iframe, svg) {
+  max-width: 100%;
+}
+.pd-outline {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--fp-border-subtle);
+  padding-left: 10px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.pd-outline-item {
+  border: 0;
+  background: transparent;
+  color: var(--fp-text-3);
+  font-size: 12px;
+  text-align: left;
+  padding: 3px 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pd-outline-item.lvl-3 {
+  padding-left: 16px;
+}
+.pd-outline-item:hover {
+  color: var(--fp-text);
+}
+.pd-fallback h1 {
+  font-size: 20px;
+  margin: 0 0 10px;
+}
+.pd-dim {
+  color: var(--fp-text-3);
+  font-size: 13px;
+}
+.pd-dim-center {
+  color: var(--fp-text-3);
+  font-size: 13px;
+  padding: 24px;
+  text-align: center;
+}
+.pd-sec-title {
+  color: var(--fp-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin: 20px 0 12px;
+}
 
-/* 窄屏(phone <600): hero/body 收窄;页签轨可横滑 */
-@media (max-width: 599px) {
-  .pd-hero-inner { padding: 12px 12px 10px; }
-  .pd-body { padding: 4px 12px 28px; }
-  .pd-tabs { display: flex; overflow-x: auto; scrollbar-width: none; }
-  .pd-tabs::-webkit-scrollbar { display: none; }
-  .pd-desc { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* ── 域内容: 卡片网格(原内联 S.grid 平移) ── */
+.pd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* 窄屏: 左栏收窄, 大纲藏起 */
+@media (max-width: 900px) {
+  .pd-root {
+    grid-template-columns: 148px minmax(0, 1fr);
+  }
+  .pd-reader {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pd-outline {
+    display: none;
+  }
+}
+
+/* Companion/dockview constraints are container constraints, not viewport constraints. */
+@container project-detail (max-width: 760px) {
+  /* 2026-08-21 用户裁决: 窄屏(Companion)下 Wiki 导航 rail 也必须占布局位置,
+     不许悬浮盖正文; 之前这里把 rail 改成 absolute 覆盖层, 正文前半截一直被压住。
+     收起仍走 data-rail-collapsed 单列(该规则特异性更高, 不受影响)。 */
+  .pd-root {
+    grid-template-columns: minmax(168px, 38%) minmax(0, 1fr);
+  }
+  .pd-rail-pin {
+    padding-top: 42px;
+  }
+  .pd-rail-toggle {
+    /* 必须保持 inline-grid: 基类 .tab-sidecar-toggle 靠 grid place-items 居中 icon,
+       之前覆盖成 inline-flex 把居中弄丢了, 收起按钮 icon 错位。 */
+    display: inline-grid;
+    position: absolute;
+    top: 7px;
+    right: 8px;
+  }
+  .pd-rail-scroll { padding-bottom: 8px; }
+  .pd-reader { grid-template-columns: minmax(0, 1fr); }
+  .pd-outline { display: none; }
+  .project-wiki-home--embedded { padding: 8px 8px 24px; }
+  .pd-docbar { padding: 7px 10px; }
+  .pd-docbar-meta, .pd-docbar-ops { display: none; }
+  .pd-body { padding: 8px 8px 24px; }
+  .pd-article { padding: 16px 18px 28px; }
+  .pd-grid { grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+  .pd-body:has(.pd-material-core) { padding: 6px; }
+  .pd-material-core, .pd-material-core--embedded { min-height: 100%; }
+}
+
+@container project-detail (max-width: 420px) {
+  .pd-entry { padding-block: 4px; font-size: 12px; }
+  .pd-rail-sec { margin-top: 8px; }
+  .pd-docbar { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
+  .pd-article { padding: 12px 12px 24px; }
+  .pd-article .wiki-prose { font-size: 12.5px; }
+  .project-wiki-home--embedded { padding-inline: 6px; }
+}
+
+/* 大纲跟随 Wiki 自身宽度，而不是浏览器视口或外层项目页宽度。Companion 很窄但
+   Dashboard 视口很宽时也必须隐藏，避免正文被常驻大纲继续挤压。 */
+@container project-wiki (max-width: 760px) {
+  .pd-reader { grid-template-columns: minmax(0, 1fr); }
+  .pd-outline { display: none; }
+}
+
+/* 程序 id 形态的条目标题(数据侧还没有中文名)等宽弱化; 打开后正文顶部的 id 行可点复制 */
+.pd-entry-code span {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--fp-text-3);
+}
+.pd-wiki-id {
+  display: inline-block;
+  border: 0;
+  background: transparent;
+  padding: 0 0 10px;
+  font-family: Consolas, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--fp-text-3);
+  cursor: copy;
+}
+.pd-wiki-id:hover {
+  color: var(--fp-text);
+}
+
+/* 样板页 ```html 范例的实时渲染框(2026-08-21): 白底纸张感, 纵横比由组件按 SVG 实尺给出 */
+.pd-live-demo {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--fp-border);
+  background: #fff;
+  margin: 10px 0 16px;
 }

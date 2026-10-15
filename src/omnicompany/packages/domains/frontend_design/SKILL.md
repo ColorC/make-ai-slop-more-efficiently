@@ -16,7 +16,7 @@ description: 前端设计与制作管线 —— 让前端服从一份持久稳�
 ## 两条子分支(共用方法, 不同标尺)
 
 ```bash
-omni run frontend_design.dashboard   # dashboard 类网页(驾驶舱/poof/lofa); 标尺 = docs/projects/frontend-design/dashboard
+omni run frontend_design.dashboard   # dashboard 类网页(驾驶舱/Canvas/lofa); 标尺 = docs/projects/frontend-design/dashboard
 omni run frontend_design.webgame     # webgame UI; 标尺 = tabletop-engine/README + walker specs
 ```
 

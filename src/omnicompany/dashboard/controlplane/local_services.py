@@ -52,10 +52,10 @@ def _registry() -> dict[str, dict[str, Any]]:
             "aliases": ["progress", "whatnow"],
             "base": progress_url,
             "health_path": "/health",
-            "ensure_cmd": [
-                sys.executable,
-                str(repo / "services" / "_progress" / "progress_service" / "ensure_progress_service_running.py"),
-            ],
+            # M4（2026-08-14）whatnow 退役归档：摘除自动拉起——代理被访问时返回 503 +
+            # manual_start 提示，不再 ensure 起进程（否则停服后任何 stray 代理访问都会把它拉活）。
+            # 真源已切 plan-groups（/api/plan-groups/api/board）。回滚：恢复下行 ensure_cmd 即可。
+            "ensure_cmd": None,
             "cwd": str(repo),
             "manual_start": str(
                 repo / "services" / "_progress" / "progress_service" / "start-progress-service.cmd"

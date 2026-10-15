@@ -1,6 +1,6 @@
 # [OMNI] origin=claude-code domain=services/_diagnosis/ux_audit ts=2026-06-30T00:00:00Z type=team status=active
 # [OMNI] summary="ux_audit Team 拓扑:InteractionEnumerator→InfoEnumerator→NavEnumerator→Consolidator(EMIT)。全确定性 SOFT。"
-# [OMNI] why="把'前端三维 UX 审计(交互/信息/跳转)+ 据矩阵打错位标记'做成可复用可观测的 omnicompany team,复跑于 omnidashboard/lofa/poof/whatnow。"
+# [OMNI] why="把'前端三维 UX 审计(交互/信息/跳转)+ 据矩阵打错位标记'做成可复用可观测的 omnicompany team,复跑于 omnidashboard/lofa/Canvas/whatnow。"
 # [OMNI] material_id="material:services._diagnosis.ux_audit.team"
 """ux_audit Team · 拓扑声明(4 节点确定性链)。"""
 from __future__ import annotations
@@ -50,7 +50,7 @@ def build_team() -> TeamSpec:
     return TeamSpec(
         id='ux_audit',
         name='ux_audit',
-        description='前端 src 三维 UX 审计(交互/信息/跳转)— 确定性枚举 + 据频率×重要性矩阵/信息层级打错位标记。可复跑于 omnidashboard/lofa/poof/whatnow。',
+        description='前端 src 三维 UX 审计(交互/信息/跳转)— 确定性枚举 + 据频率×重要性矩阵/信息层级打错位标记。可复跑于 omnidashboard/lofa/Canvas/whatnow。',
         entry='InteractionEnumerator',
         nodes=nodes,
         edges=edges,

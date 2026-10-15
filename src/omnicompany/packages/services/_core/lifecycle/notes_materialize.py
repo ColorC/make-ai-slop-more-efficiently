@@ -1,9 +1,9 @@
 # [OMNI] origin=claude-code domain=services/_core/lifecycle ts=2026-07-03T00:00:00Z type=infra status=active
-# [OMNI] summary="poof-notes 消费任务: 笔记(index.json + docs/*.md)只读读取 → 分类入册(标题分叉修正+双时间+受控标签)→ 语义索引可检索, 逐条 updatedDate 水位线增量。附孤儿 ydoc 回收(只移动进 _trash, collection 根绝不动)。"
-# [OMNI] why="批3开工锚(overnight-run.md「批3 开工锚」): poof 零改动, 语义标签只存 omni 侧属性不回写 index.json; 孤儿 13 个只挪观察不删。"
-# [OMNI] tags=semantic-os,notes-materialize,batch3,poof-notes
+# [OMNI] summary="Material 札记消费任务: index.json + docs/*.md 只读读取 → 分类入册；附孤儿 ydoc 可回搬隔离。"
+# [OMNI] why="消费侧不改札记真源；语义标签只存 omni 侧属性，不回写 index.json。"
+# [OMNI] tags=semantic-os,notes-materialize,batch3,material-notes
 # [OMNI] material_id="material:services._core.lifecycle.notes_materialize.py"
-"""poof-notes 消费任务(消费侧入册)。
+"""Material 札记消费任务(消费侧入册)。
 
 run_notes_materialize(notes_root, *, state_path, model=None, root=None, push_inbox=False):
     读 notes_root/index.json + docs/<id>.md(只读, 不改真源) → 对每条按 updatedDate 做
@@ -15,7 +15,7 @@ run_notes_materialize(notes_root, *, state_path, model=None, root=None, push_inb
 quarantine_orphan_ydocs(notes_root, dry_run):
     index.json 未收录的 docs/*.ydoc(孤儿)→ 只移动进 notes_root/_trash/, 逐条清单标注
     空骨架/有内容(有内容的粗提取一段可读文本做预览, 标注"粗提取")。collection 根
-    (docs/poof-notes.ydoc)硬编码排除, 绝不触碰。
+    canonical 与 legacy collection 根文件均硬编码排除，绝不触碰。
 """
 from __future__ import annotations
 
@@ -26,7 +26,10 @@ from pathlib import Path
 from typing import Any
 
 _UNNAMED_TITLES = {"未命名笔记", "未命名", "Untitled", "untitled"}
-_COLLECTION_ROOT_YDOC = "poof-notes.ydoc"
+_COLLECTION_ROOT_YDOCS = {
+    "canvas-notes.ydoc",
+    "poof-notes.ydoc",  # legacy compatibility: existing stores use this filename
+}
 _EMPTY_SKELETON_MAX_BYTES = 2048  # 小于此判"空骨架"(经验值, 见 overnight-run.md 定性修正)
 
 
@@ -85,7 +88,7 @@ def _register_note_inprocess(*, note_id: str, title: str, md_abs_path: str, regi
     """进程内注册一条笔记为 material(仿 semantic_fs.classify._register_inprocess, 但用笔记
     自己的稳定 id 做 entity_id, 不依赖 base 相对路径, 因为 notes_root 通常不在 omni 仓内)。
 
-    source_file 存**绝对路径**(而非相对 omni 仓根的相对路径) —— poof-notes 浅路径与 omni
+    source_file 存**绝对路径**(而非相对 omni 仓根的相对路径) —— overlay-note-store 浅路径与 omni
     仓是两个不同的根, 用绝对路径能让 semantic_fs.index.build_index 无论传入哪个 root 都能
     正确 `root / source_file` 定位到真实文件(pathlib 对绝对路径的 join 会直接返回绝对路径)。
     """
@@ -224,7 +227,7 @@ def quarantine_orphan_ydocs(notes_root: Path, dry_run: bool = True) -> dict[str,
 
     items: list[dict[str, Any]] = []
     for p in sorted(docs_dir.glob("*.ydoc")):
-        if p.name == _COLLECTION_ROOT_YDOC:
+        if p.name in _COLLECTION_ROOT_YDOCS:
             continue  # collection 根: 硬编码排除, 即便疏忽被 index.json 排除在外也绝不动
         if p.name in registered_ydocs:
             continue  # 在册笔记的 ydoc, 不是孤儿

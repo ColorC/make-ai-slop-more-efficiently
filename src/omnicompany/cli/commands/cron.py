@@ -282,7 +282,7 @@ def cron_create(name: str, schedule: str, command: str | None,
     import re
     if any(c in name for c in r' /\:*?"<>|'):
         raise click.UsageError("name 需文件系统安全(无空格/路径符)")
-    presets = {"@every15m", "@hourly", "@daily", "@weekly", "@monthly", "@yearly"}
+    presets = {"@every1m", "@every10m", "@every15m", "@hourly", "@daily", "@weekly", "@monthly", "@yearly"}
     s = schedule.strip()
     if s not in presets and not re.match(r"^(\S+\s+){4}\S+$", s):
         raise click.UsageError(f"schedule 需 preset {sorted(presets)} 或 5 段 cron")
@@ -318,6 +318,25 @@ def cron_prune(days: int, patrol_days: int) -> None:
     click.echo(f"清理 >{days} 天: 删完整日志 {r['deleted_log_files']} 个; "
                f"runs.jsonl 留 {r['jsonl_kept']} / 删 {r['jsonl_dropped']}")
     click.echo(f"清理 >{patrol_days} 天: 删 patrol 巡逻日志 {r['deleted_patrol_logs']} 个")
+
+
+@cmd_cron.command("wake-once")
+@click.option("--request-file", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.option("--user-authorized", is_flag=True, required=True, help="The user explicitly requested this deferred prompt.")
+@click.option("--dry-run", is_flag=True, help="Verify the exact live target without sending or claiming the one-shot.")
+def cron_wake_once(request_file: Path, user_authorized: bool, dry_run: bool) -> None:
+    """Execute one deferred human request in an existing Codex PTY (OS one-shot trigger)."""
+    from ._cron_wake_once import execute
+
+    if not user_authorized:
+        raise click.UsageError("explicit user authorization is required")
+    try:
+        result = execute(request_file, dry_run=dry_run)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    if result.get("status") in {"unconfirmed", "transport_error"}:
+        raise click.ClickException("wake not confirmed; inspect the durable receipt before any manual retry")
 
 
 __all__ = ["cmd_cron"]

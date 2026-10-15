@@ -3,11 +3,10 @@
  * Used by Worker.设计 facet, Team entity, Material entity.
  */
 import React, { Suspense, useEffect, useState } from 'react'
-import MarkdownRenderer from './MarkdownRenderer'
+import WikiCoreMarkdown from '../shared/view/wiki/WikiCoreMarkdown'
 import PaneHeader from './PaneHeader'
 import EmptyState from './EmptyState'
 import { colors, spacing, fonts } from './tokens'
-import { usePanels } from '../stores/panelsStore'
 
 const MonacoEditor = React.lazy(() => import('@monaco-editor/react').then((m) => ({ default: m.default })))
 
@@ -25,7 +24,7 @@ const S = {
   tabs: { display: 'flex', gap: 1, background: colors.bgPanel, borderBottom: `1px solid ${colors.border}`, flexShrink: 0 },
   tab: (active: boolean): React.CSSProperties => ({
     padding: '4px 12px',
-    background: active ? '#1a1a2a' : 'transparent',
+    background: active ? 'var(--fp-bp-paper-2)' : 'transparent',
     border: 'none',
     borderBottom: active ? `2px solid ${colors.accent}` : '2px solid transparent',
     color: active ? colors.accent : colors.textFaint,
@@ -45,15 +44,10 @@ interface Props {
 export default function CodeFileEditor({ detail, language = 'python', defaultView }: Props) {
   const initial = defaultView || (detail.design_md ? 'design' : 'source')
   const [view, setView] = useState<'design' | 'source'>(initial)
-  const openTab = usePanels((s) => s.openTab)
 
   useEffect(() => {
     setView(defaultView || (detail.design_md ? 'design' : 'source'))
   }, [detail.id, defaultView, detail.design_md])
-
-  const jumpToWikilink = (target: string) => {
-    openTab({ type: 'note', id: target }, target.split('/').pop() || target)
-  }
 
   return (
     <div style={S.root}>
@@ -65,7 +59,7 @@ export default function CodeFileEditor({ detail, language = 'python', defaultVie
       {view === 'design' ? (
         <div style={S.body}>
           {detail.design_md ? (
-            <MarkdownRenderer source={detail.design_md} onWikilinkClick={jumpToWikilink} currentPath={detail.id} />
+            <WikiCoreMarkdown source={detail.design_md} />
           ) : (
             <EmptyState text={`无 DESIGN.md：${detail.package}`} hint="切到源码查看代码" />
           )}

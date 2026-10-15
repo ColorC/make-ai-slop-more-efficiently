@@ -569,6 +569,8 @@ class AIPlayerSessionControl:
         event: AIPlayerSessionEventV1,
         request_sha256: str,
         session_json: str,
+        *,
+        telemetry_evidence_step_ids: tuple[str, ...] = (),
     ) -> None:
         connection.execute(
             """
@@ -604,6 +606,7 @@ class AIPlayerSessionControl:
             event_type=f"session.{event.event_type}",
             provider="session-control",
             action_count=0,
+            evidence_step_ids=telemetry_evidence_step_ids,
             payload={
                 "source_event_id": event.id,
                 "actor": event.actor,
@@ -1244,6 +1247,7 @@ class AIPlayerSessionControl:
         command_id: str,
         actor: str,
         reason: str,
+        evidence_step_ids: tuple[str, ...] = (),
     ) -> AIPlayerSessionV1:
         """Atomically consume one action attempt before a bound adapter call."""
 
@@ -1263,12 +1267,15 @@ class AIPlayerSessionControl:
                 last_capsule_id=session.last_capsule_id,
                 last_evidence_refs=session.last_evidence_refs,
             ),
+            telemetry_evidence_step_ids=evidence_step_ids,
         )
 
     def checkpoint(
         self,
         session_id: str,
         command: AIPlayerSessionCheckpointCommand,
+        *,
+        telemetry_evidence_step_ids: tuple[str, ...] = (),
     ) -> AIPlayerSessionV1:
         """Persist orchestrator progress without invoking a device or gameplay adapter."""
 
@@ -1380,7 +1387,13 @@ class AIPlayerSessionControl:
                 new_version=updated.version,
                 timestamp=timestamp,
             )
-            self._insert_event(connection, event, request_sha256, session_json)
+            self._insert_event(
+                connection,
+                event,
+                request_sha256,
+                session_json,
+                telemetry_evidence_step_ids=telemetry_evidence_step_ids,
+            )
             if updated.last_evidence_refs:
                 self.player_store._record_evidence(
                     connection,

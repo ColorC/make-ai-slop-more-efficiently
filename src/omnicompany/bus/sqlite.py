@@ -146,7 +146,46 @@ class SQLiteBus(EventBus):
         ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
         size_mb = size // (1024 * 1024)
         archived = archive_root / f"{p.stem}_{ts}_{size_mb}MB{p.suffix}"
-        shutil.move(str(p), str(archived))
+        # 2026-08-11/12 事故复盘 (MACHINE-FILE-HYGIENE): 文件被占用时 shutil.move 退化为
+        # copy2+unlink, unlink 失败在复制之后才抛 OSError → 归档副本留下、源库原地不动,
+        # 每个进程每次打开都再复制一份 500MB, 两天攒出 587 份精确重复 (309.6 GB)。
+        # 防线 1: 30 分钟内已有同尺寸归档则跳过(说明刚有人试过且源没变)。
+        import time
+        for existing in archive_root.glob(f"{p.stem}_*{p.suffix}"):
+            try:
+                st = existing.stat()
+            except OSError:
+                continue
+            if st.st_size == size and (time.time() - st.st_mtime) < 1800:
+                logger.warning("SQLiteBus: %s 已有 30 分钟内同尺寸归档 %s, 跳过本次轮转", p.name, existing.name)
+                return
+        try:
+            shutil.move(str(p), str(archived))
+        except OSError as exc:
+            # 防线 2: move 的 copy 阶段可能已成功, 只是删源失败 —— 把留下的半程副本清掉,
+            # 否则就是精确重复。源库继续沿用。
+            try:
+                archived.unlink(missing_ok=True)
+            except OSError:
+                pass
+            # 归档是卫生措施, 不是运行前提。别的进程(如 ccdaemon)持有这个文件时
+            # Windows 不允许改名, 这里原本会把异常抛给调用方 — 结果是 db 一旦越过
+            # 阈值, 每个只想记一条事件的进程都起不来。跳过归档继续用原文件即可;
+            # 何况在别人开着的时候把 db 搬走, 本来也会把事件流劈成两半。
+            logger.warning(
+                "SQLiteBus: %s 已达 %d MB, 但文件被占用无法归档(%s), 本次继续沿用",
+                p.name, size_mb, exc,
+            )
+            return
+        # WAL 与 shm 属于刚被归档的那个 db。留在原地会让全新的 db 配上一份旧日志。
+        for suffix in ("-wal", "-shm"):
+            companion = p.with_name(p.name + suffix)
+            if not companion.exists():
+                continue
+            try:
+                shutil.move(str(companion), str(archived) + suffix)
+            except OSError as exc:
+                logger.warning("SQLiteBus: 归档 %s 失败: %s", companion.name, exc)
         logger.warning(
             "SQLiteBus: %s 已达 %d MB 超阈值 %d MB, 自动归档到 %s",
             p.name, size_mb, self._BLOAT_THRESHOLD_BYTES // (1024 * 1024), archived,

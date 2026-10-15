@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Conversation attribution catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "string"},
+    "session_id": {"type": "string"},
+    "title": {"type": "string"},
+    "summary": {"type": "string"},
+    "project_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "state": {"type": "string", "enum": ["confirmed", "candidate", "unknown"]},
+          "project_ids": {"type": "array", "items": {"type": "string"}},
+          "plan_ids": {"type": "array", "items": {"type": "string"}},
+          "task_ids": {"type": "array", "items": {"type": "string"}},
+          "scope_segment_ids": {"type": "array", "items": {"type": "string"}},
+          "rationale": {"type": "string"},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["state", "project_ids", "rationale", "evidence_refs"]
+      }
+    },
+    "businesses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {"type": "string"},
+          "business_path": {"type": "array", "items": {"type": "string"}},
+          "summary": {"type": "string"},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["project_id", "business_path", "summary", "evidence_refs"]
+      }
+    },
+    "work_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "work_item_id": {"type": "string"},
+          "title": {"type": "string"},
+          "project_ids": {"type": "array", "items": {"type": "string"}},
+          "plan_ids": {"type": "array", "items": {"type": "string"}},
+          "task_ids": {"type": "array", "items": {"type": "string"}},
+          "scope_segment_ids": {"type": "array", "items": {"type": "string"}},
+          "business_path": {"type": "array", "items": {"type": "string"}},
+          "task_summary": {"type": "string"},
+          "intent": {"type": "string"},
+          "canonical_refs": {"type": "array", "items": {"$ref": "#/$defs/canonicalRef"}},
+          "materials": {"type": "array", "items": {"$ref": "#/$defs/evidenceStatement"}},
+          "methods": {"type": "array", "items": {"$ref": "#/$defs/evidenceStatement"}},
+          "decisions": {"type": "array", "items": {"$ref": "#/$defs/evidenceStatement"}},
+          "user_corrections": {"type": "array", "items": {"$ref": "#/$defs/evidenceStatement"}},
+          "human_interventions": {"type": "array", "items": {"$ref": "#/$defs/evidenceStatement"}},
+          "outcomes": {"type": "array", "items": {"$ref": "#/$defs/outcome"}},
+          "unknowns": {"type": "array", "items": {"$ref": "#/$defs/evidenceStatement"}},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": [
+          "work_item_id", "title", "project_ids", "business_path", "task_summary", "intent", "canonical_refs",
+          "materials", "methods", "decisions", "user_corrections", "human_interventions",
+          "outcomes", "unknowns", "evidence_refs"
+        ]
+      }
+    },
+    "unresolved_bindings": {"type": "array", "items": {"$ref": "#/$defs/evidenceStatement"}},
+    "source_chunk_ids": {"type": "array", "items": {"type": "string"}}
+  },
+  "required": [
+    "schema_version", "session_id", "title", "summary", "project_bindings",
+    "businesses", "work_items", "unresolved_bindings", "source_chunk_ids"
+  ],
+  "$defs": {
+    "canonicalRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "relation": {
+          "type": "string",
+          "enum": ["使用", "产出", "修改", "验证", "纠正", "审阅", "相关"]
+        },
+        "ref": {"type": "string"},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}}
+      },
+      "required": ["relation", "ref", "evidence_refs"]
+    },
+    "evidenceStatement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": {"type": "string"},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}}
+      },
+      "required": ["summary", "evidence_refs"]
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": {"type": "string"},
+        "certainty": {"type": "string", "enum": ["fact", "inference", "unknown"]},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}}
+      },
+      "required": ["summary", "certainty", "evidence_refs"]
+    }
+  }
+}

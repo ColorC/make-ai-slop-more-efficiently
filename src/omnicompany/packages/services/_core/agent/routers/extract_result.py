@@ -7,7 +7,7 @@
 默认行为：直接把 final_text 包成 PASS Verdict，output={text, turn_count, stop_reason}。
 
 业务子类通常 override `extract()` 或继承此 Router 实现自己的产物提取逻辑
-（如 PrefabSemanticLoop 会从 messages 里找 `submit_findings` 工具调用、
+（如业务 ExtractResultRouter 可从 messages 里找结构化提交工具调用、
 找 Markdown 产物等）。
 """
 

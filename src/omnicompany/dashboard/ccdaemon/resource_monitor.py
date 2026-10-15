@@ -11,6 +11,8 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
+import multiprocessing
 import os
 import re
 import time
@@ -23,7 +25,18 @@ from omnicompany.core.config import omni_workspace_root
 logger = logging.getLogger(__name__)
 
 SCHEMA = "omni.resource-monitor.v1"
-DEFAULT_INTERVAL_S = float(os.environ.get("OMNI_RESOURCE_MONITOR_INTERVAL_S") or 60)
+# A full Windows process attribution pass is deliberately comprehensive and can
+# take tens of seconds on machines with many CLI trees.  Running that every
+# minute turns observation into a recurring source of scheduler pressure.  The
+# monitor is diagnostic, not a realtime control loop, so ten minutes is the
+# safer default; operators can still request a shorter interval explicitly.
+DEFAULT_INTERVAL_S = float(os.environ.get("OMNI_RESOURCE_MONITOR_INTERVAL_S") or 600)
+DEPRIORITIZE_PROCESS_CPU_PCT = float(
+    os.environ.get("OMNI_RESOURCE_DEPRIORITIZE_PROCESS_CPU_PCT") or 10.0
+)
+DEPRIORITIZE_PROCESS_PRIVATE_BYTES = int(
+    os.environ.get("OMNI_RESOURCE_DEPRIORITIZE_PROCESS_PRIVATE_BYTES") or 512 * 1024**2
+)
 HISTORY_MAX_BYTES = int(
     os.environ.get("OMNI_RESOURCE_MONITOR_HISTORY_MAX_BYTES") or 20 * 1024 * 1024
 )
@@ -143,6 +156,220 @@ class Thresholds:
                 "OMNI_RESOURCE_ORPHAN_MIN_AGE_S", defaults.orphan_min_age_s
             ),
         )
+
+
+DISK_DRIVES = ("C:\\", "D:\\", "E:\\")
+GIB = 1024**3
+
+
+def _query_windows_volume(root: str) -> dict[str, Any]:
+    """Read one mounted volume using the Windows native disk-space APIs."""
+    if os.name != "nt":
+        raise OSError("Windows volume query is unavailable on this platform")
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    free_space = kernel32.GetDiskFreeSpaceExW
+    free_space.argtypes = [
+        wintypes.LPCWSTR,
+        ctypes.POINTER(ctypes.c_ulonglong),
+        ctypes.POINTER(ctypes.c_ulonglong),
+        ctypes.POINTER(ctypes.c_ulonglong),
+    ]
+    free_space.restype = wintypes.BOOL
+    available = ctypes.c_ulonglong()
+    total = ctypes.c_ulonglong()
+    free = ctypes.c_ulonglong()
+    if not free_space(root, ctypes.byref(available), ctypes.byref(total), ctypes.byref(free)):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    serial = wintypes.DWORD()
+    get_volume = kernel32.GetVolumeInformationW
+    get_volume.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        ctypes.POINTER(wintypes.DWORD),
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+    ]
+    get_volume.restype = wintypes.BOOL
+    if not get_volume(root, None, 0, ctypes.byref(serial), None, None, None, 0):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return {
+        "volume_identity": f"{root.upper()}:{int(serial.value):08x}",
+        "available_to_caller_bytes": int(available.value),
+        "total_bytes": int(total.value),
+        "free_bytes": int(free.value),
+        "queried_at": time.time(),
+        "coverage": "complete",
+    }
+
+
+def _collect_disk_usage(
+    drives: Iterable[str] = DISK_DRIVES,
+    *,
+    query=_query_windows_volume,
+) -> dict[str, Any]:
+    """Sample explicit drive roots; query failures remain unknown, never zero."""
+    volumes: list[dict[str, Any]] = []
+    for root in drives:
+        try:
+            item = query(root)
+            volumes.append({"root": root, **item})
+        except Exception as exc:  # a missing/unavailable drive is not zero free space
+            volumes.append(
+                {
+                    "root": root,
+                    "volume_identity": None,
+                    "available_to_caller_bytes": None,
+                    "total_bytes": None,
+                    "free_bytes": None,
+                    "queried_at": time.time(),
+                    "coverage": "query_error",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc)[:240],
+                }
+            )
+    return {
+        "disks": volumes,
+        "resource_coverage_disks": sum(
+            volume["coverage"] == "complete" for volume in volumes
+        ),
+    }
+
+
+def _finite_number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _nonnegative_bytes(value: Any) -> float | None:
+    number = _finite_number(value)
+    return number if number is not None and number >= 0 else None
+
+
+def _add_disk_growth(current: dict[str, Any], previous: dict[str, Any]) -> None:
+    old = {
+        item.get("volume_identity"): item
+        for item in (previous.get("disks") or [])
+        if item.get("volume_identity") and item.get("coverage") == "complete"
+    }
+    for item in current.get("disks") or []:
+        item["growth_bytes_per_sec"] = None
+        item["growth_interval_seconds"] = None
+        prior = old.get(item.get("volume_identity"))
+        if item.get("coverage") != "complete" or prior is None:
+            continue
+        current_time = _finite_number(item.get("queried_at"))
+        previous_time = _finite_number(prior.get("queried_at"))
+        current_free = _nonnegative_bytes(item.get("free_bytes"))
+        previous_free = _nonnegative_bytes(prior.get("free_bytes"))
+        if (
+            current_time is None
+            or previous_time is None
+            or current_time <= 0
+            or previous_time <= 0
+            or current_free is None
+            or previous_free is None
+        ):
+            continue
+        elapsed = current_time - previous_time
+        if elapsed <= 0:
+            continue
+        item["growth_bytes_per_sec"] = (previous_free - current_free) / elapsed
+        item["growth_interval_seconds"] = elapsed
+
+
+def _disk_observations(system: dict[str, Any], policy: dict[str, Any]) -> list[dict[str, Any]]:
+    cfg = (policy or {}).get("disk_supervision") or {}
+    if not cfg.get("enabled", False):
+        return []
+    warn_free = int(cfg.get("warning_free_bytes", 30 * GIB))
+    critical_free = int(cfg.get("critical_free_bytes", 10 * GIB))
+    warn_growth = float(cfg.get("warning_growth_bytes_per_hour", 5 * GIB)) / 3600.0
+    out: list[dict[str, Any]] = []
+    for volume in system.get("disks") or []:
+        free = _nonnegative_bytes(volume.get("free_bytes"))
+        if volume.get("coverage") != "complete" or free is None:
+            continue
+        evidence = {k: volume.get(k) for k in ("root", "volume_identity", "free_bytes", "total_bytes", "available_to_caller_bytes", "growth_bytes_per_sec", "growth_interval_seconds", "queried_at", "coverage")}
+        if free < warn_free:
+            critical = free < critical_free
+            out.append(_observation(
+                "disk-free-space", str(volume["volume_identity"]), "critical" if critical else "warning",
+                f"{volume['root']} has {free / GIB:.1f} GiB free", evidence,
+                confirm_after=int(cfg.get("confirmation_samples", 2)), confidence="high",
+            ))
+        growth = volume.get("growth_bytes_per_sec")
+        growth = _finite_number(growth)
+        if growth is not None and float(growth) > warn_growth:
+            out.append(_observation(
+                "disk-consumption-rate", str(volume["volume_identity"]), "warning",
+                f"{volume['root']} is consuming {float(growth) * 3600 / GIB:.1f} GiB/hour", evidence,
+                confirm_after=int(cfg.get("confirmation_samples", 2)), confidence="high",
+            ))
+    return out
+
+
+def _preserve_unmeasured_disk_alerts(
+    state: dict[str, Any],
+    events: list[dict[str, Any]],
+    alerts: list[dict[str, Any]],
+    previous: dict[str, Any],
+    system: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Do not resolve an active disk alert when that volume could not be measured."""
+    preserve: set[tuple[Any, str]] = set()
+    for volume in system.get("disks") or []:
+        root = volume.get("root")
+        free = _nonnegative_bytes(volume.get("free_bytes"))
+        if volume.get("coverage") != "complete" or free is None:
+            preserve.update(
+                (root, kind)
+                for kind in ("disk-free-space", "disk-consumption-rate")
+            )
+            continue
+        growth = _finite_number(volume.get("growth_bytes_per_sec"))
+        elapsed = _finite_number(volume.get("growth_interval_seconds"))
+        if growth is None or elapsed is None or elapsed <= 0:
+            preserve.add((root, "disk-consumption-rate"))
+    old_active = previous.get("active") or {}
+    if not isinstance(old_active, dict):
+        old_active = {}
+    retained = [
+        alert
+        for alert in old_active.values()
+        if isinstance(alert, dict)
+        and (alert.get("kind"), (alert.get("evidence") or {}).get("root"))
+        in {(kind, root) for root, kind in preserve}
+    ]
+    if not retained:
+        return state, events, alerts
+    active = state.setdefault("active", {})
+    for alert in retained:
+        active[alert["fingerprint"]] = alert
+    retained_fingerprints = {alert["fingerprint"] for alert in retained}
+    events = [
+        event for event in events
+        if not (
+            event.get("event") == "resolved"
+            and (event.get("alert") or {}).get("fingerprint") in retained_fingerprints
+        )
+    ]
+    alerts = [
+        alert for alert in alerts
+        if alert.get("fingerprint") not in retained_fingerprints
+    ] + retained
+    return state, events, alerts
 
 
 def _redact_command(parts: Iterable[str] | str) -> str:
@@ -318,12 +545,27 @@ def _provider_for(facts: Iterable[ProcessFact]) -> str:
     command = " ".join(item.command.lower() for item in facts)
     if "kimi" in command:
         return "kimi"
+    # zcode 必须排在 codex 之前: 子串包含 codex
+    if "zcode" in command:
+        return "zcode"
+    if "grok" in command:
+        return "grok"
+    # codex_glm / codex_the_company 与官方 codex 同一个可执行文件, 只有进程级
+    # provider 覆盖能区分, 所以先看覆盖标记再落回 codex。
+    if 'model_provider="zai"' in command or "model_provider=zai" in command:
+        return "codex_glm"
+    if 'model_provider="the_company"' in command or "model_provider=the_company" in command:
+        return "codex_the_company"
     if "codex" in command:
         return "codex"
+    if "gemini" in command:
+        return "gemini"
     if "claude" in command:
         return "claude_code"
     if "opencode" in command:
         return "opencode"
+    if "dsh-pty" in command or "omni-dsh-pty" in command:
+        return "dsh"
     return "shell"
 
 
@@ -365,6 +607,20 @@ def _group_summary(
         key=lambda item: (item.cpu_percent, item.handles, item.private_bytes),
         reverse=True,
     )
+    root_pid = int(owner.get("root_pid") or 0)
+    # Never lower the detached PTY host itself.  It is the interactive transport
+    # for the whole session, while expensive test/build children are the actual
+    # background workload.  Lowering the whole tree made keystrokes and daemon
+    # calls starve behind a worker pool even though Windows remained responsive.
+    deprioritization_pids = [
+        item.pid
+        for item in ordered
+        if item.pid != root_pid
+        and (
+            item.cpu_percent >= DEPRIORITIZE_PROCESS_CPU_PCT
+            or item.private_bytes >= DEPRIORITIZE_PROCESS_PRIVATE_BYTES
+        )
+    ]
     return {
         "id": group_id,
         "role": role,
@@ -376,6 +632,7 @@ def _group_summary(
         "private_bytes": sum(item.private_bytes for item in facts),
         "handles": sum(item.handles for item in facts),
         "threads": sum(item.threads for item in facts),
+        "deprioritization_pids": deprioritization_pids,
         "top_processes": [_process_summary(item) for item in ordered[:8]],
     }
 
@@ -614,7 +871,15 @@ def detect_observations(
                         "warning": warning,
                         "pids": group["pids"],
                     },
-                    confirm_after=3 if kind == "group-cpu-percent" else 2,
+                    # 8 GiB 已是本模块定义的 critical 私有内存异常。它不需要再等
+                    # 第二个一分钟采样才变成可消费告警；其它组指标保持原确认窗口。
+                    confirm_after=(
+                        1
+                        if kind == "group-private-bytes" and critical
+                        else 3
+                        if kind == "group-cpu-percent"
+                        else 2
+                    ),
                     confidence="medium" if kind == "group-cpu-percent" else "high",
                 )
             )
@@ -671,6 +936,109 @@ def detect_observations(
                 )
             )
     return observations
+
+
+def detect_stale_compute_observations(
+    facts: list[ProcessFact],
+    policy: dict[str, Any],
+    *,
+    now: float,
+) -> list[dict[str, Any]]:
+    """Detect old, still-expensive test/debug commands outside agent sessions.
+
+    Age is part of the proof, so a normal foreground run is not flagged merely for
+    starting.  The detector only emits evidence and never terminates a process.
+    """
+    cfg = (policy or {}).get("stale_compute_detection") or {}
+    if not cfg.get("enabled", False):
+        return []
+
+    patterns = tuple(str(item).casefold() for item in (cfg.get("command_patterns") or ()))
+    if not patterns:
+        return []
+    min_age_s = float(cfg.get("min_age_minutes", float("inf"))) * 60.0
+    min_cpu = float(cfg.get("min_cpu_percent", float("inf")))
+    min_private_bytes = float(cfg.get("min_private_mb", float("inf"))) * 1024 * 1024
+    severity = str(cfg.get("severity") or "critical")
+    alert_kind = str(cfg.get("alert_kind") or "stale-workspace-compute")
+
+    observations: list[dict[str, Any]] = []
+    for fact in facts:
+        command = fact.command.casefold()
+        matched_pattern = next((item for item in patterns if item in command), None)
+        age_s = max(0.0, now - fact.create_time)
+        if (
+            matched_pattern is None
+            or age_s < min_age_s
+            or (fact.cpu_percent < min_cpu and fact.private_bytes < min_private_bytes)
+        ):
+            continue
+        evidence = {
+            **_process_summary(fact),
+            "matched_pattern": matched_pattern,
+            "age_minutes": round(age_s / 60.0, 1),
+            "min_age_minutes": min_age_s / 60.0,
+            "min_cpu_percent": min_cpu,
+            "min_private_mb": min_private_bytes / (1024 * 1024),
+        }
+        observations.append(
+            _observation(
+                alert_kind,
+                f"{fact.pid}:{int(fact.create_time)}",
+                severity,
+                f"PID {fact.pid} has run {matched_pattern!r} for {age_s / 60.0:.1f}m "
+                f"while using {fact.cpu_percent:.1f}% CPU / "
+                f"{fact.private_bytes / (1024**3):.1f} GiB private memory",
+                evidence,
+                # The minimum age is already a durable confirmation window.
+                confirm_after=1,
+                confidence="high",
+            )
+        )
+    return observations
+
+
+def _notify_confirmed_resource_alerts(
+    events: list[dict[str, Any]], policy: dict[str, Any]
+) -> None:
+    """Push one dashboard notice for newly-confirmed critical resource alerts."""
+    cfg = (policy or {}).get("alert_consumption") or {}
+    if not cfg.get("notify_on_critical", False):
+        return
+    confirmed = [
+        event.get("alert") or {}
+        for event in events
+        if event.get("event") == "confirmed"
+        and (event.get("alert") or {}).get("severity") == "critical"
+    ]
+    if not confirmed:
+        return
+    try:
+        from omnicompany.packages.services.boss_sight.services import agent_notify
+
+        # Keep the dashboard bell payload to stable alert metadata. Alert messages
+        # can contain process-derived text, so never forward them or argv here.
+        summaries = []
+        for item in confirmed[:3]:
+            kind = str(item.get("kind") or "resource-alert")
+            evidence = item.get("evidence") or {}
+            if kind in {"disk-free-space", "disk-consumption-rate"}:
+                root = evidence.get("root")
+                free = evidence.get("free_bytes")
+                growth = evidence.get("growth_bytes_per_sec")
+                space = f" free={int(free)}B" if isinstance(free, (int, float)) else ""
+                rate = f" growth={float(growth) * 3600:.0f}B/hour" if isinstance(growth, (int, float)) else ""
+                summaries.append(f"{kind} {root or ''}{space}{rate}".strip())
+            else:
+                summaries.append(kind)
+        summary = "; ".join(summaries)
+        agent_notify.push_notice(
+            f"资源占用异常: {len(confirmed)} 项 critical",
+            open_ref={"type": "project", "id": "perf-observatory"},
+            body=summary,
+        )
+    except Exception:  # noqa: BLE001 - notification failure must not stop sampling
+        logger.warning("critical resource alert notification failed", exc_info=True)
 
 
 def _atomic_json(path: Path, payload: Any) -> None:
@@ -743,6 +1111,339 @@ def _advance_alert_state(
     return {"schema": SCHEMA, "updated_at": now, "active": active}, events, visible
 
 
+# ── PERF-OBSERVATORY 策略执行层 (priority_enforcer / runaway_idle_detection) ──
+#
+# 策略真源: config/perf/resource-policy.yaml (schema omni.resource-policy.v1)。
+# priority_enforcer 唯一允许的自动动作是把已连续确认高 CPU 的组降为 BelowNormal
+# 优先级(可逆, 绝不 kill/挂起); runaway_idle_detection 只产出证据型 alert, 走现有
+# alerts 机制落盘, 清理仍需人工确认。两者都必须 fail-open: 任何异常只 warning,
+# 不得影响采样主循环。
+
+_RESOURCE_POLICY_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _load_resource_policy(path: Path) -> dict[str, Any]:
+    """惰性加载 + mtime 缓存;解析失败时保留上次已知配置(格式错误不清空策略)。"""
+    key = str(path)
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return {}
+    cached = _RESOURCE_POLICY_CACHE.get(key)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    try:
+        import yaml
+
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        logger.warning(
+            "resource policy failed to parse from %s; keeping last-known config", path, exc_info=True
+        )
+        data = cached[1] if cached is not None else {}
+    _RESOURCE_POLICY_CACHE[key] = (mtime, data)
+    return data
+
+
+def _deprioritize_pid(pid: int) -> None:
+    """把单个 pid 的调度优先级降为 BelowNormal —— 唯一允许的自动动作,可逆,非 kill。"""
+    if os.name != "nt":
+        return
+    import psutil
+
+    psutil.Process(pid).nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+
+
+def _normalize_interactive_pid(pid: int) -> None:
+    """Keep the daemon/PTY control plane at normal scheduling priority."""
+    if os.name != "nt":
+        return
+    import psutil
+
+    psutil.Process(pid).nice(psutil.NORMAL_PRIORITY_CLASS)
+
+
+def _ledger_append_remediation(payload: dict[str, Any]) -> None:
+    from omnicompany.packages.services._core.ledger import LedgerEvent, append as _ledger_append
+
+    event = LedgerEvent(
+        type="perf.remediation",
+        agent="resource_monitor.priority_enforcer",
+        activity=(
+            f"deprioritized {payload.get('group_id')} after sustained CPU "
+            f"({payload.get('cpu_percent')}% over {payload.get('confirmation_samples')} samples)"
+        ),
+        outputs=[str(payload.get("group_id"))],
+        meta=payload,
+    )
+    _ledger_append(event)
+
+
+def apply_priority_enforcement(
+    groups: list[dict[str, Any]],
+    policy: dict[str, Any],
+    state: dict[str, Any],
+    *,
+    now: float,
+    set_priority: Any = _deprioritize_pid,
+    ledger_append: Any = _ledger_append_remediation,
+) -> dict[str, Any]:
+    """按策略把持续高 CPU 的组降优先级;返回下一轮要持久化的 state。
+
+    Fail-open: 单个 pid 降级失败或 ledger 留痕失败都只 warning,不中断其它组的处理,
+    也不向上抛出(调用方的采样主循环不受影响)。
+    """
+    new_state: dict[str, Any] = {"schema": "omni.priority-enforcement.v1", "updated_at": now}
+    cfg = (policy or {}).get("priority_enforcer") or {}
+    if not cfg.get("enabled", False) or cfg.get("mode") != "deprioritize_only":
+        new_state["streaks"] = {}
+        new_state["deprioritized"] = {}
+        return new_state
+
+    protected_prefixes = tuple(str(p) for p in (cfg.get("protected_group_prefixes") or ()))
+    sustained_cpu = float(cfg.get("sustained_cpu_percent", float("inf")))
+    confirmation_samples = max(1, int(cfg.get("confirmation_samples", 3)))
+
+    streaks = dict((state or {}).get("streaks") or {})
+    deprioritized = dict((state or {}).get("deprioritized") or {})
+    seen_ids: set[str] = set()
+
+    for group in groups:
+        gid = str(group.get("id") or "")
+        if not gid:
+            continue
+        seen_ids.add(gid)
+        if gid.startswith(protected_prefixes):
+            streaks.pop(gid, None)
+            continue
+        cpu = float(group.get("cpu_percent") or 0.0)
+        if cpu >= sustained_cpu:
+            streaks[gid] = int(streaks.get(gid, 0)) + 1
+        else:
+            streaks[gid] = 0
+            continue
+        if streaks[gid] < confirmation_samples:
+            continue
+
+        candidates = group.get("deprioritization_pids")
+        if candidates is None:
+            # Compatibility for callers/tests supplying the older group schema.
+            candidates = group.get("pids") or []
+        previous = deprioritized.get(gid) or {}
+        previous_pids = {int(pid) for pid in previous.get("pids") or []}
+        target_pids = [int(pid) for pid in candidates if int(pid) not in previous_pids]
+        if not target_pids:
+            continue
+        applied_pids: list[int] = []
+        for pid in target_pids:
+            try:
+                set_priority(pid)
+                applied_pids.append(pid)
+            except Exception:
+                logger.warning(
+                    "priority_enforcer failed to deprioritize pid %s in group %s", pid, gid, exc_info=True
+                )
+        combined_pids = sorted(previous_pids | set(applied_pids))
+        deprioritized[gid] = {"pids": combined_pids, "at": now, "cpu_percent": cpu}
+        if not applied_pids:
+            continue
+        try:
+            ledger_append(
+                {
+                    "group_id": gid,
+                    "action": "deprioritize",
+                    "role": group.get("role"),
+                    "pids": applied_pids,
+                    "cpu_percent": cpu,
+                    "sustained_cpu_percent": sustained_cpu,
+                    "confirmation_samples": confirmation_samples,
+                }
+            )
+        except Exception:
+            logger.warning("priority_enforcer ledger append failed for group %s", gid, exc_info=True)
+
+    # 组从这轮采样彻底消失(进程退出)才清理记忆,避免状态无限增长;attribute_processes
+    # 的分组以存活进程树为准,不会出现"短暂缺席又回来"的抖动。
+    for gid in list(streaks):
+        if gid not in seen_ids:
+            streaks.pop(gid, None)
+    for gid in list(deprioritized):
+        if gid not in seen_ids:
+            deprioritized.pop(gid, None)
+
+    new_state["streaks"] = streaks
+    new_state["deprioritized"] = deprioritized
+    return new_state
+
+
+def _read_session_record(sessions_path: Path, session_id: str) -> dict[str, Any] | None:
+    """从 cc_sessions.json 里只取一个 session 的记录,不解析整份文件。
+
+    data/cc_sessions.json 是按 session id 做键的单个 JSON 对象,可能积到数百条记录、
+    个别记录还带很深的 history_summary/event_history;这里按文本定位到目标键,再做一次
+    括号配平截取,只对命中的子串 json.loads,避免为了一个字段构建全量嵌套对象图。
+    """
+    try:
+        text = sessions_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    marker = f'"{session_id}"'
+    idx = text.find(marker)
+    if idx < 0:
+        return None
+    brace_start = text.find("{", idx)
+    if brace_start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    end = None
+    for i in range(brace_start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    if end is None:
+        return None
+    try:
+        value = json.loads(text[brace_start:end])
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _group_facts(group: dict[str, Any], pid_to_fact: dict[int, ProcessFact]) -> list[ProcessFact]:
+    return [pid_to_fact[pid] for pid in group.get("pids") or [] if pid in pid_to_fact]
+
+
+def _find_heavy_child(facts: list[ProcessFact], cfg: dict[str, Any]) -> ProcessFact | None:
+    names = {str(n).lower() for n in (cfg.get("heavy_child_names") or [])}
+    cpu_threshold = float(cfg.get("heavy_child_cpu_percent", float("inf")))
+    rss_threshold_mb = float(cfg.get("heavy_child_rss_mb", float("inf")))
+    for fact in facts:
+        if fact.name.lower() in names:
+            return fact
+        if fact.cpu_percent > cpu_threshold:
+            return fact
+        if (fact.rss_bytes / (1024 * 1024)) > rss_threshold_mb:
+            return fact
+    return None
+
+
+def _session_idle_hours(
+    record: dict[str, Any] | None, facts: list[ProcessFact], now: float
+) -> tuple[float, str]:
+    """判定依据优先级: cc_sessions.json 记录里的 last_submit_at(最贴合"最后活动"字面
+    含义的字段:最近一次用户提交,404 条 pty 记录里 246 条有值、最新鲜的样本仅几分钟前)
+    → ended_at(会话已结束的确定性信号) → last_activity_at(覆盖率很低,491 条里仅 7 条
+    非空且多为测试夹具值,但存在则最直接) → started_at(仅有创建时间时的次优信号)。
+    四者都拿不到时兜底为组内进程里最年轻的 create_time(最近一次有进程活动的近似信号),
+    并在返回的判定依据字符串里如实标注,供 evidence 说明这是兜底路径。
+    """
+    if isinstance(record, dict):
+        for field_name in ("last_submit_at", "ended_at", "last_activity_at", "started_at"):
+            value = record.get(field_name)
+            if isinstance(value, (int, float)) and value > 0:
+                return max(0.0, (now - float(value)) / 3600.0), field_name
+    if facts:
+        youngest_create_time = max(fact.create_time for fact in facts)
+        return max(0.0, (now - youngest_create_time) / 3600.0), "youngest_child_create_time_fallback"
+    return 0.0, "unknown"
+
+
+def detect_runaway_idle_observations(
+    groups: list[dict[str, Any]],
+    pid_to_fact: dict[int, ProcessFact],
+    policy: dict[str, Any],
+    *,
+    now: float,
+    session_lookup: Any = None,
+) -> list[dict[str, Any]]:
+    """产出证据型 alert(kind=策略里的 alert_kind),不做任何自动处置。"""
+    cfg = (policy or {}).get("runaway_idle_detection") or {}
+    if not cfg.get("enabled", False):
+        return []
+    idle_threshold_h = float(cfg.get("idle_hours_threshold", float("inf")))
+    alert_kind = str(cfg.get("alert_kind") or "runaway-idle-agent-session")
+    severity = str(cfg.get("severity") or "critical")
+
+    observations: list[dict[str, Any]] = []
+    for group in groups:
+        if group.get("role") != "agent-session":
+            continue
+        owner = group.get("owner") or {}
+        session_id = owner.get("session_id")
+        facts = _group_facts(group, pid_to_fact)
+        heavy = _find_heavy_child(facts, cfg)
+        if heavy is None:
+            continue
+
+        record = None
+        if session_lookup is not None and session_id:
+            try:
+                record = session_lookup(session_id)
+            except Exception:
+                logger.warning(
+                    "runaway_idle_detection session lookup failed for %s", session_id, exc_info=True
+                )
+        idle_hours, idle_basis = _session_idle_hours(record, facts, now)
+        if idle_hours < idle_threshold_h:
+            continue
+
+        gid = str(group.get("id") or session_id or "unknown")
+        started_at = (record or {}).get("started_at")
+        if not isinstance(started_at, (int, float)):
+            started_at = "unknown"
+        evidence = {
+            "provider": owner.get("provider") or (record or {}).get("provider") or "unknown",
+            "session_id": session_id or "unknown",
+            "session_name": (
+                (record or {}).get("provider_title")
+                or (record or {}).get("claude_session_id")
+                or "unknown"
+            ),
+            "started_at": started_at,
+            "active_plan": (record or {}).get("active_plan") or "unknown",
+            "root_pid": owner.get("root_pid", "unknown"),
+            "idle_hours": round(idle_hours, 2),
+            "idle_hours_threshold": idle_threshold_h,
+            "idle_basis": idle_basis,
+            "heavy_child_pid": heavy.pid,
+            "heavy_child_name": heavy.name,
+            "heavy_child_cpu_percent": round(heavy.cpu_percent, 1),
+            "heavy_child_rss_mb": round(heavy.rss_bytes / (1024 * 1024), 1),
+        }
+        observations.append(
+            _observation(
+                alert_kind,
+                gid,
+                severity,
+                f"{gid} idle {idle_hours:.1f}h (threshold {idle_threshold_h}h) "
+                f"with heavy child {heavy.name} (pid {heavy.pid})",
+                evidence,
+                confirm_after=1,
+                confidence="medium" if idle_basis == "youngest_child_create_time_fallback" else "high",
+            )
+        )
+    return observations
+
+
 class ResourceMonitor:
     def __init__(
         self,
@@ -758,12 +1459,19 @@ class ResourceMonitor:
         self._cpu_baseline: dict[int, tuple[float, float]] = {}
         self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
+        self._worker_process: Any | None = None
+        self._worker_stop: Any | None = None
+        self._worker_restart_count = 0
         self.last_error: str | None = None
         self.last_sample_at: float | None = None
 
     @property
     def latest_path(self) -> Path:
         return self.data_dir / "latest.json"
+
+    @property
+    def worker_status_path(self) -> Path:
+        return self.data_dir / "worker_status.json"
 
     def _collect(self) -> tuple[list[ProcessFact], dict[str, Any]]:
         try:
@@ -913,15 +1621,21 @@ class ResourceMonitor:
             "memory_percent": round(float(virtual_memory.percent), 1),
             "cpu_percent": round(float(psutil.cpu_percent(interval=0.05)), 1),
         }
+        system.update(_collect_disk_usage())
         return facts, system
 
-    def sample(self, *, persist: bool = True) -> dict[str, Any]:
+    @property
+    def resource_policy_path(self) -> Path:
+        return self.root / "config" / "perf" / "resource-policy.yaml"
+
+    @property
+    def priority_state_path(self) -> Path:
+        return self.data_dir / "priority_enforcement_state.json"
+
+    def sample(self, *, persist: bool = True, enforce_policy: bool = False) -> dict[str, Any]:
         started = time.monotonic()
         now = time.time()
         facts, system = self._collect()
-        groups, assigned = attribute_processes(facts, workspace_root=str(self.root.parent))
-        observations = detect_observations(facts, groups, system, self.thresholds)
-
         previous_state: dict[str, Any] = {}
         state_path = self.data_dir / "state.json"
         if persist and state_path.is_file():
@@ -929,7 +1643,74 @@ class ResourceMonitor:
                 previous_state = json.loads(state_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 previous_state = {}
+        try:
+            _add_disk_growth(system, previous_state.get("disk_state") or {})
+        except Exception:
+            logger.warning("disk growth calculation failed; keeping rates unknown", exc_info=True)
+            for volume in system.get("disks") or []:
+                volume["growth_bytes_per_sec"] = None
+                volume["growth_interval_seconds"] = None
+        groups, assigned = attribute_processes(facts, workspace_root=str(self.root.parent))
+        observations = detect_observations(facts, groups, system, self.thresholds)
+
+        try:
+            policy = _load_resource_policy(self.resource_policy_path)
+        except Exception:
+            logger.warning(
+                "failed to load resource policy; policy-driven features disabled this cycle",
+                exc_info=True,
+            )
+            policy = {}
+
+        try:
+            observations.extend(_disk_observations(system, policy))
+        except Exception:
+            logger.warning("disk alert detection failed; skipping this cycle", exc_info=True)
+
+        try:
+            pid_to_fact = {fact.pid: fact for fact in facts}
+            runaway_observations = detect_runaway_idle_observations(
+                groups,
+                pid_to_fact,
+                policy,
+                now=now,
+                session_lookup=lambda sid: _read_session_record(
+                    self.root / "data" / "cc_sessions.json", sid
+                ),
+            )
+        except Exception:
+            logger.warning("runaway_idle_detection failed; skipping this cycle", exc_info=True)
+            runaway_observations = []
+        observations.extend(runaway_observations)
+
+        try:
+            observations.extend(detect_stale_compute_observations(facts, policy, now=now))
+        except Exception:
+            logger.warning("stale_compute_detection failed; skipping this cycle", exc_info=True)
+
+        # priority_enforcer 会真的降低进程优先级, 只在专用后台采样循环里生效
+        # (enforce_policy=True, 见 _resource_monitor_worker_main); CLI 的
+        # `omni guardian resources` 走默认参数, 保持它"只读, 不修改任何进程"的既有承诺。
+        if enforce_policy and persist:
+            try:
+                priority_state: dict[str, Any] = {}
+                if self.priority_state_path.is_file():
+                    try:
+                        priority_state = json.loads(
+                            self.priority_state_path.read_text(encoding="utf-8")
+                        )
+                    except (OSError, json.JSONDecodeError):
+                        priority_state = {}
+                priority_state = apply_priority_enforcement(groups, policy, priority_state, now=now)
+                _atomic_json(self.priority_state_path, priority_state)
+            except Exception:
+                logger.warning("priority_enforcer failed; skipping this cycle", exc_info=True)
+
         state, events, alerts = _advance_alert_state(observations, previous_state, now=now)
+        state, events, alerts = _preserve_unmeasured_disk_alerts(
+            state, events, alerts, previous_state, system
+        )
+        state["disk_state"] = {"disks": system.get("disks") or []}
 
         external = [
             item
@@ -1010,6 +1791,7 @@ class ResourceMonitor:
                     event,
                     ALERTS_MAX_BYTES,
                 )
+            _notify_confirmed_resource_alerts(events, policy)
         self.last_sample_at = now
         self.last_error = None
         return snapshot
@@ -1036,36 +1818,114 @@ class ResourceMonitor:
         value["available"] = True
         return value
 
+    def _read_worker_status(self) -> dict[str, Any]:
+        try:
+            value = json.loads(self.worker_status_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
     def status(self) -> dict[str, Any]:
         latest = self.read_latest()
+        worker = self._worker_process
+        worker_running = bool(worker and worker.is_alive())
+        worker_status = self._read_worker_status()
         return {
-            "running": bool(self._task and not self._task.done()),
+            "running": bool(self._task and not self._task.done() and worker_running),
+            "execution_mode": "dedicated_process",
+            "worker_pid": worker.pid if worker_running else None,
+            "worker_restart_count": self._worker_restart_count,
             "interval_s": self.interval_s,
-            "last_sample_at": latest.get("sampled_at") or self.last_sample_at,
-            "last_error": self.last_error or latest.get("last_error"),
+            "last_sample_at": (
+                latest.get("sampled_at")
+                or worker_status.get("last_sample_at")
+                or self.last_sample_at
+            ),
+            "last_error": self.last_error or worker_status.get("last_error"),
             "alert_counts": latest.get("alert_counts") or {},
             "automatic_cleanup_allowed": False,
         }
 
+    def _start_worker_process(self) -> None:
+        context = multiprocessing.get_context("spawn")
+        parent_pid = os.getpid()
+        worker_stop = context.Event()
+        worker = context.Process(
+            target=_resource_monitor_worker_main,
+            args=(
+                str(self.root),
+                self.interval_s,
+                asdict(self.thresholds),
+                worker_stop,
+                parent_pid,
+            ),
+            name="cc-resource-monitor-worker",
+            daemon=True,
+        )
+        worker.start()
+        self._worker_stop = worker_stop
+        self._worker_process = worker
+
+    async def _stop_worker_process(self) -> None:
+        worker = self._worker_process
+        worker_stop = self._worker_stop
+        self._worker_process = None
+        self._worker_stop = None
+        if worker is None:
+            return
+        if worker_stop is not None:
+            worker_stop.set()
+        await asyncio.to_thread(worker.join, 3.0)
+        if worker.is_alive():
+            worker.terminate()
+            await asyncio.to_thread(worker.join, 3.0)
+        try:
+            worker.close()
+        except (OSError, ValueError):
+            pass
+
     async def run(self) -> None:
         self._stop.clear()
-        while not self._stop.is_set():
-            try:
-                await asyncio.to_thread(self.sample)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:  # noqa: BLE001
-                self.last_error = f"{type(exc).__name__}: {exc}"
-                logger.exception("resource monitor sample failed")
-            try:
-                await asyncio.wait_for(self._stop.wait(), timeout=self.interval_s)
-            except asyncio.TimeoutError:
-                pass
+        try:
+            while not self._stop.is_set():
+                worker = self._worker_process
+                if worker is None:
+                    self._start_worker_process()
+                    worker = self._worker_process
+                elif not worker.is_alive():
+                    exitcode = worker.exitcode
+                    self.last_error = f"resource monitor worker exited with code {exitcode}"
+                    self._worker_restart_count += 1
+                    try:
+                        worker.close()
+                    except (OSError, ValueError):
+                        pass
+                    self._worker_process = None
+                    self._worker_stop = None
+                    logger.error("%s; restarting", self.last_error)
+                    try:
+                        await asyncio.wait_for(self._stop.wait(), timeout=2.0)
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
+                try:
+                    await asyncio.wait_for(self._stop.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            await self._stop_worker_process()
 
     def start(self) -> asyncio.Task[None]:
         if self._task and not self._task.done():
             return self._task
-        self._task = asyncio.create_task(self.run(), name="cc-resource-monitor")
+        try:
+            # A daemon restarted from an already-deprioritized PTY inherits that
+            # priority on Windows.  Explicitly break that inheritance before it
+            # becomes the control plane for every terminal.
+            _normalize_interactive_pid(os.getpid())
+        except Exception:
+            logger.warning("failed to normalize ccdaemon priority", exc_info=True)
+        self._task = asyncio.create_task(self.run(), name="cc-resource-monitor-supervisor")
         return self._task
 
     async def stop(self) -> None:
@@ -1073,12 +1933,130 @@ class ResourceMonitor:
         task = self._task
         if task is None:
             return
-        task.cancel()
         try:
             await task
         except asyncio.CancelledError:
             pass
         self._task = None
+
+
+def _worker_parent_is_alive(expected_parent_pid: int) -> bool:
+    """Return whether the ccdaemon process that spawned this worker still exists."""
+    if expected_parent_pid <= 0:
+        return False
+    if expected_parent_pid == os.getpid():
+        return True
+
+    parent = multiprocessing.parent_process()
+    if parent is not None and parent.pid == expected_parent_pid:
+        try:
+            return parent.is_alive()
+        except (AssertionError, OSError, ValueError):
+            return False
+
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        process_query_limited_information = 0x1000
+        still_active = 259
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        handle = kernel32.OpenProcess(
+            process_query_limited_information, False, expected_parent_pid
+        )
+        if not handle:
+            return False
+        try:
+            exit_code = wintypes.DWORD()
+            return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))) and (
+                exit_code.value == still_active
+            )
+        finally:
+            kernel32.CloseHandle(handle)
+
+    try:
+        os.kill(expected_parent_pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _resource_monitor_worker_main(
+    root: str,
+    interval_s: float,
+    thresholds: dict[str, Any],
+    stop_event: Any,
+    parent_pid: int,
+) -> None:
+    """Run expensive psutil attribution outside the ccdaemon interpreter/GIL."""
+    if os.name == "nt":
+        # A ccdaemon that was already running when the no-window policy was
+        # upgraded can still spawn this worker with its old creation flags.
+        # Hide that transitional console immediately; after the next natural
+        # daemon restart _subprocess_hide prevents it from being created at all.
+        try:
+            import ctypes
+
+            console = ctypes.windll.kernel32.GetConsoleWindow()
+            if console:
+                ctypes.windll.user32.ShowWindow(console, 0)
+        except Exception:
+            logger.debug("failed to hide resource monitor worker console", exc_info=True)
+    try:
+        # The diagnostic worker must yield to the interactive control plane.
+        _deprioritize_pid(os.getpid())
+    except Exception:
+        logger.warning("failed to deprioritize resource monitor worker", exc_info=True)
+    monitor = ResourceMonitor(
+        root=Path(root),
+        interval_s=interval_s,
+        thresholds=Thresholds(**thresholds),
+    )
+    status_path = monitor.worker_status_path
+    last_sample_at: float | None = None
+    last_error: str | None = None
+
+    def write_status(*, running: bool) -> None:
+        try:
+            _atomic_json(
+                status_path,
+                {
+                    "schema": SCHEMA,
+                    "running": running,
+                    "pid": os.getpid(),
+                    "parent_pid": parent_pid,
+                    "last_sample_at": last_sample_at,
+                    "last_error": last_error,
+                    "updated_at": time.time(),
+                },
+            )
+        except OSError:
+            pass
+
+    write_status(running=True)
+    try:
+        while not stop_event.is_set() and _worker_parent_is_alive(parent_pid):
+            try:
+                snapshot = monitor.sample(enforce_policy=True)
+                last_sample_at = float(snapshot.get("sampled_at") or time.time())
+                last_error = None
+            except Exception as exc:  # noqa: BLE001
+                last_error = f"{type(exc).__name__}: {exc}"
+                logger.exception("resource monitor worker sample failed")
+            write_status(running=True)
+            wait_until = time.monotonic() + interval_s
+            while not stop_event.is_set() and time.monotonic() < wait_until:
+                if not _worker_parent_is_alive(parent_pid):
+                    return
+                stop_event.wait(min(1.0, max(0.0, wait_until - time.monotonic())))
+    finally:
+        write_status(running=False)
 
 
 _MONITOR: ResourceMonitor | None = None
@@ -1091,15 +2069,32 @@ def get_resource_monitor() -> ResourceMonitor:
     return _MONITOR
 
 
+def _read_tail_lines(path: Path, limit: int, *, chunk_bytes: int = 64 * 1024) -> list[str]:
+    """Read only enough bytes from the end of a JSONL file for ``limit`` lines."""
+    wanted = max(1, min(limit, 500))
+    try:
+        with path.open("rb") as stream:
+            stream.seek(0, os.SEEK_END)
+            position = stream.tell()
+            chunks: list[bytes] = []
+            newline_count = 0
+            while position > 0 and newline_count <= wanted:
+                size = min(chunk_bytes, position)
+                position -= size
+                stream.seek(position)
+                chunk = stream.read(size)
+                chunks.append(chunk)
+                newline_count += chunk.count(b"\n")
+    except OSError:
+        return []
+    return b"".join(reversed(chunks)).decode("utf-8", errors="replace").splitlines()[-wanted:]
+
+
 def read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
     if not path.is_file():
         return []
-    try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
-        return []
     values: list[dict[str, Any]] = []
-    for line in lines[-max(1, min(limit, 500)) :]:
+    for line in _read_tail_lines(path, limit):
         try:
             value = json.loads(line)
         except json.JSONDecodeError:
@@ -1113,8 +2108,11 @@ __all__ = [
     "ProcessFact",
     "ResourceMonitor",
     "Thresholds",
+    "apply_priority_enforcement",
     "attribute_processes",
     "detect_observations",
+    "detect_runaway_idle_observations",
+    "detect_stale_compute_observations",
     "get_resource_monitor",
     "read_jsonl_tail",
 ]

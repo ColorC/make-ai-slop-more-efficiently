@@ -53,7 +53,7 @@ doctor 是 omnicompany 的**管线级健康诊断 service**. 它扫源码 + 调 
 
 - **当前 V3** (旧 World V3 active, 2026-04-20 New World Diagnostics Phase B): 30 Worker, 4 子域 (Format/Router/Pipeline/Blackboard), Clean Migration V2 完成
 - **当前假设系统 V12** (active, 2026-05-07): V0→V12 全栈跑通 — 7 agent / 7 builder / 3 scanner / 8 tool / 253+ pytest / 真 LLM 跨 6 阶段实测过. 假设系统这一族在工具+CLI 层面 production-ready. 见 V7 final 架构汇报
-- **下一步**: 旧 V3 — Phase 2 backlog .omni/health/ 就近写盘 + LAP crystallize. 假设系统 V13+ — MetaDiagnosticAgent 完整一轮真 LLM (待 token 授权) + Guardian/CI 集成 (架构级)
+- **下一步**: 旧 V3 — Phase 2 backlog .omni/health/ 就近写盘 + LAP crystallize. 假设系统 V13+ — MetaDiagnosticAgent 与 HypothesisDeriverAgent 均已完成只读外置 canary，后续是 Guardian/CI 集成。
 - **远景 (CORE-SELF-STABILITY 协作)**: 诊断升级到语义级, 接入自我画像漂移检测
 
 进度细节: docs/PROGRESS.md (项目级) + [DESIGN.md `## 状态`](DESIGN.md) (本 service 状态).
@@ -104,7 +104,9 @@ python -m omnicompany.packages.services._diagnosis.doctor.builders.hypothesis_co
   --hypotheses-dir data/services/doctor/hypotheses --only-needs-upgrade
 ```
 
-第 2 步加 `--no-dry-run --focus-count 1` 真调 ChallengeAgent (qwen-3.6-plus, ~10K token / agent run).
+第 2 步加 `--no-dry-run --focus-count 1` 真调 ChallengeAgent。该位点通过外置
+AgentRuntime 调用 `deepseek-v4-flash`：DSH 只读证据并返回结构化提案，Omni 在
+完整校验后原子更新假设，再用 canonical finding 工具落 archive；失败不回退旧循环。
 
 数据流向: `派生 → V1 升级 → ChallengeQueue 排序 → ChallengeAgent 真证否 → finding 落 archive → V1Upgrader 重升 (反向链) → ConfidenceAuditor 自动升级建议`. schema §三 5 步全实施.
 

@@ -1,21 +1,19 @@
 # [OMNI] origin=claude-code domain=services/guardian ts=2026-05-04T00:00:00Z type=infrastructure
-"""workspace_pollution — D 盘根 + 工作区根污染检测 + 备份删除哨兵.
+"""workspace_pollution — 盘根 + 工作区根的只读污染候选哨兵.
 
 驱动: 用户 2026-05-03 反馈 bash 工具频繁误创建错误文件 (nul / -p / 反斜杠路径破坏 / 双层盘符).
 即使 BashBus 加了防御层 (上游拦截), 仍可能有遗漏 (旧 subprocess 调用 / 第三方工具 / 历史残留).
-本模块作为**事后清理**安全网, 周期性扫顶层非白名单项 → 备份后删除 + 罚单.
+本模块只产生顶层非登记项候选。未知项并不等于可删除垃圾；移动/删除必须由
+带所有权、占用、hash 与回退信息的已验收 manifest mover 单独执行。
 
 设计原则:
   - 只扫顶层 (depth=1), 不深入子目录 (P4 等大目录扫不动)
-  - 白名单驱动: 列在白名单内的合法, 未列的全部按污染处理
-  - 备份不留告示牌 (跟拖车 quarantine 不同: 那是"提醒写入者"语义, 这里是"用户工作区不被污染")
-  - 罚单 + 审计落盘, 后续可查"谁清了什么"
-  - Windows 设备名特例: nul / con / aux / prn / lpt1~9 / com1~9 单独处理
+  - 登记驱动: 工作区直属、允许本地落位的 registry 项合法，其他仅报候选
+  - 不在此设施备份、移动或删除；处置另走带 manifest 的流程
+  - Windows 设备名仅作为命名候选，不在本模块单独处置
     (它们 os.listdir 看不到, 但 os.path.exists 看得到)
 
-调用入口:
-  - 哨兵唤醒时调 run_workspace_pollution_scan()
-  - 也可手动 omni guardian workspace-pollution-scan
+调用入口: 哨兵唤醒时调 ``run_workspace_pollution_scan()``。
 """
 from __future__ import annotations
 
@@ -28,10 +26,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 logger = logging.getLogger(__name__)
 
 
-# ─── 默认白名单 (硬编码, 避免 yaml 依赖 + 启动时刻必须可用) ──────────
+class WorkspaceRegistryError(ValueError):
+    """Stable, fail-closed error while reading workspace.yaml."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 # D 盘根白名单
@@ -46,46 +51,14 @@ _D_DRIVE_ROOT_WHITELIST: frozenset[str] = frozenset({
 })
 
 
-# 工作区根 (C:/workspace/) 白名单
-_WORKSPACE_ROOT_WHITELIST: frozenset[str] = frozenset({
-    ".claude",
-    ".omni",
-    ".pytest_cache",
-    "CLAUDE.md",
-    "_archive",
-    "_scratch",
-    "captures",
-    "cmd-flash-watchdog",
-    "data",
-    "demoworkspace",
-    "figma-to-html",
-    "hypothesis-workspace",
-    "demogame-knowledge-base",
-    "demogame-learn",
-    "language-anchoring-protocol",
-    "lofa",
-    "node_modules",
-    "omnicompany",
-    "overlay-shell",
-    "overlay-note-store",
-    "package-lock.json",
-    "package.json",
-    "poof",
-    "poof-notes",
-    "quant-friend-relay",
-    "quant-lab",
-    "security_analysis",
-    "test-results",
-    "webworks",
-    "whatnow",
-    "参考项目",
-    "发布",
-    "故事",
-    "用户原始需求存档",
+# Root files are not workspace.yaml entries.  Keep this compact, explicit file
+# exception set; directory names always come from the registry loader below.
+_WORKSPACE_ROOT_STATIC_FILES: frozenset[str] = frozenset({
+    "AGENTS.md", "CLAUDE.md", "workspace.yaml", ".gitignore", ".ignore",
 })
 
 
-# Windows 保留设备名 (出现即 bash 工具 bug, 直接删不备份)
+# Windows 保留设备名（供候选分类与兼容调用者识别）
 _WINDOWS_DEVICE_NAMES: frozenset[str] = frozenset({
     "nul", "con", "aux", "prn",
     *(f"lpt{i}" for i in range(1, 10)),
@@ -93,23 +66,107 @@ _WINDOWS_DEVICE_NAMES: frozenset[str] = frozenset({
 })
 
 
-# 默认扫描根 (相对路径自动展开为绝对)
-_DEFAULT_SCAN_TARGETS = (
-    ("workspace_root", Path("C:/workspace/"), _WORKSPACE_ROOT_WHITELIST),
-    ("d_drive_root", Path("d:/"), _D_DRIVE_ROOT_WHITELIST),
-)
+def _is_direct_child_name(name: str) -> bool:
+    return (
+        bool(name)
+        and name == name.strip()
+        and name.rstrip(" .") == name
+        and name not in {".", ".."}
+        and not any(mark in name for mark in ("/", "\\", ":"))
+    )
+
+
+def load_workspace_registry_whitelist(registry_path: Path, workspace_root: Path) -> frozenset[str]:
+    """Read only local direct children registered by ``workspace.yaml``.
+
+    ``path`` is optional for legacy records, but if supplied it must resolve
+    exactly to ``workspace_root / name``.  An external path and an explicit
+    ``allow_local_root: false`` never authorize a same-named local child.  A
+    direct local entry may be pre-registered before its directory exists.
+    """
+    try:
+        raw = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise WorkspaceRegistryError("WORKSPACE_REGISTRY_MISSING", f"workspace registry missing: {registry_path}") from exc
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"workspace registry unreadable: {exc}") from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list) or not raw["entries"]:
+        raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", "workspace.yaml entries must be a non-empty list")
+
+    root = workspace_root.resolve()
+    allowed: set[str] = set()
+    seen: set[str] = set()
+    for index, entry in enumerate(raw["entries"]):
+        if not isinstance(entry, dict):
+            raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"entries[{index}] must be a mapping")
+        name = entry.get("name")
+        if not isinstance(name, str) or not _is_direct_child_name(name):
+            raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"entries[{index}].name must be one direct child name")
+        name_key = name.casefold()
+        if name_key in seen:
+            raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"duplicate workspace entry name: {name}")
+        seen.add(name_key)
+        allow_local_root = entry.get("allow_local_root", True)
+        if type(allow_local_root) is not bool:
+            raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"entries[{index}].allow_local_root must be boolean")
+        location_status = entry.get("location_status", "local")
+        if not isinstance(location_status, str) or location_status not in {"local", "external", "needs-review"}:
+            raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"entries[{index}].location_status is invalid")
+        if location_status != "local" and allow_local_root:
+            raise WorkspaceRegistryError(
+                "WORKSPACE_REGISTRY_INVALID",
+                f"entries[{index}].location_status requires allow_local_root: false",
+            )
+        raw_path = entry.get("path", name)
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"entries[{index}].path must be a string when present")
+        try:
+            candidate = (Path(raw_path) if Path(raw_path).is_absolute() else root / raw_path).resolve()
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise WorkspaceRegistryError("WORKSPACE_REGISTRY_INVALID", f"entries[{index}].path cannot resolve: {exc}") from exc
+        if candidate.parent != root or candidate.name != name:
+            continue  # valid external/non-direct catalogue record; never authorize a local namesake
+        if allow_local_root:
+            allowed.add(name)
+    return frozenset(allowed)
+
+
+def _workspace_registry_path(omni_root: Path) -> Path:
+    return omni_root.resolve().parent / "workspace.yaml"
+
+
+def _default_scan_targets(omni_root: Path) -> tuple:
+    workspace_root = omni_root.resolve().parent
+    registered = load_workspace_registry_whitelist(_workspace_registry_path(omni_root), workspace_root)
+    workspace_whitelist = registered | _WORKSPACE_ROOT_STATIC_FILES
+    return (
+        ("workspace_root", workspace_root, workspace_whitelist),
+        ("d_drive_root", Path("D:/"), _D_DRIVE_ROOT_WHITELIST),
+    )
+
+
+# Compatibility observation for older importers/tests.  Actual scans reload the
+# registry for every pass, so this value is never a stale authority.
+try:
+    from omnicompany.core.config import omni_workspace_root
+
+    _WORKSPACE_ROOT_WHITELIST = load_workspace_registry_whitelist(
+        _workspace_registry_path(omni_workspace_root()), omni_workspace_root().parent,
+    ) | _WORKSPACE_ROOT_STATIC_FILES
+except Exception:  # import must not turn a bad registry into an unsafe scanner
+    _WORKSPACE_ROOT_WHITELIST = _WORKSPACE_ROOT_STATIC_FILES
 
 
 @dataclass
 class PollutionTicket:
-    """单条污染清理罚单."""
+    """单条只读污染候选记录；历史字段名保持兼容。"""
     ticket_id: str
     detected_at: str
     scan_root: str             # workspace_root / d_drive_root
     original_path: str
     item_type: str             # file / dir / device_name
-    backup_path: str           # 空表示设备名直接删未备份
-    deleted_at: str
+    backup_path: str           # 兼容字段；候选扫描固定为 "(dry-run)"
+    deleted_at: str            # 兼容字段；候选扫描固定为 "(dry-run)"
     reason: str
 
     def to_dict(self) -> dict:
@@ -133,7 +190,7 @@ def _backup_and_delete(
     backup_root: Path,
     item_name: str,
 ) -> Path:
-    """备份到 backup_root/<item_name> 后删除原项. 返回备份路径."""
+    """Legacy manifest-mover helper; candidate scans never call it."""
     backup_root.mkdir(parents=True, exist_ok=True)
     backup_path = backup_root / item_name
     # 同名冲突: 加时间戳后缀
@@ -151,10 +208,7 @@ def _backup_and_delete(
 
 
 def _delete_device_name(scan_root: Path, name: str) -> bool:
-    """删 Windows 设备名虚假文件 (os.listdir 看不到但 os.path.exists 返 True).
-
-    用 os.unlink 直接 + path 显式构造. 失败返 False.
-    """
+    """Legacy device-name helper; read-only candidate scans never call it."""
     target = scan_root / name
     try:
         # Windows 上设备名通常不能直接 unlink; 用 open + truncate 后 unlink
@@ -181,7 +235,7 @@ def _delete_device_name(scan_root: Path, name: str) -> bool:
 def scan_pollution(
     scan_root: Path,
     whitelist: frozenset[str],
-    dry_run: bool = False,
+    dry_run: bool = True,
     omni_root: Optional[Path] = None,
 ) -> list[PollutionTicket]:
     """扫一个根目录的顶层污染. 返回处置罚单列表.
@@ -189,9 +243,13 @@ def scan_pollution(
     Args:
         scan_root: 要扫的目录 (顶层 only)
         whitelist: 该目录合法顶层项的集合
-        dry_run: True 仅汇报不动文件
+        dry_run: 兼容参数。无论传值为何，本设施只汇报不动文件。
         omni_root: omnicompany 项目根 (用于定位 .omni/quarantine/), None 用 scan_root
     """
+    requested_dry_run = dry_run
+    if not dry_run:
+        logger.warning("[workspace_pollution] destructive request blocked; use an approved manifest mover")
+    dry_run = True
     if not scan_root.exists():
         logger.debug("[workspace_pollution] 扫描根不存在: %s", scan_root)
         return []
@@ -247,7 +305,8 @@ def scan_pollution(
     # _delete_device_name 辅助函数仍保留: 普通分支 unlink 失败时 (Windows 拒绝
     # 因为名字是保留设备名), 走 \\?\ 长路径前缀绕过. 详见 _backup_and_delete 调用链.
 
-    # 写罚单清单 (append-only jsonl)
+    # Legacy append-only record branch. The forced candidate path above never
+    # reaches it; remediation belongs to the separate manifest mover.
     if tickets and not dry_run:
         try:
             ticket_log = omni_root / ".omni" / "quarantine" / "workspace_pollution" / "tickets.jsonl"
@@ -262,8 +321,8 @@ def scan_pollution(
 
 
 def run_workspace_pollution_scan(
-    targets: tuple = _DEFAULT_SCAN_TARGETS,
-    dry_run: bool = False,
+    targets: tuple | None = None,
+    dry_run: bool = True,
     omni_root: Optional[Path] = None,
 ) -> dict:
     """跑一遍所有目标根的扫描. 哨兵唤醒时调.
@@ -271,6 +330,25 @@ def run_workspace_pollution_scan(
     Returns:
         {"total_tickets": int, "by_root": {root_name: count, ...}, "tickets": [...]}
     """
+    requested_dry_run = dry_run
+    if not dry_run:
+        logger.warning("[workspace_pollution] destructive run blocked; reporting candidates only")
+    dry_run = True
+    if omni_root is None:
+        from omnicompany.core.config import omni_workspace_root
+
+        omni_root = omni_workspace_root()
+    if targets is None:
+        try:
+            targets = _default_scan_targets(omni_root)
+        except WorkspaceRegistryError as exc:
+            return {
+                "ok": False, "error_code": exc.code, "error": str(exc),
+                "total_tickets": 0, "by_root": {}, "tickets": [],
+                "dry_run": True, "requested_dry_run": requested_dry_run,
+                "blocked_reason": "workspace registry invalid; no roots scanned",
+            }
+
     all_tickets: list[PollutionTicket] = []
     by_root: dict[str, int] = {}
 
@@ -280,10 +358,13 @@ def run_workspace_pollution_scan(
         all_tickets.extend(ts)
 
     return {
+        "ok": True,
         "total_tickets": len(all_tickets),
         "by_root": by_root,
         "tickets": [t.to_dict() for t in all_tickets],
         "dry_run": dry_run,
+        "requested_dry_run": requested_dry_run,
+        "blocked_reason": "candidates only; destructive remediation requires an approved manifest mover",
     }
 
 
@@ -291,6 +372,8 @@ __all__ = [
     "PollutionTicket",
     "scan_pollution",
     "run_workspace_pollution_scan",
+    "load_workspace_registry_whitelist",
+    "WorkspaceRegistryError",
     "_D_DRIVE_ROOT_WHITELIST",
     "_WORKSPACE_ROOT_WHITELIST",
     "_WINDOWS_DEVICE_NAMES",

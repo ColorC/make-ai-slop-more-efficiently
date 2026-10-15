@@ -10,6 +10,7 @@ loads the existing Click CLI unchanged.
 from __future__ import annotations
 
 import json
+import importlib
 import os
 import sys
 
@@ -26,6 +27,108 @@ _OPTION_NAMES = _REQUIRED_OPTIONS | frozenset({"--max-skills", "--max-safety"})
 _SAFETY_LEVELS = frozenset(
     {"read_only", "reversible", "progression", "social", "economic", "restricted"}
 )
+
+# Top-level command discovery must not import every command implementation.
+# Values are (module suffix under omnicompany.cli, exported Click command).
+_LAZY_COMMANDS: dict[str, tuple[str, str]] = {
+    "trace": ("commands.trace", "cmd_trace"),
+    "round": ("commands.round_", "cmd_round"),
+    "node": ("commands.node", "cmd_node"),
+    "open-loops": ("commands.loops", "cmd_loops"),
+    "pain": ("commands.pain", "cmd_pain"),
+    "evo": ("commands.evo", "cmd_evo"),
+    "domain": ("commands.domain", "cmd_domain"),
+    "run": ("unified", "cmd_run"), "exec": ("unified", "cmd_exec"),
+    "replay": ("unified", "cmd_replay"), "tail": ("unified", "cmd_tail"),
+    "trace-view": ("unified", "cmd_trace_view"), "traces": ("unified", "cmd_traces"),
+    "pipelines": ("unified", "cmd_pipelines"), "health": ("unified", "cmd_health"),
+    "describe": ("unified", "cmd_describe"), "routers": ("unified", "cmd_routers"),
+    "formats": ("unified", "cmd_formats"), "nodes": ("unified", "cmd_nodes"),
+    "errors": ("unified", "cmd_errors"), "diagnose": ("unified", "cmd_diagnose"),
+    "inquiry": ("commands.inquiry", "cmd_inquiry"),
+    "guardian": ("commands.guardian", "cmd_guardian"),
+    "home": ("commands.home", "cmd_home"),
+    "desktop-node": ("commands.desktop_node", "cmd_desktop_node"),
+    "debt": ("commands.debt", "cmd_debt"),
+    "registry": ("commands.registry", "cmd_registry"),
+    "material": ("commands.material", "cmd_material"),
+    "learning-observatory": ("commands.learning_observatory", "cmd_learning_observatory"),
+    "resolve": ("commands.resolve", "cmd_resolve"),
+    "game": ("commands.game", "cmd_game"),
+    "semantic": ("commands.semantic", "cmd_semantic"),
+    "who": ("commands.identity", "cmd_who"), "whoami": ("commands.identity", "cmd_whoami"),
+    "session": ("commands.identity", "cmd_session"),
+    "plan": ("commands.plan", "cmd_plan"), "todo": ("commands.todo", "cmd_todo"),
+    "taskline": ("commands.taskline", "cmd_taskline"),
+    "new": ("commands.creation", "cmd_new"), "sandbox": ("commands.creation", "cmd_sandbox"),
+    "guide": ("commands.guide", "cmd_guide"), "reflect": ("commands.guide", "cmd_reflect"),
+    "self-portrait": ("commands.self_portrait", "cmd_self_portrait"),
+    "register": ("commands.registration", "cmd_register"),
+    "lookup": ("commands.registration", "cmd_lookup"),
+    "register-types": ("commands.registration", "cmd_register_types"),
+    "lock": ("commands.protection", "cmd_lock"), "meta-io": ("commands.meta_io", "cmd_meta_io"),
+    "team": ("commands.team", "cmd_team"), "assistant": ("commands.assistant", "cmd_assistant"),
+    "human": ("commands.human", "cmd_human"),
+    "llm": ("commands.llm_audit", "cmd_llm"), "pipeline": ("commands.llm_audit", "cmd_pipeline"),
+    "docauthor": ("commands.docauthor", "cmd_docauthor"), "cc": ("commands.cc", "cmd_cc"),
+    "worker": ("commands.worker", "cmd_worker"), "context": ("commands.context", "cmd_context"),
+    "chat": ("commands.chat", "cmd_chat"), "research": ("commands.research", "cmd_research"),
+    "atlas": ("commands.atlas", "cmd_atlas"), "decisions": ("commands.decisions", "cmd_decisions"),
+    "ledger": ("commands.ledger", "cmd_ledger"),
+    "token-ledger": ("commands.token_ledger", "cmd_token_ledger"),
+    "hr": ("commands.hr", "cmd_hr"), "notify": ("commands.notify", "cmd_notify"),
+    "refs": ("commands.refs", "cmd_refs"), "agents": ("commands.agents", "cmd_agents"),
+    "dispatch": ("commands.dispatch", "cmd_dispatch"), "notes": ("commands.notes", "cmd_notes"),
+    "canvas": ("commands.canvas", "cmd_canvas"), "task": ("commands.task", "cmd_task"),
+    "progress": ("commands.progress", "cmd_progress"), "convos": ("commands.convos", "cmd_convos"),
+    "handoff": ("commands.handoff", "cmd_handoff"), "convflow": ("commands.convflow", "cmd_convflow"),
+    "workflow": ("commands.workflow", "cmd_workflow"),
+    "dashboard": ("commands.dashboard", "cmd_dashboard"),
+    "project": ("commands.project", "cmd_project"),
+    "workstream": ("commands.workstream", "cmd_workstream"),
+    "governance": ("commands.governance", "cmd_governance"),
+    "cron": ("commands.cron", "cmd_cron"), "testmap": ("commands.testmap", "cmd_testmap"),
+    "plan-complete-gate": ("commands.plan_gate", "cmd_plan_complete_gate"),
+    "vilo": ("commands.vilo", "cmd_vilo"),
+    "review": ("commands.boss_sight", "cmd_review"),
+    "prompt": ("commands.boss_sight", "cmd_prompt"),
+    "propose": ("commands.boss_sight", "cmd_propose"),
+    "agent": ("commands.boss_sight", "cmd_agent"),
+}
+
+_HIDDEN_COMMANDS = frozenset({"chat", "convos"})
+
+
+def _normalize_windows_process_priority() -> bool:
+    """Break inherited background priority before launching CLI children.
+
+    Windows propagates a parent's priority class.  A previously deprioritized
+    terminal can therefore make a fresh ``omni`` invocation and every process
+    it launches (npm builds, daemon restarts, probes) remain BelowNormal long
+    after the original pressure has disappeared.  The CLI is an interactive
+    control-plane entrypoint, so restore its own process to Normal best-effort.
+    """
+
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.argtypes = []
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel32.SetPriorityClass.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel32.SetPriorityClass.restype = wintypes.BOOL
+        normal_priority_class = 0x00000020
+        return bool(
+            kernel32.SetPriorityClass(
+                kernel32.GetCurrentProcess(),
+                normal_priority_class,
+            )
+        )
+    except Exception:  # noqa: BLE001 - CLI access must survive OS policy limits
+        return False
 
 
 class _NavigateArguments:
@@ -64,6 +167,103 @@ def _configure_utf8_streams() -> None:
                 reconfigure(encoding="utf-8", errors="replace")
         except Exception:  # noqa: BLE001 - console encoding is best-effort
             pass
+
+
+def _guardian_precheck() -> None:
+    """Keep the global write sentinel without importing the full CLI graph."""
+
+    if os.environ.get("OMNICOMPANY_SKIP_GUARDIAN_PRECHECK") == "1":
+        return
+    try:
+        from omnicompany.core.guarded_write import sentinel_check_guardian_integrity
+
+        report = sentinel_check_guardian_integrity()
+    except Exception as exc:  # noqa: BLE001 - precheck warns but never blocks CLI access
+        print(f"OmniGuardian sentinel startup failed: {exc}", file=sys.stderr)
+        return
+    if report.get("ok"):
+        return
+    print("OmniGuardian PRE-CHECK found issues:", file=sys.stderr)
+    for issue in report.get("issues", []):
+        print(f"  - {issue}", file=sys.stderr)
+
+
+def _load_lazy_command(name: str):
+    module_name, attribute = _LAZY_COMMANDS[name]
+    module = importlib.import_module(f"omnicompany.cli.{module_name}")
+    command = getattr(module, attribute)
+
+    # BOSS SIGHT extends these groups at registration time. Pay that import
+    # cost only when one of the affected commands is actually invoked.
+    if name in {"worker", "plan"}:
+        import click
+
+        worker = command if name == "worker" else getattr(
+            importlib.import_module("omnicompany.cli.commands.worker"), "cmd_worker"
+        )
+        plan = command if name == "plan" else getattr(
+            importlib.import_module("omnicompany.cli.commands.plan"), "cmd_plan"
+        )
+        boss = importlib.import_module("omnicompany.cli.commands.boss_sight")
+        boss.register_boss_sight_commands(click.Group("omni"), cmd_worker=worker, cmd_plan=plan)
+    elif name == "agent":
+        control = importlib.import_module("omnicompany.cli.commands.agent_control")
+        control.register_agent_control_commands(command)
+    return command
+
+
+def _print_lazy_help() -> None:
+    visible = [name for name in _LAZY_COMMANDS if name not in _HIDDEN_COMMANDS]
+    print("Usage: omni [OPTIONS] COMMAND [ARGS]...")
+    print()
+    print("OmniCompany CLI — unified execution, observability, and management.")
+    print()
+    print("Options:")
+    print("  --help  Show this message and exit.")
+    print()
+    print("Commands:")
+    for name in visible:
+        print(f"  {name}")
+
+
+def _run_lazy_cli(argv: list[str]):
+    if not argv or argv == ["--help"] or argv == ["-h"]:
+        _print_lazy_help()
+        return 0
+    if os.environ.get("_OMNI_COMPLETE"):
+        return _run_full_cli(argv)
+    name = argv[0]
+    if name not in _LAZY_COMMANDS:
+        return _run_full_cli(argv)
+
+    _guardian_precheck()
+    try:
+        command = _load_lazy_command(name)
+    except ModuleNotFoundError as exc:
+        if name == "game" and exc.name in {"PIL", "cv2", "numpy", "onnxruntime", "rapidocr_onnxruntime"}:
+            print('Error: Game Observatory dependencies are not installed. Run: pip install "omnicompany[game-observatory]"', file=sys.stderr)
+            return 1
+        raise
+
+    import click
+
+    try:
+        result = command.main(
+            args=argv[1:],
+            prog_name=f"omni {name}",
+            standalone_mode=False,
+        )
+    except click.ClickException as exc:
+        exc.show()
+        return int(exc.exit_code)
+    except click.exceptions.Exit as exc:
+        return int(exc.exit_code)
+    except click.Abort:
+        print("Aborted!", file=sys.stderr)
+        return 1
+    if isinstance(result, int) and not isinstance(result, bool):
+        return result
+    return 0
 
 
 def _parse_fast_navigate(argv: list[str]) -> _NavigateArguments | None:
@@ -140,6 +340,7 @@ def _bind_active_published_session(argv: list[str]) -> list[str]:
 def main(argv: list[str] | tuple[str, ...] | None = None):
     """Run the narrow fast-forward path or lazily enter the full Click CLI."""
 
+    _normalize_windows_process_priority()
     _configure_utf8_streams()
     arguments = list(sys.argv[1:] if argv is None else argv)
     descriptor_value = os.environ.get(SESSION_GAME_PLAYER_RUNTIME_DESCRIPTOR_ENV)
@@ -147,7 +348,12 @@ def main(argv: list[str] | tuple[str, ...] | None = None):
         arguments = _bind_active_published_session(arguments)
     fast_arguments = _parse_fast_navigate(arguments) if descriptor_value else None
     if fast_arguments is None:
-        return _run_full_cli(arguments)
+        # The published game runtime owns its full fallback semantics (including
+        # session-id canonicalization). Ordinary CLI calls use command-level
+        # lazy loading and never initialize unrelated subsystems.
+        if descriptor_value or tuple(arguments[: len(_FAST_PREFIX)]) == _FAST_PREFIX:
+            return _run_full_cli(arguments)
+        return _run_lazy_cli(arguments)
 
     # Once a published descriptor and the exact fast command are accepted,
     # every error is fail-closed.  Falling back could repeat an already accepted

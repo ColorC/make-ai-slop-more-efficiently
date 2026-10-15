@@ -23,6 +23,7 @@ CWD 追踪 (2026-05-04 加): user 命令尾部追加 pwd 标记, 跑完从 stder
 from __future__ import annotations
 
 import logging
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -35,6 +36,43 @@ from omnicompany.packages.services._core.agent.routers.single_tool import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _command_tokens_for_prefix(command: str, cwd: Path) -> list[str]:
+    """Canonicalize one command for the native worker's executable allowlist."""
+
+    import shlex
+
+    text = command.strip()
+    redundant_cd = re.match(
+        r"^cd\s+(?:\"([^\"]+)\"|'([^']+)'|(\S+))\s*&&\s*(.+)$",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if redundant_cd:
+        declared = next(value for value in redundant_cd.groups()[:3] if value)
+        if Path(declared).expanduser().resolve() == cwd:
+            text = redundant_cd.group(4).strip()
+    try:
+        tokens = shlex.split(text, posix=True)
+    except ValueError:
+        return []
+    # PowerShell models often spell an explicit executable call as
+    # `& "D:/path/python.exe" ...`.  `&` is syntax, not part of the executable
+    # identity, and must not make an otherwise exact prefix fail closed.
+    if tokens and tokens[0] == "&":
+        tokens = tokens[1:]
+    if not tokens:
+        return []
+    executable = tokens[0].replace("\\", "/")
+    wsl_drive = re.match(r"^/mnt/([a-zA-Z])/(.*)$", executable)
+    if wsl_drive:
+        executable = f"{wsl_drive.group(1)}:/{wsl_drive.group(2)}"
+    elif not re.match(r"^[a-zA-Z]:/", executable) and not executable.startswith("/"):
+        executable = (cwd / executable).resolve().as_posix()
+    if re.match(r"^[a-zA-Z]:/", executable):
+        executable = executable.casefold()
+    return [executable, *tokens[1:]]
 
 
 # 黑名单: 无论 cwd 在哪里, 永远禁执行 (与 BashBus 默认保持一致 + 额外 P4/git 破坏)
@@ -121,6 +159,13 @@ class DevBashRouter(SingleToolRouter):
         raw_cwd = (args.get("cwd") or "").strip()
         timeout = int(args.get("timeout_sec", 120))
         timeout = max(1, min(timeout, 1200))
+        raw_process_env = args.get("_process_env")
+        process_env: dict[str, str] = {}
+        if isinstance(raw_process_env, dict):
+            for name in ("PI_SESSION_ID", "PI_PROVIDER", "PI_MODEL", "PI_REASONING_LEVEL"):
+                value = raw_process_env.get(name)
+                if value is not None:
+                    process_env[name] = str(value)
 
         if not cmd:
             raise ToolExecutionError("command is required")
@@ -195,6 +240,27 @@ class DevBashRouter(SingleToolRouter):
                 f"Set cwd to an absolute path inside one of those roots."
             )
 
+        allowed_prefixes = getattr(ctx, "allowed_bash_command_prefixes", None) or ()
+        # Some external-worker bridges historically serialized a single prefix as
+        # a scalar string.  Iterating that value one character at a time makes
+        # every legitimate command fail closed, so normalize the transport shape
+        # before applying the same exact token-prefix policy.
+        if isinstance(allowed_prefixes, str):
+            allowed_prefixes = (allowed_prefixes,)
+        if allowed_prefixes:
+            command_tokens = _command_tokens_for_prefix(cmd, cwd_abs)
+            prefix_tokens = [
+                _command_tokens_for_prefix(str(prefix), cwd_abs)
+                for prefix in allowed_prefixes
+            ]
+            if not any(
+                tokens and command_tokens[: len(tokens)] == tokens for tokens in prefix_tokens
+            ):
+                raise ToolExecutionError(
+                    "bash REFUSED: command is outside allowed_bash_command_prefixes; "
+                    f"command_tokens={command_tokens!r}; prefix_tokens={prefix_tokens!r}"
+                )
+
         # 执行 — 显式用 bash 不走 cmd.exe (跟 Claude Code 同 pattern, 见
         # 参考项目/claude-code-analysis/src/utils/Shell.ts which('bash') + spawn).
         #
@@ -205,10 +271,17 @@ class DevBashRouter(SingleToolRouter):
         #   - 跨平台不一致 (Linux/Mac shell=True 走 /bin/sh OK, Windows shell=True 走 cmd 坏)
         #
         # 修法: shutil.which('bash') 找 git bash (Windows) / 系统 bash (Linux/Mac), 显式
-        # 调 ['bash', '-c', cmd] 不走 shell=True. 跟 Claude Code 一致.
+        # 调 ['bash', '-c', cmd] 不走 shell=True. 跟 Claude Code 一致. 但是 Windows
+        # 自带的 System32\bash.exe 只是 WSL 启动器；没有 Linux distribution 时它会
+        # 白等几十秒后失败。此时直接用 PowerShell，避免把设施冷启动算进 Agent 思考。
         import os as _os
         import shutil as _shutil
         bash_path = _shutil.which("bash") or "/usr/bin/bash"
+        system32_bash = (
+            _os.name == "nt"
+            and Path(bash_path).resolve()
+            == (Path(_os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "bash.exe").resolve()
+        )
         # CWD 追踪 (CC Shell.ts pwd 模式): 把 user cmd 包成
         #   { newline cmd newline }
         #   _omni_rc=$?            # 抓 user 命令真 exit code
@@ -216,7 +289,7 @@ class DevBashRouter(SingleToolRouter):
         #   exit $_omni_rc          # 用 user exit 覆盖 printf exit (返回真退出码)
         # 即使 user_cmd 失败, pwd marker 仍然写; exit code 反映 user_cmd 不是 printf.
         # 用 newline 分隔 (不用 ;), 防 user_cmd 含 heredoc / 注释行 / 未闭合等破坏 ;.
-        wrapped_cmd = (
+        wrapped_bash_cmd = (
             "{\n" + cmd + "\n}\n"
             "_omni_rc=$?\n"
             "printf '\\n__OMNI_CWD_AFTER__%s__OMNI_END__\\n' "
@@ -232,13 +305,42 @@ class DevBashRouter(SingleToolRouter):
                 encoding="utf-8",
                 errors="replace",
             )
+            if process_env:
+                popen_kwargs["env"] = {**os.environ, **process_env}
             if _os.name == "nt":
                 # Windows: 新进程组以便能 kill group. CREATE_NEW_PROCESS_GROUP = 0x00000200
                 popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
             else:
                 popen_kwargs["start_new_session"] = True
-            # explicit args list, not shell=True. argv = [bash, -c, wrapped_cmd]
-            proc = subprocess.Popen([bash_path, "-c", wrapped_cmd], **popen_kwargs)
+            if system32_bash:
+                from omnicompany.runtime.powershell_runtime import resolve_powershell7
+
+                powershell = resolve_powershell7()
+                if not powershell:
+                    raise ToolExecutionError(
+                        "neither Git Bash nor PowerShell is available on Windows"
+                    )
+                wrapped_powershell_cmd = (
+                    "& {\n" + cmd + "\n"
+                    "$omniSucceeded = $?\n"
+                    "$omniLastExit = $LASTEXITCODE\n"
+                    "$omniRc = if ($null -eq $omniLastExit) { "
+                    "if ($omniSucceeded) { 0 } else { 1 } } else { $omniLastExit }\n"
+                    "[Console]::Error.WriteLine('__OMNI_CWD_AFTER__' + "
+                    "(Get-Location).Path + '__OMNI_END__')\n"
+                    "exit $omniRc\n}\n"
+                )
+                argv = [
+                    powershell,
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    wrapped_powershell_cmd,
+                ]
+            else:
+                argv = [bash_path, "-c", wrapped_bash_cmd]
+            # Explicit argv, never shell=True.
+            proc = subprocess.Popen(argv, **popen_kwargs)
         except Exception as e:
             raise ToolExecutionError(f"Popen failed: {e}")
 
@@ -377,6 +479,14 @@ class DevBashRouter(SingleToolRouter):
                 f"Note (Windows): `npx`/`npm` background `&` can appear to hang subprocess even with timeout. "
                 f"Use `powershell -Command 'Start-Process ... -NoNewWindow -RedirectStandardOutput log'` "
                 f"for a truly detached dev server, then poll via web_fetch / playwright_probe."
+            )
+
+        if returncode != 0:
+            raise ToolExecutionError(
+                f"bash command failed with exit code {returncode}.\n"
+                f"Captured stdout: {stdout[:2000]}\n"
+                f"Captured stderr: {stderr[:2000]}\n"
+                f"[cwd_after={cwd_after or cwd_abs}]"
             )
 
         parts = []

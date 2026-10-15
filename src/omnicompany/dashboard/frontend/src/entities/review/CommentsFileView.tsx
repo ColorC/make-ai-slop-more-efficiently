@@ -38,7 +38,7 @@ const S: Record<string, React.CSSProperties> = {
   barMeta: { flex: 1, minWidth: 0, fontSize: 12, color: COLORS.processual, fontFamily: MONO, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   barActions: { display: 'inline-flex', gap: 6, alignItems: 'center', flexShrink: 0 },
   iconGhost: {
-    width: 28, height: 28, border: `1px solid ${COLORS.border}`, borderRadius: 7, background: 'transparent',
+    width: 28, height: 28, border: `1px solid ${COLORS.border}`, borderRadius: 2, background: 'transparent',
     color: COLORS.processual, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0,
     transition: 'border-color 150ms cubic-bezier(0.175,0.885,0.32,1.1), color 150ms',
   },
@@ -48,7 +48,7 @@ const S: Record<string, React.CSSProperties> = {
   card: {
     display: 'flex', flexDirection: 'column', minWidth: 0,
     background: GLASS, backdropFilter: BLUR, WebkitBackdropFilter: BLUR,
-    border: `1px solid ${COLORS.border}`, borderRadius: 11, padding: 14,
+    border: `1px solid ${COLORS.border}`, borderRadius: 3, padding: 14,
     boxShadow: RIM,
     transition: 'border-color 150ms cubic-bezier(0.175,0.885,0.32,1.1)',
   },
@@ -58,20 +58,20 @@ const S: Record<string, React.CSSProperties> = {
   // 锚点 = 冷蓝引用片, 区别于正文。
   anchor: {
     fontSize: 13, color: COLORS.borderActive, marginTop: 10,
-    padding: '6px 10px', borderRadius: 7, background: 'var(--fp-accent-weak)',
+    padding: '6px 10px', borderRadius: 2, background: 'var(--fp-accent-weak)',
     borderLeft: `2px solid ${COLORS.borderActive}`, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   // 正文 = 主焦点, 14px。
   body: { fontSize: 14, color: COLORS.text, marginTop: 10, lineHeight: 1.5 },
   editArea: {
     width: '100%', boxSizing: 'border-box', minHeight: 88, marginTop: 10, padding: 10,
-    background: 'var(--fp-surface)', color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: 7,
+    background: 'var(--fp-surface)', color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: 2,
     fontSize: 14, fontFamily: 'inherit', resize: 'vertical',
   },
   editFoot: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 },
-  savePrimary: { padding: '5px 14px', background: COLORS.borderActive, color: 'var(--fp-accent-fg)', border: 0, borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  cancelGhost: { padding: '5px 12px', background: 'transparent', color: COLORS.textDim, border: `1px solid ${COLORS.border}`, borderRadius: 7, cursor: 'pointer', fontSize: 13 },
-  empty: { color: COLORS.textDim, fontSize: 13, padding: 18, border: `1px dashed ${COLORS.border}`, borderRadius: 11, textAlign: 'center' },
+  savePrimary: { padding: '5px 14px', background: COLORS.borderActive, color: 'var(--fp-accent-fg)', border: 0, borderRadius: 2, cursor: 'pointer', fontSize: 13, fontWeight: 500 },
+  cancelGhost: { padding: '5px 12px', background: 'transparent', color: COLORS.textDim, border: `1px solid ${COLORS.border}`, borderRadius: 2, cursor: 'pointer', fontSize: 13 },
+  empty: { color: COLORS.textDim, fontSize: 13, padding: 18, border: `1px dashed ${COLORS.border}`, borderRadius: 3, textAlign: 'center' },
   // 追加区(composer): 底部薄玻璃, 主操作显眼。
   composer: {
     borderTop: `1px solid ${COLORS.border}`, padding: 16, display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0,
@@ -79,12 +79,12 @@ const S: Record<string, React.CSSProperties> = {
   },
   composerAnchor: {
     fontSize: 13, color: COLORS.borderActive, display: 'flex', alignItems: 'center', gap: 8,
-    padding: '6px 10px', borderRadius: 7, background: 'var(--fp-accent-weak)', borderLeft: `2px solid ${COLORS.borderActive}`,
+    padding: '6px 10px', borderRadius: 2, background: 'var(--fp-accent-weak)', borderLeft: `2px solid ${COLORS.borderActive}`,
   },
   composerAnchorText: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   composerArea: {
     width: '100%', boxSizing: 'border-box', minHeight: 76, padding: 12,
-    background: 'var(--fp-surface)', color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: 9,
+    background: 'var(--fp-surface)', color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: 3,
     fontSize: 14, fontFamily: 'inherit', resize: 'vertical',
   },
   composerFoot: { display: 'flex', justifyContent: 'flex-end' },
@@ -236,7 +236,7 @@ export function CommentsFileView({ material, pendingAnchor, clearPendingAnchor, 
         />
         <div style={S.composerFoot}>
           <button type="button" data-testid="comment-submit" onClick={() => void append()} disabled={!draft.trim() || busy}
-            style={{ padding: '8px 20px', background: draft.trim() ? COLORS.borderActive : COLORS.border, color: 'var(--fp-accent-fg)', border: 0, borderRadius: 9, cursor: draft.trim() ? 'pointer' : 'default', fontSize: 14, fontWeight: 600, opacity: draft.trim() ? 1 : 0.6, transition: 'background 150ms, opacity 150ms' }}>
+            style={{ padding: '8px 20px', background: draft.trim() ? COLORS.borderActive : COLORS.border, color: 'var(--fp-accent-fg)', border: 0, borderRadius: 3, cursor: draft.trim() ? 'pointer' : 'default', fontSize: 14, fontWeight: 500, opacity: draft.trim() ? 1 : 0.6, transition: 'background 150ms, opacity 150ms' }}>
             {busy ? '…' : '追加评论'}
           </button>
         </div>

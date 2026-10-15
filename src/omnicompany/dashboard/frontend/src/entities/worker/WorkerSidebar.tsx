@@ -45,7 +45,7 @@ const S: Record<string, any> = {
   treeNode: { fontSize: 14, fontFamily: "'Berkeley Mono','Consolas','Menlo',monospace" },
   // 目录行: 次级文字, 顶层一档加粗; hover 浮极淡底(克制反馈)。
   dir: (depth: number, _expanded: boolean): React.CSSProperties => ({
-    padding: '3px 6px', paddingLeft: 4 + depth * 12, cursor: 'pointer', borderRadius: 6,
+    padding: '3px 6px', paddingLeft: 4 + depth * 12, cursor: 'pointer', borderRadius: 2,
     color: 'var(--fp-text-2)', userSelect: 'none' as const,
     fontWeight: depth === 0 ? 600 : 'normal' as const,
     transition: 'background 120ms cubic-bezier(0.175,0.885,0.32,1.1)',
@@ -54,7 +54,7 @@ const S: Record<string, any> = {
   count: { color: 'var(--fp-text-3)', marginLeft: 6, fontSize: 12 },
   // worker 叶子: 选中浮玻璃淡底 + 强调字(无缝, 无描边); 未选弱字, hover 极淡底。
   worker: (depth: number, active: boolean): React.CSSProperties => ({
-    padding: '3px 6px', paddingLeft: 4 + depth * 12 + 12, cursor: 'pointer', borderRadius: 6,
+    padding: '3px 6px', paddingLeft: 4 + depth * 12 + 12, cursor: 'pointer', borderRadius: 2,
     color: active ? 'var(--fp-link)' : 'var(--fp-text)',
     background: active ? 'var(--fp-accent-weak)' : 'transparent',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

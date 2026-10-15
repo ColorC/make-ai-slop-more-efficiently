@@ -17,6 +17,7 @@ import { usePanels } from '../../stores/panelsStore'
 import KebabMenu, { type KebabItem } from '../../shared/view/ui/KebabMenu'
 import { Segmented, DimText } from '../../components/Segmented'
 import './materialRegistry.css'
+import { inertWhen } from '../../lib/motion'
 
 const KIND_LABEL: Record<string, string> = {
   roadmap: '路线',
@@ -381,7 +382,9 @@ export default function MaterialRegistryPanel() {
                   <span className="gh-name">{label(KIND_LABEL, g)}</span>
                   <DimText>{items.length}</DimText>
                 </button>
-                <div className={`mr-grid${isCollapsed ? ' hidden' : ''}`}>
+                {/* 折叠走 .mo-collapse(grid 0fr→1fr), 不再 display:none 瞬闪; 收起时 inert 摘焦点 */}
+                <div className="mo-collapse" data-collapsed={isCollapsed ? 'true' : undefined} {...inertWhen(isCollapsed)}>
+                <div className="mr-grid mo-stagger">
                   {visible.map((item) => {
                     const todo = todoOf(item.snippet)
                     const snippet = item.snippet && !/^todo=\d+\s*\/\s*\d+$/.test(item.snippet.trim()) ? item.snippet : ''
@@ -431,6 +434,7 @@ export default function MaterialRegistryPanel() {
                       展开其余 {items.length - PAGE} 张 <ChevronDown size={11} aria-hidden />
                     </button>
                   )}
+                </div>
                 </div>
               </div>
             )

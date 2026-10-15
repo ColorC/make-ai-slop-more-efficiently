@@ -48,7 +48,7 @@ def _domain_from_pipeline_id(pipeline_id: str) -> str:
     """从 pipeline_id 推断 domain.
 
     支持多种分隔符:
-      'absorption-module-driven'  → 'absorption'
+      'research-run'  → 'research'
       'absorption.v3'  → 'absorption'
       'demogame-learn'    → 'demogame'
       'doctor-format'  → 'doctor'
@@ -167,8 +167,8 @@ def append_pipeline_health(
     """runner.run() 末尾: 把本次跑的节点审计结果追加到 pipeline_health.jsonl.
 
     Args:
-        pipeline_id:  管线 ID (如 "absorption-module-driven").
-        domain:       所属 domain (如 "absorption").
+        pipeline_id:  管线 ID (如 "research-run").
+        domain:       所属 domain (如 "research").
         trace_id:     本次 run 的 trace_id (ULID).
         node_reports: runner.node_audit_reports — {node_id: InfoAuditReport}.
     """

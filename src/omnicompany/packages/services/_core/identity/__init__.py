@@ -36,7 +36,14 @@ from omnicompany.packages.services._core.identity.resolver import (
     record_active_session,
     all_session_bindings,
     get_session_binding,
+    session_scope_segments,
+    upsert_session_scope_segment,
+    set_session_default_scope_from_history,
+    session_binding_is_confirmed,
+    validate_session_binding_scope,
+    prune_generated_session_scope_segments,
     bindings_by_session_key,
+    binding_for_session,
     bind_task_for_session,
     sessions_for_task,
     update_session_binding,
@@ -47,14 +54,35 @@ from omnicompany.packages.services._core.identity.resolver import (
 from omnicompany.packages.services._core.identity.writes import (
     session_writes,
 )
+from omnicompany.packages.services._core.identity.session_locator import (
+    locate_sessions,
+    preview_transcript,
+)
+from omnicompany.packages.services._core.identity.write_identity import (
+    current_write_identity,
+    human_write_identity,
+    machine_identity,
+    write_identity_label,
+)
 
 __all__ = [
+    "current_write_identity",
+    "human_write_identity",
+    "machine_identity",
+    "write_identity_label",
     "resolve_active_trace_id",
     "current_session_meta",
     "record_active_session",
     "all_session_bindings",
     "get_session_binding",
+    "session_scope_segments",
+    "upsert_session_scope_segment",
+    "set_session_default_scope_from_history",
+    "session_binding_is_confirmed",
+    "validate_session_binding_scope",
+    "prune_generated_session_scope_segments",
     "bindings_by_session_key",
+    "binding_for_session",
     "bind_task_for_session",
     "sessions_for_task",
     "update_session_binding",
@@ -62,4 +90,6 @@ __all__ = [
     "link_record_to_session",
     "records_for_session",
     "session_writes",
+    "locate_sessions",
+    "preview_transcript",
 ]

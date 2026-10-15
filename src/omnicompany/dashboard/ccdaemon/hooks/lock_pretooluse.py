@@ -1,5 +1,5 @@
 # [OMNI] origin=ai-ide ts=2026-05-02 type=infra status=active agent=ai-ide-current
-# [OMNI] summary="G4 内部实时拦截 hook - PreToolUse 拦 Edit/Write 等写入工具, 路径不合法时 warn 或 enforce"
+# [OMNI] summary="PreToolUse 写入守卫：路径合法性检查与跨会话活跃 claim 冲突阻断"
 # [OMNI] why="G4 离线 MVP 之上加实时层. mode=warn 默认 (打 stderr 引用规范但不阻断), mode=enforce 切真阻断, mode=off 关"
 # [OMNI] tags=hook,lock,pretooluse,realtime,G4
 # [OMNI] material_id="material:dashboard.cc_wrapper.hooks.pretooluse_lock_enforcer.implementation.py"
@@ -27,6 +27,7 @@ import sys
 
 from . import _shared as sh
 from ..write_scope import planned_write_scope, resolve_candidate, ToolPathCandidate, denial_message, is_inside_or_equal
+from ..write_scope import CLAUDE_SCRATCHPAD, TMP_PLACEMENT_HINT, auto_ordered_write_kind
 
 
 _WRITE_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit", "str_replace_editor"})
@@ -181,18 +182,92 @@ def _build_warn_message(file_path: str, mode: str) -> str:
     )
 
 
-def _active_plan_id(payload: dict, cwd: str) -> str | None:
+def _claim_conflict_guard(payload: dict, file_path: str, cwd: str) -> int | None:
+    """Block writes covered by another session's active HR claim; fail open on faults."""
+    try:
+        from pathlib import Path
+
+        from omnicompany.packages.services._core.hr.claim import find_write_conflicts
+        from omnicompany.packages.services._core.identity import current_session_meta
+
+        data_dir = sh.repo_root() / "data" / "hr"
+        meta = current_session_meta()
+        primary_trace = str(meta.get("trace_id") or sh.trace_id_for(payload) or "")
+        conflicts = find_write_conflicts(
+            file_path,
+            data_dir=data_dir,
+            owner_trace_id=primary_trace,
+            cwd=Path(cwd),
+        )
+        # A hook can know the same session through several stable aliases
+        # (trace id, PTY id, provider-native session id). Ignore all of them so
+        # the singleton active pointer can never make a session block itself.
+        session_id = str(payload.get("session_id") or payload.get("sessionId") or meta.get("session_id") or "")
+        owner_aliases = {
+            primary_trace,
+            str(meta.get("pty_id") or ""),
+            str(meta.get("session_id") or ""),
+            str(sh.trace_id_for(payload) or ""),
+            session_id,
+            f"cc_{session_id}" if session_id else "",
+            f"codex_{session_id}" if session_id else "",
+        }
+        conflicts = [row for row in conflicts if row.get("owner_trace_id") not in owner_aliases]
+        if not conflicts:
+            return None
+
+        lines = [
+            "",
+            "[OMNI-CLAIM-CONFLICT-BLOCKED] 目标路径已被其它活跃会话声明写入意向:",
+            f"  target: {file_path}",
+            f"  current_session: {primary_trace or 'unknown'}",
+        ]
+        for row in conflicts:
+            target = row.get("negotiation_target") or row.get("owner_trace_id")
+            lines.extend([
+                f"  claim: {row.get('claim_id')}",
+                f"  owner: {row.get('owner_trace_id')} ({row.get('owner_provider') or 'unknown'})",
+                f"  purpose: {row.get('purpose')}",
+                f"  expires_at: {row.get('expires_at')}",
+                f"  协商: omni hr negotiate {row.get('claim_id')} --proposal \"<边界/让路顺序/释放时间>\"",
+                f"  直达会话: omni agent send {target} -m \"HR_CLAIM_NEGOTIATION ...\"",
+            ])
+        lines.append("冲突解决并由 owner release 后再重试；不要静默覆盖。")
+        message = "\n".join(lines) + "\n"
+        sh.append_audit("hr_claim_conflict", {
+            "file_path": file_path,
+            "tool_name": payload.get("tool_name") or payload.get("toolName"),
+            "current_trace_id": primary_trace,
+            "conflict_claim_ids": [row.get("claim_id") for row in conflicts],
+        })
+        try:
+            print(message, file=sys.stderr)
+        except OSError:
+            pass
+        return 2
+    except Exception:
+        return None
+
+
+def _active_plan_id(payload: dict, cwd: str) -> tuple[str | None, str]:
+    """当前会话绑的 plan, **连同它是从哪来的**。
+
+    为什么要带出处: 写入被拒时消息里只有 plan 名, 一旦解析到了**别的会话**的 plan
+    (多会话并行时确实发生过 —— 报错指着一个我根本没在做的计划), 人第一反应是去查那个
+    计划, 方向从一开始就偏了。带上来源就能一眼分辨"我自己绑的"还是"兜底猜的"。
+    与网关 401 补正文是同一条原则: 让失败自我说明, 别让它伪装成别的问题。
+    """
     pty_id = os.environ.get("OMNI_CC_PTY_ID")
     store = sh._read_cc_sessions_store(sh.repo_root())
     if pty_id and pty_id in store:
-        return store.get(pty_id, {}).get("active_plan")
+        return store.get(pty_id, {}).get("active_plan"), f"本会话 PTY 台账({pty_id[:8]})"
     session_id = payload.get("session_id") or payload.get("sessionId") or ""
     plan = sh.detect_active_plan(
         hint_cwd=cwd,
         provider=sh.binding_provider(payload),
         session_id=str(session_id) if session_id else None,
     )
-    return sh.plan_id_of(plan) if plan else None
+    return (sh.plan_id_of(plan) if plan else None), "会话未在 PTY 台账中登记 → 走 detect_active_plan 兜底(绑定台账/cwd)"
 
 
 def _handle_payload(payload: dict) -> int:
@@ -219,7 +294,10 @@ def _handle_payload(payload: dict) -> int:
         return 0
 
     cwd = payload.get("cwd") or os.getcwd()
-    active_plan = _active_plan_id(payload, str(cwd))
+    claim_result = _claim_conflict_guard(payload, str(file_path), str(cwd))
+    if claim_result is not None:
+        return claim_result
+    active_plan, plan_source = _active_plan_id(payload, str(cwd))
     scope = planned_write_scope(cwd=str(cwd), active_plan=active_plan)
     candidate = resolve_candidate(ToolPathCandidate(key="file_path", raw=str(file_path)), cwd=str(cwd))
     root = sh.repo_root().resolve()
@@ -228,13 +306,22 @@ def _handle_payload(payload: dict) -> int:
             is_inside_or_equal(candidate.resolved, allowed_root) for allowed_root in scope.roots[1:]
         ) or any(candidate.resolved == allowed_path for allowed_path in scope.paths):
             return 0
+        auto_kind = auto_ordered_write_kind(candidate.resolved)
+        if auto_kind is not None:
+            if auto_kind == CLAUDE_SCRATCHPAD:
+                sh.emit_context(f"[OMNI-TMP-HINT] 已放行会话临时区写入。{TMP_PLACEMENT_HINT}", payload, "PreToolUse")
+            return 0
         mode = "enforce"
         msg = denial_message(tool_name, candidate, scope) or _build_warn_message(file_path, mode)
+        # plan 的**出处**必须跟着拒绝信息一起给: 只报 plan 名时, 一旦解析到别的会话的计划,
+        # 人会去查那个计划而不是查绑定, 白绕一圈。
+        msg = f"{msg}\nActive plan 来源: {plan_source}"
         sh.append_audit("lock_pretooluse_external_scope", {
             "file_path": file_path,
             "tool_name": tool_name,
             "mode": mode,
             "active_plan": active_plan,
+            "active_plan_source": plan_source,
             "session_id": payload.get("session_id"),
         })
         try:
@@ -393,6 +480,15 @@ def main() -> int:
     """PreToolUse entry, including Codex multi-file ``apply_patch`` calls."""
 
     payload = sh.read_stdin_json()
+    try:
+        from omnicompany.core.parent_action_delivery import pull_parent_actions
+
+        context = pull_parent_actions(payload)
+        if context:
+            sh.emit_context(context, payload, "PreToolUse")
+            sh.append_audit("parent_action_hook_context", {"session_id": payload.get("session_id"), "context": context})
+    except Exception as exc:
+        sh.append_audit("parent_action_hook_error", {"error": f"{type(exc).__name__}: {exc}"})
     tool_name = payload.get("tool_name") or payload.get("toolName") or ""
     if tool_name != "apply_patch":
         return _handle_payload(payload)

@@ -66,7 +66,7 @@ class SurfaceErrorBoundary extends React.Component<
 
 const backBtn: React.CSSProperties = {
   border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-link)',
-  borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: 13,
+  borderRadius: 3, padding: '2px 8px', cursor: 'pointer', fontSize: 13,
 }
 
 function BackToOmnichat({ region }: { region: Surface }) {
@@ -119,7 +119,7 @@ function AuthoredSurface() {
   usePatchedPanelsForSurface()
   const Editor = authoredRegistration.renderer.Editor
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }} data-testid="surface-authored">
+    <div style={{ height: '100vh', minHeight: 0, display: 'flex', flexDirection: 'column' }} data-testid="surface-authored">
       <Editor entity={{ type: 'authored', id: 'main', title: '札记', tags: [] } as any} />
     </div>
   )

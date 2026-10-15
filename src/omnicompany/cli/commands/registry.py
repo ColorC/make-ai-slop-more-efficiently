@@ -477,21 +477,18 @@ def _resolve_project_root() -> Path:
 
 
 def _default_scan_scopes() -> list[Path]:
-    """默认扫描范围 — omnicompany 项目根下 src/omnicompany + templates + docs."""
+    """Use the same canonical scopes as every MaterialIdIndex consumer."""
+    from omnicompany.packages.services._core.registry.material_index import default_material_scopes
+
     project_root = _resolve_project_root()
-    scopes = [
-        project_root / "src" / "omnicompany",
-        project_root / "templates",
-        project_root / "docs",
-    ]
-    return [s for s in scopes if s.exists()]
+    return default_material_scopes(project_root)
 
 
 @cmd_registry.command("rebuild")
 @click.option("--from-headers", "from_headers", is_flag=True, default=False,
               help="从所有文件 OmniMark 头 material_id 字段重建扁平索引")
 @click.option("--scope", "scopes_str", type=str, default=None,
-              help="逗号分隔扫描根目录 (默认 src/omnicompany + templates + docs)")
+              help="逗号分隔扫描根目录 (默认使用 Material 服务 canonical scopes)")
 @click.option("--json", "as_json", is_flag=True, default=False,
               help="JSON 输出")
 def cmd_registry_rebuild(from_headers: bool, scopes_str: str | None, as_json: bool):

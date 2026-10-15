@@ -13,7 +13,7 @@ const viewStore = readFileSync(resolve(process.cwd(), 'src/entities/controller/v
 describe('recovered Controller surfaces', () => {
   it('keeps the native sessions and CLI surface reachable', () => {
     expect(source).toContain("const ThreadMonitorPanel = lazy(() => import('./ThreadMonitorPanel'))")
-    expect(source).toContain("key: 'sessions', label: '会话 / CLI'")
+    expect(source).toContain("key: 'sessions', label: 'CLI Hub'")
     expect(source).toContain("view === 'sessions'")
     expect(source).toContain('<ThreadMonitorPanel />')
     expect(viewStore).toContain("'sessions'")

@@ -28,6 +28,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import getpass
 from datetime import datetime, timezone
 from typing import Any
@@ -198,11 +199,11 @@ async def register_node(req: Request) -> JSONResponse:
         "registered_from": req.client.host if req.client else "",
         "tunnel_pubkey": tunnel_pubkey,
     }
-    save_node(node_id, info)
+    await asyncio.to_thread(save_node, node_id, info)
 
     # 暂存盒子隧道公钥(待主控提权 install 进 administrators_authorized_keys)。
     if tunnel_pubkey:
-        stage_tunnel_pubkey(tunnel_pubkey)
+        await asyncio.to_thread(stage_tunnel_pubkey, tunnel_pubkey)
 
     # 回填空着的 host/user, 让"装好即远控"闭环(只填空, 不覆盖)。
     cfg = load_home_config()
@@ -254,14 +255,16 @@ async def report_node(req: Request) -> JSONResponse:
     report_token = str(body.get("report_token") or "").strip()
     if not node_id or not verify_report_token(node_id, report_token):
         return JSONResponse({"ok": False, "error": "invalid_report_token"}, status_code=403)
-    if node_id not in load_nodes():
+    known_nodes = await asyncio.to_thread(load_nodes)
+    if node_id not in known_nodes:
         return JSONResponse({"ok": False, "error": "unknown_node"}, status_code=404)
 
     status = body.get("status") if isinstance(body.get("status"), dict) else {}
     bootstrap_tail = body.get("bootstrap_log_tail", body.get("log_tail", ""))
     tunnel_tail = body.get("tunnel_log_tail", "")
     now = datetime.now(timezone.utc).isoformat()
-    save_node(
+    await asyncio.to_thread(
+        save_node,
         node_id,
         {
             "last_report": now,

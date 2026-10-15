@@ -75,7 +75,7 @@
 - [`agents/hypothesis_deriver.py`](agents/hypothesis_deriver.py) `HypothesisDeriverAgent` (id: `doctor.hypothesis_deriver`) — 假设派生 (供给 HypothesisDiagnosticAgent)
   - 跑路径: `doctor.hypothesis_derivation.request → HypothesisDeriverAgent → doctor.hypothesis_derivation.report + N×doctor.hypothesis.statement (落 yaml)`
   - dogfood 跑通 × 1 (post-compact phase 2 后续 3). 拿 worker.md 派生 5 条 worker 类假设 (H-2026-05-06-001..005), 各引 R-02/R-24/etc 具体规范条款, evidence_query 注明 'ast 解析能查可转 guardian'
-  - prompt 在 [`agents/hypothesis_deriver_prompt.md`](agents/hypothesis_deriver_prompt.md) — 强调'抽出应满足什么 + 为什么', hard rule vs 软语义自然分流
+  - prompt 在 `agents/hypothesis_deriver_prompt.md` — 强调'抽出应满足什么 + 为什么', hard rule vs 软语义自然分流
   - 工具集替: write_finding/submit_verdict → write_hypothesis/submit_derivation_report (派生专属业务工具)
   - 自定义 build_extract_result hook (扫 messages 找 last 成功 submit_derivation_report, 跟诊断 agent 思路一致)
 

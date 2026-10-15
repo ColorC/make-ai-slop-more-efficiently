@@ -16,6 +16,7 @@
   - 两个并存, 索引同一文件可在两边都有记录.
 
 职责:
+  - default_material_scopes(project_root): 唯一维护默认源范围(src/templates/docs/config)
   - rebuild_from_headers(scopes, project_root): 走 scopes 全文件树, 解析头, 落 index
   - refresh_incremental(scopes, project_root): 增量刷新(只重扫水位线之后变更的文件)
   - lookup(material_id): 单条查
@@ -25,14 +26,25 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 from typing import Optional
+
+import yaml
 
 
 # 扫哪些扩展名 (跟 OmniMark 注释支持的语法一致: # 行或 <!-- --> 行)
 _OMNIMARK_FILE_SUFFIXES = {".py", ".md", ".yaml", ".yml", ".json", ".toml"}
+
+DEFAULT_MATERIAL_SCOPE_RELATIVE = (
+    Path("src/omnicompany"),
+    Path("templates"),
+    Path("docs"),
+    Path("config"),
+)
 
 # 跳目录跟 scanner.py 同步
 _SKIP_DIRS = {
@@ -40,6 +52,35 @@ _SKIP_DIRS = {
     "_archive", "_graveyard", ".git", "dist", "build",
     ".omni",  # 运行态/沙箱附属目录, 里面的 material_id 字段是数据不是自述头(2026-07-02 验收缺陷2)
 }
+
+
+def default_material_scopes(project_root: Path) -> list[Path]:
+    """返回平台与已登记项目 canonical Wiki 的 material 真源范围。"""
+    root = Path(project_root)
+    scopes = [
+        root / relative
+        for relative in DEFAULT_MATERIAL_SCOPE_RELATIVE
+        if (root / relative).exists()
+    ]
+    manifest = root / "config" / "material_wiki" / "profiles.yaml"
+    if manifest.is_file():
+        try:
+            from omnicompany.packages.services._core.material_wiki.profiles import (
+                load_profile_manifest,
+                resolve_canonical_root,
+            )
+
+            for registration in load_profile_manifest(manifest):
+                if registration.canonical:
+                    canonical_root = resolve_canonical_root(
+                        registration.canonical.root_ref,
+                        omnicompany_root=root,
+                    )
+                    if canonical_root.exists() and canonical_root not in scopes:
+                        scopes.append(canonical_root)
+        except Exception:
+            pass
+    return scopes
 
 
 def _clean_material_id(raw: str) -> str:
@@ -106,6 +147,45 @@ class MaterialIdEntry:
         return cls(**{k: v for k, v in d.items() if k in known})
 
 
+def _material_wiki_entry(path: Path, project_root: Path) -> MaterialIdEntry | None:
+    """Read Material Wiki YAML frontmatter without importing its storage adapter."""
+    if path.suffix.lower() != ".md":
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        return None
+    try:
+        raw = yaml.safe_load(text[4:end]) or {}
+    except yaml.YAMLError:
+        return None
+    material = raw.get("material_wiki") if isinstance(raw, dict) else None
+    if not isinstance(material, dict) or not material.get("material_id"):
+        return None
+    try:
+        file_path = path.relative_to(project_root).as_posix()
+    except ValueError:
+        file_path = path.resolve().as_posix()
+    placement = tuple(str(item) for item in material.get("placement_path") or ())
+    return MaterialIdEntry(
+        material_id=_clean_material_id(str(material.get("material_id") or "")),
+        file_path=file_path,
+        kind="material_wiki",
+        origin="canonical",
+        ts="",
+        agent="",
+        domain=str(material.get("project_id") or ""),
+        summary=str(material.get("title") or ""),
+        why="canonical Material Wiki body",
+        tags=("material-wiki", *placement),
+    )
+
+
 class MaterialIdIndex:
     """OmniMark `material_id` 索引 (单文件 JSON 落盘)."""
 
@@ -158,6 +238,21 @@ class MaterialIdIndex:
         assert self._cache is not None
         return list(self._cache.values())
 
+    def upsert(self, entry: MaterialIdEntry) -> None:
+        """Incrementally project one canonical material without rebuilding all roots."""
+        self._load()
+        assert self._cache is not None
+        existing = self._cache.get(entry.material_id)
+        if existing is not None and Path(existing.file_path) != Path(entry.file_path):
+            raise ValueError(
+                f"material_id 冲突：{entry.material_id} 已指向 {existing.file_path}，"
+                f"不能改指 {entry.file_path}"
+            )
+        self._cache[entry.material_id] = entry
+        self._meta = dict(self._meta)
+        self._meta["projected_at"] = _now_iso()
+        self._save()
+
     def count(self) -> int:
         self._load()
         assert self._cache is not None
@@ -206,14 +301,18 @@ class MaterialIdIndex:
                 if p.suffix.lower() not in _OMNIMARK_FILE_SUFFIXES:
                     continue
                 total_scanned += 1
+                fields = None
+                material_entry = None
                 try:
                     fields = parse_omnimark(p)
                 except Exception:
-                    continue
-                if fields is None:
-                    continue
-                total_with_header += 1
-                material_id = _clean_material_id((fields.extra or {}).get("material_id", ""))
+                    pass
+                if fields is not None:
+                    total_with_header += 1
+                    material_id = _clean_material_id((fields.extra or {}).get("material_id", ""))
+                else:
+                    material_entry = _material_wiki_entry(p, project_root)
+                    material_id = material_entry.material_id if material_entry else ""
                 if not material_id:
                     continue
                 total_with_material_id += 1
@@ -229,7 +328,7 @@ class MaterialIdIndex:
                     continue  # 保留首次出现的, 后续同 id 跳过
 
                 seen_files[material_id] = [rel]
-                new_cache[material_id] = MaterialIdEntry(
+                new_cache[material_id] = material_entry or MaterialIdEntry(
                     material_id=material_id,
                     file_path=rel,
                     kind=fields.type or "",
@@ -327,13 +426,17 @@ class MaterialIdIndex:
                     rel = p.relative_to(project_root).as_posix()
                 except ValueError:
                     rel = p.as_posix()
+                fields = None
+                material_entry = None
                 try:
                     fields = parse_omnimark(p)
                 except Exception:
-                    continue
-                if fields is None:
-                    continue
-                material_id = _clean_material_id((fields.extra or {}).get("material_id", ""))
+                    pass
+                if fields is not None:
+                    material_id = _clean_material_id((fields.extra or {}).get("material_id", ""))
+                else:
+                    material_entry = _material_wiki_entry(p, project_root)
+                    material_id = material_entry.material_id if material_entry else ""
                 if not material_id:
                     continue
                 # 该文件之前登记过别的 material_id(改了头) → 摘掉旧条目
@@ -345,7 +448,7 @@ class MaterialIdIndex:
                 if existing is not None and existing.file_path != rel:
                     conflicts_seen.setdefault(material_id, [existing.file_path]).append(rel)
                     continue
-                self._cache[material_id] = MaterialIdEntry(
+                self._cache[material_id] = material_entry or MaterialIdEntry(
                     material_id=material_id,
                     file_path=rel,
                     kind=fields.type or "",
@@ -383,10 +486,27 @@ class MaterialIdIndex:
                 for mid, entry in sorted(self._cache.items())
             },
         }
-        self.index_path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        temporary: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                newline="\n",
+                dir=self.index_path.parent,
+                prefix=f".{self.index_path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                json.dump(data, handle, ensure_ascii=False, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+                temporary = handle.name
+            os.replace(temporary, self.index_path)
+            temporary = None
+        finally:
+            if temporary:
+                Path(temporary).unlink(missing_ok=True)
 
 
 def get_material_id_index(registry_dir: Optional[Path] = None) -> MaterialIdIndex:

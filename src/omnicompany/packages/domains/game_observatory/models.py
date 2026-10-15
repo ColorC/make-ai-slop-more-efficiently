@@ -1629,6 +1629,7 @@ class NormalizedAction(BaseModel):
         "tap", "swipe", "pinch", "two_finger_swipe", "text", "key", "launch",
         "force_stop", "wait", "back", "home",
         "mouse_move", "mouse_button", "gamepad_button", "gamepad_axis", "reset",
+        "semantic",
     ]
     x: int | None = None
     y: int | None = None
@@ -1649,9 +1650,17 @@ class NormalizedAction(BaseModel):
     two_finger_offset_x: int = Field(default=0, ge=-4096, le=4096)
     two_finger_offset_y: int = Field(default=50, ge=-4096, le=4096)
     two_finger_steps: int = Field(default=5, ge=2, le=60)
+    semantic_command: str | None = Field(default=None, min_length=1, max_length=500)
 
     @model_validator(mode="after")
     def validate_multitouch(self) -> NormalizedAction:
+        if self.type == "semantic":
+            if not self.semantic_command or not self.semantic_command.strip():
+                raise ValueError("semantic action requires semantic_command")
+            if any(value is not None for value in (self.x, self.y, self.x2, self.y2)):
+                raise ValueError("semantic action must not contain coordinate fields")
+        elif self.semantic_command is not None:
+            raise ValueError("semantic_command is only valid for semantic actions")
         if self.type in LIFECYCLE_ACTION_TYPES and (
             not self.package or not re.fullmatch(r"[a-zA-Z0-9_.]+", self.package)
         ):
@@ -1704,6 +1713,7 @@ class EvidenceStability(BaseModel):
         "static-consecutive",
         "bounded-motion-terminal",
         "trusted-reference-or-static",
+        "guarded-batch-checkpoint",
     ] = "static-consecutive"
     threshold: float = Field(default=0.01, ge=0, le=1)
     required_consecutive: int = Field(default=2, ge=1, le=20)
@@ -1906,23 +1916,35 @@ class EvidenceStep(BaseModel):
 
     def publication_issues(self) -> list[str]:
         issues = list(self.quality_issues)
+        capture_profile = self.metadata.get("capture_profile")
         if self.status != "passed":
             issues.append(f"{self.id}: step status is {self.status}")
         if not self.ended_at:
             issues.append(f"{self.id}: step has no end timestamp")
-        required = {
-            "before_frame": self.before_frame_id,
-            "after_frame": self.after_frame_id,
-        }
+        if capture_profile == "semantic_trace":
+            required = {
+                "before_semantic_trace": self.before_ui_tree_id,
+                "after_semantic_trace": self.after_ui_tree_id,
+            }
+        else:
+            required = {
+                "before_frame": self.before_frame_id,
+                "after_frame": self.after_frame_id,
+            }
         if not self.metadata.get("observation_only"):
             required["action_run"] = self.action_run_id
-        if self.metadata.get("capture_profile") != "compact_static":
+        if capture_profile == "full":
             required["video"] = self.video_artifact_id
         for role, artifact_id in required.items():
             if not artifact_id:
                 issues.append(f"{self.id}: missing {role}")
-        if not self.stability.settled:
+        if not self.stability.settled and capture_profile != "guarded_batch_checkpoint":
             issues.append(f"{self.id}: after state did not settle")
+        if capture_profile == "guarded_batch_checkpoint" and (
+            self.stability.profile != "guarded-batch-checkpoint"
+            or self.metadata.get("guarded_batch_checkpoint") is not True
+        ):
+            issues.append(f"{self.id}: guarded batch checkpoint metadata is inconsistent")
         if self.terminal_condition and (
             not self.terminal_evaluation or not self.terminal_evaluation.passed
         ):

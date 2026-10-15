@@ -18,18 +18,18 @@ export interface KebabItem {
 
 const ST = {
   trigger: {
-    width: 24, height: 24, border: '1px solid var(--fp-border)', borderRadius: 5, background: 'transparent',
-    color: '#8b98a8', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+    width: 24, height: 24, border: '1px solid var(--fp-border)', borderRadius: 2, background: 'transparent',
+    color: 'var(--fp-link)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0,
   } as React.CSSProperties,
-  triggerOpen: { color: 'var(--fp-text)', borderColor: '#3a4d61', background: '#16202b' } as React.CSSProperties,
+  triggerOpen: { color: 'var(--fp-text)', borderColor: 'var(--fp-border)', background: 'var(--fp-bp-paper-2)' } as React.CSSProperties,
   overlay: { position: 'fixed', inset: 0, zIndex: 79 } as React.CSSProperties,
   menu: {
-    position: 'fixed', zIndex: 80, minWidth: 188, border: '1px solid var(--fp-border)', borderRadius: 6,
+    position: 'fixed', zIndex: 80, minWidth: 188, border: '1px solid var(--fp-border)', borderRadius: 2,
     background: 'var(--fp-solid)', boxShadow: '0 18px 40px rgba(0,0,0,.5)', padding: 6, display: 'flex', flexDirection: 'column', gap: 2,
   } as React.CSSProperties,
   item: {
     display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', border: 0, background: 'transparent',
-    color: 'var(--fp-text)', borderRadius: 5, padding: '8px 9px', fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap',
+    color: 'var(--fp-text)', borderRadius: 2, padding: '8px 9px', fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap',
   } as React.CSSProperties,
 }
 
@@ -90,7 +90,7 @@ export default function KebabMenu({ items, testid, triggerStyle, iconSize = 15 }
               <button
                 key={it.testid || `${it.label}-${i}`}
                 type="button"
-                style={{ ...ST.item, ...(it.danger ? { color: '#ff8a80' } : null), ...(it.disabled ? { color: '#5a6573', cursor: 'default' } : null) }}
+                style={{ ...ST.item, ...(it.danger ? { color: 'var(--fp-err)' } : null), ...(it.disabled ? { color: 'var(--fp-link)', cursor: 'default' } : null) }}
                 data-testid={it.testid}
                 disabled={it.disabled}
                 onClick={(e) => { e.stopPropagation(); if (it.disabled) return; setOpen(false); it.onClick() }}

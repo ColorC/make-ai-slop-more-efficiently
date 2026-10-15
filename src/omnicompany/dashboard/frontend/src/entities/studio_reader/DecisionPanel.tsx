@@ -114,12 +114,12 @@ const S: Record<string, CSSProperties> = {
   list: { margin: 0, padding: 0, listStyle: 'none' },
   block: {
     background: 'var(--fp-solid)', border: '1px solid var(--fp-border-subtle)',
-    borderLeft: '3px solid var(--fp-accent-2)', borderRadius: 13,
+    borderLeft: '3px solid var(--fp-accent-2)', borderRadius: 5,
     padding: '15px 17px', marginBottom: 13,
   },
   blockHead: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
   did: { fontSize: 12, color: 'var(--fp-text-3)', fontFamily: 'var(--fp-font-mono)', fontVariantNumeric: 'tabular-nums' },
-  state: { fontSize: 12, padding: '2px 9px', borderRadius: 6, border: '1px solid var(--fp-border-subtle)', background: 'var(--fp-surface)' },
+  state: { fontSize: 12, padding: '2px 9px', borderRadius: 2, border: '1px solid var(--fp-border-subtle)', background: 'var(--fp-surface)' },
   stmt: { fontSize: 14, color: 'var(--fp-text)', lineHeight: 1.6 },
   quote: {
     fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.6, fontStyle: 'italic',
@@ -128,6 +128,6 @@ const S: Record<string, CSSProperties> = {
     background: 'color-mix(in srgb, var(--fp-accent-2) 6%, transparent)', borderRadius: '0 7px 7px 0',
     whiteSpace: 'pre-wrap',
   },
-  ref: { fontSize: 11, color: 'var(--fp-text-3)', fontFamily: 'var(--fp-font-mono)', marginTop: 6, wordBreak: 'break-all' },
+  ref: { fontSize: 12, color: 'var(--fp-text-3)', fontFamily: 'var(--fp-font-mono)', marginTop: 6, wordBreak: 'break-all' },
   dim: { color: 'var(--fp-text-3)', fontSize: 13 },
 }

@@ -47,9 +47,45 @@ class BusRejection(BusError):
     def __init__(self, bus: str, action: str, reason: str, detail: dict | None = None):
         self.bus = bus
         self.action = action
-        self.reason = reason
+        self.reason = (
+            reason.strip()
+            if isinstance(reason, str) and reason.strip()
+            else "阻止层未提供具体理由"
+        )
         self.detail = detail or {}
-        super().__init__(f"[{bus}] {action} rejected: {reason}")
+        context = _format_rejection_context(self.detail)
+        super().__init__(f"[{bus}] {action} rejected: {self.reason}{context}")
+
+
+_VISIBLE_REJECTION_DETAIL_KEYS = (
+    "path",
+    "paths",
+    "cwd",
+    "pattern",
+    "checker",
+    "workspace",
+    "allowed_prefixes",
+    "write_prefixes",
+    "bash_cwd_prefixes",
+)
+
+
+def _format_rejection_context(detail: dict) -> str:
+    """Expose bounded, useful policy context without echoing arbitrary payloads."""
+    visible: list[str] = []
+    for key in _VISIBLE_REJECTION_DETAIL_KEYS:
+        value = detail.get(key)
+        if isinstance(value, (str, int, float, bool)):
+            safe_value = value
+        elif isinstance(value, (list, tuple)) and all(
+            isinstance(item, (str, int, float, bool)) for item in value
+        ):
+            safe_value = list(value)[:32]
+        else:
+            continue
+        rendered = json.dumps(safe_value, ensure_ascii=False, separators=(",", ":"))
+        visible.append(f"{key}={rendered[:1200]}")
+    return f" | context: {', '.join(visible)}" if visible else ""
 
 
 @dataclass
@@ -207,15 +243,18 @@ class ServiceBus(ABC):
 
         用法: `raise self._reject(action, reason, detail)`
         """
+        resolved_reason = (
+            reason.strip() if isinstance(reason, str) and reason.strip() else "阻止层未提供具体理由"
+        )
         record = AuditRecord(
             bus=self.bus_name,
             action=action,
             payload=detail or {},
             ok=False,
-            rejection_reason=reason,
+            rejection_reason=resolved_reason,
         )
         self._emitter.emit(record)
-        return BusRejection(self.bus_name, action, reason, detail)
+        return BusRejection(self.bus_name, action, resolved_reason, detail)
 
     def audit_tail(self, limit: int = 50) -> list[AuditRecord]:
         """便利方法: 查最近 N 条审计. 仅 emitter 支持 `tail` 时有效.

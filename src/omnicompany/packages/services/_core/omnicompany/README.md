@@ -6,7 +6,7 @@
 
 # omnicompany · 黑板架构中心承载
 
-> Worker / Material / Team 基类 + MaterialDispatcher (Worker × EventBus 激活引擎) + 金标范本库. **其他 agent 建新 Team 必参考的规范权威之一** (跟 self_narrative_three_files.md / design_md_template.md 平级).
+> Worker / Material / Team 基类 + MaterialDispatcher（Worker × 直接 Material ledger 激活）+ 金标范本库。EventBus 仅承载无正文审计投影。
 
 ---
 
@@ -16,14 +16,11 @@ omnicompany 是 omnicompany 项目的**中心承载 service**. 它有两大职�
 
 1. **统一 shape 样板的权威实现** — 提供 `Worker` (Router 子类别名) / `Material` (Format 别名) / `Team` (PipelineSpec 别名) 三个基类, 让新代码 `from omnicompany.packages.services.omnicompany import Worker, Material, Team` 直接拿到对的 import.
 
-2. **MaterialDispatcher** — Worker × EventBus 激活驱动. 让 Worker 通过 EventBus (stock) 订阅激活的材料黑板执行器. ~230 行小代码, **不造新 runtime**, 复用现有 EventBus / FactoryEvent / Router. TeamRunner 负责显式 DAG 编排, MaterialDispatcher 负责材料到达后的订阅激活; 二者共享同一 Format/EventBus, 不是二重权威。
+2. **MaterialDispatcher** — Worker × run-scoped Material ledger 激活驱动。Material 正文和激活顺序只存在直接 ledger；EventBus 可选接收 `material.published` 的 identity/hash/provenance 审计投影，不是 stock。TeamRunner 负责显式 DAG，MaterialDispatcher 负责材料到达订阅语义，二者共享 Format 契约而不共享状态权威。
 
 3. **金标范本库** — 含 [agent_team_demo.py](agent_team_demo.py) Agent Team 4 Worker 示例 (Context Script / LLM / Tool / Finalizer) + Team 新建统一形式硬规则.
 
-**设计原则** (用户 2026-04-20 洞察):
-> "stock 就是 eventbus, 不用想太多, 大部分是重命名 + 设计思维调整 + 原本不严谨的内容清除"
-
-omnicompany 不引入新概念, 只把已有 EventBus + Router 加一层订阅激活 adapter + shape 约定.
+**当前设计原则**：Material 是业务权威；EventBus 只记录领域/审计/投影/里程碑。早期“stock 就是 EventBus”的判断已被 2026-08-14 Agent Runtime 外置计划取代。
 
 跟项目里其他规范权威的关系:
 - **omnicompany** (本 service) 管 **代码层** Worker/Material/Team 基类 + dispatcher + Team 新建硬规则 (目录结构 / formats.py / workers/__init__.py / etc)
@@ -36,7 +33,7 @@ omnicompany 不引入新概念, 只把已有 EventBus + Router 加一层订阅�
 **解决**:
 - 新 Team 建立时该怎么组织目录 / 命名 / 写 formats.py / 写 workers/
 - Worker 怎么订阅 Material 激活 (MaterialDispatcher)
-- Worker 间数据流过 EventBus (stock) 怎么走
+- Worker 间 Material 如何经直接 ledger 流转，以及如何产生 bodyless 审计投影
 - 子 job 语义 (R-25 `_emit_as_new_job`) 怎么用
 - Q4 诊断 (orphan_workers / unconsumed_materials) 给订阅图做静态完整性检查
 - 给其他 agent 一个 Agent Team 4 Worker 金标参考
@@ -49,21 +46,21 @@ omnicompany 不引入新概念, 只把已有 EventBus + Router 加一层订阅�
 
 ## 设计目的与最终目标
 
-**设计目的**: 给其他 agent / 新代码一个**单一权威**的 import 入口 (`from omnicompany.packages.services.omnicompany import Worker, Material, Team`), 不再每次 grep terminology.md 看"读作什么". 同时 MaterialDispatcher 让 Worker 真能通过 EventBus 跑通 (而不仅是命名上的).
+**设计目的**: 给其他 agent / 新代码一个**单一权威**的 import 入口 (`from omnicompany.packages.services.omnicompany import Worker, Material, Team`)，并让 Worker 通过直接 Material ledger 跑通订阅图。
 
-**理论锚点**: 体现 omnicompany 黑板架构 — Worker 不直接调下游, 都通过 stock (EventBus) 异步交互. 跟 LAP 协议第一红线"事件总线驱动" 直接对应.
+**理论锚点**: Worker 不直接调用下游，而是消费由 Material authority 提供的材料；EventBus 不保存 Material 正文，也不决定激活。
 
 **最终目标** (当下能认知的):
 - 随命名迁移 A→B 推进到位时扩 Team 形式规范
 - Phase 1 黑板 pilot 沉淀更多金标 (Diagnosis Agent Worker / WorkspaceWriterWorker / 等)
-- dispatcher 优化: 并发激活 / 真 SQLite bus 订阅 / 更高效订阅匹配
+- dispatcher 优化: 并发激活 / durable Material authority adapter / 更高效订阅匹配
 - Q2 三上限完整实装 (max_workers_per_job / max_child_jobs / max_job_tree_depth)
 
 ## 规划
 
 - **当前 V1 active** (2026-04-20 立档, 2026-06-13 材料统一计划转正): MaterialDispatcher + Worker/Material/Team 别名 + AgentTeam demo + Team 新建硬规则
 - **下一步**: 按材料统一计划继续接入公司级 material 事件流与 material registry 收束
-- **远景**: Phase 2 完整预算 / Workspace 集成 / SQLiteBus 真跑
+- **远景**: Phase 2 完整预算 / Workspace 集成 / durable Material authority
 
 ## 构成
 

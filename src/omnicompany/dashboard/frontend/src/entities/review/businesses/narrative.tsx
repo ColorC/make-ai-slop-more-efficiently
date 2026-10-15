@@ -95,8 +95,8 @@ function useNarrativeProject(): { proj: NProject | null; error: string | null; l
 function EngineDown({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
     <div data-testid="narrative-engine-down" style={ST.down}>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>叙事内容引擎不可达</div>
-      <div style={{ fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.6 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>叙事内容引擎不可达</div>
+      <div style={{ fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.6 }}>
         {error} — 驾驶舱反代会自动拉起引擎, 稍候重试; 反复失败时看托管中心 narrative-studio 的启动日志。
       </div>
       <button type="button" style={ST.retryBtn} data-testid="narrative-engine-retry" onClick={onRetry}>
@@ -114,7 +114,7 @@ function AuthBadge({ authority }: { authority?: string | null }) {
     <span
       data-testid={isAuthor ? 'narrative-badge-author' : 'narrative-badge-draft'}
       style={{
-        flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '0 6px', height: 17, lineHeight: '17px', borderRadius: 5,
+        flexShrink: 0, fontSize: 12, fontWeight: 500, padding: '0 6px', height: 17, lineHeight: '17px', borderRadius: 2,
         color: isAuthor ? 'var(--fp-ok)' : 'var(--fp-warn)',
         background: `color-mix(in srgb, ${isAuthor ? 'var(--fp-ok)' : 'var(--fp-warn)'} 12%, transparent)`,
         border: `1px solid color-mix(in srgb, ${isAuthor ? 'var(--fp-ok)' : 'var(--fp-warn)'} 38%, transparent)`,
@@ -172,7 +172,7 @@ function LegacyNarrativeOutlineView({ m: _m }: { m: Material }) {
               <div key={st.id} style={{ ...ST.card, ...ST.stageCard }} data-testid={`narrative-stage-${st.id}`}>
                 <div style={ST.cardHead}>
                   <StatusDot status={st.status} />
-                  <span style={{ flex: 1, minWidth: 0, fontWeight: 650, fontSize: 13.5 }}>{st.title || st.id}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontWeight: 500, fontSize: 13.5 }}>{st.title || st.id}</span>
                   <AuthBadge authority={st.authority} />
                 </div>
                 {st.summary?.sentence && <div style={ST.cardSub}>{st.summary.sentence}</div>}
@@ -222,7 +222,7 @@ export function NarrativePremiseView({ m }: { m: Material }) {
             <div style={{ fontSize: 12, color: 'var(--fp-text-3)', marginBottom: 8 }}>
               命题 {p?.locked ? '· 已锁定' : ''}
             </div>
-            <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.6 }}>{p?.proposition || '(命题空)'}</div>
+            <div style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.6 }}>{p?.proposition || '(命题空)'}</div>
             {p?.stance && <div style={{ marginTop: 10, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.6 }}>立场: {p.stance}</div>}
           </div>
           {(p?.controlling_ideas ?? []).length > 0 && (
@@ -245,7 +245,7 @@ export function NarrativeCharactersView({ m }: { m: Material }) {
   const chars = proj?.characters ?? []
   const rels = proj?.relationships ?? []
   const arcRow = (label: string, v?: string | null) => v
-    ? <div style={{ display: 'flex', gap: 8, fontSize: 12.5, lineHeight: 1.55 }}><span style={{ flexShrink: 0, color: 'var(--fp-text-3)' }}>{label}</span><span style={{ color: 'var(--fp-text-2)' }}>{v}</span></div>
+    ? <div style={{ display: 'flex', gap: 8, fontSize: 13, lineHeight: 1.55 }}><span style={{ flexShrink: 0, color: 'var(--fp-text-3)' }}>{label}</span><span style={{ color: 'var(--fp-text-2)' }}>{v}</span></div>
     : null
   return (
     <div data-testid="narrative-characters" style={ST.root}>
@@ -258,7 +258,7 @@ export function NarrativeCharactersView({ m }: { m: Material }) {
               <div key={c.id} style={{ ...ST.card, padding: 14 }} data-testid={`narrative-character-${c.id}`}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: c.color || 'var(--fp-accent)' }} />
-                  <span style={{ fontSize: 14.5, fontWeight: 650, flex: 1, minWidth: 0 }}>{c.name}</span>
+                  <span style={{ fontSize: 14.5, fontWeight: 500, flex: 1, minWidth: 0 }}>{c.name}</span>
                   {c.importance && <span style={ST.impChip}>{c.importance}</span>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -270,7 +270,7 @@ export function NarrativeCharactersView({ m }: { m: Material }) {
                 {c.secret && (
                   <details style={{ marginTop: 10 }}>
                     <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--fp-text-3)' }}>秘密 ›</summary>
-                    <div style={{ fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.55, paddingTop: 6 }}>{c.secret}</div>
+                    <div style={{ fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.55, paddingTop: 6 }}>{c.secret}</div>
                   </details>
                 )}
               </div>
@@ -319,10 +319,10 @@ export function NarrativeDraftsView({ m }: { m: Material }) {
                 {drafts.filter((d) => norm(d.status) === col.key).map((d) => (
                   <div key={d.id} style={{ ...ST.card, padding: 12, marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>{d.title || d.id}</span>
-                      {d.text_type && <span style={{ fontSize: 11, color: 'var(--fp-text-3)', fontFamily: MONO }}>{d.text_type}</span>}
+                      <span style={{ fontSize: 13, fontWeight: 500, flex: 1, minWidth: 0 }}>{d.title || d.id}</span>
+                      {d.text_type && <span style={{ fontSize: 12, color: 'var(--fp-text-3)', fontFamily: MONO }}>{d.text_type}</span>}
                     </div>
-                    {d.body && <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.5 }}>{summarize(d.body)}</div>}
+                    {d.body && <div style={{ marginTop: 6, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.5 }}>{summarize(d.body)}</div>}
                   </div>
                 ))}
               </div>
@@ -349,16 +349,16 @@ export function NarrativeScenesView({ m }: { m: Material }) {
             <div key={sc.id} style={{ ...ST.card, padding: 14, marginBottom: 10 }} data-testid={`narrative-scene-${sc.id}`}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <StatusDot status={sc.status} />
-                <span style={{ fontSize: 14, fontWeight: 650, flex: 1, minWidth: 0 }}>{sc.title || sc.id}</span>
+                <span style={{ fontSize: 14, fontWeight: 500, flex: 1, minWidth: 0 }}>{sc.title || sc.id}</span>
                 {sc.value_shift && (sc.value_shift.from || sc.value_shift.to) && (
                   <span style={{ fontSize: 12, color: 'var(--fp-text-2)', flexShrink: 0 }}>
                     {sc.value_shift.from ?? '?'} → {sc.value_shift.to ?? '?'}
                   </span>
                 )}
               </div>
-              {sc.intent_summary && <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.55 }}>{sc.intent_summary}</div>}
+              {sc.intent_summary && <div style={{ marginTop: 6, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.55 }}>{sc.intent_summary}</div>}
               {(sc.objective_events ?? []).length > 0 && (
-                <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.6 }}>
+                <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.6 }}>
                   {(sc.objective_events ?? []).map((ev, i) => <li key={i}>{ev}</li>)}
                 </ul>
               )}
@@ -378,8 +378,8 @@ export function NarrativeSettingView({ m }: { m: Material }) {
   const renderNode = (n: NWorldNode, depth: number): ReactNode => (
     <div key={n.id} style={{ marginLeft: depth * 16 }}>
       <div style={{ ...ST.card, padding: '10px 14px', marginBottom: 6 }}>
-        <span style={{ fontSize: 13.5, fontWeight: 600 }}>{n.name}</span>
-        {n.description && <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.55 }}>{n.description}</div>}
+        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{n.name}</span>
+        {n.description && <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.55 }}>{n.description}</div>}
       </div>
       {(n.children ?? []).map((c) => renderNode(c, depth + 1))}
     </div>
@@ -463,9 +463,9 @@ export function NarrativeGuidanceView({ m }: { m: Material }) {
               <div>
                 {reveals.map((r) => (
                   <div key={r.id} style={{ ...ST.card, padding: '12px 16px', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 600 }}>{r.title || r.id}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 500 }}>{r.title || r.id}</span>
                     <span style={{ fontSize: 12, color: 'var(--fp-text-3)', marginLeft: 8 }}>{String(r.order ?? '')}</span>
-                    {r.rewrites && <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.55 }}>重写: {r.rewrites}</div>}
+                    {r.rewrites && <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.55 }}>重写: {r.rewrites}</div>}
                   </div>
                 ))}
               </div>
@@ -541,10 +541,10 @@ export function NarrativeGameTextView({ m }: { m: Material }) {
                 {list.map((g) => (
                   <div key={g.id} style={{ ...ST.card, padding: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 }}>{g.title || g.id}</span>
-                      {g.category && <span style={{ fontSize: 11, color: 'var(--fp-text-3)' }}>{g.category}</span>}
+                      <span style={{ fontSize: 13, fontWeight: 500, flex: 1, minWidth: 0 }}>{g.title || g.id}</span>
+                      {g.category && <span style={{ fontSize: 12, color: 'var(--fp-text-3)' }}>{g.category}</span>}
                     </div>
-                    {g.body && <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{g.body.length > 160 ? `${g.body.slice(0, 160)}…` : g.body}</div>}
+                    {g.body && <div style={{ marginTop: 6, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{g.body.length > 160 ? `${g.body.slice(0, 160)}…` : g.body}</div>}
                   </div>
                 ))}
               </div>
@@ -561,12 +561,12 @@ const ST: Record<string, CSSProperties> = {
   root: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: 'transparent', color: 'var(--fp-text)', overflow: 'auto' },
   dim: { padding: 24, color: 'var(--fp-text-3)', fontSize: 13 },
   down: {
-    margin: 24, padding: '16px 18px', maxWidth: 560, borderRadius: 11,
+    margin: 24, padding: '16px 18px', maxWidth: 560, borderRadius: 3,
     background: 'color-mix(in srgb, var(--fp-warn) 8%, transparent)',
     border: '1px solid color-mix(in srgb, var(--fp-warn) 30%, transparent)', color: 'var(--fp-text)',
   },
   retryBtn: {
-    marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7,
+    marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2,
     background: 'var(--fp-card)', color: 'var(--fp-text)', border: '1px solid var(--fp-border)', cursor: 'pointer', fontSize: 13,
   },
   // "适用裁决"chip 与展开浮层(rul*)已随顶栏工厂迁到 ./narrativeToolbars。
@@ -576,19 +576,19 @@ const ST: Record<string, CSSProperties> = {
   },
   cell: {
     minHeight: 40, display: 'flex', flexDirection: 'column', gap: 6, padding: 4,
-    borderRadius: 9, background: 'color-mix(in srgb, var(--fp-surface) 55%, transparent)',
+    borderRadius: 3, background: 'color-mix(in srgb, var(--fp-surface) 55%, transparent)',
   },
   card: {
     background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
-    border: '1px solid var(--fp-border)', borderRadius: 10, padding: 10,
+    border: '1px solid var(--fp-border)', borderRadius: 3, padding: 10,
     boxShadow: '0 2px 10px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.06)',
   },
   stageCard: { borderTop: '3px solid var(--fp-accent-2)' },
   cardHead: { display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 },
-  cardSub: { marginTop: 6, fontSize: 12.5, color: 'var(--fp-text-2)', lineHeight: 1.5 },
-  cardFn: { marginTop: 4, fontSize: 11.5, color: 'var(--fp-text-3)', lineHeight: 1.45 },
+  cardSub: { marginTop: 6, fontSize: 13, color: 'var(--fp-text-2)', lineHeight: 1.5 },
+  cardFn: { marginTop: 4, fontSize: 12, color: 'var(--fp-text-3)', lineHeight: 1.45 },
   impChip: {
-    flexShrink: 0, fontSize: 11, padding: '0 7px', height: 17, lineHeight: '17px', borderRadius: 999,
+    flexShrink: 0, fontSize: 12, padding: '0 7px', height: 17, lineHeight: '17px', borderRadius: 999,
     color: 'var(--fp-text-2)', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)',
   },
   relChip: {

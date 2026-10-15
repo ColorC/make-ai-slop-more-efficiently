@@ -1,0 +1,13 @@
+{
+  "kind": "run.state",
+  "protocol_version": "0.1.0",
+  "run_id": "run-1",
+  "sequence": 1,
+  "timestamp": "2026-08-14T15:45:00+08:00",
+  "state": "running",
+  "sessionEvent": {
+    "type": "assistant/chunk",
+    "data": { "text": "private DSH payload" }
+  }
+}
+

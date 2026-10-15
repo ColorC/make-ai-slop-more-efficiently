@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
 import subprocess
 from io import StringIO
 from typing import ClassVar
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class PowerShellRouter(SingleToolRouter):
-    """Execute a PowerShell command (Windows PowerShell or pwsh)."""
+    """Execute a PowerShell 7 command through ``pwsh``."""
 
     CONSUMED_META_IO: ClassVar[tuple[str, ...]] = ("*",)
     PRODUCED_META_IO: ClassVar[tuple[str, ...]] = ("*",)
@@ -44,9 +43,9 @@ class PowerShellRouter(SingleToolRouter):
         "\n"
         "IMPORTANT: This tool is for terminal operations via PowerShell: git, npm, docker, and PS cmdlets. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.\n"
         "\n"
-        "PowerShell edition: unknown — assume Windows PowerShell 5.1 for compatibility\n"
-        "   - Do NOT use `&&`, `||`, ternary `?:`, null-coalescing `??`, or null-conditional `?.`. These are PowerShell 7+ only and parser-error on 5.1.\n"
-        "   - To chain commands conditionally: `A; if ($?) { B }`. Unconditionally: `A; B`.\n"
+        "PowerShell edition: PowerShell 7+ (the `pwsh` executable).\n"
+        "   - `&&`, `||`, ternary `?:`, null-coalescing `??`, and null-conditional `?.` are available.\n"
+        "   - When targeting a separate Windows PowerShell 5.1 machine, use the older `A; if ($?) { B }` form.\n"
         "\n"
         "Before executing the command, please follow these steps:\n"
         "\n"
@@ -126,13 +125,15 @@ class PowerShellRouter(SingleToolRouter):
         timeout_sec = int(args.get("timeout_sec", 60))
 
         # 选择 shell
-        ps = shutil.which("pwsh") or shutil.which("powershell.exe") or shutil.which("powershell")
+        from omnicompany.runtime.powershell_runtime import resolve_powershell7
+
+        ps = resolve_powershell7()
         if not ps:
             if os.environ.get("OMNI_POWERSHELL_DRY_RUN") == "1":
                 return f"(dry-run, no pwsh installed) command was: {command}"
             raise ToolExecutionError(
-                "pwsh / powershell.exe not on PATH. "
-                "Install pwsh (https://aka.ms/pscore) or use Bash tool."
+                "PowerShell 7 (pwsh.exe) is not installed. "
+                "Install it (https://aka.ms/pscore) or use Bash tool."
             )
 
         # 通过 -NonInteractive -Command "..." 执行

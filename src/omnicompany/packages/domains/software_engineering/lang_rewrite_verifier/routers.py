@@ -19,27 +19,16 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 import subprocess
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from omnicompany.protocol.anchor import Verdict, VerdictKind
-from omnicompany.runtime.agent.agent_loop_config import (
-    CompactConfig,
-    LoopConfig,
-    PermissionConfig,
-)
 from omnicompany.runtime.routing.router import Router
-
-from omnicompany.packages.services._core.agent import (
-    AgentNodeLoop,
-    DevBashRouter,
-    GlobRouter,
-    GrepRouter,
-    ReadFileRouter,
-)
 from omnicompany.packages.services._core.agent.routers.prompt_builder import PromptBuilderRouter
 from omnicompany.packages.services._core.agent.routers.extract_result import ExtractResultRouter
+from omnicompany.runtime.agent_runtime import run_readonly_structured_agent
 
 DOMAIN = "smoke"
 
@@ -172,52 +161,141 @@ class _SmokeTestExtractResult(ExtractResultRouter):
         )
 
 
-class SmokeTestGeneratorRouter(AgentNodeLoop):
-    """AgentNodeLoop (router 化, 2026-05-03 迁): 全局阅读翻译后的 Rust 项目, 生成冒烟测试套件.
+StructuredSmokeRunner = Callable[..., Awaitable[dict[str, Any]]]
+_SMOKE_RESULT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["work_dir", "compile_command", "test_cases"],
+    "properties": {
+        "work_dir": {"type": "string", "minLength": 1},
+        "compile_command": {"type": "string", "const": "cargo build"},
+        "test_cases": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 7,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "description", "cmd", "success_pattern", "timeout_secs", "fatal"],
+                "properties": {
+                    "id": {"type": "string", "minLength": 1, "maxLength": 80},
+                    "description": {"type": "string", "minLength": 5, "maxLength": 300},
+                    "cmd": {
+                        "type": "string",
+                        "minLength": 5,
+                        "maxLength": 500,
+                        "pattern": "^cargo [^;&|<>]+$",
+                    },
+                    "success_pattern": {"type": "string", "minLength": 1, "maxLength": 300},
+                    "timeout_secs": {"type": "integer", "minimum": 1, "maximum": 300},
+                    "fatal": {"type": "boolean"},
+                },
+            },
+        },
+    },
+}
 
-    拥有完整的项目视角：读 Cargo.toml、src/*.rs、理解核心接口，
-    然后从简到繁生成 3-7 个测试用例。
-    """
+
+def _rust_project_snapshot(work_dir: Path) -> str:
+    paths = [work_dir / "Cargo.toml"]
+    paths.extend(sorted((work_dir / "src").rglob("*.rs"))[:40])
+    sections: list[str] = []
+    total = 0
+    for path in paths:
+        if not path.is_file():
+            continue
+        raw = path.read_text(encoding="utf-8", errors="replace")
+        remaining = 20000 - total
+        if remaining <= 0:
+            break
+        raw = raw[:remaining]
+        total += len(raw)
+        sections.extend([f"## FILE: {path.relative_to(work_dir).as_posix()}", raw])
+    return "\n\n".join(sections)
+
+
+class SmokeTestGeneratorRouter(Router):
+    """Read a translated Rust project through AgentRuntime and return a test plan."""
 
     FORMAT_IN = "rewrite.verified-code"
     FORMAT_OUT = f"{DOMAIN}.test-suite"
-    DESCRIPTION = "AgentNodeLoop: 读取 Rust 项目结构，生成针对性冒烟测试套件"
-
-    NODE_PROMPT: ClassVar[str] = _NODE_PROMPT
-    TOOL_ROUTERS: ClassVar[list] = [ReadFileRouter, GrepRouter, GlobRouter, DevBashRouter]
-    LOOP_CONFIG: ClassVar[LoopConfig] = LoopConfig(
-        max_turns=20,
-        compact=CompactConfig(auto_compact_enabled=False),
-        permission=PermissionConfig(mode="readonly"),
-    )
+    DESCRIPTION = "外置 AgentRuntime 只读分析 Rust 项目，Omni 校验 cargo 冒烟测试计划"
 
     def __init__(
         self,
         *,
         model: str | None = None,
         bus: Any | None = None,
-        config: LoopConfig | None = None,
-    ):
-        super().__init__(model=model, bus=bus, config=config or self.LOOP_CONFIG)
+        report_runner: StructuredSmokeRunner = run_readonly_structured_agent,
+    ) -> None:
+        self._bus = bus
+        self._model = model or "deepseek-v4-flash"
+        self._report_runner = report_runner
 
-    # ── 子类钩子: 自定义 PromptBuilder + ExtractResult + tool context (work_dir → bash root) ──
-
-    def build_prompt_builder(self, *, bus: Any) -> PromptBuilderRouter:
-        return _SmokeTestPromptBuilder(template=self.NODE_PROMPT, bus=bus)
-
-    def build_extract_result(self, *, bus: Any) -> ExtractResultRouter:
-        return _SmokeTestExtractResult(bus=bus)
-
-    def build_tool_context(self, *, input_data: dict, turn: int, trace_id: str) -> dict:
-        # DevBashRouter 要求 cwd 必须在 allowed_bash_roots 内. 这里用 input 的 work_dir/rs_dir
-        # 作为根 (Rust 项目根, agent 在里面跑 cargo build).
-        work_dir = input_data.get("rs_dir") or input_data.get("work_dir") or ""
-        roots: tuple[str, ...] = (work_dir,) if work_dir else ()
-        return {
-            "trace_id": trace_id,
-            "turn_number": turn,
-            "allowed_bash_roots": roots,
-        }
+    async def run(self, input_data: Any) -> Verdict:
+        if not isinstance(input_data, dict):
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="input_data must be an object")
+        work_dir = Path(str(input_data.get("rs_dir") or input_data.get("work_dir") or "")).resolve()
+        if not work_dir.is_dir() or not (work_dir / "Cargo.toml").is_file():
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="Rust work_dir or Cargo.toml is missing")
+        task = (
+            f"Rust project root: {work_dir}\n"
+            f"Original source: {input_data.get('source_file') or '(not supplied)'}\n"
+            "Return 3-7 ordered cargo smoke tests from the authoritative snapshot below. "
+            "The first case must be id=build, cmd='cargo build', fatal=true. Do not execute commands.\n\n"
+            "Every cmd must be one foreground cargo command and must not contain redirects, pipes, "
+            "shell chaining, backgrounding, curl, sleep, pkill, or environment assignments.\n\n"
+            + _rust_project_snapshot(work_dir)
+        )
+        try:
+            response = await self._report_runner(
+                task=task,
+                instructions=_NODE_PROMPT,
+                result_schema=_SMOKE_RESULT_SCHEMA,
+                workspace_cwd=work_dir,
+                caller="lang-rewrite-verifier.smoke-test-generator",
+                model=self._model,
+                allowed_tools=(),
+                max_steps=8,
+                max_output_tokens=4096,
+                timeout_seconds=180,
+            )
+        except Exception as error:  # noqa: BLE001
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"external AgentRuntime failed: {type(error).__name__}: {error}")
+        runtime = response.get("runtime", {})
+        suite = response.get("final")
+        if not response.get("ok") or not isinstance(suite, dict):
+            return Verdict(kind=VerdictKind.FAIL, output={"agent_runtime": runtime}, diagnosis=str(response.get("error") or "missing smoke test suite"))
+        cases = suite.get("test_cases")
+        issues: list[str] = []
+        if Path(str(suite.get("work_dir") or "")).resolve() != work_dir:
+            issues.append("work_dir changed")
+        if not isinstance(cases, list) or not 3 <= len(cases) <= 7:
+            issues.append("test_cases count must be 3-7")
+            cases = []
+        ids: set[str] = set()
+        for index, case in enumerate(cases):
+            if not isinstance(case, dict):
+                issues.append(f"case {index} is not an object")
+                continue
+            case_id = str(case.get("id") or "")
+            if not case_id or case_id in ids:
+                issues.append(f"case {index} id is blank or duplicated")
+            ids.add(case_id)
+            command = str(case.get("cmd") or "")
+            if not command.startswith("cargo ") or any(token in command for token in (";", "&&", "||", "|", ">", "<")):
+                issues.append(
+                    f"case {case_id or index} has unsafe/non-cargo command: {command!r}"
+                )
+        if cases and (cases[0].get("id") != "build" or cases[0].get("cmd") != "cargo build" or cases[0].get("fatal") is not True):
+            issues.append("first case must be fatal cargo build")
+        if issues:
+            return Verdict(kind=VerdictKind.FAIL, output={"issues": issues, "agent_runtime": runtime}, diagnosis=f"smoke suite rejected: {issues[0]}")
+        return Verdict(
+            kind=VerdictKind.PASS,
+            output={"work_dir": str(work_dir), "compile_command": "cargo build", "test_cases": cases, "agent_runtime": runtime},
+            diagnosis=f"generated {len(cases)} validated smoke tests",
+        )
 
 
 # ── SmokeRunnerRouter ─────────────────────────────────────────────────────────

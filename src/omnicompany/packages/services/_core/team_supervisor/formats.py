@@ -49,8 +49,9 @@ M_TARGET_SPEC = Material(
             "run_count": {
                 "type": "integer",
                 "minimum": 1,
+                "maximum": 10,
                 "default": 1,
-                "description": "跑 target 的次数, ≥1",
+                "description": "跑 target 的次数, 1..10",
             },
             "previous_ledger_path": {
                 "type": "string",
@@ -385,8 +386,8 @@ M_TEST_RESULTS = Material(
         "  - passed (bool): 是否通过 (真布尔有客观判据)\n"
         "  - observed (str, 句子): 实际观察到什么\n"
         "  - evidence (list[obj]): 引用锚点 · 每条 {path, line/key, excerpt}\n\n"
-        "TestExecutor 承诺: target dispatch 真跑 (不模拟); 每条假设都跑 oracle 不跳过 (跳过则记 passed=false + observed='oracle 跑失败 ...'); "
-        "evidence 引用 target 真产物或代码锚点.\n\n"
+        "TestExecutor 承诺: target dispatch 由 Omni 控制面真跑 (不模拟), Cordis 无 Team dispatch 权限; "
+        "每条假设都评估且不跳过; evidence 引用 target 真产物或代码锚点.\n\n"
         "下游 HealthReportAssembler 装配 health_report."
     ),
     parent="doc",

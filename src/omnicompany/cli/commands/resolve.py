@@ -91,12 +91,13 @@ def cmd_resolve_ref(ctx: click.Context, reference: str, verify: bool, as_json: b
 @click.option("--incremental", is_flag=True, default=False,
               help="增量刷新(只重扫比索引新的文件); 默认全量重建")
 @click.option("--scope", "scopes_str", type=str, default=None,
-              help="逗号分隔扫描根目录(默认 src/omnicompany + templates + docs)")
+              help="逗号分隔扫描根目录(默认 src/omnicompany + templates + docs + config)")
 @click.option("--json", "as_json", is_flag=True, default=False, help="JSON 输出")
 def cmd_resolve_rebuild_index(incremental: bool, scopes_str: str | None, as_json: bool):
     """重建 / 增量刷新 material 适配器的底层 MaterialIdIndex。"""
     from omnicompany.core.config import omni_workspace_root
     from omnicompany.packages.services._core.registry.material_index import (
+        default_material_scopes,
         get_material_id_index,
     )
 
@@ -105,12 +106,7 @@ def cmd_resolve_rebuild_index(incremental: bool, scopes_str: str | None, as_json
         scopes = [Path(s.strip()) for s in scopes_str.split(",") if s.strip()]
         scopes = [s if s.is_absolute() else (project_root / s) for s in scopes]
     else:
-        scopes = [
-            project_root / "src" / "omnicompany",
-            project_root / "templates",
-            project_root / "docs",
-        ]
-        scopes = [s for s in scopes if s.exists()]
+        scopes = default_material_scopes(project_root)
 
     index = get_material_id_index()
     click.echo(click.style(

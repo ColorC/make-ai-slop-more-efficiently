@@ -44,7 +44,7 @@ def cmd_notify() -> None:
 @external_or_controller
 def cmd_notify_push(title, open_spec, body) -> None:
     """推一条提醒到铃铛。例:omni notify push \"决策树已就绪\" --open project:aigc-image:tree"""
-    from omnicompany.dashboard.boss_sight.services import agent_notify
+    from omnicompany.packages.services.boss_sight.services import agent_notify
 
     rec = agent_notify.push_notice(title, open_ref=_parse_open(open_spec), body=body)
     click.echo(f"✓ 推送提醒 {rec['id']}:{title}" + (f"  → {open_spec}" if open_spec else "  (无跳转)"))
@@ -55,7 +55,7 @@ def cmd_notify_push(title, open_spec, body) -> None:
 @any_caller
 def cmd_notify_list(show_all) -> None:
     """列当前铃铛提醒。"""
-    from omnicompany.dashboard.boss_sight.services import agent_notify
+    from omnicompany.packages.services.boss_sight.services import agent_notify
 
     notices = agent_notify.list_notices(include_resolved=show_all)
     if not notices:

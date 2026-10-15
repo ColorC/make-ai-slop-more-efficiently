@@ -22,7 +22,7 @@
 .wk-crumb .cseg { overflow: hidden; text-overflow: ellipsis; }
 .wk-crumb .csep { color: var(--fp-border); flex: none; }
 .wk-crumb .cell { flex: none; letter-spacing: .1em; }
-.wk-crumb .cleaf { flex: none; color: var(--fp-text); font-weight: 600; }
+.wk-crumb .cleaf { flex: none; color: var(--fp-text); font-weight: 500; }
 
 .wk-badges { display: flex; align-items: center; gap: 8px; flex: none; }
 
@@ -55,7 +55,7 @@
 .wk-log-hint { flex: none; padding: 7px 14px; color: var(--fp-text-3);
   font-family: var(--fp-font-mono); font-size: var(--fp-fs-4);
   border-bottom: 1px solid var(--fp-border-subtle); }
-.wk-log-hint b { color: var(--fp-text-2); font-weight: 600; }
+.wk-log-hint b { color: var(--fp-text-2); font-weight: 500; }
 .wk-log-list { flex: 1; overflow: auto; background: var(--fp-bp-paper); padding: 2px 8px 26px; }
 .wk-logrow { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
   padding: 6px 10px; border: 0; border-bottom: 1px solid var(--fp-border-subtle);

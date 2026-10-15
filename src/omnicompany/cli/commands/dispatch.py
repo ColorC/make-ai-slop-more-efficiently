@@ -19,29 +19,31 @@ def cmd_dispatch() -> None:
 @click.option("--message", "-m", default=None, help="想发出的消息")
 @click.option("--context", "-c", default=None, help="最近上下文(可选)")
 @click.option("--input-b64", "input_b64", default=None,
-              help="base64 的 JSON {message, context?, poof_panes?} —— 给 poof 等调用方避开 shell 转义")
+              help="base64 JSON {message, context?, managed_panes?}；旧字段仍在解析层兼容")
 @click.option("--all", "all_convos", is_flag=True, help="把所有(非仅在跑)对话纳入候选")
-@click.option("--json", "as_json", is_flag=True, help="只输出决策 JSON(给 poof 等调用方)")
+@click.option("--json", "as_json", is_flag=True, help="只输出决策 JSON(给托管调用面)")
 @click.option("--timeout", default=150, help="worker 超时秒")
 @any_caller
 def cmd_dispatch_route(message: str | None, context: str | None, input_b64: str | None,
                        all_convos: bool, as_json: bool, timeout: int) -> None:
     """把一条消息路由到 5 类之一, 输出决策。"""
-    from omnicompany.dashboard.boss_sight.services.dispatch_router import route
+    from omnicompany.packages.services.boss_sight.services.dispatch_router import route
 
-    poof_panes = None
+    managed_panes = None
     if input_b64:
         import base64
         payload = json.loads(base64.b64decode(input_b64).decode("utf-8"))
         message = payload.get("message") or message
         context = payload.get("context") or context
-        poof_panes = payload.get("poof_panes")
+        managed_panes = payload.get("managed_panes")
+        if managed_panes is None:
+            managed_panes = payload.get("poof_panes")  # legacy input compatibility
     if not message:
         raise click.ClickException("要么给 -m/--message, 要么给 --input-b64")
 
     try:
         decision = route(message, context=context, running_only=not all_convos,
-                         poof_panes=poof_panes, timeout=timeout)
+                         managed_panes=managed_panes, timeout=timeout)
     except Exception as e:  # noqa: BLE001
         if as_json:
             click.echo(json.dumps({"kind": "error", "error": f"{type(e).__name__}: {e}"},
@@ -56,7 +58,7 @@ def cmd_dispatch_route(message: str | None, context: str | None, input_b64: str 
     kind = decision.get("kind")
     labels = {
         "send_active_window": "→ 发给已活跃外部窗口",
-        "send_poof_pane": "→ 发给 poof 在跑窗格",
+        "send_managed_pane": "→ 发给托管中的窗格",
         "new_with_project": "→ 新起(带项目上下文)",
         "new_strongest": "→ 新起(最强模型)",
         "ask_user": "？需要你选一个目标",
@@ -88,10 +90,10 @@ def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str
                           copy_text: str | None, paste: bool, submit: bool,
                           dry: bool, as_json: bool) -> None:
     """把某个 app 的窗口激活到最前(send_active_window 的执行端)。"""
-    from omnicompany.dashboard.boss_sight.services import winjump
+    from omnicompany.packages.services.boss_sight.services import winjump
 
     if not location and key:
-        from omnicompany.dashboard.boss_sight.services.agent_registry import load_registry
+        from omnicompany.packages.services.boss_sight.services.agent_registry import load_registry
         rec = load_registry().get(key)
         if rec:
             location = rec.get("location")
@@ -102,12 +104,12 @@ def cmd_dispatch_activate(location: str | None, key: str | None, title_hint: str
         raise click.ClickException("--submit 必须同时提供 --copy，禁止提交未知剪贴板内容")
 
     if copy_text:
-        from omnicompany.dashboard.boss_sight.services import winjump as _wj
+        from omnicompany.packages.services.boss_sight.services import winjump as _wj
         _wj.set_clipboard(copy_text)  # CF_UNICODETEXT, 中文不乱
 
     if dry:
         # 只列出该位置匹配到的窗口, 不激活
-        from omnicompany.dashboard.boss_sight.services.winjump import _enum_windows, _proc_name, _procs_for
+        from omnicompany.packages.services.boss_sight.services.winjump import _enum_windows, _proc_name, _procs_for
         want = {p.lower() for p in _procs_for(location)}
         hits = [{"pid": p, "title": t, "proc": _proc_name(p)} for (h, p, t) in _enum_windows()
                 if _proc_name(p).lower().removesuffix(".exe") in want]

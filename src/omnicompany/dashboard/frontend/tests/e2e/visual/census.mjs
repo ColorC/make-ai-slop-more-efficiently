@@ -17,7 +17,7 @@
  *
  * 用法(在 frontend/ 目录下跑):
  *   node tests/e2e/visual/census.mjs [--out <census目录>] [--only dashboard|lofa]
- *     [--dash http://127.0.0.1:8210] [--lofa-api https://10.3.43.246:12443]
+ *     [--dash http://127.0.0.1:8210] [--lofa-api https://192.0.2.10:12443]
  */
 import { chromium } from 'playwright';
 import { readFile, mkdir, writeFile } from 'fs/promises';
@@ -29,7 +29,7 @@ const OUT = arg('out', 'C:/workspace/omnicompany/docs/plans/frontend-design/[202
 const ONLY = arg('only', '');
 const VIEWS = (arg('views', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
 const DASH = arg('dash', 'http://127.0.0.1:8210');
-const LOFA_API = arg('lofa-api', 'https://10.3.43.246:12443');
+const LOFA_API = arg('lofa-api', 'https://192.0.2.10:12443');
 const WWW = arg('lofa-www', 'C:/workspace/lofa/app/www');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 

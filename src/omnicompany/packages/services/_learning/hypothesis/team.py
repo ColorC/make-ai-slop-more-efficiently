@@ -9,10 +9,10 @@
   load 本域 belief 快照(决策库)
   for iteration in range(max_iterations):
     主 agent(Experimenter)自由探索 → 产出行为轨迹
-    总结 agent(BeliefReflector,AgentNodeLoop)
-      读轨迹 + belief 快照
-      用决策库五件套(list/record/challenge/resolve/link)直接维护统一库
-      所有状态判定都是它的语义判断;库层校验(风险必填/前提必真)是硬门
+    总结 agent(BeliefReflector,外置零工具 AgentRuntime)
+      读轨迹 + belief 快照,只返回 belief operation proposals
+      Omni 先整批校验挑战/裁定/证伪回传/前提边,再调用 canonical library
+      Decision 与 Material 权威始终留在控制面
   收工:重渲 30-知识 投影
 
 权威=docs/plans/[2026-07-10]DECISION-ONTOLOGY/plan.md 合并清单#1(停机一次性迁移):
@@ -32,6 +32,7 @@ import uuid
 from omnicompany.packages.services._learning.hypothesis.belief_tools import (
     beliefs_snapshot,
 )
+from omnicompany.protocol.anchor import VerdictKind
 
 try:
     from dotenv import load_dotenv as _load_dotenv
@@ -187,11 +188,12 @@ async def _run_session_async(session_config: dict) -> dict:
             event_type=EventType.TASK_INTENT.value,
             source=f"hypothesis.pipeline.{domain}",
             payload={
-                "instruction": goal,
+                "session_id": session_id,
                 "domain": domain,
                 "max_iterations": max_iterations,
-                "scene": scene,
-                "session_id": session_id,
+                "scene_mode": str(scene.get("mode") or ""),
+                "scene_kind": str(scene.get("kind") or ""),
+                "goal_sha256": hashlib.sha256(goal.encode("utf-8")).hexdigest(),
             },
             tags=["hypothesis", f"domain.{domain}"],
         ))
@@ -209,6 +211,9 @@ async def _run_session_async(session_config: dict) -> dict:
         and scene.get("kind") == "game-ui-exploration"
     )
     suggestion_ledger = scene.get("suggestion_ledger")
+    run_status = "succeeded"
+    failure_reason = ""
+    andon_gaps: list[str] = []
     log.info("[hyp] 开工: domain=%s 库内已有 belief %d 条", domain, snapshot["total"])
 
     for iteration in range(max_iterations):
@@ -229,8 +234,27 @@ async def _run_session_async(session_config: dict) -> dict:
             "session": session_config,
             "trace_id": experimenter_trace_id,
         })
-        if exp_verdict.output is None:
-            log.warning("[hyp] Experimenter 无输出,终止")
+        if exp_verdict.kind is VerdictKind.FAIL or exp_verdict.output is None:
+            run_status = "failed"
+            failure_reason = exp_verdict.diagnosis or "Experimenter returned no output"
+            iteration_results.append({
+                "iteration": iteration,
+                "experimenter_trace_id": experimenter_trace_id,
+                "trace_length": 0,
+                "trace": [],
+                "final_text": "",
+                "turn_count": 0,
+                "stop_reason": "agent_runtime_failed",
+                "experimenter_verdict": "fail",
+                "failure_reason": failure_reason,
+                "suggestions_added": 0,
+                "proposal_attempt_count": 0,
+                "tool_error_count": 0,
+                "elapsed_seconds": round(time.perf_counter() - iteration_started, 6),
+                "reflector_skipped": True,
+                "prior_beliefs_exposed": expose_prior_beliefs,
+            })
+            log.error("[hyp] iter %d | Experimenter 失败: %s", iteration, failure_reason)
             break
         trace = exp_verdict.output.get("trace", [])
         proposal_trace = [item for item in trace if item.get("tool") == "propose_probe"]
@@ -247,11 +271,14 @@ async def _run_session_async(session_config: dict) -> dict:
             "final_text": exp_verdict.output.get("final_text", ""),
             "turn_count": exp_verdict.output.get("turn_count", 0),
             "stop_reason": exp_verdict.output.get("stop_reason", ""),
+            "experimenter_verdict": exp_verdict.kind.value,
             "suggestions_added": suggestions_after - suggestions_before,
             "proposal_attempt_count": len(proposal_trace),
             "tool_error_count": tool_error_count,
             "elapsed_seconds": round(time.perf_counter() - iteration_started, 6),
-            "reflector_skipped": is_unverified_game_shadow,
+            "reflector_skipped": (
+                is_unverified_game_shadow or exp_verdict.kind is VerdictKind.PARTIAL
+            ),
             "prior_beliefs_exposed": expose_prior_beliefs,
             "completion_contract_passed": exp_verdict.output.get(
                 "completion_contract_passed"
@@ -267,11 +294,19 @@ async def _run_session_async(session_config: dict) -> dict:
         iteration_results.append(iteration_result)
         log.info("[hyp] iter %d | Experimenter 调用了 %d 次工具", iteration, len(trace))
 
-        # ── 总结 agent:直接维护统一决策库 ──────────────
+        if exp_verdict.kind is VerdictKind.PARTIAL:
+            run_status = "partial"
+            andon_gaps = [str(item) for item in exp_verdict.output.get("gaps", [])]
+            iteration_result["andon"] = True
+            iteration_result["andon_gaps"] = andon_gaps
+            log.warning("[hyp] iter %d | Experimenter Andon: %s", iteration, andon_gaps)
+            break
+
+        # ── 总结 agent 提案；Omni 控制面验证并维护统一决策库 ──────────────
         if is_unverified_game_shadow:
             log.info("[hyp] iter %d | 未执行的 game-ui shadow 建议不进入决策库", iteration)
         else:
-            await reflector.run({
+            reflector_verdict = await reflector.run({
                 "trace": trace,
                 "explore_domain": domain,
                 "beliefs_snapshot": snapshot,
@@ -281,6 +316,18 @@ async def _run_session_async(session_config: dict) -> dict:
                 "agent_name": "BeliefReflectorRouter",
                 "domain": "services/hypothesis",
             })
+            iteration_result["reflector_verdict"] = reflector_verdict.kind.value
+            if reflector_verdict.kind is VerdictKind.FAIL:
+                run_status = "failed"
+                failure_reason = reflector_verdict.diagnosis or "BeliefReflector failed"
+                iteration_result["failure_reason"] = failure_reason
+            elif reflector_verdict.kind is VerdictKind.PARTIAL:
+                run_status = "partial"
+                andon_gaps = [
+                    str(item) for item in (reflector_verdict.output or {}).get("gaps", [])
+                ]
+                iteration_result["andon"] = True
+                iteration_result["andon_gaps"] = andon_gaps
 
         after = beliefs_snapshot(domain)
         by_status: dict[str, int] = {}
@@ -307,6 +354,7 @@ async def _run_session_async(session_config: dict) -> dict:
                         "experimenter_trace_id": experimenter_trace_id,
                         "suggestions_added": suggestions_after - suggestions_before,
                         "reflector_skipped": is_unverified_game_shadow,
+                        "status": run_status,
                         "beliefs_total": after["total"],
                         "beliefs_by_status": by_status,
                     },
@@ -314,6 +362,8 @@ async def _run_session_async(session_config: dict) -> dict:
                 ))
             except Exception as exc:
                 log.warning("[hyp] iter 事件发射失败: %s", exc)
+        if run_status != "succeeded":
+            break
 
     # 最终状态 + 重渲知识投影(30-知识)
     final = beliefs_snapshot(domain)
@@ -332,6 +382,10 @@ async def _run_session_async(session_config: dict) -> dict:
         log.warning("[hyp] 30-知识 投影重渲失败(非致命,可手动 omni decisions knowledge): %s", exc)
 
     result = {
+        "status": run_status,
+        "failure_reason": failure_reason,
+        "andon": run_status == "partial",
+        "gaps": andon_gaps,
         "session_id": session_id,
         "domain": domain,
         "scene_mode": scene.get("mode") or "",
@@ -354,11 +408,15 @@ async def _run_session_async(session_config: dict) -> dict:
                 trace_id=session_id,
                 event_type=EventType.TASK_FINISH.value,
                 source=f"hypothesis.pipeline.{domain}",
-                payload={
-                    "session_id": session_id,
-                    "domain": domain,
-                    "result": result,
-                },
+            payload={
+                "session_id": session_id,
+                "domain": domain,
+                "status": run_status,
+                "iterations_completed": len(iteration_results),
+                "total_beliefs": final["total"],
+                "suggestion_count": result["suggestion_count"],
+                "failure_reason": failure_reason,
+            },
                 tags=["hypothesis", f"domain.{domain}"],
             ))
             await bus.close()
@@ -406,8 +464,8 @@ from omnicompany.protocol.anchor import (
 def build_team() -> TeamSpec:
     """hypothesis 探索管线拓扑:单节点会话驱动器。
 
-    节点内部驱动 N 轮 Experimenter→BeliefReflector 循环(run_session,自建 bus 与
-    两个 AgentNodeLoop)——循环不在 TeamSpec 语义内,故对 TeamRunner 呈现为一个
+    节点内部驱动 N 轮 Experimenter→BeliefReflector 循环(run_session,自建 bus；
+    Experimenter 与 Reflector 均已外置)——循环不在 TeamSpec 语义内,故对 TeamRunner 呈现为一个
     确定性入口节点(照 vilo eval 系「薄包装驱动 agent 循环」模式)。
     """
     nodes = [
@@ -418,9 +476,9 @@ def build_team() -> TeamSpec:
                 id="hypothesis-session",
                 name="HypothesisSession",
                 description=(
-                    "会话驱动器:N 轮 [Experimenter 自由探索(bash/read/glob/grep 出轨迹)"
-                    "→ BeliefReflector 用决策库五件套(list/record/challenge/resolve/link)"
-                    "维护统一库 belief];收工重渲 30-知识 投影。"
+                    "会话驱动器:N 轮 [Experimenter 外置只读证据提案(Omni 校验引用)"
+                    "→ BeliefReflector 外置提案 → Omni 校验并维护统一库 belief];"
+                    "收工重渲 30-知识 投影。"
                 ),
                 from_format="hypothesis.session",
                 to_format="hypothesis.store_diff",
@@ -432,7 +490,7 @@ def build_team() -> TeamSpec:
     return TeamSpec(
         id="hypothesis",
         name="假设探索",
-        description="Experimenter 自由探索 + BeliefReflector 维护统一决策库 belief;主题摘要=30-知识生成投影。",
+        description="外置 Experimenter 只读证据提案 + 外置 BeliefReflector 提案 + Omni 校验证据并维护统一决策库 belief;主题摘要=30-知识生成投影。",
         purpose="把对陌生系统的探索所得沉成可证伪、可流转的统一库 belief。",
         nodes=nodes,
         edges=[],

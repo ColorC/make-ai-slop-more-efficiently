@@ -43,10 +43,17 @@ def _load_archmap_data_allowed() -> tuple[set[str], set[str], set[str]]:
             _ARCHMAP_CACHE["files"],        # type: ignore[return-value]
             _ARCHMAP_CACHE["patterns"],     # type: ignore[return-value]
         )
-    # archmap 在 <repo>/docs/archmap.yaml
-    # 本文件 parents[5] = src/omnicompany/packages/services/guardian/rules/directory_hygiene.py
-    # parents[5] = src, parents[6] = <repo>
-    repo_root = Path(__file__).resolve().parents[6]
+    # 包层级会随 services/_core 重组变化，不能用固定 parents[n] 猜仓根。
+    here = Path(__file__).resolve()
+    repo_root = next(
+        (
+            parent
+            for parent in here.parents
+            if (parent / "pyproject.toml").is_file()
+            and (parent / "docs" / "archmap.yaml").is_file()
+        ),
+        here.parents[6],
+    )
     archmap_path = repo_root / "docs" / "archmap.yaml"
     allowed_subdirs: set[str] = set()
     allowed_files: set[str] = set()

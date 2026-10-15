@@ -65,10 +65,14 @@ const PROFILES: Record<string, DisplayProfile> = {
       'narrative_gametext_v1',
     ],
   },
-  // 前端设计(walker, 对照回归): 沿用轨迹画布口径, 多版本并存(样张 v1/v2 版本片并排)。
+  // walker(游戏素材治理 + 前端设计双域): 排布=域层级注册投影。
+  // game_assets 四层(素材登记/运行时接线/审阅裁决/采用与报告, 2026-08-02 治理体系化,
+  // 规范 walker-game docs/specs/game-asset-governance-system.md §5) + frontend_design 各层;
+  // 多版本并存(样张 v1/v2 版本片、注册表版本谱系均保留可见)。
   walker: {
-    structure: 'track',
+    structure: 'domain-tree',
     versionPolicy: 'coexist',
+    schemaRenderers: ['game.report.aggregate-v1'],
   },
   // demogame 策划案(G1 样板, DEC-2026-07-05-005 收编落点): 三层排布=细化案域层级注册;
   // 策划案以最新为主, 被钉住的旧版选择性展示(第三型)。

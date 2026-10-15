@@ -26,7 +26,7 @@
 
 ### 反模式（真实案例）
 
-`prefab_semantic_loop.py` 2026-04-17 v1 给了 `run_bash` + bashlex AST 白名单。Agent 在 T18 写 `grep -rn "pbui_activity_artcontest_main" d:/P4/main/Client/ | head -20` —— 扫几 GB 内容，subprocess timeout 在 Windows shell=True 下未真正 kill 子进程树，Agent Loop 卡死 20 分钟无输出。修复手段走向越来越复杂：加子串黑名单 → bashlex AST → Windows taskkill /T /F → prompt 里加告诫。全是头疼医头。
+某个旧版 Agent 工具提供了 `run_bash` 与 shell AST 白名单。Agent 对整个大型资源仓库执行递归搜索，再通过管道截取前 20 行；Windows 上 shell 子进程未随超时退出，导致任务长时间无输出。继续叠加关键词黑名单和提示词仍无法解决范围控制，最终改为带必填路径与结果上限的结构化工具。
 
 ### 正向替代
 

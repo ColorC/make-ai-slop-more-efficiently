@@ -27,37 +27,6 @@ def register_all() -> None:
 
     try:
         register(PipelineEntry(
-            name="material-diagnosis",
-            description=(
-                "Material 健康诊断 — 单 Material 或批量 (原 format-diagnosis, 2026-04-22 命名规范化).\n"
-                "  单 Material: omni run material-diagnosis --material_id guardian.check-request\n"
-                "  多 ID:       omni run material-diagnosis --ids guardian.check-request,bw.epic\n"
-                "  目录:        omni run material-diagnosis --folder src/omnicompany/packages/services/guardian\n"
-                "  文件:        omni run material-diagnosis --file .../formats.py\n"
-                "  域前缀:      omni run material-diagnosis --domain bw"
-            ),
-            domain="doctor",
-            build_team=_lazy("omnicompany.packages.services._diagnosis.doctor.team",
-                                 "build_team"),
-            build_bindings=_lazy_fn("omnicompany.packages.services._diagnosis.doctor.run",
-                                    "build_bindings"),
-            default_db_dir="data/services/doctor",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(name="material_id", help="单个 Material ID (如 guardian.check-request)"),
-                CliArg(name="ids", help="多个 Material ID, 逗号分隔"),
-                CliArg(name="folder", help="扫描目录下所有 formats.py"),
-                CliArg(name="file", help="扫描指定 formats.py 文件"),
-                CliArg(name="domain", help="扫描指定域前缀 (如 bw、guardian)"),
-                CliArg(name="source_root", help="源码根目录 (默认 src/omnicompany/)"),
-                CliArg(name="grade", help="只显示指定等级, 逗号分隔 (如 C,D,F)"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip material-diagnosis: %s", e)
-
-    try:
-        register(PipelineEntry(
             name="format-repair",
             description="Format 自动修复 — 诊断失败项后调用 LLM 规划并 patch 源码，循环至 A 级",
             domain="repair",
@@ -130,7 +99,7 @@ def register_all() -> None:
             description=(
                 "前端 src 三维 UX 审计 — 交互/信息/跳转 确定性枚举 + 据频率×重要性矩阵/信息层级打错位标记(平铺/删除无保护/无层级/说明冗余).\n"
                 "  omni run ux-audit -i src_root=C:/workspace/omnicompany/src/omnicompany/dashboard/frontend/src -i app=omnidashboard\n"
-                "  产出: 每界面交互/信息/跳转计数 + 错位界面清单 + markdown 总表(落 data/services/ux_audit/). 可复跑于 lofa/poof/whatnow.\n"
+                "  产出: 每界面交互/信息/跳转计数 + 错位界面清单 + markdown 总表(落 data/services/ux_audit/). 可复跑于 lofa/Canvas/whatnow.\n"
                 "  口径: frostpane/REBUILD-STANDARD.md + INTERACTION-AUDIT.md. 语义两轴(重要性/频率/含义)留 LLM 增补节点(SOFT 待加)."
             ),
             domain="ux_audit",
@@ -263,14 +232,13 @@ def register_all() -> None:
         logger.debug("skip sw.implement: %s", e)
 
     # ── Skill 导入器 (2026-04-09 重构) ──
-    # 主管线: 解析 skill → 产 workflow-factory 可消费的需求稿
-    # (不再自己生成 Python 代码, 那是 workflow-factory 的权威职责)
+    # 主管线: 解析 skill → 产可审阅的需求稿；代码生成器已退役。
     try:
         register(PipelineEntry(
             name="skill-import",
             description=(
-                "Skill 导入器 — 解析外部 Claude Code Skill, 产出 workflow-factory "
-                "可消费的 markdown 需求稿 (parse → analyze → infer → draft_requirement)"
+                "Skill 导入器 — 解析外部 Claude Code Skill，产出可审阅的 markdown "
+                "需求稿 (parse → analyze → infer → draft_requirement)"
             ),
             domain="workflow",
             build_team=_lazy(
@@ -290,12 +258,12 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip skill-import: %s", e)
 
-    # ── Skill Importer Verify — 忠实度检验 (workflow-factory 产物后运行) ──
+    # ── Skill Importer Verify — 忠实度检验 ──
     try:
         register(PipelineEntry(
             name="skill-import-verify",
             description=(
-                "忠实度检验 — 检查 workflow-factory 生成的 package 是否忠实实现了 "
+                "忠实度检验 — 检查候选 package 是否忠实实现了 "
                 "原 Claude Code Skill 的所有节点 / 约束 / 覆盖预期, 产出 compliance 报告"
             ),
             domain="workflow",
@@ -312,233 +280,6 @@ def register_all() -> None:
         ))
     except Exception as e:
         logger.debug("skip skill-import-verify: %s", e)
-
-    # ── Repo Architect — 仓库架构深度分析 (absorption 核心工具) ──
-    try:
-        register(PipelineEntry(
-            name="repo-architect",
-            description=(
-                "仓库架构深度分析管线 — 输入 GitHub URL 或本地路径, 输出完整架构报告 + "
-                "覆盖率证明 + OmniKB 条目。翻译自 yzddmr6/repo-analyzer SOTA skill, "
-                "20 节点 DAG 覆盖 16 Format 完整链路 (人工补齐 workflow-factory 首轮截断)"
-            ),
-            domain="workflow",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.repo.architect.run",
-                "build_repo_architect_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.repo.architect.run",
-                "build_repo_architect_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=40,
-            cli_args=[
-                CliArg(name="url", help="GitHub 仓库 URL"),
-                CliArg(name="local_path", help="本地仓库路径 (和 url 互斥)"),
-                CliArg(name="focus", help="分析焦点 (自然语言, <=2000 字符)"),
-                CliArg(name="mode", help="分析模式 quick/standard/deep"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip repo-architect: %s", e)
-
-    # ── Repo Learner — 带目的的 repo 学习支流 (AgentNodeLoop 主 agent + sub agent) ──
-    try:
-        register(PipelineEntry(
-            name="repo-learner",
-            description=(
-                "带目的的 repo 学习支流 — 主 agent (150 turns) 自由读仓库, 最多 spawn "
-                "3 个子 agent (50 turns each) 深读模块, 产出自由格式 learning report "
-                "(Learning Value + Learning Locations 两段必含)。与 repo-architect 并列, "
-                "共享前 4 个基础节点 (input_validator / repo_acquirer / repo_identity_anchor "
-                "/ scale_surveyor)。"
-            ),
-            domain="workflow",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.repo.learner.run",
-                "build_repo_learner_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.repo.learner.run",
-                "build_repo_learner_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=10,  # pipeline 外层只有 6 节点; AgentNodeLoop 内部 turns 才是大头
-            cli_args=[
-                CliArg(name="url", help="GitHub 仓库 URL"),
-                CliArg(name="local_path", help="本地仓库路径 (和 url 互斥)"),
-                CliArg(name="focus", help="学习焦点 hint (自然语言, 可空)"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip repo-learner: %s", e)
-
-    # ── OmniKB 知识库审计 ──
-    # 设计文档: docs/plans/[2026-04-09]KNOWLEDGE-REVIVAL-AND-ABSORPTION-REDESIGN/
-    try:
-        register(PipelineEntry(
-            name="omnikb-audit",
-            description=(
-                "OmniKB 全量审计 — 校验知识库引用完整性、code_anchor 漂移、"
-                "孤儿 Router、Format 覆盖"
-            ),
-            domain="knowledge",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.knowledge.run",
-                "build_audit_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.knowledge.run",
-                "build_audit_bindings",
-            ),
-            default_db_dir="data/services/knowledge",
-            default_max_steps=5,
-        ))
-    except Exception as e:
-        logger.debug("skip omnikb-audit: %s", e)
-
-    # ── Repo Absorption (Stage 1: Survey & Triage) ──
-    # 设计文档: docs/plans/[2026-04-08]REPO-ABSORPTION-WORKFLOW/
-    # 当前为骨架冒烟阶段，4 个 Router 都是 stub。后续 Stage 增量扩展。
-    try:
-        register(PipelineEntry(
-            name="absorption-survey",
-            description=(
-                "Repo Absorption · Stage 1 Survey & Triage — "
-                "从 GitHub 仓库列表识别值得吸纳的地标，不下载源码"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_survey_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_survey_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=15,
-            cli_args=[
-                CliArg(
-                    name="repos",
-                    help="目标仓库列表 (JSON 数组或逗号分隔)，如 'openai/codex,google-gemini/gemini-cli'",
-                    required=True,
-                ),
-                CliArg(
-                    name="profile",
-                    help="吸纳 Profile: framework_absorption | domain_absorption",
-                    default="framework_absorption",
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-survey: %s", e)
-
-    # ── Repo Absorption V3 (模块驱动四层地图, Phase A: RepoMapper 实化) ──
-    # 设计文档: docs/plans/[2026-04-13]REPO-ABSORPTION-V3/DESIGN.md
-    try:
-        register(PipelineEntry(
-            name="absorption-module-driven",
-            description=(
-                "Repo Absorption V3 · 模块驱动四层地图管线 — "
-                "RepoMapper 全量扫描双层地图，ModulePicker LLM 语义选模块，"
-                "ModuleReader 展开代码，LearningExtractor 提炼发现"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=10,
-            cli_args=[
-                CliArg(
-                    name="repo_name",
-                    help="目标 repo 名称，如 'hermes-agent'",
-                    required=True,
-                ),
-                CliArg(
-                    name="repo_local_path",
-                    help="本地克隆路径（已 git clone 的目录）",
-                    required=True,
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-module-driven: %s", e)
-
-    # ── Repo Absorption V3 Stage 3 (工作流修改管线, Phase 1 骨架) ──
-    # 设计文档: docs/plans/[2026-04-14]STAGE3-WORKFLOW-MODIFIER/plan.md
-    try:
-        register(PipelineEntry(
-            name="absorption-workflow-modifier",
-            description=(
-                "Repo Absorption V3 Stage 3 · 工作流修改管线 — "
-                "SpecParser 解析改进提案，HumanApprovalGate 人工审批，"
-                "WorkflowGenerator 生成变更（Phase 2），DangerGate + Validator 检查（Phase 3）"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_stage3_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v3_stage3_bindings",
-            ),
-            default_db_dir="data/domains/absorption",
-            default_max_steps=5,
-            cli_args=[
-                CliArg(
-                    name="repo_name",
-                    help="目标 repo 名称，如 'hermes-agent'",
-                    required=True,
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-workflow-modifier: %s", e)
-
-    # ── Repo Absorption V2 (问题驱动定向深读, Phase 1 骨架) ──
-    # 设计文档: docs/plans/[2026-04-13]REPO-ABSORPTION-V2/plan.md
-    try:
-        register(PipelineEntry(
-            name="absorption-baseline",
-            description=(
-                "Repo Absorption V2 · 问题驱动定向深读管线 — "
-                "以自画像缺口(G1-G7)为问题来源，带着问题进行定向深读，终止条件是'问题被回答'"
-            ),
-            domain="absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v2_pipeline",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.absorption.run",
-                "build_v2_bindings",
-            ),
-            default_db_dir="data/absorption",
-            default_max_steps=30,
-            cli_args=[
-                CliArg(
-                    name="repo_name",
-                    help="目标 repo 名称，如 'gemini-cli'",
-                    required=True,
-                ),
-                CliArg(
-                    name="repo_local_path",
-                    help="本地克隆路径（已 git clone 的目录）",
-                    required=True,
-                ),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-baseline: %s", e)
 
     # ── Unity 探索 ──
     try:
@@ -974,59 +715,6 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip selftest: %s", e)
 
-    # ── team-builder · agent-first 新拓扑 (A3 2026-04-23) ──
-    try:
-        register(PipelineEntry(
-            name="team-builder",
-            description=(
-                "造 Team 的 Team · agent-first 设计 · 4 节点 "
-                "(OriginRequestLoader → {IntentAnalyzer, ReferenceScout} → TeamArchitect) "
-                "→ 输出七节 team_design 骨架"
-            ),
-            domain="team_builder",
-            build_team=_lazy(
-                "omnicompany.packages.services._core.team_builder.team",
-                "build_team_agent_first",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._core.team_builder.run",
-                "build_bindings_agent_first",
-            ),
-            default_db_dir="data/services/team_builder",
-            default_max_steps=1000,  # 铁律 B: 预算宽松
-            cli_args=[
-                CliArg(name="text", help="自然语言 Team 需求描述"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip team-builder: %s", e)
-
-    # ── workflow-factory (legacy · 保留旧拓扑作 Diamond 参考 · 2026-04-23) ──
-    try:
-        register(PipelineEntry(
-            name="workflow-factory",
-            description=(
-                "legacy 旧 workflow_factory 拓扑 (Diamond shortcut 归档作参考) · "
-                "新代码用 team-builder (agent-first)"
-            ),
-            domain="team_builder",
-            build_team=_lazy(
-                "omnicompany.packages.services._core.team_builder.team",
-                "build_team",  # 旧 build_team
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._core.team_builder.run",
-                "build_bindings",  # 旧 build_bindings
-            ),
-            default_db_dir="data/services/team_builder_legacy",
-            default_max_steps=1000,
-            cli_args=[
-                CliArg(name="text", help="(legacy) 自然语言工作流需求"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip workflow-factory (legacy): %s", e)
-
     # ── trace-induction 轨迹归纳管线 ──
     try:
         register(PipelineEntry(
@@ -1286,7 +974,7 @@ def register_all() -> None:
         register(PipelineEntry(
             name="frontend_design.dashboard",
             description=(
-                "前端设计·dashboard 分支 — dashboard 类网页(驾驶舱/poof/lofa)审查: "
+                "前端设计·dashboard 分支 — dashboard 类网页(驾驶舱/Canvas/lofa)审查: "
                 "标尺→确定性门禁→VLM相对评审→改进闭环+决策沉淀。标尺真源=docs/projects/frontend-design/dashboard。"
             ),
             domain="frontend_design",
@@ -1300,9 +988,12 @@ def register_all() -> None:
                 CliArg(name="ruler_ref", help="标尺真源指针(默认 frostpane)", default=""),
                 CliArg(name="baseline_ref", help="相对评审基准图(可选)", default=""),
             ],
-            when={"semantic": "改完 dashboard 类网页(驾驶舱/poof/lofa)的界面要过设计审查门时;小改动(改个按钮)走快速路径直改+亮线检查,不必跑本管线",
+            when={"semantic": "改完 dashboard 类网页(驾驶舱/Canvas/lofa)的界面要过设计审查门时;小改动(改个按钮)走快速路径直改+亮线检查,不必跑本管线",
                   "match_keys": ["dashboard", "frontend", "ui-review"], "judge": "llm"},
             scale={"tier": "short", "minutes": "3-10", "cost": "确定性门禁+1-2 次 VLM 评审"},
+            book_refs=("docs/ontology/60-dashboard前端设计.md#方法·不打分用证据",
+                       "docs/ontology/60-dashboard前端设计.md#信息·七维自查与门禁分流",
+                       "docs/ontology/60-dashboard前端设计.md#方法·真源定一"),
         ))
         register(PipelineEntry(
             name="frontend_design.webgame",
@@ -1324,6 +1015,8 @@ def register_all() -> None:
             when={"semantic": "webgame UI 屏改动后要过设计审查门时(游戏屏全屏+悬浮HUD 标准)",
                   "match_keys": ["webgame", "frontend", "ui-review"], "judge": "llm"},
             scale={"tier": "short", "minutes": "3-10", "cost": "确定性门禁+1-2 次 VLM 评审"},
+            book_refs=("docs/ontology/40-walker前端设计.md#战场·信息范式底线",
+                       "docs/ontology/60-dashboard前端设计.md#方法·不打分用证据"),
         ))
     except Exception as e:
         logger.debug("skip frontend_design pipelines: %s", e)
@@ -1373,7 +1066,7 @@ def register_all() -> None:
             default_db_dir="data/domains/project_atlas",
             default_max_steps=10,
             cli_args=[
-                CliArg(name="space", help="工作空间(omnicompany/quant-lab/webworks/poof/aiworkspace)", required=True),
+                CliArg(name="space", help="工作空间(omnicompany/quant-lab/webworks/Canvas/aiworkspace)", required=True),
                 CliArg(name="dry_run", help="不调模型, 走占位验管线", is_flag=True),
             ],
         ))
@@ -1436,7 +1129,7 @@ def register_all() -> None:
         register(PipelineEntry(
             name="personal_site.run",
             description=(
-                "colorc.cc 作品集/dev-log 生产 — 入题→生成(起 claude-code 工人深读真源)→改造"
+                "example.com 作品集/dev-log 生产 — 入题→生成(起 claude-code 工人深读真源)→改造"
                 "(本质意译去术语+加结构+真demo)→对抗门→落地建索引→脱敏门发布→[可选]demo分支(委托 slidecast 出会动演示)。默认 --dry_run 短路工人。"
             ),
             domain="personal_site",
@@ -1502,59 +1195,8 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip csv-to-md: %s", e)
 
-    # ── repo-absorption · 由 team_builder V3 生成 (dry_run · 2026-04-23) ──
-    try:
-        register(PipelineEntry(
-            name="repo-absorption",
-            description='Repo Absorption · 由 team_builder 自动生成 (12 个文件, 116812 bytes)',
-            domain="repo_absorption",
-            build_team=_lazy(
-                "omnicompany.packages.services._learning.repo.absorption.team",
-                "build_team",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._learning.repo.absorption.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/services/repo_absorption",
-            default_max_steps=1000,
-            cli_args=[
-                CliArg(name="text", help="自然语言需求"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip repo-absorption: %s", e)
-
-    # ── runtime-test-builder · 真 meta 层 v2 (2026-04-27 Phase C 重构, 替旧伪 meta) ──
-    # 当场针对生成假设 + 调度验证, 不再二选一固定模板
-    try:
-        register(PipelineEntry(
-            name="runtime-test-builder",
-            description=(
-                "真 meta 层 v2 测试团队构建器 — 给 target_team_id 深探 target 包 + "
-                "综合 hypothesis_library 当场针对生成假设清单 (3-10 条特化假设) + "
-                "调度每条验证 + 装画像. 非二选一固定模板."
-            ),
-            domain="runtime_test_builder",
-            build_team=_lazy(
-                "omnicompany.packages.services._utility.runtime_test.builder.team",
-                "build_team",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._utility.runtime_test.builder.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/services/runtime_test_builder",
-            default_max_steps=1000,
-            cli_args=[
-                CliArg(name="target_team_id", help="待测目标团队 id"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip runtime-test-builder: %s", e)
-
     # ── code-runtime-test · 代码产物测试团队 (2026-04-26 立) ──
-    # 标杆对标 + 错误处理 + 重现性 · 全 HARD 不调 LLM · 跟 absorption-runtime-test 平行
+    # 标杆对标 + 错误处理 + 重现性 · 全 HARD 不调 LLM
     try:
         register(PipelineEntry(
             name="code-runtime-test",
@@ -1580,36 +1222,6 @@ def register_all() -> None:
     except Exception as e:
         logger.debug("skip code-runtime-test: %s", e)
 
-    # ── absorption-runtime-test · absorption 类工作的特化测试团队 (2026-04-27 改名 + 砍路 2 + 升路 4) ──
-    # 旧名 knowledge-runtime-test (2026-04-26 立, 4 路通用模板) — 误抽象层级
-    # 现 (Phase A): 标明 absorption 特化 · 3 路 (稳定 + 抽样落地 + 源覆盖) · 升路 4 程序化排名
-    # 沉淀自 data/domains/test_team/scratch/ 的 3 实验 + plan.md 来龙去脉
-    try:
-        register(PipelineEntry(
-            name="absorption-runtime-test",
-            description=(
-                "absorption 类工作的特化测试团队 — 真跑 target N 次 + 3 路特化验证 (跨次稳定 / "
-                "抽样落地 / 源覆盖 程序化排名 top-K) → 产画像 (非契约扫, 非通用模板). "
-                "仅适用 absorption 类 (代码改进提案) target. 真通用层在 Phase B/C 立."
-            ),
-            domain="absorption_runtime_test",
-            build_team=_lazy(
-                "omnicompany.packages.services._utility.runtime_test.absorption.team",
-                "build_team",
-            ),
-            build_bindings=_lazy_fn(
-                "omnicompany.packages.services._utility.runtime_test.absorption.run",
-                "build_bindings",
-            ),
-            default_db_dir="data/services/absorption_runtime_test",
-            default_max_steps=1000,
-            cli_args=[
-                CliArg(name="target_team_id", help="待测目标团队 id (如 'repo-absorption')"),
-            ],
-        ))
-    except Exception as e:
-        logger.debug("skip absorption-runtime-test: %s", e)
-
     # ── team-supervisor · 通用 team 健康监督 (2026-04-26 立) ──
     # 设计文档: docs/plans/[2026-04-26]TEAM-SUPERVISOR/plan.md
     try:
@@ -1617,8 +1229,7 @@ def register_all() -> None:
             name="team-supervisor",
             description=(
                 "通用 team 健康监督 — 三问 (Q1 产物形式 / Q2 设计目的 / Q3 健康判据) + "
-                "假设进化 + 信号模式. 只产 health_report, 不修复 target. "
-                "首批喂 repo-absorption."
+                "假设进化 + 信号模式. 只产 health_report, 不修复 target."
             ),
             domain="team_supervisor",
             build_team=_lazy(
@@ -1632,7 +1243,7 @@ def register_all() -> None:
             default_db_dir="data/services/team_supervisor",
             default_max_steps=1000,
             cli_args=[
-                CliArg(name="target_team_id", help="待监督的 team id (如 'repo-absorption')"),
+                CliArg(name="target_team_id", help="待监督的当前 team id"),
             ],
         ))
     except Exception as e:
@@ -1687,11 +1298,6 @@ def _register_sedimented_event_teams() -> None:
          "focus",
          "omnicompany.packages.services._focus.plan_progress_recorder.workers",
          "planprog.request"),
-        ("conversation-operation-sedimenter",
-         "[沉淀·事件型] 从 CC/codex 对话提取常见操作并提出可沉淀 team 骨架(脑子=gpt-5.5 tool-agent)",
-         "agent_framework",
-         "omnicompany.packages.services._learning.conversation_sedimenter.workers",
-         "convop.request"),
     ]
     for args in teams:
         try:

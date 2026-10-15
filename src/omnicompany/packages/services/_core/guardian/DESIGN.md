@@ -266,7 +266,7 @@ _R034 (design_md)  ← 本 session 新加
 - 关联管线：[pipeline.py](pipeline.py) + [routers.py](routers.py)
 - 关联规则家族：[rules/](rules/) 全部 10 个家族文件
 - 关联规则注册：[rules/__init__.py](rules/__init__.py)（RULES 聚合）
-- 关联 Agent 复核：judge_agent.py / [llm_judge_agent.py](llm_judge_agent.py)
+- 关联 Agent 复核：judge_agent.py / llm_judge_agent.py
 - 关联 auto_check：[auto_check.py](auto_check.py) / [auto_comment.py](auto_comment.py) / [sentinel.py](sentinel.py)
 - 关联 tow_truck：[tow_truck.py](tow_truck.py)（Phase 1 只重命名）
 - 关联演化接入：[guardian_hook.py](guardian_hook.py) / [evolve_signal.py](evolve_signal.py)

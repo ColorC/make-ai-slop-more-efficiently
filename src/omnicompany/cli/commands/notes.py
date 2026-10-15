@@ -1,9 +1,9 @@
 # [OMNI] origin=claude-code ts=2026-06-22 type=cli
 # [OMNI] material_id="material:cli.commands.notes.py"
-"""omni notes — 操控 poof 里的 BlockSuite 笔记(经文件命令队列桥)。需 poof 在跑。
+"""omni notes — 操控 Canvas 的旧 BlockSuite 札记(经文件命令队列桥)。需札记画布打开。
 
 给 codex 总控用: 任意 增/删/改 笔记元素属性、搜索笔记/元素、列模板、居中定位、刷新。
-桥: CLI 写 `%LOCALAPPDATA%/poof/notes-bridge/req-<id>.json`, poof 前端轮询执行(在活的
+桥: CLI 写 `%LOCALAPPDATA%/overlay-shell/notes-bridge/req-<id>.json`, overlay-shell 前端轮询执行(在活的
 BlockSuite collection 上做定向 op, 不整 doc 替换 → 不损坏笔记), 写回 res-<id>.json。
 """
 from __future__ import annotations
@@ -20,7 +20,11 @@ from .._access import any_caller, external_or_controller
 
 def _bridge_dir() -> str:
     base = os.environ.get("LOCALAPPDATA") or os.environ.get("TEMP") or "."
-    d = os.path.join(base, "poof", "notes-bridge")
+    # Must match overlay-shell/src-tauri/src/notebridge.rs. The desktop app's
+    # Legacy compatibility note: the retired product used a different runtime directory;
+    # ``overlay-shell``; leaving the CLI on the legacy directory makes every
+    # request time out because the running app never sees it.
+    d = os.path.join(base, "overlay-shell", "notes-bridge")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -33,7 +37,7 @@ def _call(op: str, *, timeout: float = 25.0, **args):
     tmp = req + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump({"op": op, **args}, f, ensure_ascii=False)
-    os.replace(tmp, req)  # 原子, poof 不会读到半截
+    os.replace(tmp, req)  # 原子写，札记画布不会读到半截
     deadline = time.time() + timeout
     while time.time() < deadline:
         if os.path.exists(res):
@@ -53,12 +57,12 @@ def _call(op: str, *, timeout: float = 25.0, **args):
         os.remove(req)
     except OSError:
         pass
-    raise click.ClickException("poof 没响应(要 poof 在跑;命令在活笔记 collection 上执行)")
+    raise click.ClickException("札记画布没响应(需打开 Canvas；命令在活动札记 collection 上执行)")
 
 
 @click.group("notes")
 def cmd_notes() -> None:
-    """操控 poof 笔记(增删改元素 / 搜索 / 模板 / 居中 / 刷新, 经桥, 需 poof 在跑)。"""
+    """操控 Canvas 札记(增删改元素 / 搜索 / 模板 / 居中 / 刷新，经桥，需札记画布打开)。"""
 
 
 def _emit(data) -> None:
@@ -85,7 +89,7 @@ def cmd_notes_list() -> None:
 @click.argument("query")
 @any_caller
 def cmd_notes_search(query: str) -> None:
-    """搜笔记 + 元素(标题 / 正文匹配),返回命中的元素链接 poof-note://note/block。"""
+    """搜札记与元素(标题 / 正文匹配)，返回 omni://note/<id> 引用。"""
     _emit(_call("search", query=query))
 
 
@@ -113,18 +117,42 @@ def cmd_notes_add(note: str, flavour: str, text: str, parent: str | None) -> Non
 @click.option(
     "--kind",
     required=True,
-    type=click.Choice(["md", "file", "plan", "progress", "review", "ai"]),
-    help="md/file=文件路径(md→原生同步块, file→代码块原文); plan/progress/review=omni 实体; ai=AI块",
+    type=click.Choice(["md", "file", "image", "plan", "progress", "review", "ai"]),
+    help="md/file=文件路径(md→原生同步块, file→代码块原文); image=图片路径(可带 --xywh 摆上画布); plan/progress/review=omni 实体; ai=AI块",
 )
 @click.option("--ref", default="", help="源标识: 文件路径 / plan_id / 进度 id / mat_id")
 @click.option("--name", default=None, help="显示名(可选)")
 @click.option("--text", default="", help="ai 块的初始文本(可选)")
+@click.option("--xywh", default=None, help='image 专用: 画布坐标 "[x,y,w,h]", 给了就摆上 surface 画布')
 @any_caller
 def cmd_notes_add_block(
-    note: str, kind: str, ref: str, name: str | None, text: str
+    note: str, kind: str, ref: str, name: str | None, text: str, xywh: str | None
 ) -> None:
-    """把内容作为同步源块加进笔记(双向写回源 + 历史)。统一入口, 走 poof 的块注册表/插入总线。"""
-    _emit(_call("add-block", note=note, kind=kind, ref=ref, name=name, text=text))
+    """把内容作为同步源块加进札记(双向写回源 + 历史)，走 Canvas 块注册表/插入总线。"""
+    _emit(_call("add-block", note=note, kind=kind, ref=ref, name=name, text=text, xywh=xywh))
+
+
+@cmd_notes.command("add-element")
+@click.option("--note", required=True)
+@click.option(
+    "--etype",
+    required=True,
+    type=click.Choice(["connector", "shape", "frame", "text"]),
+    help="connector=连线(需 --from/--to); shape=形状 / frame=分区 / text=文本(需 --xywh)",
+)
+@click.option("--from", "from_", default=None, help="connector 起点块 id")
+@click.option("--to", default=None, help="connector 终点块 id")
+@click.option("--xywh", default=None, help='画布坐标 "[x,y,w,h]"(shape/frame/text 必填)')
+@click.option("--text", default=None, help="文字内容(connector 标签 / shape / text)")
+@click.option("--name", default=None, help="frame 标题")
+@any_caller
+def cmd_notes_add_element(
+    note: str, etype: str, from_: str | None, to: str | None,
+    xywh: str | None, text: str | None, name: str | None,
+) -> None:
+    """在笔记画布(surface)上创建连线/形状/分区/文本元素。"""
+    _emit(_call("add-element", note=note, etype=etype, to=to, xywh=xywh,
+                text=text, name=name, **{"from": from_}))
 
 
 @cmd_notes.command("update")
@@ -189,24 +217,25 @@ def cmd_notes_templates() -> None:
 @cmd_notes.command("refresh")
 @any_caller
 def cmd_notes_refresh() -> None:
-    """刷新(让 poof 重渲染当前笔记)。"""
+    """刷新当前札记。"""
     _emit(_call("refresh"))
 
 
 # ── note 真源只读 + 提升成 plan (WORK-LIFECYCLE-AND-DISPATCH) ──
-# 这两条**不走 notebridge**(不需 poof 在跑), 直接读 poof-notes 浅路径文件,
-# note 唯一真源仍是 poof-notes, omni 只读不另存。
+# 这两条**不走 notebridge**(不需 Canvas 打开)，直接读 overlay-note-store 浅路径文件；
+# 札记唯一真源仍是 overlay-note-store，omni 只读不另存。
 
 @cmd_notes.command("ls")
 @click.option("--json", "as_json", is_flag=True)
 @any_caller
 def cmd_notes_ls(as_json: bool) -> None:
-    """列 poof-notes 浅路径里的笔记(只读, 不需 poof 在跑)。"""
+    """列 overlay-note-store 里的 Material 札记(只读，不需 Canvas 打开)。"""
     from omnicompany.packages.services._core.lifecycle.note_source import read_note_source
     src = read_note_source()
     if not src.available():
         raise click.ClickException(
-            f"读不到 poof-notes 浅路径: {src.index_path} (poof 未落浅路径 / POOF_NOTES_DIR 未配)")
+            f"读不到 overlay-note-store: {src.index_path} "
+            "(札记画布尚未落盘 / OVERLAY_NOTE_STORE_DIR 未配；旧环境变量仍兼容)")
     notes = [n.to_dict() for n in src.list_notes()]
     if as_json:
         _emit(notes)
@@ -221,16 +250,16 @@ def cmd_notes_ls(as_json: bool) -> None:
 @click.option("--json", "as_json", is_flag=True)
 @any_caller
 def cmd_notes_read(note_id: str, as_json: bool) -> None:
-    """读一条 poof 笔记的标题+正文(只读浅路径, 不需 poof 在跑)。"""
+    """读一条 Material 札记的标题与正文(只读浅路径，不需 Canvas 打开)。"""
     from omnicompany.packages.services._core.lifecycle.note_source import read_note_source
     n = read_note_source().get_note(note_id)
     if not n:
-        raise click.ClickException(f"poof-notes 里没有 note: {note_id} (omni notes ls 看有哪些)")
+        raise click.ClickException(f"overlay-note-store 里没有札记: {note_id} (用 omni notes ls 查看)")
     if as_json:
         _emit(n.to_dict(with_body=True))
         return
     click.echo(f"# {n.title}  ({n.anchor if hasattr(n,'anchor') else note_id})")
-    click.echo(n.body() or "(无正文 .md 导出; 在 poof 打开该笔记或 omni notes refresh)")
+    click.echo(n.body() or "(无正文 .md 导出；在 Canvas 打开该札记或执行 omni notes refresh)")
 
 
 @cmd_notes.command("promote")
@@ -242,7 +271,7 @@ def cmd_notes_read(note_id: str, as_json: bool) -> None:
 @any_caller
 def cmd_notes_promote(note_id: str, category: str, model: str | None,
                       dry: bool, as_json: bool) -> None:
-    """把一条 poof note 调研澄清成可执行 plan 草稿 (走统一 agent)。
+    """把一条 Material 札记调研澄清成可执行 plan 草稿(走统一 agent)。
 
     产出 docs/plans/<category>/[date]NAME/plan.md(+brief.md); 歧义标 NEEDS CLARIFICATION
     并入 omni human inbox; 草稿要过 omni plan gate 才能 split/dispatch。
@@ -279,9 +308,9 @@ def _notes_materialize_state_path():
 @cmd_notes.command("materialize")
 @external_or_controller
 @click.option("--model", default=None, help="覆盖默认性价比模型")
-@click.option("--inbox", is_flag=True, help="置信不足/越界标签推 human-inbox")
+@click.option("--inbox", is_flag=True, help="置信不足/越界标签推 HumanBus 运行时人工复核队列")
 def cmd_notes_materialize(model: str | None, inbox: bool) -> None:
-    """消费任务: poof-notes 逐条水位线增量入册(标题分叉修正+双时间+受控标签), 真源零改动。
+    """消费任务: Material 札记逐条水位线增量入册(标题修正+双时间+受控标签)，真源零改动。
 
     手动 = 直接跑此 verb; 定期 = cron 任务 gov-notes-materialize 每小时调同函数
     (index.json 无变更时零 LLM 调用)。
@@ -299,9 +328,9 @@ def cmd_notes_materialize(model: str | None, inbox: bool) -> None:
 @external_or_controller
 @click.option("--apply", "do_apply", is_flag=True, help="真移动(默认 dry-run 只出清单)")
 def cmd_notes_quarantine_orphans(do_apply: bool) -> None:
-    """孤儿 ydoc(index.json 未收录)回收: 只移动进 poof-notes/_trash/, collection 根绝不动。
+    """孤儿 ydoc(index.json 未收录)回收: 只移入 overlay-note-store/_trash，collection 根绝不动。
 
-    默认 dry-run 只出清单; --apply 才真移动(可回搬, poof-notes 是独立 git 仓)。
+    默认 dry-run 只出清单；--apply 才真移动(可回搬，札记存储与 omni 仓分离)。
     """
     from omnicompany.packages.services._core.lifecycle.note_source import overlay_note_store_dir
     from omnicompany.packages.services._core.lifecycle.notes_materialize import quarantine_orphan_ydocs

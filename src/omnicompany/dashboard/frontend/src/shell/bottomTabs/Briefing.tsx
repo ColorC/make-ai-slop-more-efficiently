@@ -8,7 +8,7 @@ const S: Record<string, React.CSSProperties> = {
     height: '100%',
     overflow: 'auto',
     background: 'var(--fp-bg)',
-    color: '#d8dee9',
+    color: 'var(--fp-text)',
     fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif',
     padding: 20,
     boxSizing: 'border-box',
@@ -21,8 +21,8 @@ const S: Record<string, React.CSSProperties> = {
     marginBottom: 18,
     flexWrap: 'wrap',
   },
-  headline: { fontSize: 22, fontWeight: 700, color: 'var(--fp-text)', marginBottom: 8, letterSpacing: 0 },
-  sub: { fontSize: 15, color: '#a7b0bd', lineHeight: 1.6, maxWidth: 760 },
+  headline: { fontSize: 22, fontWeight: 500, color: 'var(--fp-text)', marginBottom: 8, letterSpacing: 0 },
+  sub: { fontSize: 15, color: 'var(--fp-text)', lineHeight: 1.6, maxWidth: 760 },
   timestamp: { fontSize: 14, color: 'var(--fp-text-3)', whiteSpace: 'nowrap' },
   grid: {
     display: 'grid',
@@ -30,37 +30,37 @@ const S: Record<string, React.CSSProperties> = {
     gap: 10,
     marginBottom: 16,
   },
-  tile: { border: '1px solid #242b33', background: 'var(--fp-solid)', borderRadius: 6, padding: 14, minHeight: 74 },
-  tileLabel: { fontSize: 14, color: '#9aa6b2', marginBottom: 8 },
-  tileValue: { fontSize: 26, color: 'var(--fp-text)', fontWeight: 700, letterSpacing: 0 },
+  tile: { border: '1px solid var(--fp-border)', background: 'var(--fp-solid)', borderRadius: 2, padding: 14, minHeight: 74 },
+  tileLabel: { fontSize: 14, color: 'var(--fp-text)', marginBottom: 8 },
+  tileValue: { fontSize: 26, color: 'var(--fp-text)', fontWeight: 500, letterSpacing: 0 },
   sectionGrid: {
     display: 'grid',
     gridTemplateColumns: 'minmax(260px, 1.1fr) minmax(260px, 1fr)',
     gap: 14,
   },
-  section: { borderTop: '1px solid #242b33', paddingTop: 12, minWidth: 0 },
-  sectionTitle: { fontSize: 15, color: '#90caf9', fontWeight: 700, marginBottom: 8 },
+  section: { borderTop: '1px solid var(--fp-border)', paddingTop: 12, minWidth: 0 },
+  sectionTitle: { fontSize: 15, color: 'var(--fp-link)', fontWeight: 500, marginBottom: 8 },
   row: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
     padding: '9px 0',
-    borderBottom: '1px solid #171d24',
+    borderBottom: '1px solid var(--fp-border)',
     minWidth: 0,
   },
   rowMain: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   muted: { color: 'var(--fp-text-3)', fontSize: 14 },
-  link: { color: '#90caf9', textDecoration: 'none' },
+  link: { color: 'var(--fp-link)', textDecoration: 'none' },
   pill: {
     flexShrink: 0,
     border: '1px solid var(--fp-border)',
     borderRadius: 999,
     padding: '2px 8px',
     fontSize: 14,
-    color: '#c9d1d9',
+    color: 'var(--fp-text)',
   },
-  error: { color: '#ff8a80', fontSize: 15, lineHeight: 1.6 },
+  error: { color: 'var(--fp-err)', fontSize: 15, lineHeight: 1.6 },
 }
 
 function relFromIso(ts: string | null | undefined): string {
@@ -172,10 +172,10 @@ export default function BriefingTab() {
           {((data as any).plans.active as any[]).map((p) => {
             const fresh = Boolean(p.fresh_24h)
             return (
-              <div key={p.plan_id} style={{ ...S.row, ...(fresh ? { background: '#0d2116' } : {}) }} data-fresh={fresh ? '1' : '0'}>
+              <div key={p.plan_id} style={{ ...S.row, ...(fresh ? { background: 'color-mix(in srgb, var(--fp-ok) 14%, transparent)' } : {}) }} data-fresh={fresh ? '1' : '0'}>
                 <button
                   type="button"
-                  style={{ ...S.link, ...S.rowMain, color: fresh ? '#8ee6a8' : '#90caf9', background: 'transparent', border: 0, cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                  style={{ ...S.link, ...S.rowMain, color: fresh ? 'var(--fp-ok)' : 'var(--fp-link)', background: 'transparent', border: 0, cursor: 'pointer', textAlign: 'left', padding: 0 }}
                   data-testid="briefing-plan-item"
                   {...openProps(
                     () => openTab({ type: 'plan', id: p.plan_id }, p.title || p.plan_id),

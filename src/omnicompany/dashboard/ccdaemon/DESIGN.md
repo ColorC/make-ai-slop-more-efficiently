@@ -9,11 +9,11 @@
 - **下一步**: 阶段三把 `cc_wrapper/` 全套搬入 + 重命名 + 重写 chat 路线
 
 ## 核心目的
-ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单独跑一个 uvicorn 进程 (8201), 装载所有 claude-agent-sdk client / winpty PtySession / claude binary 子进程, 跟 dashboard 控制面进程**进程级隔离**.
+ccdaemon 是 OmniCompany **外部 CLI Agent Worker 子进程的独家持有方**。它单独运行 uvicorn (8201)，持有 Codex、Claude Code、Kiro、Kimi、OpenCode、CodeBuddy、Qoder 等真实 PTY runtime，并与 Dashboard 控制面进程级隔离。
 
-**解决**: dashboard 控制面文件 (`controlplane/*.py`) 改动后开 `--reload` 自动生效, 不影响 ccdaemon 持有的 chat 会话; 反过来 ccdaemon 自身代码改动通过 `omni cc daemon restart` 显式触发, 浏览器走自动重连协议感知重启 + 历史续展, 不会出现"AI IDE 改 chat 后端把当前对话杀掉" 的自杀事故.
+**解决**: Dashboard 控制面热更新不影响 ccdaemon 持有的 CLI Agent Worker；daemon 自身改动通过 `omni cc daemon restart` 显式生效，所有表现端按同一 Worker ID 重连或 provider-native resume。
 
-**不解决**: HTTP/WebSocket 反向代理 (属 `controlplane/cc_proxy.py`); CLI 入口 (属 `cli/commands/cc.py` 跟 `cli/commands/cc_daemon.py`); 业务逻辑 (chat / pty 内的真业务), 仅做生命周期 + 路由装载.
+**不解决**: HTTP/WebSocket 反向代理（属 `controlplane/cc_proxy.py`）、模型本身的业务判断和 Team 拓扑；这里只负责外部 runtime 的生命周期、终端 I/O、binding 和事件桥接。
 
 ## 核心接口
 
@@ -23,8 +23,8 @@ ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单
 
 ### 业务模块
 - **`sessions.py`** — `CcSession` 共同基类, 封装 `data/cc_sessions.json` 元数据协议 (id/kind/cwd/started_at/ended_at/claude_session_id/active_plan/exit_reason). 阶段三填写 — sessions.py
-- **`chat.py`** — claude-agent-sdk 路线 chat session manager + 路由 + WebSocket. 阶段三从 `cc_wrapper/cc_chat_bridge.py` 重写迁入 — [chat.py](chat.py)
-- **`pty.py`** — winpty 路线 PTY session manager + 路由 + WebSocket. 阶段三从 `cc_wrapper/pty_service.py` 跟 `cc_wrapper/api.py` 合并迁入 — [pty.py](pty.py)
+- **`chat.py`** — 旧结构化 chat 的只读历史兼容；新建接口返回 410，不再是运行路径 — [chat.py](chat.py)
+- **`pty.py` / `pty_routes.py`** — Agent Worker 的真实 PTY 持有方和统一 `/cc/agent-workers` 入口 — [pty.py](pty.py)
 - **`installer.py`** — claude code settings 安装/卸载工具. 阶段三从 `cc_wrapper/settings_installer.py` 迁入 — [installer.py](installer.py)
 - **`hooks/`** — claude code SessionStart / PreToolUse / UserPromptSubmit 等钩子. 阶段三整目录从 `cc_wrapper/hooks/` 搬入 — [hooks/](hooks/)
 - **`mcp_server.py`** — claude code MCP server 集成. 阶段三搬入 — [mcp_server.py](mcp_server.py)
@@ -72,4 +72,4 @@ ccdaemon 是 dashboard 体系内**Claude Code 子进程的独家持有方**. 单
 - 关联计划: [`docs/plans/dashboard/[2026-05-09]DASHBOARD-DOGFOOD-RESILIENCE/plan.md`](../../../../docs/plans/dashboard/[2026-05-09]DASHBOARD-DOGFOOD-RESILIENCE/plan.md)
 - 协议依赖: [`docs/plans/dashboard/[2026-05-03]CC-PLAN-SESSION-CONTEXT/plan.md`](../../../../docs/plans/dashboard/[2026-05-03]CC-PLAN-SESSION-CONTEXT/plan.md) (active_plan 绑定 / cc_sessions.json schema)
 - 兄弟包依赖: [`controlplane/DESIGN.md`](../controlplane/DESIGN.md) (反向代理协议 / cc_proxy.py)
-- 关联规范: `docs/standards/cli/cc_wrapper_hooks.md`
+- 关联规范: [`docs/standards/cli/cc_wrapper_hooks.md`](../../../../docs/standards/cli/cc_wrapper_hooks.md)

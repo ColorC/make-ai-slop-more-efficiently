@@ -120,6 +120,48 @@ def _post(path: str, body: dict) -> dict:
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
+# ── M3b 真源分流: OMNI_TASK_SSOT=plan-groups 时读写改走 plan-groups 文件真源 ──
+def _ssot_pg() -> bool:
+    from omnicompany.packages.services._core.lifecycle.task import ssot_is_plan_groups
+    return ssot_is_plan_groups()
+
+
+def _board(archived: bool = False) -> dict:
+    if _ssot_pg():
+        from omnicompany.packages.services._core.lifecycle import plan_groups_store as pgs
+        return pgs.board(archived)
+    return _get("/api/board" + ("?archived=1" if archived else ""))
+
+
+def _create_task(record: dict) -> None:
+    if _ssot_pg():
+        from omnicompany.packages.services._core.lifecycle import plan_groups_store as pgs
+        goal_id = str(record.get("goal_id") or "").strip()
+        gid = pgs.group_of_milestone(goal_id) if goal_id else None
+        if gid is None:
+            gid = "_inbox"  # 里程碑不存在 → 收件箱（whatnow 对未知 goal 也只是挂上）
+        pgs.add_task(gid, record)
+        return
+    _post("/api/tasks", record)
+
+
+def _add_progress(task_id: str, text: str, source: str) -> None:
+    if _ssot_pg():
+        from omnicompany.packages.services._core.lifecycle import plan_groups_store as pgs
+        pgs.append_progress("task", task_id, text, source)
+        return
+    _post("/api/progress", {"subject_kind": "task", "subject_id": task_id,
+                            "text": text, "source": source})
+
+
+def _patch_task(task_id: str, **fields) -> None:
+    if _ssot_pg():
+        from omnicompany.packages.services._core.lifecycle import plan_groups_store as pgs
+        pgs.patch_task(task_id, **fields)
+        return
+    _post("/api/task/patch", {"id": task_id, **fields})
+
+
 def _match_task_by_plan(board: dict, plan_id: str) -> str:
     """在 board 里按 plan_id 找 task: 精确 → 后缀(去 [日期]/路径前缀) 双匹配。"""
     leaf = plan_id.rstrip("/").split("/")[-1]
@@ -164,13 +206,13 @@ class WhatnowRecorderWorker(Worker):
     def run(self, input_data: dict[str, Any]) -> Verdict:
         a = input_data.get("planprog.assessment") or {}
         plan_id = str(a.get("plan_id", ""))
-        # whatnow 可达性 + 取 board。必须带 archived=1 与 sync 发现阶段同口径——
+        # 真源可达性 + 取 board。必须带 archived=1 与 sync 发现阶段同口径——
         # 否则已归档 task 在这里不可见, 会被误判成新计划重建(还把 archived 洗掉)。
         try:
-            board = _get("/api/board?archived=1")
+            board = _board(archived=True)
         except Exception as e:  # noqa: BLE001
             return Verdict(kind=VerdictKind.FAIL,
-                           diagnosis=f"whatnow 不可达(:8230): {e} —— 先确认服务在跑(start-whatnow.cmd)")
+                           diagnosis=f"任务真源不可读(:8230 或 plan-groups): {e}")
         task_id = str(a.get("task_id", "")).strip() or _match_task_by_plan(board, plan_id)
         created = False
         if not task_id:
@@ -179,14 +221,14 @@ class WhatnowRecorderWorker(Worker):
             if not goal_id:
                 return Verdict(
                     kind=VerdictKind.FAIL,
-                    diagnosis=(f"whatnow board 里没有 plan_id={plan_id} 对应的 task, "
+                    diagnosis=(f"board 里没有 plan_id={plan_id} 对应的 task, "
                                f"且未给 goal_id(无法新建归属), 无法记录"),
                     output={"plan_id": plan_id, "recorded": False, "whatnow_ok": True,
                             "note": "no matching task, no goal_id to create under"},
                 )
             task_id = _plan_task_id(plan_id)
             try:
-                _post("/api/tasks", {
+                _create_task({
                     "id": task_id, "goal_id": goal_id, "plan_id": plan_id,
                     "title": str(a.get("title", plan_id))[:120],
                     "status": a.get("status", "in_progress"),
@@ -195,9 +237,9 @@ class WhatnowRecorderWorker(Worker):
                 })
             except Exception as e:  # noqa: BLE001
                 return Verdict(kind=VerdictKind.FAIL,
-                               diagnosis=f"新建 whatnow task 失败(plan_id={plan_id}, goal={goal_id}): {e}")
+                               diagnosis=f"新建 task 失败(plan_id={plan_id}, goal={goal_id}): {e}")
             created = True
-            board = _get("/api/board")  # 刷新, 让下面"当前完成度不倒退"能查到刚建的 task
+            board = _board()  # 刷新, 让下面"当前完成度不倒退"能查到刚建的 task
         # 当前完成度(不倒退) + 执行子任务完成率(有子任务时三者取 max, §N-completion)
         cur = 0
         exec_rate: int | None = None
@@ -211,17 +253,16 @@ class WhatnowRecorderWorker(Worker):
         ev = " / ".join(a.get("evidence") or [])
         note = f"[plan-progress-recorder] {a.get('progress_note', '')}" + (f" | 证据: {ev}" if ev else "")
         try:
-            _post("/api/progress", {"subject_kind": "task", "subject_id": task_id,
-                                    "text": note, "source": "plan-progress-recorder"})
-            _post("/api/task/patch", {"id": task_id, "completion": new_c,
-                                      "status": a.get("status", "in_progress"),
-                                      "line": a.get("line", "side")})
+            _add_progress(task_id, note, "plan-progress-recorder")
+            _patch_task(task_id, completion=new_c,
+                        status=a.get("status", "in_progress"),
+                        line=a.get("line", "side"))
         except Exception as e:  # noqa: BLE001
-            return Verdict(kind=VerdictKind.FAIL, diagnosis=f"whatnow 写入失败: {e}")
+            return Verdict(kind=VerdictKind.FAIL, diagnosis=f"任务真源写入失败: {e}")
         # 复查
         ok = False
         try:
-            b2 = _get("/api/board")
+            b2 = _board()
             for c in b2.get("clusters", []):
                 for g in c.get("goals", []):
                     for t in g.get("tasks", []):

@@ -59,12 +59,12 @@
 
 N 个元素带相同前缀, 触发收子目录. 例如:
 
-- `repo_absorption / repo_architect / repo_exporter / repo_learner` → 收 `_learning/repo/` 子目录
+- `repo_absorption / repo_architect / repo_learner` 已退役并移入 `_graveyard/services/_learning/repo/`；仍有独立价值的 `repo_exporter` 迁到 `_authoring/repo_exporter/`，不属于持续学习主线
 - `kb_ingestion_agent / kb_multi_agent` → 收 `_learning/kb/`
 - `hypothesis / hypothesis_library` → 收 `_learning/hypothesis/`
 - `absorption_runtime_test / code_runtime_test / runtime_test_builder` → 收 `_utility/runtime_test/`
 
-收完后子目录里的元素**去掉前缀**: `repo_absorption` → `_learning/repo/absorption`. 前缀已经在父目录体现, 不重复.
+退役目录只保留历史实现，不参与活包发现；当前持续学习唯一入口见 `docs/projects/ai-learning-observatory/PROJECT_INDEX.md`。
 
 ### 3.3 共同消费方
 
@@ -102,7 +102,7 @@ N 个元素属于同一语义类别 (即使前缀不同), 触发收子目录:
 | `_domain_specific/` | 特定 domain 的子内容 | `docs/standards/_domain_specific/demogame/` |
 | `_experimental/` | 实验性 / 临时, 可能废弃 | `services/_experimental/` |
 
-~~`_scratch/`~~ — **2026-05-02 撤规范**. 跟 `.omni/sandbox/drafts/` 功能重叠 (都是注册前临时草稿区), 但 sandbox 有明确 lifecycle (drafts → check → promote / archive) 而 _scratch 是松散临时. 用户拍板归并: 临时工作走 `.omni/sandbox/drafts/`, 不立 `_scratch/`. 详 auto-memory `feedback_no_dir_creation_without_approval`.
+`_scratch/` 为历史存量位置，不再新建。一次性运行临时文件与待转正草稿分别按 [目录清洁度守则](directory_cleanliness.md) 的落点优先级处理；不得把所有临时运行输出都塞进草稿区，也不得因旧目录退役而直接删除或移动其内容。
 
 下划线前缀的目录在排序时排在前面 (lexicographic), 自然区别于业务子目录.
 
@@ -216,7 +216,7 @@ N 个元素属于同一语义类别 (即使前缀不同), 触发收子目录:
 4. _前缀的目录不当业务子目录用 (4.1 约定)
 5. service 跟 domain 边界判定按 4.3 (服务跨业务 vs 业务私域)
 6. 每个目录回答一个清晰的语义问题 (一、 根本)
-7. **新目录创建经审批** — AI IDE / agent 不擅自新建目录, 必须先经用户批准 (跨项目铁律 2026-05-02 立, 详 auto-memory `feedback_no_dir_creation_without_approval`)
+7. **新目录先确定归属** — 已授权任务在项目既有分区内创建必要目录可直接实施；新顶层项目、改变项目主目录或跨项目迁移应先明确归属和依赖，不能以建目录代替设计判断。已有用户授权不重复索取。
 8. **不擅自立新 bucket** — `services/` 下 `_authoring / _core / _diagnosis / _learning / _utility` 5 个 bucket 是固定清单, 新 bucket 必先改本规范 §4.2.1 加范围 + 用户批准
 
 ## 八、 修订协议
@@ -225,13 +225,13 @@ N 个元素属于同一语义类别 (即使前缀不同), 触发收子目录:
 
 1. 改之前先看本规范当前怎么定义"修订"
 2. 改完跑一次现有目录结构的 audit, 看有没有新违反的
-3. audit 报告进 `docs/plans/<日期>DIRECTORY-RESTRUCTURE/plan.md`
+3. audit 过程与证据追加当前治理计划 `progress.md`，不为一次修订另建平行计划
 4. 修订日期跟 OmniMark `ts` 字段同步
 
 ## 九、 跟其他规范的关系
 
 - `_global/distributed-docs.md` 立六域结构 + 内容类型矩阵 — 本规范是"目录形态" 层, distributed-docs 是"内容归属" 层, 不冲突
 - `concepts/template.md` §一 三层分类 — AI 控制体系 / 文档体系 / 元模板. 本规范的 `_core/` / `_authoring/` / 等是这三层的物理目录组织
-- `cli/sandbox.md` 沙盒规范 — `.omni/sandbox/` 是临时草稿唯一位置 (2026-05-02 撤掉 `_scratch/` 后归并)
+- `cli/sandbox.md` 沙盒规范 — `.omni/sandbox/` 管待转正草稿；运行临时文件位置统一按 `_global/directory_cleanliness.md`，不扩大沙盒语义
 - `_global/single_source_thin_wrap.md` 唯一源 + 薄包装铁律 — 跟本规范 `templates/<kind>/` (源) 跟 `.claude/skills/<X>/SKILL.md` (薄包装) 的关系一致
 - `concepts/plan.md` plan 目录规范 — 本规范是父级, plan 规范是子规范的具体化

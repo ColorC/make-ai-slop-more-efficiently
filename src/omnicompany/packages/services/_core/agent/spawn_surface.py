@@ -72,7 +72,7 @@ AGENT_SPAWN_ENTRIES: tuple[AgentSpawnEntry, ...] = (
         kind="controller-spawn",
         surface="SpawnSubagentRouter / omni worker spawn",
         label="Asynchronous BOSS SIGHT plan worker",
-        implementation="omnicompany.dashboard.boss_sight.controller.tools.SpawnSubagentRouter",
+        implementation="omnicompany.packages.services.boss_sight.controller.tools.SpawnSubagentRouter",
         use_when=(
             "The BOSS SIGHT controller starts a long-running plan-bound worker and must "
             "return a subagent id immediately."

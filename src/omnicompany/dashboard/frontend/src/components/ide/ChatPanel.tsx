@@ -93,7 +93,7 @@ export default function ChatPanel({ onFileClick, appendText, onAppendConsumed }:
       >
         {timeline.length === 0 && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ color: '#444', fontSize: 15, textAlign: 'center' }}>
+            <div style={{ color: 'var(--fp-text-3)', fontSize: 15, textAlign: 'center' }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>omnicompany</div>
               <div>Type a message to start an agent session</div>
             </div>
@@ -114,7 +114,7 @@ export default function ChatPanel({ onFileClick, appendText, onAppendConsumed }:
 
         {isRunning && (
           <div style={{ padding: '4px 12px' }}>
-            <span style={{ color: '#ffb74d', fontSize: 14, animation: 'pulse 1.5s infinite' }}>
+            <span style={{ color: 'var(--fp-warn)', fontSize: 14, animation: 'pulse 1.5s infinite' }}>
               Agent is {agentState}...
             </span>
           </div>
@@ -127,7 +127,7 @@ export default function ChatPanel({ onFileClick, appendText, onAppendConsumed }:
           display: 'flex',
           gap: 8,
           padding: '8px 12px',
-          borderTop: '1px solid #222',
+          borderTop: '1px solid var(--fp-border-subtle)',
           background: 'var(--fp-bg)',
         }}
       >
@@ -139,10 +139,10 @@ export default function ChatPanel({ onFileClick, appendText, onAppendConsumed }:
           disabled={isRunning}
           style={{
             flex: 1,
-            background: '#111',
-            border: '1px solid #333',
-            borderRadius: 8,
-            color: '#e0e0e0',
+            background: 'var(--fp-bp-solid)',
+            border: '1px solid var(--fp-border-subtle)',
+            borderRadius: 'var(--fp-bp-r1)',
+            color: 'var(--fp-text)',
             padding: '8px 12px',
             fontSize: 15,
             fontFamily: 'Consolas, Menlo, monospace',
@@ -157,10 +157,10 @@ export default function ChatPanel({ onFileClick, appendText, onAppendConsumed }:
           onClick={handleSend}
           disabled={isRunning || !input.trim()}
           style={{
-            background: input.trim() && !isRunning ? '#1a3a5a' : '#1a1a1a',
-            border: '1px solid #2a3a4a',
-            borderRadius: 8,
-            color: input.trim() && !isRunning ? '#90caf9' : '#444',
+            background: input.trim() && !isRunning ? 'var(--fp-bp-paper-2)' : 'var(--fp-bp-solid)',
+            border: '1px solid var(--fp-border)',
+            borderRadius: 'var(--fp-bp-r1)',
+            color: input.trim() && !isRunning ? 'var(--fp-link)' : 'var(--fp-text-3)',
             padding: '8px 16px',
             cursor: input.trim() && !isRunning ? 'pointer' : 'not-allowed',
             fontSize: 14,

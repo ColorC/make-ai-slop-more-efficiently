@@ -2,7 +2,11 @@ import React from 'react'
 import { Activity } from 'lucide-react'
 import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
-import MultiagentView from './MultiagentView'
+
+// The runtime board is one of the heaviest dashboard surfaces. Keep its
+// registration metadata in the entry chunk, but fetch the view only when the
+// panel hydrates instead of making every dashboard load parse it up front.
+const MultiagentView = React.lazy(() => import('./MultiagentView'))
 
 export interface MultiagentEntity extends Entity {
   type: 'multiagent'

@@ -1,0 +1,750 @@
+{
+  "$defs": {
+    "ApplicabilityScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "account_scope_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Account Scope Id"
+        },
+        "build_scope_id": {
+          "minLength": 1,
+          "title": "Build Scope Id",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "game_version": {
+          "minLength": 1,
+          "title": "Game Version",
+          "type": "string"
+        },
+        "locale": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locale"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_through": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid Through"
+        }
+      },
+      "required": [
+        "environment_id",
+        "game_id",
+        "build_scope_id",
+        "game_version"
+      ],
+      "title": "ApplicabilityScopeV1",
+      "type": "object"
+    },
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "FactRecordV1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "inferred",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "rationale": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "rationale"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "contradicted"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict_fact_ids": {
+                "minItems": 1
+              },
+              "evidence_refs": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "evidence_refs",
+              "conflict_fact_ids"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "applicability": {
+          "$ref": "#/$defs/ApplicabilityScopeV1"
+        },
+        "conflict_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conflict Fact Ids",
+          "type": "array"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "unknown",
+            "contradicted"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "supersedes_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supersedes Fact Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "statement",
+        "status",
+        "applicability",
+        "recorded_at"
+      ],
+      "title": "FactRecordV1",
+      "type": "object"
+    },
+    "FailureRecoveryBoundaryV1": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "minLength": 1,
+          "title": "Condition",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/FactRecordV1"
+          },
+          "minItems": 1,
+          "title": "Facts",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "failure",
+            "invalid",
+            "cooldown",
+            "depletion",
+            "recovery",
+            "irreversible",
+            "safety"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "response": {
+          "minLength": 1,
+          "title": "Response",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "condition",
+        "response",
+        "facts"
+      ],
+      "title": "FailureRecoveryBoundaryV1",
+      "type": "object"
+    },
+    "ResourceFlowV1": {
+      "additionalProperties": false,
+      "properties": {
+        "conditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conditions",
+          "type": "array"
+        },
+        "direction": {
+          "enum": [
+            "input",
+            "consume",
+            "produce",
+            "reward",
+            "convert"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/FactRecordV1"
+          },
+          "minItems": 1,
+          "title": "Facts",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "quantity_expression": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity Expression"
+        },
+        "resource_entity_id": {
+          "minLength": 1,
+          "title": "Resource Entity Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "direction",
+        "resource_entity_id",
+        "facts"
+      ],
+      "title": "ResourceFlowV1",
+      "type": "object"
+    },
+    "SystemRelationV1": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/FactRecordV1"
+          },
+          "minItems": 1,
+          "title": "Facts",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "relation_type": {
+          "minLength": 1,
+          "title": "Relation Type",
+          "type": "string"
+        },
+        "target_system_id": {
+          "minLength": 1,
+          "title": "Target System Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "relation_type",
+        "target_system_id",
+        "description",
+        "facts"
+      ],
+      "title": "SystemRelationV1",
+      "type": "object"
+    },
+    "SystemStateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/FactRecordV1"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "description"
+      ],
+      "title": "SystemStateV1",
+      "type": "object"
+    },
+    "SystemTransitionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Effects",
+          "type": "array"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/FactRecordV1"
+          },
+          "minItems": 1,
+          "title": "Facts",
+          "type": "array"
+        },
+        "from_state_id": {
+          "minLength": 1,
+          "title": "From State Id",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "preconditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Preconditions",
+          "type": "array"
+        },
+        "to_state_id": {
+          "minLength": 1,
+          "title": "To State Id",
+          "type": "string"
+        },
+        "trigger": {
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "from_state_id",
+        "to_state_id",
+        "trigger",
+        "facts"
+      ],
+      "title": "SystemTransitionV1",
+      "type": "object"
+    },
+    "UnknownQuestionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "next_observation": {
+          "minLength": 1,
+          "title": "Next Observation",
+          "type": "string"
+        },
+        "priority": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "question": {
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "related_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Fact Ids",
+          "type": "array"
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Reason"
+        }
+      },
+      "required": [
+        "id",
+        "question",
+        "priority",
+        "next_observation"
+      ],
+      "title": "UnknownQuestionV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "classification": {
+      "enum": [
+        "core_loop",
+        "adjacent",
+        "top_level",
+        "read_only",
+        "unknown"
+      ],
+      "title": "Classification",
+      "type": "string"
+    },
+    "entry_and_unlock": {
+      "items": {
+        "$ref": "#/$defs/FactRecordV1"
+      },
+      "minItems": 1,
+      "title": "Entry And Unlock",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "failure_recovery_boundaries": {
+      "items": {
+        "$ref": "#/$defs/FailureRecoveryBoundaryV1"
+      },
+      "minItems": 1,
+      "title": "Failure Recovery Boundaries",
+      "type": "array"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "modeling_status": {
+      "enum": [
+        "modeled",
+        "partial",
+        "read_only_boundary",
+        "unknown"
+      ],
+      "title": "Modeling Status",
+      "type": "string"
+    },
+    "objective": {
+      "items": {
+        "$ref": "#/$defs/FactRecordV1"
+      },
+      "minItems": 1,
+      "title": "Objective",
+      "type": "array"
+    },
+    "relations": {
+      "items": {
+        "$ref": "#/$defs/SystemRelationV1"
+      },
+      "title": "Relations",
+      "type": "array"
+    },
+    "resource_flows": {
+      "items": {
+        "$ref": "#/$defs/ResourceFlowV1"
+      },
+      "title": "Resource Flows",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.game-system-dossier.v1",
+      "default": "game-observatory.game-system-dossier.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_document_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Document Ids",
+      "type": "array"
+    },
+    "states": {
+      "items": {
+        "$ref": "#/$defs/SystemStateV1"
+      },
+      "minItems": 1,
+      "title": "States",
+      "type": "array"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "transitions": {
+      "items": {
+        "$ref": "#/$defs/SystemTransitionV1"
+      },
+      "title": "Transitions",
+      "type": "array"
+    },
+    "unknown_questions": {
+      "items": {
+        "$ref": "#/$defs/UnknownQuestionV1"
+      },
+      "title": "Unknown Questions",
+      "type": "array"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "game_id",
+    "environment_id",
+    "title",
+    "classification",
+    "modeling_status",
+    "objective",
+    "entry_and_unlock",
+    "states",
+    "failure_recovery_boundaries",
+    "updated_at"
+  ],
+  "title": "GameSystemDossierV1",
+  "type": "object"
+}

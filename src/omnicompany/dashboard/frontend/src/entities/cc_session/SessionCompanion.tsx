@@ -1,65 +1,67 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   Activity,
-  ArrowLeft,
   BookOpen,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardCheck,
   Copy,
   ExternalLink,
-  FolderKanban,
-  GitBranch,
   Keyboard,
   LayoutPanelLeft,
-  ListTree,
   Maximize2,
+  Minimize2,
+  NotebookPen,
+  LayoutGrid,
   Plus,
   RefreshCw,
   Rows3,
   Square,
-  Unlink,
 } from 'lucide-react'
 import { ccApi, type CcSessionMeta, type SessionContext } from '../../api/ccClient'
-import {
-  reviewstageApi,
-  type ReviewReadback,
-  type ReviewReadbackItem,
-} from '../../api/reviewstageClient'
-import { api, type TraceDetail, type TraceEvent } from '../../api/client'
 import { copyText } from '../../lib/copyText'
 import { openInOmnidashboard } from '../../lib/surface'
 import { usePanels } from '../../stores/panelsStore'
 import KebabMenu, { type KebabItem } from '../../shared/view/ui/KebabMenu'
-import { useReviewStream } from '../review/streamStore'
 import { useSessionControls, type SessionControls } from './sessionControlsStore'
 import { commandForSiblingSession } from './sessionCommand'
 import './sessionCompanion.css'
+import { workshopSurfaceUrl } from '../../lib/workshopSurface'
+import { ensureDesktopSession } from '../../lib/desktopSession'
+import { useCompanionNav } from './companionNavStore'
 
-const ReviewMaterialPanel = React.lazy(async () => {
-  const module = await import('../review_material')
-  return { default: module.ReviewMaterialPanel }
+const WorkshopSurface = React.lazy(async () => {
+  const module = await import('../studio_reader/WorkshopSurface')
+  return { default: module.WorkshopSurface }
+})
+
+// 未绑定项目的概览才回退到审阅队列。绑定后只挂唯一的项目 Wiki 首页。
+const TaskPanel = React.lazy(() => import('../task/TaskPanel'))
+
+const ReviewBoard = React.lazy(async () => {
+  const module = await import('../review_queue/ReviewBoard')
+  return { default: module.ReviewBoard }
+})
+
+const ProjectDetail = React.lazy(async () => {
+  const module = await import('../project/ProjectDetail')
+  return { default: module.default }
 })
 
 export type CompanionMode = 'embedded' | 'tab' | 'surface'
-export type CompanionPage = 'multiagent' | 'overview' | 'materials' | 'trace'
-export const DEFAULT_COMPANION_PAGE: CompanionPage = 'multiagent'
+// 已提交页(2026-08-14 用户裁定)移除: 提交是会话行为, 侧栏只置顶展示本会话提交的材料。
+// 2026-09-04: 专注页并回 Todo(studio) —— 用户「todo 和专注差距太小了, 要么就
+// 合并到 todo 吧」。消息队列现在是 Todo 页顶部那一段, 不再单独占一个页签。
+export type CompanionPage = 'multiagent' | 'overview' | 'notes' | 'studio'
+export const DEFAULT_COMPANION_PAGE: CompanionPage = 'overview'
 
 const MultiagentView = React.lazy(async () => {
   const module = await import('../multiagent/MultiagentView')
   return { default: module.default }
 })
 
-const MATERIAL_PAGE_SIZE = 8
-const TRACE_PAGE_SIZE = 24
-
 export interface SessionCompanionProps {
   sessionId: string
   alive?: boolean
   mode?: CompanionMode
   onHeaderDoubleClick?: () => void
-  onRequestWide?: () => void
   headerActions?: React.ReactNode
 }
 
@@ -73,12 +75,17 @@ export function companionSurfaceUrl(
   return url.toString()
 }
 
-export function dedupeReviewReadback(items: ReviewReadbackItem[]): ReviewReadbackItem[] {
-  const byId = new Map<string, ReviewReadbackItem>()
-  for (const item of items) {
-    if (item?.id && !byId.has(item.id)) byId.set(item.id, item)
-  }
-  return Array.from(byId.values())
+/** Dashboard and overlay both host the same Workshop Canvas. */
+export function sessionNotesUrl(
+  sessionId: string,
+  origin: string = window.location.origin,
+): string {
+  return new URL(workshopSurfaceUrl('canvas', { session: sessionId }), origin).toString()
+}
+
+export function companionHostTabId(sessionId: string, mode: CompanionMode): string | null {
+  if (mode === 'surface') return null
+  return mode === 'tab' ? `cc_companion:${sessionId}` : `cc_session:${sessionId}`
 }
 
 export async function requestSiblingSession(
@@ -97,54 +104,6 @@ export async function requestSiblingSession(
 function shortId(value: string, size = 10): string {
   if (!value) return '—'
   return value.length <= size ? value : value.slice(0, size)
-}
-
-function titleTail(value: string | null | undefined): string {
-  if (!value) return '未绑定'
-  const tail = value.split('/').filter(Boolean).pop() || value
-  return tail.replace(/^\[\d{4}-\d{2}-\d{2}\]/, '') || value
-}
-
-function providerLabel(provider: string | null | undefined): string {
-  if (!provider) return 'CLI'
-  if (provider === 'claude_code' || provider === 'claude-code') return 'Claude Code'
-  if (provider === 'codex') return 'Codex'
-  if (provider === 'codebuddy') return 'CodeBuddy'
-  if (provider === 'opencode') return 'OpenCode'
-  if (provider === 'kimi') return 'Kimi'
-  if (provider === 'shell') return 'Shell'
-  return provider
-}
-
-function formatTime(value: string | number | null | undefined): string {
-  if (value == null || value === '') return '—'
-  const date = typeof value === 'number'
-    ? new Date(value < 1e12 ? value * 1000 : value)
-    : new Date(value)
-  return Number.isNaN(date.getTime())
-    ? String(value)
-    : date.toLocaleString(undefined, {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-}
-
-function traceSummary(event: TraceEvent): string {
-  const payload = event.payload || {}
-  const value = (
-    payload.summary
-    || payload.title
-    || payload.task_desc
-    || payload.tool_name
-    || payload.command
-    || payload.message
-    || payload.path
-  )
-  if (value != null && String(value).trim()) return String(value).trim().slice(0, 180)
-  const keys = Object.keys(payload)
-  return keys.length ? keys.slice(0, 4).join(' · ') : event.event_type
 }
 
 function PageButton({
@@ -174,56 +133,30 @@ function PageButton({
   )
 }
 
-function Pager({
-  page,
-  total,
-  pageSize,
-  onChange,
-}: {
-  page: number
-  total: number
-  pageSize: number
-  onChange: (page: number) => void
-}) {
-  const pages = Math.max(1, Math.ceil(total / pageSize))
-  if (pages <= 1) return null
-  return (
-    <div className="cccp-pager" aria-label="分页">
-      <button type="button" disabled={page <= 0} onClick={() => onChange(page - 1)} aria-label="上一页">
-        <ChevronLeft size={14} />
-      </button>
-      <span>{page + 1} / {pages}</span>
-      <button type="button" disabled={page >= pages - 1} onClick={() => onChange(page + 1)} aria-label="下一页">
-        <ChevronRight size={14} />
-      </button>
-    </div>
-  )
-}
-
 export default function SessionCompanion({
   sessionId,
   alive,
   mode = 'embedded',
   onHeaderDoubleClick,
-  onRequestWide,
   headerActions,
 }: SessionCompanionProps) {
   const openTab = usePanels((state) => state.openTab)
   const [page, setPage] = useState<CompanionPage>(DEFAULT_COMPANION_PAGE)
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null)
   const [meta, setMeta] = useState<CcSessionMeta | null>(null)
   const [context, setContext] = useState<SessionContext | null>(null)
-  const [readback, setReadback] = useState<ReviewReadback | null>(null)
-  const [trace, setTrace] = useState<TraceDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [creatingSibling, setCreatingSibling] = useState(false)
-  const [materialPage, setMaterialPage] = useState(0)
-  const [tracePage, setTracePage] = useState(0)
-  const reviewVersion = useReviewStream((state) => state.version)
-  const reviewConnected = useReviewStream((state) => state.connected)
+  // 侧栏全屏(2026-08-16 用户裁定): CSS overlay 盖满视口, 取消后原位原样恢复 —— DOM 不动。
+  const [fullscreen, setFullscreen] = useState(false)
+  const [notesMounted, setNotesMounted] = useState(false)
+  const [notesReady, setNotesReady] = useState(false)
+  const [notesSlow, setNotesSlow] = useState(false)
+  const [notesError, setNotesError] = useState('')
+  const [notesReload, setNotesReload] = useState(0)
   const controls = useSessionControls((state) => state.bySession[sessionId])
+  const navRequest = useCompanionNav((state) => state)
 
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
@@ -238,34 +171,8 @@ export default function SessionCompanion({
     setContext(nextContext)
     setMeta(nextMeta)
 
-    const provider = (
-      nextContext?.context.provider
-      || nextMeta?.provider
-      || 'claude_code'
-    )
-    const providerSessionId = (
-      nextContext?.context.provider_session_id
-      || nextMeta?.provider_session_id
-      || nextContext?.context.claude_session_id
-      || nextMeta?.claude_session_id
-      || sessionId
-    )
-    const traceId = nextContext?.context.trace_id || sessionId
-    const [readbackResult, traceResult] = await Promise.allSettled([
-      reviewstageApi.readback({
-        provider,
-        session_id: providerSessionId,
-        limit: 200,
-      }),
-      api.trace(traceId),
-    ])
-    if (readbackResult.status === 'fulfilled') setReadback(readbackResult.value)
-    if (traceResult.status === 'fulfilled') setTrace(traceResult.value)
-
     const failures: string[] = []
     if (contextResult.status === 'rejected') failures.push('会话绑定')
-    if (readbackResult.status === 'rejected') failures.push('已提交材料')
-    if (traceResult.status === 'rejected') failures.push('轨迹')
     setError(failures.length ? `${failures.join('、')}暂时不可用` : '')
     setLoading(false)
   }, [sessionId])
@@ -288,50 +195,71 @@ export default function SessionCompanion({
     }
   }, [alive, refresh])
 
-  useEffect(() => useReviewStream.getState().acquire(), [])
-
-  // 材料一提交，Review WebSocket 的 version 当场变化；readback 立即重拉。
-  // 15 秒可见页轮询只在事件流断线/关联晚到时兜底。
   useEffect(() => {
-    if (reviewVersion > 0) void refresh(true)
-  }, [refresh, reviewVersion])
-
-  const materials = useMemo(
-    () => dedupeReviewReadback(readback?.items || []),
-    [readback],
-  )
-  const activePlan = context?.context.active_plan || meta?.active_plan || null
-  const project = (
-    context?.context.project
-    || context?.context.plan_meta?.project
-    || null
-  ) as string | null
-  const traceId = context?.context.trace_id || sessionId
-  const events = trace?.events || []
-  const displayTitle = meta?.display_title || meta?.provider_title || shortId(sessionId, 12)
-  const ptyMissing = !loading && (!meta || !meta.alive)
+    setNotesMounted(false)
+    setNotesReady(false)
+    setNotesSlow(false)
+    setNotesError('')
+    setNotesReload(0)
+  }, [sessionId])
 
   useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(materials.length / MATERIAL_PAGE_SIZE) - 1)
-    if (materialPage > maxPage) setMaterialPage(maxPage)
-  }, [materialPage, materials.length])
+    if (page === 'notes') setNotesMounted(true)
+  }, [page, sessionId])
 
   useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(events.length / TRACE_PAGE_SIZE) - 1)
-    if (tracePage > maxPage) setTracePage(maxPage)
-  }, [events.length, tracePage])
+    if (!navRequest.sessionId || navRequest.sessionId !== sessionId || !navRequest.page) return
+    if (navRequest.page === 'notes') setNotesMounted(true)
+    setPage(navRequest.page)
+  }, [navRequest.nonce, navRequest.page, navRequest.sessionId, sessionId])
 
-  const openEntity = useCallback((
-    type: 'plan' | 'project' | 'review_material' | 'trace',
-    id: string,
-    title: string,
-  ) => {
-    if (mode === 'surface') {
-      openInOmnidashboard(type, id, undefined, title)
+  const handleNotesReady = useCallback(() => {
+    setNotesReady(true)
+    setNotesSlow(false)
+    setNotesError('')
+  }, [])
+
+  // 2026-08-18 统一应用鉴权: 画布 iframe 报 auth-required 时不再把登录表单留在画布里。
+  // 桌面运行时先补 mint 一次会话; 拿不到(或浏览器环境)就顶层打开一次画布入口,
+  // 让用户在顶层完成网关登录拿到 cookie, 回到侧栏重试即可。
+  const reauthNotes = useCallback(async () => {
+    setNotesError('')
+    const ok = await ensureDesktopSession().catch(() => false)
+    if (ok) {
+      setNotesReady(false)
+      setNotesSlow(false)
+      setNotesReload((value) => value + 1)
       return
     }
-    openTab({ type, id }, title)
-  }, [mode, openTab])
+    window.open(sessionNotesUrl(sessionId), '_blank', 'noopener')
+  }, [sessionId])
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data
+      if (!data || typeof data !== 'object') return
+      if (data.type === 'omni-notes-ready') {
+        handleNotesReady()
+        return
+      }
+      if (data.type === 'omni-notes-error') {
+        setNotesError(String(data.error || '画布打开失败'))
+        setNotesSlow(true)
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [handleNotesReady])
+
+  useEffect(() => {
+    if (page !== 'notes' || notesReady) return
+    const timer = window.setTimeout(() => setNotesSlow(true), 8_000)
+    return () => window.clearTimeout(timer)
+  }, [notesReady, notesReload, page])
+
+  const displayTitle = meta?.display_title || meta?.provider_title || shortId(sessionId, 12)
+  const ptyMissing = !loading && (!meta || !meta.alive)
+  const project = context?.context.project?.trim() || ''
 
   const openCompanionTab = useCallback((split: boolean) => {
     openTab(
@@ -393,25 +321,10 @@ export default function SessionCompanion({
   }, [controls, refresh, sessionId])
 
   const selectPage = (next: CompanionPage) => {
-    setSelectedMaterialId(null)
+    if (next === 'notes') setNotesMounted(true)
     setPage(next)
-    if (next === 'materials') onRequestWide?.()
+    // 2026-08-12 用户裁决: 切页签不再自动加宽侧栏(宽度尽量不变), 宽窄只由用户拖/双击决定
   }
-
-  const selectMaterial = (item: ReviewReadbackItem) => {
-    setSelectedMaterialId(item.id)
-    setPage('materials')
-    onRequestWide?.()
-  }
-
-  const visibleMaterials = materials.slice(
-    materialPage * MATERIAL_PAGE_SIZE,
-    (materialPage + 1) * MATERIAL_PAGE_SIZE,
-  )
-  const visibleEvents = events.slice(
-    tracePage * TRACE_PAGE_SIZE,
-    (tracePage + 1) * TRACE_PAGE_SIZE,
-  )
 
   const actionItems: KebabItem[] = [
     ...(mode === 'embedded' ? [
@@ -429,32 +342,15 @@ export default function SessionCompanion({
       },
     ] : []),
     {
+      label: '复制会话 ID',
+      icon: <Copy size={15} />,
+      onClick: () => { void copyText(sessionId) },
+    },
+    {
       label: '复制独立链接',
       icon: <Copy size={15} />,
       testid: 'companion-copy-link',
       onClick: copyCompanionLink,
-    },
-    {
-      label: '在新窗口打开',
-      icon: <Maximize2 size={15} />,
-      testid: 'companion-open-window',
-      onClick: () => window.open(companionSurfaceUrl(sessionId), '_blank', 'noopener,noreferrer'),
-    },
-    {
-      label: 'Multiagent',
-      icon: <Activity size={15} />,
-      onClick: () => {
-        if (mode === 'surface') openInOmnidashboard('multiagent', 'main', undefined, 'Multiagent')
-        else openTab({ type: 'multiagent', id: 'main' }, 'Multiagent')
-      },
-    },
-    {
-      label: '审阅',
-      icon: <ClipboardCheck size={15} />,
-      onClick: () => {
-        if (mode === 'surface') openInOmnidashboard('review_queue', 'main', undefined, '审阅')
-        else openTab({ type: 'review_queue', id: 'main' }, '审阅')
-      },
     },
     ...(controls ? [
       {
@@ -462,12 +358,6 @@ export default function SessionCompanion({
         icon: <Keyboard size={15} />,
         testid: 'cc-session-toggle-key-mode',
         onClick: controls.toggleKeyMode,
-      },
-      {
-        label: '全选终端内容',
-        icon: <Copy size={15} />,
-        testid: 'cc-session-select-all',
-        onClick: controls.selectAll,
       },
       {
         label: '终端快捷键速查',
@@ -483,41 +373,6 @@ export default function SessionCompanion({
     },
   ]
 
-  if (selectedMaterialId) {
-    const selected = materials.find((item) => item.id === selectedMaterialId)
-    return (
-      <section className="cccp-root cccp-reading" data-testid="session-companion" data-mode={mode}>
-        <header className="cccp-reading-head">
-          <button
-            type="button"
-            className="cccp-text-btn"
-            onClick={() => setSelectedMaterialId(null)}
-            data-testid="companion-material-back"
-          >
-            <ArrowLeft size={14} /> 已提交
-          </button>
-          <div className="cccp-reading-title" title={selected?.title || selectedMaterialId}>
-            {selected?.title || selectedMaterialId}
-          </div>
-          <button
-            type="button"
-            className="cccp-icon-btn"
-            title="在完整页签中打开"
-            aria-label="在完整页签中打开"
-            onClick={() => openEntity('review_material', selectedMaterialId, selected?.title || selectedMaterialId)}
-          >
-            <ExternalLink size={14} />
-          </button>
-        </header>
-        <div className="cccp-reader">
-          <React.Suspense fallback={<div className="cccp-empty">正在加载材料阅读视图…</div>}>
-            <ReviewMaterialPanel id={selectedMaterialId} embedded />
-          </React.Suspense>
-        </div>
-      </section>
-    )
-  }
-
   return (
     <section
       className="cccp-root"
@@ -525,6 +380,7 @@ export default function SessionCompanion({
       data-mode={mode}
       data-page={page}
       data-session-id={sessionId}
+      data-fullscreen={fullscreen ? '1' : undefined}
     >
       <nav
         className="cccp-nav"
@@ -535,16 +391,16 @@ export default function SessionCompanion({
       >
         <div className="cccp-nav-pages">
           <PageButton active={page === 'multiagent'} icon={<Activity size={14} />} onClick={() => selectPage('multiagent')} testid="companion-nav-multiagent">
-            Multiagent
+            会话
           </PageButton>
-          <PageButton active={page === 'overview'} icon={<FolderKanban size={14} />} onClick={() => selectPage('overview')} testid="companion-nav-overview">
+          <PageButton active={page === 'overview'} icon={<BookOpen size={14} />} onClick={() => selectPage('overview')} testid="companion-nav-overview">
             概览
           </PageButton>
-          <PageButton active={page === 'materials'} icon={<BookOpen size={14} />} onClick={() => selectPage('materials')} testid="companion-nav-materials">
-            已提交 <span className="cccp-count">{materials.length}</span>
+          <PageButton active={page === 'notes'} icon={<NotebookPen size={14} />} onClick={() => selectPage('notes')} testid="companion-nav-notes">
+            画布
           </PageButton>
-          <PageButton active={page === 'trace'} icon={<ListTree size={14} />} onClick={() => selectPage('trace')} testid="companion-nav-trace">
-            轨迹 <span className="cccp-count">{events.length}</span>
+          <PageButton active={page === 'studio'} icon={<LayoutGrid size={14} />} onClick={() => selectPage('studio')} testid="companion-nav-studio">
+            Todo
           </PageButton>
         </div>
         <div className="cccp-nav-actions">
@@ -563,6 +419,16 @@ export default function SessionCompanion({
               ? <RefreshCw size={14} className="cccp-spinning" />
               : <Plus size={14} />}
           </button>
+          <button
+            type="button"
+            className="cccp-icon-btn"
+            title={fullscreen ? '取消全屏（回到原位置）' : '侧栏全屏'}
+            aria-label={fullscreen ? '取消全屏' : '侧栏全屏'}
+            data-testid="cc-session-fullscreen"
+            onClick={() => setFullscreen((value) => !value)}
+          >
+            {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
           <KebabMenu testid="cc-session-actions" items={actionItems} />
           <button
             type="button"
@@ -578,9 +444,9 @@ export default function SessionCompanion({
         </div>
       </nav>
 
-      {(actionError || error || ptyMissing || (!reviewConnected && reviewVersion > 0)) && (
+      {(actionError || error) && (
         <div className="cccp-notice" data-error="1" role="status">
-          {actionError || error || (ptyMissing ? 'PTY 已不在运行；材料与轨迹仍可查看。' : '材料实时流已断开，正在短轮询补偿。')}
+          {actionError || error}
         </div>
       )}
 
@@ -593,154 +459,87 @@ export default function SessionCompanion({
           </div>
         )}
 
-        {page === 'overview' && (
-          <div className="cccp-page" data-testid="companion-overview">
-            <section className="cccp-section">
-              <div className="cccp-section-head">
-                <span>绑定</span>
-                <span>Plan / Project</span>
-              </div>
-              <button
-                type="button"
-                className="cccp-binding"
-                data-bound={activePlan ? '1' : '0'}
-                disabled={!activePlan}
-                onClick={() => activePlan && openEntity('plan', activePlan, titleTail(activePlan))}
-              >
-                {activePlan ? <CheckCircle2 size={15} /> : <Unlink size={15} />}
-                <span className="cccp-binding-label">PLAN</span>
-                <strong title={activePlan || undefined}>{titleTail(activePlan)}</strong>
-                {activePlan && <ExternalLink size={12} />}
-              </button>
-              <button
-                type="button"
-                className="cccp-binding"
-                data-bound={project ? '1' : '0'}
-                disabled={!project}
-                onClick={() => project && openEntity('project', project, project)}
-              >
-                {project ? <CheckCircle2 size={15} /> : <Unlink size={15} />}
-                <span className="cccp-binding-label">PROJECT</span>
-                <strong title={project || undefined}>{project || '未绑定'}</strong>
-                {project && <ExternalLink size={12} />}
-              </button>
-            </section>
-
-            <div className="cccp-stat-grid">
-              <button type="button" onClick={() => selectPage('materials')}>
-                <BookOpen size={16} />
-                <strong>{materials.length}</strong>
-                <span>已提交材料</span>
-              </button>
-              <button type="button" onClick={() => selectPage('trace')}>
-                <GitBranch size={16} />
-                <strong>{events.length}</strong>
-                <span>轨迹事件</span>
-              </button>
-            </div>
-
-            <section className="cccp-section">
-              <div className="cccp-section-head">
-                <span>会话</span>
-                <span>{shortId(sessionId, 12)}</span>
-              </div>
-              <dl className="cccp-meta">
-                <div><dt>Provider</dt><dd>{providerLabel(context?.context.provider || meta?.provider)}</dd></div>
-                <div><dt>Native ID</dt><dd title={context?.context.provider_session_id || meta?.provider_session_id || undefined}>{shortId(context?.context.provider_session_id || meta?.provider_session_id || '', 16)}</dd></div>
-                <div><dt>Trace</dt><dd title={traceId}>{shortId(traceId, 16)}</dd></div>
-                <div><dt>Started</dt><dd>{formatTime(context?.context.started_at || meta?.started_at)}</dd></div>
-                <div className="cccp-meta-wide"><dt>CWD</dt><dd title={context?.context.cwd || meta?.cwd || undefined}>{context?.context.cwd || meta?.cwd || '—'}</dd></div>
-              </dl>
-            </section>
+        {page === 'studio' && (
+          <div className="cccp-page cccp-page-studio" data-testid="companion-studio">
+            <React.Suspense fallback={<div className="cccp-empty">正在载入 Todo…</div>}>
+              <TaskPanel sessionId={sessionId} />
+            </React.Suspense>
           </div>
         )}
 
-        {page === 'materials' && (
-          <div className="cccp-page" data-testid="companion-materials">
-            <div className="cccp-page-head">
-              <div>
-                <strong>已提交材料</strong>
-                <span>正式关联 + 对话中精确发送的 ID / 链接 / 名称</span>
-              </div>
-              <Pager page={materialPage} total={materials.length} pageSize={MATERIAL_PAGE_SIZE} onChange={setMaterialPage} />
-            </div>
-            {visibleMaterials.length === 0 ? (
-              <div className="cccp-empty">
-                <BookOpen size={20} />
-                <strong>还没有检测到已提交材料</strong>
-                <span>发送材料 ID、材料链接或完整名称后会自动出现。</span>
+        {page === 'overview' && (
+          <div className="cccp-page cccp-page-overview" data-testid="companion-overview">
+            {project ? (
+              <div className="cccp-wiki-host" data-testid="companion-project-wiki" data-project={project}>
+                <React.Suspense fallback={<div className="cccp-empty">正在载入项目 Wiki…</div>}>
+                  <ProjectDetail key={project} entity={{ id: project }} wikiOnly />
+                </React.Suspense>
               </div>
             ) : (
-              <div className="cccp-material-list">
-                {visibleMaterials.map((item) => (
+              <React.Suspense fallback={<div className="cccp-empty">正在载入审阅队列…</div>}>
+                <ReviewBoard />
+              </React.Suspense>
+            )}
+          </div>
+        )}
+
+        <div
+          className="cccp-page cccp-page-notes"
+          data-testid="companion-notes"
+          hidden={page !== 'notes'}
+        >
+          {notesMounted && (
+            <div
+              className="cccp-notes-host"
+              data-testid="companion-notes-host"
+              data-session-id={sessionId}
+            >
+              <React.Suspense fallback={<div className="cccp-empty">正在打开画布…</div>}>
+                <WorkshopSurface
+                  key={`${sessionId}:${notesReload}`}
+                  kind="canvas"
+                  sessionId={sessionId}
+                  title="札记"
+                  onReady={handleNotesReady}
+                  onError={(error) => {
+                    setNotesError(error)
+                    if (error === 'auth-required') setNotesSlow(true)
+                  }}
+                />
+              </React.Suspense>
+            </div>
+          )}
+          {notesMounted && !notesReady && (
+            <div className="cccp-notes-gate" data-testid="companion-notes-loading">
+              <RefreshCw className="cccp-notes-spin" size={18} />
+              <strong>{notesError === 'auth-required' ? '画布需要重新认证' : (notesError || (notesSlow ? '画布加载时间过长' : '正在打开画布…'))}</strong>
+              <span>{notesSlow ? '可在这里重载；也可以先用独立页面打开，不必一直等空白画布。' : '画布就绪后会自动出现。'}</span>
+              {notesSlow && (
+                <div className="cccp-notes-recovery">
                   <button
                     type="button"
-                    key={item.id}
-                    className="cccp-material-row"
-                    onClick={() => selectMaterial(item)}
-                    data-testid={`companion-material-${item.id}`}
+                    onClick={() => {
+                      setNotesReady(false)
+                      setNotesSlow(false)
+                      setNotesError('')
+                      setNotesReload((value) => value + 1)
+                    }}
                   >
-                    <span className="cccp-material-icon"><BookOpen size={15} /></span>
-                    <span className="cccp-material-main">
-                      <strong>{item.title}</strong>
-                      <span>
-                        {item.kind} · {item.status} · {formatTime(item.created_at)}
-                      </span>
-                      <code title={item.id}>{item.id}</code>
-                    </span>
-                    <span className="cccp-association">
-                      {item.association === 'session_binding' ? '已关联' : '对话提及'}
-                    </span>
-                    <ChevronRight size={14} />
+                    <RefreshCw size={14} /> 重新加载
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {page === 'trace' && (
-          <div className="cccp-page" data-testid="companion-trace">
-            <div className="cccp-page-head">
-              <div>
-                <strong>会话轨迹</strong>
-              </div>
-              <div className="cccp-page-actions">
-                <Pager page={tracePage} total={events.length} pageSize={TRACE_PAGE_SIZE} onChange={setTracePage} />
-                <button
-                  type="button"
-                  className="cccp-text-btn"
-                  onClick={() => openEntity('trace', traceId, `Trace · ${shortId(traceId, 12)}`)}
-                >
-                  完整轨迹 <ExternalLink size={12} />
-                </button>
-              </div>
+                  <a href={sessionNotesUrl(sessionId)} target="_blank" rel="noreferrer">
+                    <ExternalLink size={14} /> 独立打开
+                  </a>
+                  {notesError === 'auth-required' && (
+                    <button type="button" data-testid="companion-notes-reauth" onClick={() => { void reauthNotes() }}>
+                      <RefreshCw size={14} /> 重新认证
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            {visibleEvents.length === 0 ? (
-              <div className="cccp-empty">
-                <ListTree size={20} />
-                <strong>暂时没有轨迹事件</strong>
-                <span>会话事件进入统一 trace 后会在这里聚合。</span>
-              </div>
-            ) : (
-              <ol className="cccp-trace-list">
-                {visibleEvents.map((event) => (
-                  <li key={event.id}>
-                    <span className="cccp-trace-node" />
-                    <div>
-                      <div className="cccp-trace-line">
-                        <strong>{event.event_type}</strong>
-                        <span>{event.source}</span>
-                        <time>{formatTime(event.timestamp)}</time>
-                      </div>
-                      <p>{traceSummary(event)}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </section>
   )

@@ -180,7 +180,7 @@ def validate_context_fork_allocation(
     if not decision_ref.strip():
         raise ValueError("context_fork requires agent_allocation_decision_ref")
 
-    from omnicompany.packages.services._core.team_builder.agent_allocation import (
+    from omnicompany.packages.services._core.agent.agent_allocation import (
         AgentAllocationDecision,
         AgentAllocationMode,
     )

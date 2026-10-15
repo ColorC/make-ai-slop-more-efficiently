@@ -1,60 +1,60 @@
-// settings 实体页 · 蓝图 G 重置(2026-07-19 阶段四第四波;合同=TRIFORM-UX-REDESIGN-V2/demo/MAPPING.md):
-//   · 页内「系统信息 / Token 统计」无边框文字钮 → segmented(role=radiogroup/radio,
-//     与 dockview 窗口页签形态分层);「BOSS SIGHT」装饰行删除(分组卡 gr-h 已标识身份)。
-//   · 硬编码 console 皮(#0f0f0f/#90caf9/Consolas 栈)清零 → scene 格纸底 + 分组厚框纸件卡;
-//     内容 max-width 720 居中(消 desktop 1400px 眼动)。
-//   · 系统信息各节 → kv 条(mono 大写标签,元数据不泄漏原文);数据库 OK/缺/尺寸 → 状态徽章+mono。
-// 数据(/api/system/info)与文案锚点(版本 + 路径 / worker 数 / 数据库 / API 端点 / 系统信息)未动。
 import React, { useEffect, useState } from 'react'
-import { HardDrive, Settings } from 'lucide-react'
+import { HardDrive, LayoutPanelTop, Settings, TerminalSquare, Type } from 'lucide-react'
 import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
 import { usePanels } from '../../stores/panelsStore'
-import CcInstallCard from './CcInstallCard'
-import BossSightControlCard from './BossSightControlCard'
-import TokenStatsTab from './TokenStatsTab'
+import { TAB_TITLE_LIMITS, useUiSettings, type TabLayout, type TerminalRenderer } from '../../stores/uiSettingsStore'
+import ClientDownloadsTab from './ClientDownloadsTab'
+import ContentSharesTab from './ContentSharesTab'
+import SecurityNodeTab from './SecurityNodeTab'
+import SubscriptionsTab from './SubscriptionsTab'
 import './settings.css'
 
 export interface SettingsEntity extends Entity {
   type: 'settings'
 }
 
-const SINGLE: SettingsEntity = { type: 'settings' as any, id: 'main', title: '设置 / 系统信息' }
+const SINGLE: SettingsEntity = { type: 'settings' as any, id: 'main', title: '设置' }
 
 const resolver: EntityResolver<SettingsEntity> = {
   type: 'settings',
   async fetch(id) {
     if (id === 'main') return SINGLE
-    throw new Error(`settings: only 'main' available`)
+    if (id === 'subscriptions') return { type: 'settings' as const, id: 'subscriptions', title: '订阅配额' }
+    throw new Error(`settings: unknown id ${id}`)
   },
   async list() { return [SINGLE] },
 }
 
 interface SystemInfo {
   version: string
-  project_root: string
-  packages_root: string
-  stats: { worker_count: number; package_count: number }
-  databases: Record<string, { path: string; exists: boolean; size?: number; error?: string }>
-  endpoints: Record<string, string>
 }
 
-function fmtBytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
-}
+function SystemTab({ onOpenFileBridge }: { onOpenFileBridge: () => void }) {
+  const [info, setInfo] = useState<SystemInfo | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-function SystemInfoView({ info, onOpenFileBridge }: { info: SystemInfo; onOpenFileBridge: () => void }) {
+  useEffect(() => {
+    let alive = true
+    fetch('/api/system/info')
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json() as Promise<SystemInfo>
+      })
+      .then((payload) => { if (alive) setInfo(payload) })
+      .catch((reason) => { if (alive) setError(String(reason)) })
+    return () => { alive = false }
+  }, [])
+
   return (
     <>
-      <div className="st-sec">文件投递</div>
+      <div className="st-sec">本机入口</div>
       <section className="st-group">
         <div className="st-gr">
           <HardDrive size={17} aria-hidden="true" />
           <span className="st-row-t">
             <span className="t1">Agent 暂存区</span>
-            <span className="t2">查看上传记录；平时直接向任意页面拖入文件，或粘贴剪贴板中的文件。</span>
+            <span className="t2">查看上传记录；也可以向任意页面拖入或粘贴文件。</span>
           </span>
           <button
             type="button"
@@ -67,99 +67,161 @@ function SystemInfoView({ info, onOpenFileBridge }: { info: SystemInfo; onOpenFi
         </div>
       </section>
 
-      <BossSightControlCard />
-
-      <div className="st-sec">版本 + 路径</div>
+      <div className="st-sec">当前版本</div>
       <section className="st-group">
-        <div className="st-gr"><span className="st-k">version</span><span className="st-v">{info.version}</span></div>
-        <div className="st-gr"><span className="st-k">project_root</span><span className="st-v">{info.project_root}</span></div>
-        <div className="st-gr"><span className="st-k">packages_root</span><span className="st-v">{info.packages_root}</span></div>
+        <div className="st-gr">
+          <span className="st-k">Dashboard</span>
+          {info ? (
+            <span className="st-v">{info.version}</span>
+          ) : error ? (
+            <span className="st-err">暂时无法读取版本</span>
+          ) : (
+            <span className="st-muted">正在读取…</span>
+          )}
+        </div>
       </section>
-
-      <div className="st-sec">统计</div>
-      <section className="st-group">
-        <div className="st-gr"><span className="st-k">worker 数</span><span className="st-v">{info.stats.worker_count}</span></div>
-        <div className="st-gr"><span className="st-k">DESIGN.md 数</span><span className="st-v">{info.stats.package_count}</span></div>
-      </section>
-
-      <div className="st-sec">数据库</div>
-      <section className="st-group">
-        {Object.entries(info.databases).map(([name, db]) => (
-          <div key={name} className="st-gr st-db">
-            <div className="st-db-h">
-              <span className="st-db-n">{name}</span>
-              <span className={`v2-status ${db.exists ? 'st-ok' : 'st-err'}`}>
-                <i className="led" aria-hidden="true" />{db.exists ? 'OK' : '缺'}
-              </span>
-              {db.exists && db.size !== undefined && <span className="st-db-s">{fmtBytes(db.size)}</span>}
-            </div>
-            <div className="st-db-p">{db.path || db.error || ''}</div>
-          </div>
-        ))}
-      </section>
-
-      <div className="st-sec">API 端点</div>
-      <section className="st-group">
-        {Object.entries(info.endpoints).map(([k, v]) => (
-          <div key={k} className="st-gr"><span className="st-k">{k}</span><span className="st-v">{v}</span></div>
-        ))}
-      </section>
-
-      <CcInstallCard />
     </>
   )
 }
 
-const TABS: Array<{ key: 'system' | 'tokens'; label: string }> = [
-  { key: 'system', label: '系统信息' },
-  { key: 'tokens', label: 'Token 统计' },
+function InterfaceTab() {
+  const tabLayout = useUiSettings((state) => state.tabLayout)
+  const tabTitleMaxLength = useUiSettings((state) => state.tabTitleMaxLength)
+  const setTabLayout = useUiSettings((state) => state.setTabLayout)
+  const setTabTitleMaxLength = useUiSettings((state) => state.setTabTitleMaxLength)
+  const terminalRenderer = useUiSettings((state) => state.terminalRenderer)
+  const setTerminalRenderer = useUiSettings((state) => state.setTerminalRenderer)
+  const layouts: Array<{ value: TabLayout; label: string }> = [
+    { value: 'single-row', label: '单行' },
+    { value: 'stacked', label: '堆叠' },
+  ]
+  // gpu = WebGL(快, 但画布不透明, 玻璃只能做在窗框); glass = DOM 渲染器(真透, 更吃 CPU)
+  const renderers: Array<{ value: TerminalRenderer; label: string }> = [
+    { value: 'gpu', label: '高性能' },
+    { value: 'glass', label: '玻璃' },
+  ]
+
+  return (
+    <>
+      <div className="st-sec">页签</div>
+      <section className="st-group">
+        <div className="st-gr">
+          <LayoutPanelTop size={17} aria-hidden="true" />
+          <span className="st-row-t">
+            <span className="t1">页签排列</span>
+            <span className="t2">选择单行横向滚动，或允许页签自动换行堆叠。</span>
+          </span>
+          <span className="v2-seg" role="radiogroup" aria-label="页签排列">
+            {layouts.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                role="radio"
+                aria-checked={tabLayout === item.value}
+                className={`seg-i${tabLayout === item.value ? ' on' : ''}`}
+                onClick={() => setTabLayout(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </span>
+        </div>
+        <div className="st-gr st-gr-separated">
+          <Type size={17} aria-hidden="true" />
+          <span className="st-row-t">
+            <span className="t1">标题最大长度</span>
+            <span className="t2">超过长度后以省略号显示，完整标题仍会保留。</span>
+          </span>
+          <label className="st-number-field">
+            <input
+              type="number"
+              min={TAB_TITLE_LIMITS.min}
+              max={TAB_TITLE_LIMITS.max}
+              step={1}
+              aria-label="页签标题最大长度"
+              value={tabTitleMaxLength}
+              onChange={(event) => setTabTitleMaxLength(Number(event.target.value))}
+            />
+            <span>字</span>
+          </label>
+        </div>
+      </section>
+
+      <div className="st-sec">终端</div>
+      <section className="st-group">
+        <div className="st-gr">
+          <TerminalSquare size={17} aria-hidden="true" />
+          <span className="st-row-t">
+            <span className="t1">终端底</span>
+            <span className="t2">
+              玻璃能让蓝图格纸从文字底下透上来，代价是退回 CPU 渲染，大量输出滚动时更吃性能。
+              切换后需重开终端页签才生效。
+            </span>
+          </span>
+          <span className="v2-seg" role="radiogroup" aria-label="终端底">
+            {renderers.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                role="radio"
+                aria-checked={terminalRenderer === item.value}
+                className={`seg-i${terminalRenderer === item.value ? ' on' : ''}`}
+                onClick={() => setTerminalRenderer(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </span>
+        </div>
+      </section>
+    </>
+  )
+}
+
+type SettingsTab = 'downloads' | 'subscriptions' | 'content-shares' | 'security' | 'interface' | 'system'
+
+const TABS: Array<{ key: SettingsTab; label: string }> = [
+  { key: 'downloads', label: '客户端下载' },
+  { key: 'subscriptions', label: '订阅配额' },
+  { key: 'content-shares', label: '内容分享' },
+  { key: 'security', label: 'Remote Node' },
+  { key: 'interface', label: '界面' },
+  { key: 'system', label: '系统' },
 ]
 
-const Editor: React.FC<{ entity: SettingsEntity }> = () => {
-  const [tab, setTab] = useState<'system' | 'tokens'>('system')
-  const [info, setInfo] = useState<SystemInfo | null>(null)
-  const [error, setError] = useState<string | null>(null)
+const Editor: React.FC<{ entity: SettingsEntity }> = ({ entity }) => {
+  const [tab, setTab] = useState<SettingsTab>(entity.id === 'subscriptions' ? 'subscriptions' : 'downloads')
   const openTab = usePanels((state) => state.openTab)
-  useEffect(() => {
-    fetch('/api/system/info')
-      .then((r) => r.json())
-      .then(setInfo)
-      .catch((e) => setError(String(e)))
-  }, [])
 
   return (
     <div className="st-page" data-testid="settings-page">
       <div className="st-tools">
         <span className="v2-seg" role="radiogroup" aria-label="设置视图" data-testid="settings-view-tabs">
-          {TABS.map((t) => {
-            const on = tab === t.key
+          {TABS.map((item) => {
+            const selected = tab === item.key
             return (
               <button
-                key={t.key}
+                key={item.key}
                 type="button"
                 role="radio"
-                aria-checked={on}
-                className={`seg-i${on ? ' on' : ''}`}
-                onClick={() => setTab(t.key)}
+                aria-checked={selected}
+                className={`seg-i${selected ? ' on' : ''}`}
+                onClick={() => setTab(item.key)}
               >
-                {t.label}
+                {item.label}
               </button>
             )
           })}
         </span>
       </div>
       <div className="st-wrap">
-        {tab === 'tokens' ? (
-          <TokenStatsTab />
-        ) : error ? (
-          <div className="st-err">{error}</div>
-        ) : !info ? (
-          <div className="st-muted">loading…</div>
-        ) : (
-          <SystemInfoView
-            info={info}
-            onOpenFileBridge={() => openTab({ type: 'file_bridge', id: 'main' }, 'Agent 暂存区')}
-          />
+        {tab === 'downloads' && <ClientDownloadsTab onOpenRemoteNode={() => setTab('security')} />}
+        {tab === 'subscriptions' && <SubscriptionsTab />}
+        {tab === 'content-shares' && <ContentSharesTab />}
+        {tab === 'security' && <SecurityNodeTab />}
+        {tab === 'interface' && <InterfaceTab />}
+        {tab === 'system' && (
+          <SystemTab onOpenFileBridge={() => openTab({ type: 'file_bridge', id: 'main' }, 'Agent 暂存区')} />
         )}
       </div>
     </div>
@@ -169,6 +231,6 @@ const Editor: React.FC<{ entity: SettingsEntity }> = () => {
 export const settingsRegistration: EntityRegistration<SettingsEntity> = {
   resolver,
   renderer: { type: 'settings' as any, Editor },
-  label: '系统信息',
+  label: '设置',
   icon: React.createElement(Settings, { size: 14 }),
 }

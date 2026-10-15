@@ -21,9 +21,8 @@
     else:
         print(f"rejected: {result.reason}")
 
-UniversalFallbackLoop 会把 guarded_write 包装成 Agent 可调用的工具, 并强制
-每次 fallback 只有一个 `allowed_output`。Agent 试图写其他地方 → 工具返回
-reject 消息, Agent 收到反馈后自然放弃。
+UniversalFallbackLoop 先让外置 AgentRuntime 返回结构化报告，再由 Omni 直接
+调用 guarded_write。AgentRuntime 不获得任何写工具或输出路径选择权。
 """
 
 from __future__ import annotations

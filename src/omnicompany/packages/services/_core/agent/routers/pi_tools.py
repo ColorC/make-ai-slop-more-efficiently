@@ -155,16 +155,14 @@ class PiBashRouter(_PiToolContract, DevBashRouter):
             "PI_MODEL": getattr(ctx, "pi_model", ""),
             "PI_REASONING_LEVEL": getattr(ctx, "pi_reasoning_level", ""),
         }
-        prefix = " ".join(
-            f"{name}={shlex.quote(str(value))}"
-            for name, value in exports.items()
-            if str(value)
-        )
-        if prefix:
-            command = f"export {prefix}; {command}"
         translated = {
             "command": command,
             "cwd": str(getattr(ctx, "cwd", "") or ""),
+            # Keep observability metadata out of the command text.  Besides
+            # confusing exact command-prefix enforcement, POSIX `export` is not
+            # valid in the PowerShell fallback used on Windows without Git Bash.
+            # DevBash accepts only these fixed internal PI_* keys.
+            "_process_env": {name: str(value) for name, value in exports.items() if str(value)},
         }
         if timeout is not None:
             translated["timeout_sec"] = timeout

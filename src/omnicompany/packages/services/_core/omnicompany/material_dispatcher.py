@@ -1,10 +1,15 @@
 # [OMNI] origin=claude-code domain=omnicompany/omnicompany ts=2026-04-20T00:00:00Z type=router
 # [OMNI] material_id="material:omnicompany.worker_activation.dispatcher.engine.py"
-"""MaterialDispatcher — 让 Worker 通过 EventBus (stock) 订阅激活的 dispatcher.
+"""MaterialDispatcher — run-scoped Material ledger subscription dispatcher.
+
+Authority boundary:
+- Material bodies and activation order live in the private run ledger.
+- EventBus is an optional, bodyless audit projection only.
+- A missing or failed EventBus cannot change Material execution results.
 
 对齐黑板架构 plan:
 - Q1: 单次激活 (trace_id, worker_id) → 每 job 激活一次
-- EventBus = stock, FactoryEvent = material 封装
+- run ledger = 临时 Material stock, FactoryEvent = 兼容返回信封
 - Worker.FORMAT_IN = 订阅的 event_type
 - Worker.FORMAT_OUT = 产出的 event_type
 - trace_id = job_id（贯穿所有 material）
@@ -12,18 +17,20 @@
 
 运行模型（最小版）:
 1. 发布初始 material event
-2. 循环拉取 stock 里的 event
+2. 循环读取 run ledger 里的 Material
 3. 按 event_type 匹配订阅 worker → 激活 → 产 Verdict
 4. Verdict.output 的每条 {format_id: data} 发布为新 event
 5. 直到 stock 内无新 event（或达 max_iterations）
 
 composite FORMAT_IN (list[str]) 支持:
-- 按 worker 维护"待齐 material 集", 所有订阅的 material 都在 stock 里才激活
+- 按 worker 维护"待齐 material 集", 所有订阅的 material 都在 ledger 里才激活
 - 单次激活语义不变
 
-本 dispatcher 已在 2026-06-13 材料统一计划中转正为**材料黑板执行器**。验证路径:
+本 dispatcher 是旧 MaterialDispatcher API 的兼容执行器；跨 run 的 canonical
+Material 查询/订阅由 Material authority/BlackboardCoordinator 提供，不由 EventBus 提供。
+验证路径:
 - Team 1 guardian 4 Worker 通过 dispatcher 跑 scan_request → audit_log.entry 全链路
-- 跑通 = 证 EventBus 就是 stock, 设计自洽
+- 跑通 = 证明 ledger 订阅图自洽，与 EventBus 可用性无关
 - 跑不通 = 暴露之前不严谨 (F-15 透传 / F-16 kind 错标 / 孤儿 worker / 冗余 material)
 
 不做的事:
@@ -33,16 +40,62 @@ composite FORMAT_IN (list[str]) 支持:
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+import hashlib
+import json
 import logging
 from typing import Any
 
 from omnicompany.bus.base import EventBus
-from omnicompany.bus.memory import MemoryBus
 from omnicompany.protocol.anchor import Verdict, VerdictKind
 from omnicompany.protocol.events import FactoryEvent
 from omnicompany.runtime.routing.router import Router
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class _RunMaterialLedger:
+    """Canonical run-local Material bodies; never backed by EventBus."""
+
+    events: list[FactoryEvent] = field(default_factory=list)
+
+    def append(self, event: FactoryEvent) -> None:
+        self.events.append(event)
+
+    def at(self, cursor: int) -> FactoryEvent:
+        return self.events[cursor]
+
+    def __len__(self) -> int:
+        return len(self.events)
+
+
+def _body_digest(payload: dict[str, Any]) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _audit_projection(material: FactoryEvent) -> FactoryEvent:
+    """Project Material identity/provenance without copying its body."""
+    return FactoryEvent(
+        trace_id=material.trace_id,
+        event_type="material.published",
+        source="material_dispatcher.audit",
+        payload={
+            "material_ref": f"material-event:{material.id}",
+            "format_id": material.event_type,
+            "producer": material.source,
+            "causation_ref": material.parent_id,
+            "body_sha256": _body_digest(material.payload),
+        },
+        tags=["omni.material.projection", "material.published"],
+    )
 
 
 def _worker_id(worker: Router) -> str:
@@ -75,7 +128,7 @@ def _format_in_mode(worker: Router) -> str:
 
 
 class MaterialDispatcher:
-    """Worker × EventBus 激活驱动器.
+    """Worker × direct Material ledger activation driver.
 
     用法:
         dispatcher = MaterialDispatcher(workers=[W1, W2, W3, W4])
@@ -94,7 +147,7 @@ class MaterialDispatcher:
         max_iterations: int = 100,
     ):
         self._workers = workers
-        self._bus = bus or MemoryBus()
+        self._audit_bus = bus
         self._max_iterations = max_iterations
         # (trace_id, worker_id) → 已激活 (Q1 单次激活)
         self._activated: set[tuple[str, str]] = set()
@@ -106,13 +159,11 @@ class MaterialDispatcher:
         *,
         job_id: str | None = None,
     ) -> list[FactoryEvent]:
-        """运行一个 job: 发布初始 material → 驱动订阅激活 → 返回全部 event."""
+        """运行一个 job: 写入 run ledger → 驱动订阅激活 → 返回 material 信封."""
         from ulid import ULID
 
         if not job_id:
             job_id = str(ULID())
-
-        await self._bus.connect()
 
         initial_event = FactoryEvent(
             trace_id=job_id,
@@ -120,9 +171,7 @@ class MaterialDispatcher:
             source="dispatcher.initial",
             payload=initial_payload,
         )
-        await self._bus.publish(initial_event)
-
-        produced: list[FactoryEvent] = [initial_event]
+        ledger = _RunMaterialLedger([initial_event])
         # Worker 等齐 material 用的累计字典: (job_id, worker_id) → {format_id: event}
         # 按 job 分键: 子 job 独立累计 (agent 多轮不串味)
         pending: dict[tuple[str, str], dict[str, FactoryEvent]] = {}
@@ -130,8 +179,8 @@ class MaterialDispatcher:
         cursor = 0
         iter_count = 0
 
-        while cursor < len(produced) and iter_count < self._max_iterations:
-            current = produced[cursor]
+        while cursor < len(ledger) and iter_count < self._max_iterations:
+            current = ledger.at(cursor)
             cursor += 1
             iter_count += 1
 
@@ -215,12 +264,12 @@ class MaterialDispatcher:
                         source=f"worker.{wid}",
                         payload=payload,
                     )
-                    await self._bus.publish(new_event)
-                    produced.append(new_event)
+                    ledger.append(new_event)
                 # 清理 pending (本 worker 本 job 已激活)
                 pending.pop(buf_key, None)
 
-        await self._bus.close()
+        produced = ledger.events
+        await self._project_audit(produced)
 
         if iter_count >= self._max_iterations:
             logger.warning(
@@ -229,6 +278,22 @@ class MaterialDispatcher:
             )
 
         return produced
+
+    async def _project_audit(self, materials: list[FactoryEvent]) -> None:
+        """Best-effort bodyless projection; never an execution dependency."""
+        if self._audit_bus is None:
+            return
+        try:
+            await self._audit_bus.connect()
+            for material in materials:
+                await self._audit_bus.publish(_audit_projection(material))
+        except Exception as error:  # noqa: BLE001 - audit loss cannot replace Material truth
+            logger.warning("material audit projection failed: %s", error)
+        finally:
+            try:
+                await self._audit_bus.close()
+            except Exception as error:  # noqa: BLE001 - best-effort audit lifecycle
+                logger.warning("material audit bus close failed: %s", error)
 
     # ──────────────────────────────────────────────────────────
     # 激活 (处理 sync/async worker.run)

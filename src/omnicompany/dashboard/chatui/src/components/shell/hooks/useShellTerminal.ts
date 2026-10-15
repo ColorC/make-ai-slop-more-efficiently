@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject, RefObject } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
-import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 import type { Project } from '../../../types/app';
@@ -15,6 +14,7 @@ import { copyTextToClipboard } from '../../../utils/clipboard';
 import { isCodexLoginCommand } from '../utils/auth';
 import { sendSocketMessage } from '../utils/socket';
 import { ensureXtermFocusStyles } from '../utils/terminalStyles';
+import { registerWrappedUrlLinks } from './terminalLinkProvider';
 
 type UseShellTerminalOptions = {
   terminalContainerRef: RefObject<HTMLDivElement>;
@@ -91,9 +91,11 @@ export function useShellTerminal({
     fitAddonRef.current = nextFitAddon;
     nextTerminal.loadAddon(nextFitAddon);
 
-    // Avoid wrapped partial links in compact login flows.
+    // Wrapped/table-split URLs stay whole: the provider rebuilds the full
+    // address across rows instead of linkifying a truncated first-row fragment.
+    // Still skipped in compact login flows, where the auth URL chip is the path.
     if (!minimal) {
-      nextTerminal.loadAddon(new WebLinksAddon());
+      registerWrappedUrlLinks(nextTerminal);
     }
 
     try {

@@ -260,10 +260,13 @@ def home_status() -> None:
         click.echo("请先跑 `omni home init`,盒子双击 bootstrap.bat 装好后,把 host/user 回填到 "
                    "config/home.yaml,再跑 `omni home status`。")
         return
-    install_dir = str(cfg.get("install_dir") or "").replace("\\", "/").rstrip("/")
+    # The SSH target is Windows and its default remote shell is cmd.exe.
+    # Keep native separators: `type "D:/..."` is parsed unreliably by cmd and
+    # caused `home status` to miss a file that PowerShell had just written.
+    install_dir = str(cfg.get("install_dir") or "").replace("/", "\\").rstrip("\\")
     node_id = str(cfg.get("node_id") or "home-main")
-    status_ps1 = f"{install_dir}/scripts/home_node_status.ps1"
-    status_yaml = f"{install_dir}/data/node_status/{node_id}.yaml"
+    status_ps1 = f"{install_dir}\\scripts\\home_node_status.ps1"
+    status_yaml = f"{install_dir}\\data\\node_status\\{node_id}.yaml"
     # 先跑状态采集脚本(刷新 yaml),再 type 出来打印。两条分开 SSH,与远端默认 shell 无关。
     rc1, out1, err1 = _ssh(cfg, f'powershell -NoProfile -File "{status_ps1}" -NodeId "{node_id}"')
     if rc1 != 0:
@@ -339,7 +342,7 @@ def home_run(cmd: tuple[str, ...], confirm: bool) -> None:
 def home_omni(args: tuple[str, ...]) -> None:
     """在远端盒子跑 omni(cd <install_dir> && omni <args...>),落审计(permission=omni-remote)。"""
     cfg = load_home_config()
-    install_dir = str(cfg.get("install_dir") or "").replace("\\", "/").rstrip("/")
+    install_dir = str(cfg.get("install_dir") or "").replace("/", "\\").rstrip("\\")
     remote = f'cd "{install_dir}" && omni ' + " ".join(args).strip()
     remote = remote.rstrip()
     try:
@@ -429,7 +432,7 @@ def home_authorize_tunnel() -> None:
     click.echo("需要在主控机【以管理员身份】运行下面这条命令(只跑一次):")
     click.echo(install_cmd)
     click.echo("")
-    click.echo("说明: 该脚本会把盒子隧道密钥以受限项(restrict,permitlisten=127.0.0.1:%d)加进 "
+    click.echo("说明: 该脚本会把盒子隧道密钥以仅允许指定反向转发的选项(permitlisten=127.0.0.1:%d)加进 "
                "主控 administrators_authorized_keys, 并放行盒子来源 IP 入站 22; "
                "之后盒子隧道会在数秒内自动连上, 回主控跑 `omni home status` 验证。"
                % tunnel_port)
@@ -437,21 +440,31 @@ def home_authorize_tunnel() -> None:
 
 @cmd_home.command("tunnel-status")
 def home_tunnel_status() -> None:
-    """探测主控 loopback 转发口是否在监听(在=盒子反向隧道已连上)。"""
+    """探测主控 loopback 转发口是否提供 SSH 数据面。"""
     cfg = load_home_config()
     tunnel_port = int(cfg.get("tunnel_port") or 8223)
     host = "127.0.0.1"
-    alive = False
+    connected = False
+    banner = b""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(1.5)
             s.connect((host, tunnel_port))
-            alive = True
+            connected = True
+            try:
+                banner = s.recv(255)
+            except OSError:
+                banner = b""
     except OSError:
-        alive = False
-    if alive:
+        connected = False
+    if connected and banner.startswith(b"SSH-"):
         click.echo(f"反向隧道已连上: {host}:{tunnel_port} 在监听(盒子 ssh -R 已建立)。")
         click.echo("可直接 `omni home status` / `omni home ssh` 经隧道连盒子。")
+    elif connected:
+        raise click.ClickException(
+            f"端口监听但SSH数据面不可用: {host}:{tunnel_port} 已接受TCP连接，"
+            "但未返回SSH banner。"
+        )
     else:
         click.echo(f"反向隧道未连上: {host}:{tunnel_port} 无人监听。")
         click.echo("可能原因: 1) 盒子还没跑引导包; 2) 盒子隧道公钥还没授权进主控 "

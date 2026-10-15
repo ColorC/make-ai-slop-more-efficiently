@@ -22,6 +22,11 @@ import {
 export const OPENCODE_FALLBACK_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
     {
+      value: 'opencode-go/deepseek-v4-flash',
+      label: 'DeepSeek V4 Flash',
+      description: 'OpenCode Go - opencode-go/deepseek-v4-flash',
+    },
+    {
       value: 'anthropic/claude-sonnet-4-5',
       label: 'Claude Sonnet 4.5',
       description: 'anthropic - anthropic/claude-sonnet-4-5',
@@ -62,7 +67,7 @@ export const OPENCODE_FALLBACK_MODELS: ProviderModelsDefinition = {
       description: 'google - google/gemini-2.5-flash',
     },
   ],
-  DEFAULT: 'anthropic/claude-sonnet-4-5',
+  DEFAULT: 'opencode-go/deepseek-v4-flash',
 };
 
 const OPEN_CODE_MODELS_TIMEOUT_MS = 20_000;

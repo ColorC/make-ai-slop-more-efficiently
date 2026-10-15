@@ -50,7 +50,7 @@ export default function CollapsibleSessionContext({ sessionId, alive, kind }: Pr
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        title={collapsed ? '展开会话上下文 / 札记' : '收起会话上下文 / 札记'}
+        title={collapsed ? '展开会话上下文 / 画布' : '收起会话上下文 / 画布'}
         data-testid="session-ctx-toggle"
         // 透明吃宿主全局冷渐变(不铺实底把渐变顶掉); 颜色全 var(--fp-*), hover 才浮一层极淡底。
         style={{

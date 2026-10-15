@@ -237,8 +237,8 @@ def _is_non_retryable_auth_error(err_str: str) -> bool:
 
 
 # 对齐 CC FOREGROUND_529_RETRY_SOURCES（src/services/api/withRetry.ts L62）：
-# 旧设计 (foreground 白名单) 默认拒绝 — 实战 agent 类名 (LegacyAgnlMigrationAgent /
-# GuardianAgent 等) 不在白名单 → 一旦 529 立刻失败. 但这些 agent 都是 user-waiting 的
+# 旧设计 (foreground 白名单) 默认拒绝 — 实战前台 agent 类名
+# 不在白名单 → 一旦 529 立刻失败. 但这些 agent 都是 user-waiting 的
 # 前台调用, 应该重试.
 #
 # 2026-05-04 反转语义: 默认前台 (重试), 仅明确 background 的 caller 不重试.
@@ -552,7 +552,7 @@ class LLMCallRouter(Router):
         llm = self._llm if use_tools else self._llm_no_tools
         model_name = getattr(llm, "model", "?") or "?"
         consecutive_529 = 0   # CC MAX_529_RETRIES 单独计数
-        # caller 形如 "PrefabSemanticLoop.turn_3"；提 query_source：background 标记由业务子类
+        # caller 形如 "DomainWorker.turn_3"；提 query_source：background 标记由业务子类
         # 通过 caller_prefix 注入（未来：LoopConfig 可声明 query_source）；默认视为前台
         query_source = caller.split(".")[0] if caller else None
         last_error: Exception | None = None

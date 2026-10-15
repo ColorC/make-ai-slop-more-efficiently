@@ -11,7 +11,7 @@ export const GLASS = {
   backdropFilter: 'var(--fp-blur)',
   WebkitBackdropFilter: 'var(--fp-blur)',
   border: '1px solid var(--fp-border)',
-  borderRadius: 11,
+  borderRadius: 3,
   boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
 } as const
 export const MONO = "'Berkeley Mono','Consolas','Menlo',monospace"
@@ -24,16 +24,16 @@ export const dimStyle: React.CSSProperties = {
   color: 'var(--fp-text-3)', fontSize: 13, padding: 24, textAlign: 'center',
 }
 export const secTitleStyle: React.CSSProperties = {
-  color: 'var(--fp-text-2)', fontSize: 13, fontWeight: 650, letterSpacing: '.02em', margin: '24px 0 12px',
+  color: 'var(--fp-text-2)', fontSize: 13, fontWeight: 500, letterSpacing: '.02em', margin: '24px 0 12px',
 }
 
 const C: Record<string, any> = {
   itemCard: { ...GLASS, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 14, cursor: 'pointer', transition: `border-color 150ms ${EASE}` },
   itemTop: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
-  typeBadge: { display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 600 },
-  itemTitle: { color: 'var(--fp-text)', fontSize: 15, fontWeight: 600, letterSpacing: '-0.005em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  typeBadge: { display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 500 },
+  itemTitle: { color: 'var(--fp-text)', fontSize: 15, fontWeight: 500, letterSpacing: '-0.005em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   itemMeta: { color: 'var(--fp-text-3)', fontSize: 12, fontFamily: MONO, marginTop: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  openBtn: { marginTop: 12, width: '100%', boxSizing: 'border-box', border: '1px solid var(--fp-border)', background: 'color-mix(in srgb, var(--fp-accent) 10%, transparent)', color: 'var(--fp-link)', borderRadius: 7, padding: '7px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: `all 150ms ${EASE}` },
+  openBtn: { marginTop: 12, width: '100%', boxSizing: 'border-box', border: '1px solid var(--fp-border)', background: 'color-mix(in srgb, var(--fp-accent) 10%, transparent)', color: 'var(--fp-link)', borderRadius: 2, padding: '7px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: `all 150ms ${EASE}` },
 }
 
 // 卡片 hover 描边反馈(整套卡片共用)

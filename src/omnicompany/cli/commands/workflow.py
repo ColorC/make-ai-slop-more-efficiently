@@ -21,7 +21,7 @@ from .._access import any_caller, external_or_controller
 
 
 def _daemon_base() -> str:
-    from omnicompany.dashboard.ccdaemon import lifecycle
+    from omnicompany.dashboard.ccdaemon.api import lifecycle
 
     s = lifecycle.read_status()
     if not (getattr(s, "alive", False) and getattr(s, "port", None)):

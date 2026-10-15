@@ -101,7 +101,7 @@ Router 内的"Python 源码清理" / "从 LLM 响应提代码块" / "JSON schema
 
 **C-13** `[MUST]` **不在仓库根放日志/报告/临时文件**
 
-`*.log` / `*_report.*` / `scratch_*` / `tmp_*` 禁止出现在仓库根. 报告放 `docs/reports/<category>/`, 日志放 `logs/`, 临时文件放 `.omni/tmp/`.
+`*.log` / `*_report.*` / `scratch_*` / `tmp_*` 禁止出现在仓库根。过程记录追加当前计划 `progress.md`，正式报告沿用项目已声明文档区，日志沿用项目日志区；一次性临时文件使用项目已声明临时区，无声明时用项目 `.omni/tmp/<task-or-session>/`。待转正草稿与运行临时文件的区别、历史路径处理以 [目录清洁度守则](directory_cleanliness.md) 为准。
 已有执行: Guardian OMNI-015, archmap v12.
 
 ---

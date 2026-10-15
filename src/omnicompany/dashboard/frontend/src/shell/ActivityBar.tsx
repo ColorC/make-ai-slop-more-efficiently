@@ -25,12 +25,12 @@ interface Props {
 const S: Record<string, any> = {
   bar: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    width: 44, background: 'var(--fp-bg)', borderRight: '1px solid #222',
+    width: 44, background: 'var(--fp-bg)', borderRight: '1px solid var(--fp-border-subtle)',
     padding: '8px 0', flexShrink: 0,
   },
   btn: (active: boolean): React.CSSProperties => ({
     width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'transparent', color: active ? '#90caf9' : '#666',
+    background: 'transparent', color: active ? 'var(--fp-link)' : 'var(--fp-text-2)',
     border: 'none', borderLeft: active ? '2px solid #90caf9' : '2px solid transparent',
     cursor: 'pointer', fontSize: 18,
   }),

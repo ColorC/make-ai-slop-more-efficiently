@@ -59,12 +59,12 @@ export function CommentsPanel({ headerActions }: { headerActions?: React.ReactNo
             <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
               <div style={{ maxWidth: 280, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <span aria-hidden style={{
-                  width: 44, height: 44, borderRadius: 11, display: 'grid', placeItems: 'center',
+                  width: 44, height: 44, borderRadius: 3, display: 'grid', placeItems: 'center',
                   background: 'var(--fp-accent-weak)', border: `1px solid ${COLORS.border}`, color: COLORS.borderActive,
                 }}>
                   <MessageSquare size={20} />
                 </span>
-                <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.text }}>暂无评论</div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: COLORS.text }}>暂无评论</div>
                 <div style={{ fontSize: 13, color: COLORS.textDim, lineHeight: 1.5 }}>选中一条审阅材料, 这里显示它的评论。</div>
               </div>
             </div>

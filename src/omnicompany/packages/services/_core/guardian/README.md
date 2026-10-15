@@ -65,7 +65,7 @@ guardian 不是 Team 形态 (虽然有"巡逻管线"), 是**多功能合规 serv
 | 巡逻管线 (3 节点) | 扫文件 → 跑规则 → 写报告 | [pipeline.py](pipeline.py) + [workers/](workers/) |
 | 规则家族 | OMNI-NNN 规则定义, 按语义家族组织; OMNI-093 守护唯一权威收束 | [rules/](rules/) |
 | 规则引擎 | FileContext / GuardianRule / Violation | [rules/_base.py](rules/_base.py) |
-| Guardian Agent (LLM 复核) | needs_judgment 规则二次裁定 | judge_agent.py + [llm_judge_agent.py](llm_judge_agent.py) |
+| Guardian Agent (LLM 复核) | needs_judgment 规则二次裁定 | judge_agent.py + llm_judge_agent.py |
 | Sentinel (常驻巡逻) | 增量巡逻 + 唤醒机制 + 罚单逾期升级 | [sentinel.py](sentinel.py) |
 | 拖车 (修复) | warn-only 之外的轻量改动 | [tow_truck.py](tow_truck.py) |
 | auto_check (阈值触发) | commit 数 / 时间 / 变更行数阈值 | [auto_check.py](auto_check.py) |

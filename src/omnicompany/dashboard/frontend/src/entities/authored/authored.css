@@ -4,11 +4,30 @@
    scene 格纸底 + 2px 白框纸件框住 iframe(厚框纸件语言),零重复 chrome(不加标题/工具行)。
    ============================================================ */
 
-.au-shell { height: 100%; box-sizing: border-box; padding: 10px;
-  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
-.au-frame { height: 100%; overflow: hidden; box-sizing: border-box;
-  border: var(--fp-bp-frame-w) solid var(--fp-border); border-radius: var(--fp-r2);
-  box-shadow: var(--fp-shadow-sm); }
+.au-shell {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 10px;
+  background: transparent;
+}
+[data-testid="overlay-notes-panel"] {
+  min-height: 0;
+  height: 100%;
+}
+.au-frame {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: var(--fp-bp-frame-w) solid var(--fp-border);
+  border-radius: var(--fp-r2);
+  box-shadow: var(--fp-shadow-sm);
+}
 .au-frame iframe { display: block; width: 100%; height: 100%; border: 0; background: transparent; }
 
 @media (max-width: 599px) {

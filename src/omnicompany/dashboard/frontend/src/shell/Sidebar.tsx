@@ -10,8 +10,8 @@ import { registry } from '../entities/registry'
 import { usePanels } from '../stores/panelsStore'
 import { ideApi } from '../api/ideClient'
 import { ccApi } from '../api/ccClient'
-import { ccChatApi } from '../api/ccChatClient'
 import Modal from './Modal'
+import { BlueprintSelect } from '../components/BlueprintSelect'
 import { PanelLeftClose } from 'lucide-react'
 
 const MODULE_ENTITIES: Record<ModuleKey, EntityType[]> = {
@@ -33,29 +33,29 @@ const MODULE_TITLE: Record<ModuleKey, string> = {
 }
 
 const S: Record<string, any> = {
-  root: { display: 'flex', flexDirection: 'column', width: '100%', background: '#0d0d0d', borderRight: '1px solid #222', flexShrink: 0, height: '100%', overflow: 'hidden' },
-  header: { padding: '6px 8px 6px 12px', color: '#90caf9', fontSize: 14, borderBottom: '1px solid #222', fontFamily: 'Consolas, Menlo, monospace', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  root: { display: 'flex', flexDirection: 'column', width: '100%', background: 'var(--fp-bp-solid)', borderRight: '1px solid var(--fp-border-subtle)', flexShrink: 0, height: '100%', overflow: 'hidden' },
+  header: { padding: '6px 8px 6px 12px', color: 'var(--fp-link)', fontSize: 14, borderBottom: '1px solid var(--fp-border-subtle)', fontFamily: 'Consolas, Menlo, monospace', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   headerTitle: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  iconButton: { width: 24, height: 24, border: '1px solid #333', borderRadius: 4, background: '#111', color: '#888', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
-  search: { margin: '6px 8px', padding: '4px 8px', background: '#111', border: '1px solid #333', borderRadius: 4, color: '#e0e0e0', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' },
+  iconButton: { width: 24, height: 24, border: '1px solid var(--fp-border-subtle)', borderRadius: 3, background: 'var(--fp-bp-solid)', color: 'var(--fp-text-2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  search: { margin: '6px 8px', padding: '4px 8px', background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, color: 'var(--fp-text)', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' },
   list: { flex: 1, overflow: 'auto' },
   // group label: was #444 (almost invisible) — bump to #888 (still muted but readable)
-  group: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', color: '#888', fontSize: 14, marginTop: 8, textTransform: 'uppercase' as const, fontFamily: 'Consolas, Menlo, monospace' },
-  groupAction: { background: 'transparent', border: 'none', color: '#90caf9', cursor: 'pointer', fontSize: 15, padding: '0 4px', lineHeight: 1 },
+  group: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 12px', color: 'var(--fp-text-2)', fontSize: 14, marginTop: 8, textTransform: 'uppercase' as const, fontFamily: 'Consolas, Menlo, monospace' },
+  groupAction: { background: 'transparent', border: 'none', color: 'var(--fp-link)', cursor: 'pointer', fontSize: 15, padding: '0 4px', lineHeight: 1 },
   item: (selected: boolean): React.CSSProperties => ({
     padding: '3px 12px', cursor: 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace',
     // text was #bbb (light gray) → #d0d0d0 (closer to white) — main item names are emphasized
-    color: selected ? '#90caf9' : '#d0d0d0', background: selected ? '#1a2a3a' : 'transparent',
+    color: selected ? 'var(--fp-link)' : 'var(--fp-text)', background: selected ? 'var(--fp-bp-paper-2)' : 'transparent',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   }),
-  meta: { color: '#888', fontSize: 14, marginLeft: 8 },
-  empty: { padding: 12, color: '#888', fontSize: 14 },
+  meta: { color: 'var(--fp-text-2)', fontSize: 14, marginLeft: 8 },
+  empty: { padding: 12, color: 'var(--fp-text-2)', fontSize: 14 },
   textarea: {
-    width: '100%', minHeight: 100, background: '#111', border: '1px solid #333',
-    borderRadius: 4, color: '#e0e0e0', padding: 8, fontSize: 14,
+    width: '100%', minHeight: 100, background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border-subtle)',
+    borderRadius: 3, color: 'var(--fp-text)', padding: 8, fontSize: 14,
     fontFamily: 'Consolas, Menlo, monospace', resize: 'vertical' as const, boxSizing: 'border-box' as const,
   },
-  hint: { color: '#666', fontSize: 14, marginTop: 6 },
+  hint: { color: 'var(--fp-text-2)', fontSize: 14, marginTop: 6 },
 }
 
 export default function Sidebar({ module, onClose }: { module: ModuleKey; onClose?: () => void }) {
@@ -135,19 +135,12 @@ export default function Sidebar({ module, onClose }: { module: ModuleKey; onClos
     } finally { setSubmitting(false) }
   }
 
-  // 默认创 chat session (claude-agent-sdk 包装本地 claude, 网页 chat UI).
-  // 老 PTY 路线通过 spawnCcPtySession 入口创 (Shift 点击 / 后续菜单).
-  const spawnCcSession = async (preferPty: boolean = false) => {
+  // Retired shell compatibility: every Agent creation is a real CLI Worker.
+  const spawnCcSession = async (_preferPty: boolean = false) => {
     try {
-      if (preferPty) {
-        const m = await ccApi.create({})
-        const last = m.cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] || m.cwd
-        openTab({ type: 'cc_session', id: m.id }, `${last} · pty · ${m.id.slice(0, 8)}`)
-      } else {
-        const m = await ccChatApi.create({})
-        const last = m.cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] || m.cwd
-        openTab({ type: 'cc_session', id: m.id }, `${last} · chat · ${m.id.slice(-6)}`)
-      }
+      const m = await ccApi.createAgentWorker({ provider: 'claude_code', visibility: 'visible' })
+      const last = m.cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] || m.cwd
+      openTab({ type: 'cc_session', id: m.id }, `${last} · CLI · ${m.id.slice(0, 8)}`)
       setReloadKey((k) => k + 1)
     } catch (e) {
       setSubmitErr(String(e))
@@ -247,27 +240,24 @@ export default function Sidebar({ module, onClose }: { module: ModuleKey; onClos
         confirmLabel={submitting ? '创建中...' : '创建'}
       >
         <div style={{ marginBottom: 8 }}>
-          <label style={{ color: '#888', fontSize: 14, display: 'block', marginBottom: 4 }}>
+          <label style={{ color: 'var(--fp-text-2)', fontSize: 14, display: 'block', marginBottom: 4 }}>
             关联 plan (可选, 决定 work_type / standards / 退出条件)
           </label>
-          <select
+          {/* 2026-08-06: 原生 <select> + 硬编码 #111/#333 —— 展开是系统黑弹层, 换蓝图自绘件。 */}
+          <BlueprintSelect
             value={newSessionPlan}
-            onChange={(e) => setNewSessionPlan(e.target.value)}
-            data-new-session-plan
-            style={{
-              width: '100%', padding: '4px 8px', background: '#111',
-              border: '1px solid #333', borderRadius: 4, color: '#e0e0e0',
-              fontSize: 14, fontFamily: 'Consolas, Menlo, monospace',
-              boxSizing: 'border-box',
-            }}
-          >
-            <option value="">(无 plan, 仅注入 PROGRESS.md 头)</option>
-            {planList.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.date ? `[${p.date}] ` : ''}{p.topic}
-              </option>
-            ))}
-          </select>
+            onChange={setNewSessionPlan}
+            label="关联 plan"
+            aria-label="关联 plan"
+            style={{ width: '100%' }}
+            options={[
+              { value: '', label: '(无 plan, 仅注入 PROGRESS.md 头)' },
+              ...planList.map((p) => ({
+                value: p.id,
+                label: `${p.date ? `[${p.date}] ` : ''}${p.topic}`,
+              })),
+            ]}
+          />
         </div>
         <textarea
           style={S.textarea}
@@ -280,7 +270,7 @@ export default function Sidebar({ module, onClose }: { module: ModuleKey; onClos
           }}
         />
         <div style={S.hint}>Ctrl/Cmd + Enter 提交 · Esc 取消</div>
-        {submitErr && <div style={{ color: '#ef5350', marginTop: 8, fontSize: 14 }}>{submitErr}</div>}
+        {submitErr && <div style={{ color: 'var(--fp-err)', marginTop: 8, fontSize: 14 }}>{submitErr}</div>}
       </Modal>
     </div>
   )

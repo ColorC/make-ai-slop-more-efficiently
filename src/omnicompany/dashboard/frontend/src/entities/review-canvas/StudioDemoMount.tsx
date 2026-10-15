@@ -103,14 +103,14 @@ export default function StudioDemoMount() {
     return (
       <div data-testid="studio-demo-nested-guard" style={{
         position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', background: 'var(--fp-bg, #0b0e14)',
+        justifyContent: 'center', background: 'var(--fp-bg, var(--fp-bp-solid))',
       }}>
         <div style={{
-          maxWidth: 460, padding: '28px 32px', borderRadius: 12, textAlign: 'center',
+          maxWidth: 460, padding: '28px 32px', borderRadius: 3, textAlign: 'center',
           background: 'var(--fp-glass, rgba(255,255,255,.04))', border: '1px solid var(--fp-border, rgba(255,255,255,.12))',
           color: 'var(--fp-text, #dde3ee)', fontFamily: 'var(--fp-font-sans, sans-serif)',
         }}>
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>引导演示要在独立标签页里播放</div>
+          <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 10 }}>引导演示要在独立标签页里播放</div>
           <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--fp-text-2, #9aa3b5)', marginBottom: 18 }}>
             这份材料嵌在审阅台里打开时,驾驶舱会嵌进驾驶舱,演示没法正常指引。
             点下面的按钮在新标签页打开,演示会带着你走完全部步骤。
@@ -118,8 +118,8 @@ export default function StudioDemoMount() {
           <a href={window.location.href} target="_blank" rel="noreferrer"
             data-testid="studio-demo-open-top"
             style={{
-              display: 'inline-block', padding: '9px 22px', borderRadius: 8, textDecoration: 'none',
-              background: 'var(--fp-accent, #4c8dff)', color: '#fff', fontSize: 14, fontWeight: 600,
+              display: 'inline-block', padding: '9px 22px', borderRadius: 2, textDecoration: 'none',
+              background: 'var(--fp-accent, #4c8dff)', color: '#fff', fontSize: 14, fontWeight: 500,
             }}>
             在新标签页打开演示
           </a>

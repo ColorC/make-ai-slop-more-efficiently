@@ -1,0 +1,173 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "current_state_condition": {
+      "minLength": 1,
+      "title": "Current State Condition",
+      "type": "string"
+    },
+    "disconfirming_signals": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Disconfirming Signals",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "expected_signals": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Expected Signals",
+      "type": "array"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "predicted_next_state": {
+      "minLength": 1,
+      "title": "Predicted Next State",
+      "type": "string"
+    },
+    "proposed_observation": {
+      "minLength": 1,
+      "title": "Proposed Observation",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.next-state-prediction.v1",
+      "default": "game-observatory.next-state-prediction.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/EvidenceReferenceV1"
+      },
+      "minItems": 1,
+      "title": "Source Evidence Refs",
+      "type": "array"
+    },
+    "source_fact_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Source Fact Ids",
+      "type": "array"
+    },
+    "system_id": {
+      "minLength": 1,
+      "title": "System Id",
+      "type": "string"
+    },
+    "unknown_question_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Unknown Question Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "game_id",
+    "environment_id",
+    "system_id",
+    "unknown_question_ids",
+    "source_fact_ids",
+    "source_evidence_refs",
+    "current_state_condition",
+    "proposed_observation",
+    "predicted_next_state",
+    "expected_signals",
+    "disconfirming_signals",
+    "created_at"
+  ],
+  "title": "NextStatePredictionV1",
+  "type": "object"
+}

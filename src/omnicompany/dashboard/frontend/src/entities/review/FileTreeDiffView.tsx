@@ -84,13 +84,13 @@ const S: Record<string, React.CSSProperties> = {
   srcTag: { color: 'var(--fp-text-3)', fontSize: 13, fontFamily: 'var(--fp-font-mono)' },
   total: { color: 'var(--fp-text-2)', fontSize: 13 },
   // 切换钮: 安静幽灵钮(非主操作显眼底), hover 浮淡底。
-  toggle: { border: '1px solid var(--fp-border)', background: 'var(--fp-surface)', color: 'var(--fp-text-2)', borderRadius: 7, padding: '4px 11px', cursor: 'pointer', fontSize: 13, transition: 'border-color 150ms var(--fp-ease), color 150ms var(--fp-ease)' },
+  toggle: { border: '1px solid var(--fp-border)', background: 'var(--fp-surface)', color: 'var(--fp-text-2)', borderRadius: 2, padding: '4px 11px', cursor: 'pointer', fontSize: 13, transition: 'border-color 150ms var(--fp-ease), color 150ms var(--fp-ease)' },
   // 树容器: 极淡安静面(护眼读长列表), 不盖死渐变。
-  treeWrap: { margin: 12, padding: '6px 8px', background: 'var(--fp-surface)', border: '1px solid var(--fp-border-subtle)', borderRadius: 11, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)' },
-  dirRow: { padding: '3px 4px', cursor: 'pointer', color: 'var(--fp-text-3)', userSelect: 'none', display: 'flex', alignItems: 'center', borderRadius: 6, fontSize: 13 },
+  treeWrap: { margin: 12, padding: '6px 8px', background: 'var(--fp-surface)', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)' },
+  dirRow: { padding: '3px 4px', cursor: 'pointer', color: 'var(--fp-text-3)', userSelect: 'none', display: 'flex', alignItems: 'center', borderRadius: 2, fontSize: 13 },
   arr: { color: 'var(--fp-text-3)', display: 'inline-block', width: 14, flexShrink: 0 },
-  leafRow: { padding: '3px 4px 3px 8px', display: 'flex', alignItems: 'center', gap: 6, borderRadius: 6 },
-  mark: { fontWeight: 700, width: 12, flexShrink: 0, fontFamily: 'var(--fp-font-mono)', fontSize: 13 },
+  leafRow: { padding: '3px 4px 3px 8px', display: 'flex', alignItems: 'center', gap: 6, borderRadius: 2 },
+  mark: { fontWeight: 500, width: 12, flexShrink: 0, fontFamily: 'var(--fp-font-mono)', fontSize: 13 },
   empty: { color: 'var(--fp-text-3)', fontSize: 13, padding: 8 },
   toast: { color: 'var(--fp-ok)', fontSize: 13 },
 }
@@ -100,10 +100,10 @@ export function FilePreview({ file }: { file: FileEntry }) {
   const pv = file.preview
   if (pv?.kind === 'image') {
     if (pv.oversized || !pv.data_url) return <div style={S.empty}>图片过大未内嵌（{file.path}）</div>
-    return <div style={{ padding: 8, background: 'var(--fp-surface)', borderRadius: 8, textAlign: 'center' }}><img src={pv.data_url} alt={file.path} style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 6 }} /></div>
+    return <div style={{ padding: 8, background: 'var(--fp-surface)', borderRadius: 2, textAlign: 'center' }}><img src={pv.data_url} alt={file.path} style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 2 }} /></div>
   }
   if (pv?.kind === 'html') {
-    return <iframe data-testid="filetree-html-preview" srcDoc={pv.content || ''} sandbox="allow-same-origin" style={{ width: '100%', height: '60vh', border: 'none', borderRadius: 8, background: '#fff' }} title={file.path} />
+    return <iframe data-testid="filetree-html-preview" srcDoc={pv.content || ''} sandbox="allow-same-origin" style={{ width: '100%', height: '60vh', border: 'none', borderRadius: 2, background: '#fff' }} title={file.path} />
   }
   if (file.diff) {
     return (
@@ -183,10 +183,10 @@ function FileLeaf({ file, depth, material, onOpenFile }: { file: FileEntry; dept
             data-testid="filetree-annotate-input"
             value={annoteText} onChange={(e) => setAnnoteText(e.target.value)}
             placeholder="对这个文件的改动写点说明…"
-            style={{ flex: 1, background: 'var(--fp-card)', border: '1px solid var(--fp-border)', color: 'var(--fp-text)', borderRadius: 6, padding: '4px 7px', fontSize: 13 }}
+            style={{ flex: 1, background: 'var(--fp-card)', border: '1px solid var(--fp-border)', color: 'var(--fp-text)', borderRadius: 2, padding: '4px 7px', fontSize: 13 }}
             onKeyDown={(e) => { if (e.key === 'Enter') void submitAnnote() }}
           />
-          <button type="button" onClick={() => void submitAnnote()} style={{ background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', border: 0, borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}>提交</button>
+          <button type="button" onClick={() => void submitAnnote()} style={{ background: 'var(--fp-bp-seal)', color: '#fff', border: '1px solid rgba(255,240,235,.55)', borderRadius: 2, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}>提交</button>
         </div>
       )}
       {open && (

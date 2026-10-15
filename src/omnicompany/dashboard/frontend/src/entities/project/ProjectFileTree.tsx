@@ -44,7 +44,7 @@ function RowBtn({ title, onClick, children, testid }: { title: string; onClick: 
   return (
     <button
       type="button" title={title} data-testid={testid}
-      style={{ border: 'none', background: 'transparent', color: 'var(--fp-text-3)', opacity: 0.55, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex', alignItems: 'center', borderRadius: 5 }}
+      style={{ border: 'none', background: 'transparent', color: 'var(--fp-text-3)', opacity: 0.55, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex', alignItems: 'center', borderRadius: 2 }}
       onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--fp-text)' }}
       onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.55'; e.currentTarget.style.color = 'var(--fp-text-3)' }}
       onClick={(e) => { e.stopPropagation(); onClick() }}
@@ -122,7 +122,7 @@ export default function ProjectFileTree({ projectId, onOpenMaterial }: {
           role="treeitem" aria-expanded={node.dir ? isOpen : undefined}
           style={{
             display: 'flex', alignItems: 'center', gap: 4, minHeight: ROW_H,
-            paddingLeft: 6 + depth * 16, paddingRight: 6, cursor: 'pointer', borderRadius: 6,
+            paddingLeft: 6 + depth * 16, paddingRight: 6, cursor: 'pointer', borderRadius: 2,
             background: isSelected ? 'color-mix(in srgb, var(--fp-accent) 14%, transparent)' : 'transparent',
           }}
           onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--fp-surface)' }}
@@ -145,11 +145,11 @@ export default function ProjectFileTree({ projectId, onOpenMaterial }: {
             fontWeight: node.related ? 600 : 400,
           }}>{node.name}</span>
           {node.related && depth === 0 && (
-            <span style={{ flexShrink: 0, fontSize: 11, color: 'var(--fp-link)', border: '1px solid var(--fp-border)', borderRadius: 999, padding: '0 7px', background: 'var(--fp-accent-weak)' }}>本项目</span>
+            <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--fp-link)', border: '1px solid var(--fp-border)', borderRadius: 999, padding: '0 7px', background: 'var(--fp-accent-weak)' }}>本项目</span>
           )}
-          {node.note && <span style={{ flexShrink: 0, fontSize: 11, color: 'var(--fp-text-3)' }} title={node.note}>{node.note}</span>}
+          {node.note && <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--fp-text-3)' }} title={node.note}>{node.note}</span>}
           {allMode && depth === 0 && !node.related && node.projects && node.projects.length > 0 && (
-            <span style={{ flexShrink: 0, fontSize: 11, color: 'var(--fp-text-3)', fontFamily: MONO }}>{node.projects.join(' ')}</span>
+            <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--fp-text-3)', fontFamily: MONO }}>{node.projects.join(' ')}</span>
           )}
           {annot && (
             <span style={{ marginLeft: 6, fontSize: 12, color: node.material ? 'var(--fp-link)' : 'var(--fp-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flexShrink: 1 }} title={annot}>
@@ -200,16 +200,16 @@ export default function ProjectFileTree({ projectId, onOpenMaterial }: {
         <div style={{ ...GLASS, width: 400, flexShrink: 0, padding: 14, maxHeight: '72vh', overflow: 'auto' }} data-testid="fs-detail-panel">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {selected.dir ? <Folder size={15} style={{ color: 'var(--fp-link)' }} /> : <File size={15} style={{ color: 'var(--fp-text-2)' }} />}
-            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 650, color: 'var(--fp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selected.name}>{selected.name}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500, color: 'var(--fp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selected.name}>{selected.name}</span>
             <RowBtn title="关闭" onClick={() => { setSelected(null); setDetail(null) }}><X size={14} /></RowBtn>
           </div>
           <div style={{ marginTop: 8, fontSize: 12, fontFamily: MONO, color: 'var(--fp-text-3)', wordBreak: 'break-all' }}>{selected.path}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button type="button" data-testid="open-in-vscode"
-              style={{ flex: 1, border: '1px solid var(--fp-border)', background: 'color-mix(in srgb, var(--fp-accent) 10%, transparent)', color: 'var(--fp-link)', borderRadius: 7, padding: '7px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              style={{ flex: 1, border: '1px solid var(--fp-border)', background: 'color-mix(in srgb, var(--fp-accent) 10%, transparent)', color: 'var(--fp-link)', borderRadius: 2, padding: '7px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onClick={() => openInVscode(selected.path)}>在 VSCode 打开</button>
             <button type="button"
-              style={{ flex: 1, border: '1px solid var(--fp-border)', background: 'var(--fp-surface)', color: 'var(--fp-text-2)', borderRadius: 7, padding: '7px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              style={{ flex: 1, border: '1px solid var(--fp-border)', background: 'var(--fp-surface)', color: 'var(--fp-text-2)', borderRadius: 2, padding: '7px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onClick={() => { void copyText(selected.path) }}>复制路径</button>
           </div>
 
@@ -221,19 +221,19 @@ export default function ProjectFileTree({ projectId, onOpenMaterial }: {
               </div>
               {d.material && (
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 650, color: 'var(--fp-link)' }}>material 身份</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fp-link)' }}>material 身份</div>
                   <div style={{ marginTop: 6, fontSize: 13, color: 'var(--fp-text)' }}>{d.material.title || d.material.id}</div>
                   <div style={{ marginTop: 4, fontSize: 12, color: 'var(--fp-text-3)', fontFamily: MONO }}>
                     {d.material.kind}{d.material.status ? ` · ${d.material.status}` : ''} · {d.material.id}
                   </div>
                   <button type="button"
-                    style={{ marginTop: 8, width: '100%', border: '1px solid var(--fp-border)', background: 'color-mix(in srgb, var(--fp-accent) 10%, transparent)', color: 'var(--fp-link)', borderRadius: 7, padding: '6px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    style={{ marginTop: 8, width: '100%', border: '1px solid var(--fp-border)', background: 'color-mix(in srgb, var(--fp-accent) 10%, transparent)', color: 'var(--fp-link)', borderRadius: 2, padding: '6px 0', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                     onClick={() => onOpenMaterial(d.material!.id, d.material!.title || d.material!.id)}>打开材料</button>
                 </div>
               )}
               {d.omni && (
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 650, color: 'var(--fp-text-2)' }}>[OMNI] 功能注释</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fp-text-2)' }}>[OMNI] 功能注释</div>
                   {d.omni.summary && <div style={{ marginTop: 6, fontSize: 13, color: 'var(--fp-text)', lineHeight: 1.5 }}>{d.omni.summary}</div>}
                   {d.omni.why && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--fp-text-2)', lineHeight: 1.5 }}>为什么在这: {d.omni.why}</div>}
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--fp-text-3)', fontFamily: MONO, lineHeight: 1.6 }}>
@@ -244,7 +244,7 @@ export default function ProjectFileTree({ projectId, onOpenMaterial }: {
               )}
               {d.instances && d.instances.length > 0 && (
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 12, fontWeight: 650, color: 'var(--fp-text-2)' }}>注册系统实体</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fp-text-2)' }}>注册系统实体</div>
                   {d.instances.map((it) => (
                     <div key={it.entity_id} style={{ marginTop: 6, fontSize: 12, fontFamily: MONO, color: 'var(--fp-text-3)', wordBreak: 'break-all' }}>
                       {it.type} · {it.name} <span style={{ opacity: 0.7 }}>({it.entity_id})</span>

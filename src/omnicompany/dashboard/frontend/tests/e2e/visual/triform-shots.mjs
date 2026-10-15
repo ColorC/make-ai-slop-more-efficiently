@@ -6,7 +6,7 @@
  * 每个里程碑的改前改后成对截图基建。输出 PNG 到 --out 目录(默认 ./_shots)。
  *
  * 用法(在 frontend/ 目录下跑):
- *   node tests/e2e/visual/triform-shots.mjs [--out <目录>] [--dash http://127.0.0.1:8210] [--lofa-api https://10.3.43.246:12443]
+ *   node tests/e2e/visual/triform-shots.mjs [--out <目录>] [--dash http://127.0.0.1:8210] [--lofa-api https://192.0.2.10:12443]
  *
  * 原理:
  * - dashboard:直连 8210(服务 frontend/dist,改完先 npm run build)。
@@ -24,7 +24,7 @@ const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const OUT = arg('out', join(process.cwd(), 'tests/e2e/visual/_shots'));
 const DASH = arg('dash', 'http://127.0.0.1:8210');
-const LOFA_API = arg('lofa-api', 'https://10.3.43.246:12443');
+const LOFA_API = arg('lofa-api', 'https://192.0.2.10:12443');
 const WWW = arg('lofa-www', 'C:/workspace/lofa/app/www');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 

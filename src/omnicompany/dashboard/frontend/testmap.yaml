@@ -919,3 +919,109 @@ features:
       - file: src/stores/useSessionStore.test.ts
         cases: ["keeps stale realtime assistant text before a later server user message", "drops realtime assistant text once server has the same content", "drops optimistic user text when the server copy only differs by thinking prefix"]
     status: covered
+
+  - id: todo_panel.generic_panels
+    what: Todo 页的通用面板引擎 —— 一套分组器产出统一 Panel, 账页与看板共用; 分组维度(状态/项目/优先级/截止)可切, 换分组不改渲染代码
+    should:
+      - "unit: 同一份数据换分组维度就换一组面板, 面板 key/内容与维度一致"
+      - "unit: 面板 seed = 在该面板里新建时的落点(进行道 → in-progress; 挂起道默认 paused 而非 blocked)"
+      - "unit: 状态/优先级面板可落; 项目/截止面板只读且必须带一句话理由"
+      - "unit: 一个项目都没有时也留一个面板, 否则连 + 都没得点"
+    tests:
+      - file: src/entities/task/taskBus.test.ts
+        cases: ["同一份数据换分组维度就换一组面板（面板通用，渲染代码不变）", "面板 seed = 在这个面板里新建时的落点", "状态/优先级面板可落, 项目/截止面板只读并带一句话理由", "一个项目都没有时也要留一个面板 —— 否则连 + 都没得点", "cancelled 与 archived 退出主体, 进归档区"]
+    status: covered
+
+  - id: todo_panel.cross_panel_drag
+    what: 跨面板拖拽 —— 落到哪个面板就写那个分组维度的字段; 同值不写; 只读维度一律不写并给理由
+    should:
+      - "unit: 拖进状态道 = status set; 拖进优先级面板 = update priority"
+      - "unit: 已在目标面板内不产生写(blocked 拖回挂起道不该被降级成 paused); 同优先级不写"
+      - "unit: 只读面板(项目/截止)一律返回 null, 不发任何写请求"
+    tests:
+      - file: src/entities/task/taskBus.test.ts
+        cases: ["拖进状态道 = status set", "已经在这条道里就不写 —— blocked 拖回挂起道不该被悄悄降级成 paused", "拖进优先级面板 = update priority; 同级不写", "只读面板一律不写（宿主 task update 没有 project 通道）"]
+    status: covered
+
+  - id: todo_panel.bus_selectors
+    what: Todo(task-core 总线)页的纯选择器 —— 泳道映射、手动/截止/优先级排序、父子树、逾期判定与截止分桶
+    should:
+      - "unit: paused/blocked 并入挂起道, 未知 stateKey 按 todo 聚合(与后端 open 兜底同语义)"
+      - "unit: 手动序 orderKey 字典序在前 NULL 最后; 截止序无截止排最后; 优先级序 null 最后"
+      - "unit: 父不在结果集里的孤儿按根渲染, 互指成环时两条都不丢(任务凭空消失是严重故障)"
+      - "unit: 截止分桶 逾期/今天/7 天内/以后/无截止"
+    tests:
+      - file: src/entities/task/taskBus.test.ts
+        cases: ["paused / blocked 合并进挂起道", "未知 stateKey 按 todo 聚合（与后端 open 兜底同语义）", "手动序: orderKey 字典序在前, NULL 最后, 回退 createdAt", "截止序: 无截止的排最后", "优先级序: 数字越大越靠前, null 最后", "父不在结果集里的孤儿按根渲染, 不被吞掉", "自指/成环不死循环", "分桶: 逾期 / 今天 / 7 天内 / 以后 / 无截止"]
+    status: covered
+
+  - id: todo_panel.quick_add_syntax
+    what: 面板内就地新建行的内联语法 #项目 !优先级 @截止, 解释不了的 token 一律原样留在标题里
+    should:
+      - "unit: 能抽出项目/优先级/截止且标题干净"
+      - "unit: 匹配不到的 #项目、解释不了的 @token、超范围的 !n 全部留在标题里, 绝不静默吞字"
+      - "unit: 日期 token 覆盖 今天/tomorrow/周几/MM-DD/YYYY-MM-DD, 非法日期(2-31)返回 null"
+    tests:
+      - file: src/entities/task/taskBus.test.ts
+        cases: ["抽出项目 / 优先级 / 截止, 标题干净", "匹配不到的 #项目 原样留在标题里, 绝不静默吞字", "解释不了的 @token 也留在标题里", "!超范围 不当优先级处理", "日期 token: 今天/明天/周几/MM-DD/YYYY-MM-DD"]
+    status: covered
+
+  - id: todo_panel.blueprint_style_gate
+    what: Todo 页样式表的蓝图口径闸门 —— 圆角/字号/颜色/字重四条硬规矩由测试盯着, 不靠人自觉
+    should:
+      - "unit: task.css 的 border-radius 只走 --fp-bp-r* token(除 0/50%), 不出现 4/6/8px 网页圆角"
+      - "unit: font-size 只走 --fp-fs-*(12px 地板), 零硬编码色值, font-weight 不超过 500"
+    tests:
+      - file: src/entities/task/taskBus.test.ts
+        cases: ["圆角只走 token（制图感 = 锐利, 不出现 4/6/8px 网页圆角）", "字号只走 --fp-fs-*（12px 是地板, 不写字面量）", "零硬编码色值（一切颜色走 --fp-* token）", "字重封顶 500（层级靠字号与字距, 不靠加粗）"]
+    status: covered
+
+  - id: todo_panel.action_menu
+    what: 任务动作菜单 —— 右键任意一行/卡或点行尾 ⋯ 都出同一份; 状态/优先级/截止是带选中态的子菜单; 归档与从归档恢复都在这里
+    should:
+      - "e2e: 右键任务行出菜单, 含 状态/优先级/截止 子菜单 + 打开详情/新建子任务/绑定会话 + 复制标题/复制 id + 归档"
+      - "e2e: 菜单里选状态 → 只发一条 status set; 选归档 → 发 status set cancelled + archive"
+      - "e2e: 菜单「项目 ▸」可改项目(含未分组) → 发 update {projectId}; 未分组落桥上翻成 --no-project"
+      - "e2e: 归档区的行右键出「从归档恢复」→ 发 POST /api/tbus/task/restore"
+      - "e2e: 行尾 ⋯ 打开的是同一份菜单(右键不可发现时的兜底入口)"
+    tests:
+      - file: docs/plans/_cross/[2026-09-01]TASK-CORE-PERSONAL-TASK-BUS/spec-todo-frontend-rebuild.md
+        cases: ["§14 第三轮实拍取证(浏览器实测写请求清单)"]
+    status: manual-verified
+
+  - id: todo_panel.form_composer
+    what: 就地新建是多字段编辑区(标题+描述+项目/状态/优先级/截止), 语法只是加速器不是唯一入口
+    should:
+      - "e2e: 点面板 + 展开的 composer 有标题、描述、四个属性件; 全部点选即可, 不必输入任何语法"
+      - "e2e: 提交后 POST /api/tbus/task 带上 description / stateKey / priority"
+      - "unit: 写了 #项目 !优先级 @截止 时对应属性件跟着变(语法与表单同源, 不是两套)"
+    tests:
+      - file: docs/plans/_cross/[2026-09-01]TASK-CORE-PERSONAL-TASK-BUS/spec-todo-frontend-rebuild.md
+        cases: ["§14 第三轮实拍取证(composer 写请求)"]
+      - file: src/entities/task/taskBus.test.ts
+        cases: ["抽出项目 / 优先级 / 截止, 标题干净"]
+    status: manual-verified
+
+  - id: todo_panel.project_and_archive_drag
+    what: 项目可改(拖/菜单/详情三个入口)与归档面板可拖入拖出; 归档是可逆的
+    should:
+      - "e2e: 按项目分组时把一条拖到另一个项目面板 → POST /api/tbus/task/update {projectId}"
+      - "e2e: 拖进归档面板 → status set cancelled + archive; 从归档往正常面板拖 → POST /api/tbus/task/restore"
+      - "e2e: 只有截止分组仍只读并给出理由; 状态/优先级/项目三个维度都可落"
+      - "unit: dropWriteFor 对项目面板返回 update{projectId}, 同项目不写; 归档面板返回 archive/restore"
+    tests:
+      - file: src/entities/task/taskBus.test.ts
+        cases: ["拖进项目面板 = update projectId; 同项目不写", "截止分组仍然只读（落到桶里的哪一天是猜的）", "拖进归档面板 = archive; 已归档的再拖进去不写", "从归档往正常面板拖 = restore（恢复后再落目标维度）", "状态/优先级/项目面板都可落; 只有截止分组只读并带一句话理由"]
+      - file: docs/plans/_cross/[2026-09-01]TASK-CORE-PERSONAL-TASK-BUS/spec-todo-frontend-rebuild.md
+        cases: ["§15.6 浏览器实拍取证"]
+    status: covered
+
+  - id: blueprint_select.popup_not_clipped
+    what: BlueprintSelect 弹层 portal 到 body + fixed 定位, 不再被祖先 overflow 裁剪(全站共享件)
+    should:
+      - "e2e: 在带 overflow:auto 的滚动容器深处展开下拉, listbox 完整可见、无祖先裁剪、父节点是 document.body"
+      - "e2e: 外点判定把 portal 出去的 listbox 算进命中范围, 点选项不会被当成外点而先收起"
+    tests:
+      - file: docs/plans/_cross/[2026-09-01]TASK-CORE-PERSONAL-TASK-BUS/spec-todo-frontend-rebuild.md
+        cases: ["§15.4 / §15.6 下拉裁剪实测"]
+    status: manual-verified

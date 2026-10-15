@@ -13,7 +13,6 @@ import { Copy, Code2, ShieldCheck, RefreshCw, Plus, Search, Check } from 'lucide
 import { ccApi } from '../../api/ccClient'
 import { ccChatApi, type ImportableSession, type CcChatSessionMeta } from '../../api/ccChatClient'
 import { reviewstageApi, type Material } from '../../api/reviewstageClient'
-import { projectsApi } from '../../api/projectsClient'
 import { usePanels } from '../../stores/panelsStore'
 import { openProps } from '../../utils/middleClick'
 import { relTimeEn as relTime } from '../../lib/time'
@@ -84,7 +83,8 @@ export default function HomeThreeCards() {
   const [plans, setPlans] = useState<any[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [teams, setTeams] = useState<any[]>([])  // 管线(team*.py), 加进最近列表的一个 kind
-  const [planProj, setPlanProj] = useState<Record<string, string>>({})  // planId → 所属项目 id
+  const [conversationLoaded, setConversationLoaded] = useState(false)
+  const [teamLoaded, setTeamLoaded] = useState(false)
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [openError, setOpenError] = useState<string | null>(null)
@@ -94,49 +94,64 @@ export default function HomeThreeCards() {
   const openTab = usePanels((s) => s.openTab)
   const openTabBg = usePanels((s) => s.openTabBackground)
 
-  const load = useCallback(async () => {
+  const loadPrimary = useCallback(async () => {
     setLoading(true)
     try {
-      const [chat, active, allPlans, mats, teamsRaw] = await Promise.all([
-        ccChatApi.list({ limit: 80, includeArchived: false }).catch(() => [] as CcChatSessionMeta[]),
-        ccChatApi.activeSessions(7 * 86400, 80).catch(() => [] as ImportableSession[]),
-        // 全量计划(120 条, 带 last_modified_ts) — 后端已有该接口, 不用 briefing 的 15 条活跃子集
-        fetch('/api/boss-sight/plans').then((r) => (r.ok ? r.json() : { plans: [] })).then((d) => (d.plans as any[]) || []).catch(() => [] as any[]),
-        reviewstageApi.list().then((r) => r.items).catch(() => [] as Material[]),
-        fetch('/api/teams').then((r) => (r.ok ? r.json() : { items: [] })).then((d) => (d.items as any[]) || []).catch(() => [] as any[]),
+      await Promise.all([
+        fetch('/api/boss-sight/plans')
+          .then((r) => (r.ok ? r.json() : { plans: [] }))
+          .then((d) => setPlans((d.plans as any[]) || []))
+          .catch(() => setPlans([])),
+        reviewstageApi.list({ limit: 80 })
+          .then((r) => setMaterials(r.items))
+          .catch(() => setMaterials([])),
       ])
-      const omniByClaudeSid = new Map<string, CcChatSessionMeta>()
-      for (const c of chat) { if (c.claude_session_id) omniByClaudeSid.set(c.claude_session_id, c) }
-      const rows: any[] = active.map((it) => {
-        const omni = omniByClaudeSid.get(it.session_id)
-        return { provider: it.provider, status: it.status, digest: it.digest, preview: it.preview, last_user: it.last_user, last_did: it.last_did, mtime: it.mtime || 0, cwd: it.cwd, sessionId: it.session_id, omniId: omni?.id, activePlan: omni?.active_plan ?? null }
-      })
-      const activeSids = new Set(active.map((a) => a.session_id))
-      for (const c of chat) {
-        if (c.claude_session_id && activeSids.has(c.claude_session_id)) continue
-        rows.push({ provider: c.provider || 'claude_code', status: c.alive ? 'idle' : 'done', preview: c.last_message || c.first_message, mtime: c.started_at || 0, sessionId: c.claude_session_id || c.id, omniId: c.id, activePlan: c.active_plan ?? null })
-      }
-      setConvs(rows)
-      setPlans(allPlans)  // 全量 120 条; 展示走下方无限滚动分批(滚到底再多渲)
-      setMaterials(mats)
-      setTeams(teamsRaw)
-      // planId → 所属项目 id(服务端归属权威, 不靠路径前缀猜), 给计划/材料配项目 icon
-      void projectsApi.list().then((board) => {
-        const projs = ((board as any)?.projects as any[]) || []
-        return Promise.all(projs.map((p) =>
-          projectsApi.plans(p.id).then((r) => ({ id: p.id as string, ids: (r.plan_ids || []) as string[] })).catch(() => ({ id: p.id as string, ids: [] as string[] })),
-        ))
-      }).then((lists) => {
-        const map: Record<string, string> = {}
-        for (const { id, ids } of (lists || [])) for (const pid of ids) map[pid] = id
-        setPlanProj(map)
-      }).catch(() => {})
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  const loadConversations = useCallback(async (force = false) => {
+    if (conversationLoaded && !force) return
+    const [chat, active] = await Promise.all([
+      ccChatApi.list({ limit: 80, includeArchived: false }).catch(() => [] as CcChatSessionMeta[]),
+      ccChatApi.activeSessions(7 * 86400, 80).catch(() => [] as ImportableSession[]),
+    ])
+    const omniByClaudeSid = new Map<string, CcChatSessionMeta>()
+    for (const c of chat) { if (c.claude_session_id) omniByClaudeSid.set(c.claude_session_id, c) }
+    const rows: any[] = active.map((it) => {
+      const omni = omniByClaudeSid.get(it.session_id)
+      return { provider: it.provider, status: it.status, digest: it.digest, preview: it.preview, last_user: it.last_user, last_did: it.last_did, mtime: it.mtime || 0, cwd: it.cwd, sessionId: it.session_id, omniId: omni?.id, activePlan: omni?.active_plan ?? null }
+    })
+    const activeSids = new Set(active.map((a) => a.session_id))
+    for (const c of chat) {
+      if (c.claude_session_id && activeSids.has(c.claude_session_id)) continue
+      rows.push({ provider: c.provider || 'claude_code', status: c.alive ? 'idle' : 'done', preview: c.last_message || c.first_message, mtime: c.started_at || 0, sessionId: c.claude_session_id || c.id, omniId: c.id, activePlan: c.active_plan ?? null })
+    }
+    setConvs(rows)
+    setConversationLoaded(true)
+  }, [conversationLoaded])
+
+  const loadTeams = useCallback(async (force = false) => {
+    if (teamLoaded && !force) return
+    const rows = await fetch('/api/teams')
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => (d.items as any[]) || [])
+      .catch(() => [] as any[])
+    setTeams(rows)
+    setTeamLoaded(true)
+  }, [teamLoaded])
+
+  const refresh = useCallback(async () => {
+    const requests: Promise<unknown>[] = [loadPrimary()]
+    if (kinds.conv) requests.push(loadConversations(true))
+    if (kinds.team) requests.push(loadTeams(true))
+    await Promise.all(requests)
+  }, [kinds.conv, kinds.team, loadConversations, loadPrimary, loadTeams])
+
+  useEffect(() => { void loadPrimary() }, [loadPrimary])
+  useEffect(() => { if (kinds.conv) void loadConversations() }, [kinds.conv, loadConversations])
+  useEffect(() => { if (kinds.team) void loadTeams() }, [kinds.team, loadTeams])
 
   // 普通人用聊天迁到收编的 chatui(独立服务 :7348): "+新对话"不再建驾驶舱 cc_session, 直接开 chatui 首页。
   const onCreate = useCallback(async () => {
@@ -144,11 +159,11 @@ export default function HomeThreeCards() {
     try {
       const meta = await ccApi.create({})
       openTab({ type: 'cc_session', id: meta.id }, `Claude CLI · ${meta.id.slice(0, 8)}`)
-      void load()
+      if (kinds.conv) void loadConversations(true)
     } catch (cause) {
       setOpenError(`新建 CLI 失败: ${cause instanceof Error ? cause.message : String(cause)}`)
     }
-  }, [load, openTab])
+  }, [kinds.conv, loadConversations, openTab])
 
   // ── 导航 ──
   // "最近对话"行点击: chatui 与驾驶舱会话 id 不通, 无法深链具体会话, 一律开 chatui 首页(新标签)。
@@ -185,11 +200,15 @@ export default function HomeThreeCards() {
   // ── 合并成统一行, 纯按更新时间(ts 毫秒)降序 ──
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = []
+    const projectByPlan = new Map<string, string>()
+    for (const plan of plans) {
+      if (plan.plan_id && plan.project_id) projectByPlan.set(plan.plan_id, plan.project_id)
+    }
     // digest 字段可能是便宜模型如实写的占位串(「信息不足」/「无」), 视同空以便回退到 preview/路径
     const cleanDigest = (s?: string) => { const v = (s || '').trim(); return v === '信息不足' || v === '无' ? '' : v }
     if (kinds.plan) {
       for (const p of plans) {
-        out.push({ key: `plan-${p.plan_id}`, kind: 'plan', title: p.title || planShortName(p.plan_id), ts: isoMs(p.last_modified_ts), plan: planShortName(p.plan_id), path: p.plan_id || '', status: p.status, projId: planProj[p.plan_id], open: (bg) => openPlan(p, bg), menu: [
+        out.push({ key: `plan-${p.plan_id}`, kind: 'plan', title: p.title || planShortName(p.plan_id), ts: isoMs(p.last_modified_ts), plan: planShortName(p.plan_id), path: p.plan_id || '', status: p.status, projId: p.project_id || undefined, open: (bg) => openPlan(p, bg), menu: [
           { label: '复制 plan id', icon: <Copy size={14} />, testid: 'recent-kebab-copy-plan', onClick: () => { void copyText(String(p.plan_id || '')) } },
           { label: '跑 plan audit', icon: <ShieldCheck size={14} />, testid: 'recent-kebab-audit-plan', onClick: () => { void startAudit('plan', String(p.plan_id || '')) } },
         ] })
@@ -197,7 +216,7 @@ export default function HomeThreeCards() {
     }
     if (kinds.material) {
       for (const m of materials) {
-        out.push({ key: `mat-${m.id}`, kind: 'material', title: m.title, ts: isoMs(m.created_at), plan: planShortName(m.source_plan_id), path: `${m.kind || ''}${m.tier ? ' · ' + m.tier : ''}`, status: m.status, projId: planProj[m.source_plan_id || ''], open: (bg) => openMaterial(m, bg), menu: [{ label: '复制材料 id', icon: <Copy size={14} />, testid: 'recent-kebab-copy-mat', onClick: () => { void copyText(String(m.id)) } }] })
+        out.push({ key: `mat-${m.id}`, kind: 'material', title: m.title, ts: isoMs(m.created_at), plan: planShortName(m.source_plan_id), path: `${m.kind || ''}${m.tier ? ' · ' + m.tier : ''}`, status: m.status, projId: projectByPlan.get(m.source_plan_id || ''), open: (bg) => openMaterial(m, bg), menu: [{ label: '复制材料 id', icon: <Copy size={14} />, testid: 'recent-kebab-copy-mat', onClick: () => { void copyText(String(m.id)) } }] })
       }
     }
     if (kinds.conv) {
@@ -222,7 +241,7 @@ export default function HomeThreeCards() {
     }
     out.sort((a, b) => b.ts - a.ts)
     return out
-  }, [plans, materials, convs, teams, kinds, planProj]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [plans, materials, convs, teams, kinds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fRows = useMemo(() => rows.filter((r) => matchQ(q, r.title, r.plan, r.path, KIND_META[r.kind].label)), [rows, q])
   const shown = fRows.slice(0, visible)
@@ -305,7 +324,7 @@ export default function HomeThreeCards() {
             <Plus size={13} aria-hidden />新 CLI
           </button>
           <KebabMenu testid="home-actions" items={[
-            { label: '刷新', icon: <RefreshCw size={15} />, testid: 'home-refresh', onClick: () => { void load() } },
+            { label: '刷新', icon: <RefreshCw size={15} />, testid: 'home-refresh', onClick: () => { void refresh() } },
           ] as KebabItem[]} />
         </span>
       </div>

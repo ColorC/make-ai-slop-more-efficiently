@@ -13,14 +13,75 @@
 /* ── PTY 终端页(Editor.tsx) ── */
 .cs-body { gap: 0; padding: 0; box-sizing: border-box; }
 .cs-term-col { position: relative; overflow: hidden; min-width: 0; }
+/* 终端玻璃窗体层(2026-08-06 二轮)。
+   刻意做成一层"永不重绘的独立兄弟", 而不是把 backdrop-filter 挂在 .cs-term 上 ——
+   终端是高频重绘面(流式输出), 模糊挂在它本体上会让每帧都重算 backdrop, 成本 ∝
+   模糊半径 × 面积(设计语言 §5)。这一层内容恒定、位置恒定, 它背后的 #bp-grid 又是
+   position:fixed 静态的, 所以模糊结果可被缓存, 静止时开销≈0。
+   xterm 的 WebGL 画布自带合成层, 浮在这层之上, 两者互不触发对方重绘。 */
+.cs-term-col::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* 玻璃 = 模糊(主角) + 斜向高光(给出面的朝向) + 边缘高光(给出厚度)。
+     2026-08-06 三轮: 撤掉了曾经加的 feTurbulence 噪点 —— 那是在真模糊没生效时
+     用来"看起来像玻璃"的补偿, 属于掩盖问题。真因是 EditorArea 的 .mo-swap-in
+     带 animation 创建了 backdrop root, 让内部所有 backdrop-filter 糊了个空;
+     那个修掉之后模糊本身就够了, 噪点反而是终端阅读面上的多余颗粒。 */
+  background:
+    linear-gradient(135deg,
+      rgba(190, 220, 255, .075) 0%,
+      rgba(190, 220, 255, .015) 34%,
+      transparent 58%,
+      rgba(140, 175, 225, .035) 100%),
+    var(--fp-term-pane);
+  backdrop-filter: var(--fp-term-pane-blur);
+  -webkit-backdrop-filter: var(--fp-term-pane-blur);
+  box-shadow:
+    inset 0 1px 0 rgba(200, 228, 255, .16),
+    inset 1px 0 0 rgba(200, 228, 255, .08),
+    inset 0 -1px 0 rgba(4, 10, 26, .55);
+}
 .cs-sidecar-handle { position: absolute; top: 8px; right: 9px; z-index: 12;
   background: color-mix(in srgb, var(--fp-bp-panel) 82%, transparent);
   backdrop-filter: var(--fp-bp-panel-blur); -webkit-backdrop-filter: var(--fp-bp-panel-blur); }
-.cs-term { flex: 1; overflow: hidden; margin: 0; padding: 8px; min-height: 0;
-  border: 0; border-radius: 0; background: var(--fp-bp-solid);
+/* 终端 = 嵌在图板上的深色观察窗(2026-08-06「黑玻璃」裁决)。
+   xterm 自己画底(见 readTerminalTheme 的 --fp-term-bg), 这里负责"窗框":
+   内缘一圈冷高光 + 外圈压边, 读起来像玻璃是嵌进去的、有厚度的, 而不是贴上去的一块色板。
+   容器本身留 --fp-term-bg-solid 兜底, 避免 xterm 挂载前闪一下蓝底。 */
+.cs-term { position: relative; z-index: 1;
+  flex: 1; overflow: hidden; margin: 0; padding: 8px; min-height: 0;
+  /* 底交给上面的玻璃层, 这里必须透明, 否则又把它盖死(一轮就是栽在这) */
+  border: 0; border-radius: 0; background: transparent;
+  box-shadow:
+    inset 0 0 0 1px var(--fp-term-edge),
+    inset 0 1px 0 rgba(180, 210, 255, .16),
+    inset 0 0 34px var(--fp-term-glow);
   cursor: text; }
-.cs-term .xterm { height: 100%; overscroll-behavior: contain; }
+.cs-term .xterm { height: 100%; overscroll-behavior: contain; background: transparent; }
+/* xterm 自带样式会给滚动视口刷一层不透明底(实测 rgb(0,0,0)), 它盖在玻璃层之上,
+   于是玻璃白做。这里把三层容器全部放平, 底只由 .cs-term-col::before 的玻璃层负责。 */
+.cs-term .xterm-viewport,
+.cs-term .xterm-screen,
+/* xterm 6 的滚动包装层也会刷 theme.background(实测 rgba(4,8,18,.28)),
+   不放平就等于在玻璃上又盖一层, 玻璃档白压暗一次。 */
+.cs-term .xterm-scrollable-element { background: transparent !important; }
+/* DOM 渲染器(玻璃档)下, xterm 会给每行 span 刷默认底; 放平才能让玻璃透上来。
+   WebGL 档下这些元素不存在, 规则空转, 无副作用。 */
+.cs-term .xterm-rows > div { background: transparent; }
 .cs-term .xterm-screen { cursor: text; }
+.cs-term-restoring {
+  position: absolute; inset: 0; z-index: 10; display: grid; place-items: center;
+  background: var(--fp-term-bg-solid); color: var(--fp-text-2); pointer-events: auto;
+  font: 500 var(--fp-fs-3)/1.4 var(--fp-font-mono);
+}
+.cs-term-restoring span::before {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 9px;
+  border-radius: 50%; background: var(--fp-accent-2);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--fp-accent-2) 16%, transparent);
+}
 @media (pointer: coarse) {
   .cs-term .xterm { touch-action: none; }
 }
@@ -30,11 +91,31 @@
   border: 1px solid var(--fp-border-strong);
   background: var(--fp-bp-paper); color: var(--fp-text);
   box-shadow: var(--fp-bp-shadow-pop);
-  font: 650 var(--fp-fs-3)/1 var(--fp-font-sans);
+  font: 500 var(--fp-fs-3)/1 var(--fp-font-sans);
   cursor: pointer; touch-action: manipulation;
 }
 .cs-latest:hover { border-color: var(--fp-accent-2); background: var(--fp-bp-paper-2); }
 .cs-latest:active { transform: translateY(1px); }
+/* assistant 费用问题浮签: 悬在终端顶部, 只占一小条, 不挡输入焦点。 */
+.cs-billing {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 22;
+  display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px);
+  padding: 7px 8px 7px 14px; border-radius: 999px;
+  border: 1px solid var(--fp-warn);
+  background: var(--fp-bp-paper); color: var(--fp-text);
+  box-shadow: var(--fp-bp-shadow-pop);
+  font: 500 var(--fp-fs-4)/1.3 var(--fp-font-sans);
+}
+.cs-billing-note { color: var(--fp-warn); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-billing-btn {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  min-height: 30px; padding: 0 12px; border-radius: 999px; border: 0;
+  background: var(--fp-accent-2); color: var(--fp-bp-paper-deep);
+  font: 600 var(--fp-fs-4)/1 var(--fp-font-sans);
+  cursor: pointer; touch-action: manipulation;
+}
+.cs-billing-btn:hover { filter: brightness(1.08); }
+.cs-billing-btn:disabled { opacity: .6; cursor: default; }
 .cs-errbar { padding: 12px; flex-shrink: 0; font-size: var(--fp-fs-3);
   background: color-mix(in srgb, var(--fp-err) 10%, transparent);
   border-top: 1px solid color-mix(in srgb, var(--fp-err) 38%, transparent); color: var(--fp-err); }
@@ -58,7 +139,7 @@
   background: var(--fp-bp-solid); color: var(--fp-text-2); font-size: var(--fp-fs-4); line-height: 1.55; }
 .cs-shortcuts-grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 1px 12px; }
 .cs-shortcuts-grid kbd, .cs-shortcuts-grid span { padding: 6px 0; border-bottom: 1px solid var(--fp-border-subtle); }
-.cs-shortcuts-grid kbd { color: var(--fp-bp-brass-hi); font: 600 var(--fp-fs-4)/1.4 var(--fp-font-mono); }
+.cs-shortcuts-grid kbd { color: var(--fp-bp-brass-hi); font: 500 var(--fp-fs-4)/1.4 var(--fp-font-mono); }
 .cs-shortcuts-grid span { color: var(--fp-text-2); font-size: var(--fp-fs-4); line-height: 1.4; }
 
 .cs-root { width: 360px; border-left: var(--fp-bp-frame-w) solid var(--fp-border);
@@ -73,7 +154,7 @@
   border-bottom: 1px solid var(--fp-border-subtle);
   background: color-mix(in srgb, var(--fp-bp-tracing-strong) 92%, transparent);
   backdrop-filter: var(--fp-bp-tracing-blur); -webkit-backdrop-filter: var(--fp-bp-tracing-blur); }
-.cs-provider { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-weight: 600;
+.cs-provider { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-weight: 500;
   font-family: var(--fp-font-mono); letter-spacing: .08em; text-transform: uppercase;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -85,7 +166,7 @@
 .cs-section[data-empty="1"] { border-style: dashed; box-shadow: none; background: transparent; }
 .cs-sechead { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
   padding: 8px 12px; border: 0; background: transparent; color: var(--fp-text);
-  font-size: var(--fp-fs-3); font-weight: 600; cursor: pointer; font-family: inherit;
+  font-size: var(--fp-fs-3); font-weight: 500; cursor: pointer; font-family: inherit;
   box-sizing: border-box; user-select: none; }
 .cs-sechead:hover { background: var(--fp-bp-paper-2); }
 .cs-section[data-empty="1"] .cs-sechead { color: var(--fp-text-3); cursor: default; }
@@ -159,13 +240,30 @@
 .cs-handoff-card { max-width: 420px; text-align: center; padding: 24px;
   background: var(--fp-bp-paper); border: var(--fp-bp-frame-w) solid var(--fp-border);
   border-radius: var(--fp-r2); box-shadow: var(--fp-bp-shadow-sm); }
-.cs-handoff-title { font-size: var(--fp-fs-2); font-weight: 700; margin-bottom: 8px; }
+.cs-handoff-title { font-size: var(--fp-fs-2); font-weight: 500; margin-bottom: 8px; }
 .cs-handoff-desc { color: var(--fp-text-3); font-size: var(--fp-fs-3); line-height: 1.6;
   margin-bottom: 16px; }
 /* 白线描边次按钮(落点卡 CTA;与 controller .ct-newbtn 同形,本实体自带不跨实体依赖) */
 .cs-openbtn { display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 15px; border-radius: var(--fp-r1); border: 1px solid var(--fp-border-strong);
-  background: transparent; color: var(--fp-text); font-size: var(--fp-fs-3); font-weight: 600;
+  background: transparent; color: var(--fp-text); font-size: var(--fp-fs-3); font-weight: 500;
   cursor: pointer; transition: all var(--fp-t-fast); }
 .cs-openbtn:hover { background: var(--fp-bp-paper-2); }
 .cs-openbtn:active { transform: translateY(1px); }
+
+/* ── Web-display 会话(iframe 展示面,如 DeepSeek Harness Web UI) ── */
+.ws-root { height: 100%; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; color: var(--fp-text); background: transparent;
+  box-sizing: border-box; }
+.ws-spin { animation: ws-spin 1s linear infinite; }
+@keyframes ws-spin { to { transform: rotate(360deg); } }
+.ws-ended-title { font-size: var(--fp-fs-2); font-weight: 500; }
+.ws-ended-desc { color: var(--fp-text-3); font-size: var(--fp-fs-3); max-width: 420px;
+  text-align: center; line-height: 1.6; }
+.ws-toolbar { width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; box-sizing: border-box;
+  border-bottom: 1px solid var(--fp-border); background: var(--fp-bp-paper); }
+.ws-url { font-size: var(--fp-fs-3); color: var(--fp-text-2); font-family: var(--fp-mono, monospace);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-spacer { flex: 1; }
+.ws-frame { flex: 1; width: 100%; border: 0; background: #fff; min-height: 0; }

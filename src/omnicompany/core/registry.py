@@ -98,8 +98,7 @@ _REGISTRY: dict[str, TeamEntry] = {}
 def register(entry: TeamEntry) -> None:
     """注册一个可执行 Team。重复注册同名 Team 会覆盖并发出警告。
 
-    entry.aliases 内的旧名同时注册到 _REGISTRY (同一 TeamEntry 对象共享),
-    保证 `get("workflow-factory")` 仍返回 team-builder 的 entry.
+    entry.aliases 内的旧名同时注册到 _REGISTRY (同一 TeamEntry 对象共享)。
     """
     if entry.name in _REGISTRY:
         logger.warning("Team '%s' already registered, overwriting", entry.name)
@@ -161,4 +160,3 @@ def discover() -> None:
         register_all()
     except Exception as e:
         logger.debug("discover failed: %s", e)
-

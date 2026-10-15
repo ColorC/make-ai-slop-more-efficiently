@@ -6,7 +6,7 @@
  * MaterialContentView 的富渲染不在本测范围, 用一个只回显的探针 kind 渲染器占位。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { Material } from '../../api/reviewstageClient'
 import { registerKindRenderer, type BusinessToolbarSpec } from './rendererRegistry'
 import { MaterialDetail } from './MaterialDetail'
@@ -51,7 +51,7 @@ function renderDetail(m: Material) {
 beforeEach(() => { vi.restoreAllMocks() })
 
 describe('MaterialDetail 合并顶栏(件一)', () => {
-  it('① 有 toolbar 的材料 → 渲染合并栏, 业务身份 + 审阅动作(通过/驳回/⋯)都在, 无第二条顶栏', () => {
+  it('① 有 toolbar 的材料 → 渲染合并栏, 低频裁决折进更多菜单, 无第二条顶栏', () => {
     renderDetail(mat({ kind: 'probe-with-tb' as never, extra: {} }))
     const merged = screen.getByTestId('material-detail-merged-toolbar')
     expect(merged).toBeTruthy()
@@ -59,7 +59,9 @@ describe('MaterialDetail 合并顶栏(件一)', () => {
     expect(screen.getByTestId('material-title').textContent).toBe('业务标题占位')
     expect(merged.getAttribute('title')).toContain('原材料标题')
     expect(screen.getByTestId('biz-icon')).toBeTruthy()
-    // 审阅动作永不丢: 通过/驳回两键 + tier/status + 更多。
+    // 通过/驳回不再常驻，但仍能从更多菜单手工兜底。
+    expect(screen.queryByTestId('verdict-accept')).toBeNull()
+    fireEvent.click(screen.getByTestId('material-detail-more'))
     expect(screen.getByTestId('verdict-accept')).toBeTruthy()
     expect(screen.getByTestId('verdict-reject')).toBeTruthy()
     expect(screen.getByTestId('material-tier-status')).toBeTruthy()
@@ -70,7 +72,8 @@ describe('MaterialDetail 合并顶栏(件一)', () => {
     renderDetail(mat({ kind: 'probe-no-tb' as never }))
     expect(screen.queryByTestId('material-detail-merged-toolbar')).toBeNull()
     expect(screen.getByTestId('material-title').textContent).toBe('原材料标题')
-    // 审阅动作仍在。
+    // 审阅动作仍在更多菜单。
+    fireEvent.click(screen.getByTestId('material-detail-more'))
     expect(screen.getByTestId('verdict-accept')).toBeTruthy()
     expect(screen.getByTestId('verdict-reject')).toBeTruthy()
   })

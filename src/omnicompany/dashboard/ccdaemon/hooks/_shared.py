@@ -31,6 +31,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..provider_identity import (
+    NATIVE_TRACE_PROVIDER_IDS,
+    canonical_cli_provider_id,
+    provider_event_source,
+)
+
 try:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
@@ -71,8 +77,14 @@ def hook_provider(payload: dict[str, Any] | None = None) -> str:
                 break
     if not explicit and payload:
         explicit = str(payload.get("provider") or "")
-    normalized = str(explicit or "").strip().lower().replace("-", "_")
-    return "codex" if normalized == "codex" else "claude_code"
+    if explicit:
+        # Preserve the real provider instead of collapsing every non-Codex
+        # hook to Claude. Unknown explicit values are still more truthful than
+        # a fabricated Claude identity and remain auditable downstream.
+        return canonical_cli_provider_id(explicit)
+    if payload and hook_output_is_kimi(payload):
+        return "kimi"
+    return "claude_code"
 
 
 def binding_provider(payload: dict[str, Any] | None = None) -> str:
@@ -84,7 +96,7 @@ def binding_provider(payload: dict[str, Any] | None = None) -> str:
 def hook_source(payload: dict[str, Any] | None = None) -> str:
     """EventBus source spelling used by native hook events."""
 
-    return "codex" if hook_provider(payload) == "codex" else "claude-code"
+    return provider_event_source(hook_provider(payload))
 
 
 def provider_session_id(payload: dict[str, Any]) -> str:
@@ -233,7 +245,16 @@ def _read_cc_sessions_store(root: Path) -> dict[str, dict[str, Any]]:
         # canonical resolver also honours OMNI_CC_DAEMON_STATE_DIR.
         from omnicompany.dashboard.ccdaemon.pty import _read_meta_store
 
-        return _read_meta_store(use_cache=False)
+        # use_cache=True used to be wrong here for the wrong reason: every hook
+        # invocation is a fresh subprocess, so pty.py's in-memory cache (keyed
+        # on mtime/size/ino) starts empty regardless and this call always fell
+        # through to a full json.loads() of the 9MB+ store (PERF-OBSERVATORY
+        # P1.5b). It's now safe *and* fast: use_cache=True additionally checks
+        # a cross-process marshal-backed disk cache keyed on that exact same
+        # (path, mtime_ns, size, ino) tuple, so a hook only skips the parse
+        # when the file provably has not changed since some process last read
+        # or wrote it — never a staleness window, just a mtime-exact match.
+        return _read_meta_store(use_cache=True)
     except (ImportError, json.JSONDecodeError, OSError, ValueError):
         return {}
 
@@ -301,9 +322,12 @@ def detect_active_plan(
     # 1. provider-neutral binding ledger.
     if effective_sid and effective_provider:
         try:
-            from omnicompany.packages.services._core.identity import bindings_by_session_key
+            from omnicompany.packages.services._core.identity import binding_for_session
 
-            record = bindings_by_session_key().get(f"{effective_provider}:{effective_sid}") or {}
+            record = binding_for_session(
+                provider=effective_provider,
+                session_id=effective_sid,
+            )
             plan_id = record.get("active_plan")
             if plan_id:
                 candidate = plans / str(plan_id)
@@ -344,13 +368,54 @@ def plan_id_of(plan_dir: Path) -> str:
         return plan_dir.name
 
 
-MAX_DEFAULT_CONTEXT_CHARS = 800
-_CONSTRAINT_HEADINGS = {
-    "执行约束",
-    "硬规则",
-    "execution constraints",
-    "hard rules",
-}
+MAX_DEFAULT_CONTEXT_CHARS = 520
+
+
+# ── 会话内注入中文计划名 (2026-08-20 用户裁定: 会话里要看到计划的中文命名) ──
+_PLAN_TITLE_ZH: dict[str, str] | None = None
+
+
+def _plan_title_zh_table() -> dict[str, str]:
+    global _PLAN_TITLE_ZH
+    if _PLAN_TITLE_ZH is None:
+        table: dict[str, str] = {}
+        try:
+            import json as _json
+
+            raw = _json.loads(
+                (repo_root() / "data" / "registry" / "plan_governance.json").read_text(encoding="utf-8")
+            )
+            for pid, entry in (raw.get("plans") or {}).items():
+                if isinstance(entry, dict) and entry.get("title_zh"):
+                    table[str(pid)] = str(entry["title_zh"])
+        except Exception:
+            pass
+        _PLAN_TITLE_ZH = table
+    return _PLAN_TITLE_ZH
+
+
+def plan_display_title(plan_id: str, plan_dir: Path, meta: dict[str, Any] | None = None) -> str:
+    """治理覆盖表 title_zh > frontmatter title > 正文 H1 > slug 兜底。slug 本身不改。"""
+    hit = _plan_title_zh_table().get(plan_id)
+    if hit:
+        return hit
+    title = str((meta or {}).get("title") or "").strip()
+    if title:
+        return title
+    # 只读 frontmatter (元数据), 绝不回落到正文 H1 ——
+    # 注入上下文刻意不带 plan 正文 (见 test_session_start_uses_brief_pointer_without_plan_body)。
+    try:
+        head = (plan_dir / "plan.md").read_text(encoding="utf-8", errors="replace").splitlines()[:80]
+    except Exception:
+        return plan_id
+    if not head or head[0].strip() != "---":
+        return plan_id
+    for line in head[1:]:
+        if line.strip() == "---":
+            break
+        if line.startswith("title:"):
+            return line.split(":", 1)[1].strip().strip("'\"")
+    return plan_id
 
 
 def _relative_workspace_path(path: Path, root: Path) -> str:
@@ -358,37 +423,6 @@ def _relative_workspace_path(path: Path, root: Path) -> str:
         return str(path.resolve().relative_to(root.resolve())).replace(os.sep, "/")
     except ValueError:
         return str(path)
-
-
-def _brief_constraints(path: Path, *, limit: int = 2) -> list[str]:
-    """Read at most two stable rules from a small plan brief.
-
-    The main plan is deliberately not scanned: its prose and checklists change
-    frequently and are the source of the old context bloat.  Rules are injected
-    only when a plan maintains an explicit ``brief.md`` section for them.
-    """
-
-    if not path.is_file():
-        return []
-    try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
-        return []
-    in_section = False
-    rules: list[str] = []
-    for raw in lines:
-        line = raw.strip()
-        if line.startswith("## "):
-            heading = line[3:].strip().lower()
-            in_section = heading in _CONSTRAINT_HEADINGS
-            continue
-        if in_section and line.startswith(("- ", "* ")):
-            rule = " ".join(line[2:].split())[:160]
-            if rule:
-                rules.append(rule)
-                if len(rules) >= limit:
-                    break
-    return rules
 
 
 def build_minimal_context(
@@ -402,55 +436,147 @@ def build_minimal_context(
     """Build the complete model-visible hook context.
 
     Default hook output is an index, not a summary of the indexed files.  Keep
-    it below 800 characters so repeated starts, resumes and compactions cannot
+    it below 520 characters so repeated starts, resumes and compactions cannot
     crowd out the user's actual request.
     """
 
     root = repo_root()
     suffix = f" ({reason})" if reason else ""
-    lines = [f"# omnicompany context{suffix}", f"- workspace: `{cwd}`"]
-    if not plan:
-        lines.extend([
-            "- active plan: none",
-            "- bind a plan only when this becomes durable work: `omni plan use <id>`",
-        ])
-        return "\n".join(lines)[:MAX_DEFAULT_CONTEXT_CHARS]
-
-    plan_id = plan_id_of(plan)
-    plan_dir = _relative_workspace_path(plan, root)
-    brief = plan / "brief.md"
-    start_file = brief if brief.is_file() else plan / "plan.md"
-    lines.extend([
-        f"- active plan: `{plan_id}`",
-        f"- plan directory: `{plan_dir}`",
-        f"- resume from: `{_relative_workspace_path(start_file, root)}`",
-    ])
-
+    lines = [f"# omnicompany context{suffix}"]
     binding: dict[str, Any] = {}
     if payload:
         try:
-            from omnicompany.packages.services._core.identity import get_session_binding
+            from omnicompany.packages.services._core.identity import binding_for_session
 
-            binding = get_session_binding(trace_id_for(payload)) or {}
+            binding = binding_for_session(
+                trace_id=trace_id_for(payload),
+                provider=binding_provider(payload),
+                session_id=provider_session_id(payload),
+                pty_id=os.environ.get("OMNI_CC_PTY_ID"),
+            ) or {}
         except Exception:
             binding = {}
+    if not plan:
+        lines.append(f"- workspace: `{cwd}`")
+        lines.append("- active plan: none")
+        for label, value in (
+            ("project", binding.get("project")),
+            ("workstream", binding.get("workstream")),
+            ("topic", binding.get("topic")),
+        ):
+            clean = " ".join(str(value or "").split())
+            if clean:
+                lines.append(f"- {label}: {clean[:120]}")
+        if binding.get("workstream"):
+            lines.append("- resume: `omni workstream context`")
+        elif not binding.get("project"):
+            lines.append("- project lookup: `omni project find <称呼>`")
+            lines.append("- skill route: `omni skill resolve <名称> --json` (只加载 canonical_path)")
+            lines.append("- skills: load only the matching path when needed")
+            lines.append("- durable work: `omni session bind --project <id> --workstream <id> --topic <one-focus>`")
+        return "\n".join(lines)[:MAX_DEFAULT_CONTEXT_CHARS]
+
+    plan_id = plan_id_of(plan)
+    brief = plan / "brief.md"
+    start_file = brief if brief.is_file() else plan / "plan.md"
+    try:
+        relative_plan = plan.resolve().relative_to(Path(cwd).resolve())
+        plan_dir = str(relative_plan).replace(os.sep, "/") or "."
+    except ValueError:
+        plan_dir = _relative_workspace_path(plan, root)
+    try:
+        resume_path = str(start_file.resolve().relative_to(Path(cwd).resolve())).replace(os.sep, "/")
+    except ValueError:
+        resume_path = _relative_workspace_path(start_file, root)
+    lines.extend([
+        f"- 计划: {plan_display_title(plan_id, plan, plan_meta)}",
+        f"- active plan: `{plan_id}`",
+        f"- plan directory: `{plan_dir}`",
+        f"- resume from: `{resume_path}`",
+    ])
+
     meta = plan_meta or {}
     for label, value in (
         ("project", binding.get("project") or meta.get("project")),
+        ("workstream", binding.get("workstream")),
         ("task", binding.get("task_id")),
         ("topic", binding.get("topic")),
     ):
         clean = " ".join(str(value or "").split())
         if clean:
             lines.append(f"- {label}: {clean[:160]}")
-    for rule in _brief_constraints(brief):
-        lines.append(f"- hard rule: {rule}")
-    lines.append("- open only the files needed for the current request")
+    # Keep the hook as a pointer.  Read brief.md only when the current task
+    # actually needs plan-specific details; do not copy rule prose into every
+    # Claude/Codex session start.
+    if binding.get("workstream"):
+        lines.append("- resume: `omni workstream context`")
+    lines.append(f"- workspace: `{cwd}`")
 
     text = "\n".join(lines)
     if len(text) <= MAX_DEFAULT_CONTEXT_CHARS:
         return text
     return text[: MAX_DEFAULT_CONTEXT_CHARS - 1].rstrip() + "…"
+
+
+# ─── swarm snapshot (SWARM-DISPATCH-PROACTIVITY P3) ──────────────────────────
+# 一到两行"本机集群"快照, 只挂 SessionStart(不进 UserPromptSubmit, 不逐 prompt 重复)。
+# 默认关闭。开关优先级: env OMNI_HOOK_SWARM_SNAPSHOT=on|off > flag 文件存在与否。
+# 任何失败静默降级为空串 —— 快照绝不能拖慢或搞挂 hook。
+
+SWARM_SNAPSHOT_ENV = "OMNI_HOOK_SWARM_SNAPSHOT"
+_SWARM_SNAPSHOT_MAX_CHARS = 220
+
+
+def _swarm_snapshot_flag_file() -> Path:
+    return repo_root() / "config" / "hooks" / "swarm-snapshot.on"
+
+
+def swarm_snapshot_enabled() -> bool:
+    v = os.environ.get(SWARM_SNAPSHOT_ENV, "").strip().lower()
+    if v in ("on", "1", "true"):
+        return True
+    if v in ("off", "0", "false"):
+        return False
+    try:
+        return _swarm_snapshot_flag_file().is_file()
+    except OSError:
+        return False
+
+
+def swarm_snapshot_line() -> str:
+    """读 agent 注册表缓存(data/boss_sight/agent_registry.json), 出一行快照。
+
+    不跑命令、不打网络、不烧 token; 注册表由 ccdaemon/omni agents refresh 维护,
+    这里只消费。schema 变化或文件缺失 → 返回空串。
+    """
+    if not swarm_snapshot_enabled():
+        return ""
+    try:
+        p = repo_root() / "data" / "boss_sight" / "agent_registry.json"
+        entries = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(entries, dict):
+            return ""
+        # running 标志有僵尸(实测 48 条 running:true 大半是历史窗格);
+        # 语义活跃 = running 且会话文件 30 分钟内动过(mtime 是原生会话 jsonl 的修改时间)。
+        now = time.time()
+        running = [
+            e for e in entries.values()
+            if isinstance(e, dict) and e.get("running") is True
+            and isinstance(e.get("mtime"), (int, float)) and now - e["mtime"] < 1800
+        ]
+        if not running:
+            return ""
+        # P0/post 探针实证: worker 不会自己去读盘上的 AGENTS.md, 指针要带上
+        # 授权语句和入口命令才构成决策时刻的可用信息(纯指针=又一跳摩擦)。
+        line = (
+            f"- swarm: 本机 {len(running)} 个 agent 在跑, 跨模型派发设施可用。"
+            f"规格明确+可机械验收+体量够的机械活, 默认派发不必亲手做: "
+            f"`omni worker run <provider> --spec <契约文件>` 或 `omni task dispatch`; "
+            f"判据/分层/契约模板见工作区 AGENTS.md「集群派发」节"
+        )
+        return line[:_SWARM_SNAPSHOT_MAX_CHARS]
+    except Exception:
+        return ""
 
 
 # ─── event bus (synchronous SQLite write) ────────────────────────────────────
@@ -479,10 +605,10 @@ def trace_id_for(stdin_payload: dict) -> str:
     """
     provider = hook_provider(stdin_payload)
     pty_id = os.environ.get("OMNI_CC_PTY_ID")
-    if pty_id and provider == "claude_code":
+    if pty_id and provider not in NATIVE_TRACE_PROVIDER_IDS:
         return pty_id  # cc_session.id matches directly
     sid = provider_session_id(stdin_payload) or "unknown"
-    prefix = "codex" if provider == "codex" else "cc"
+    prefix = "cc" if provider == "claude_code" else provider
     return f"{prefix}_{sid}"
 
 

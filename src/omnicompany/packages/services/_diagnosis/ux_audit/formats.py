@@ -19,7 +19,7 @@ M_TARGET = Format(
     description=(
         "要审计的前端源码目录。\n"
         "- src_root (str, required): 前端 src 目录绝对路径(如 .../dashboard/frontend/src)\n"
-        "- app (str, optional): 应用名(omnidashboard/lofa/poof/whatnow),仅用于报告标题\n"
+        "- app (str, optional): 应用名(omnidashboard/lofa/Canvas/whatnow),仅用于报告标题\n"
         "- include_dirs (list[str], optional): 只扫这些子目录(默认 ['entities','shell'])\n"
         "- exclude (list[str], optional): 排除目录(默认 .git/node_modules/dist/__pycache__)"
     ),

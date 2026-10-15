@@ -171,7 +171,8 @@ export default function DecisionLens({ project }: { project: string }) {
     <div style={LS.root} data-testid="decision-lens">
       <div style={LS.main}>
         <div style={LS.toolbar}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fp-text-2)' }}>决策浏览</span>
+          <span style={{ fontSize: 'var(--fp-fs-3)', fontWeight: 500, color: 'var(--fp-text-2)',
+            fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.18em' }}>决策浏览</span>
           {LENSES.map((l) => (
             <button
               key={l.key} type="button" title={l.hint}
@@ -272,14 +273,15 @@ function RecordDetail({ node }: { node: GraphNode }) {
 }
 
 const LS: Record<string, any> = {
-  root: { display: 'flex', height: '100%', minHeight: 0, background: 'var(--fp-solid)' },
+  root: { display: 'flex', height: '100%', minHeight: 0, background: 'var(--fp-bp-solid)' },
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' },
   toolbar: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
     borderBottom: '1px solid var(--fp-border-subtle)',
   },
   lensBtn: (active: boolean): CSSProperties => ({
-    padding: '2px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
+    padding: '2px 10px', borderRadius: 'var(--fp-bp-r1)', fontSize: 'var(--fp-fs-4)', cursor: 'pointer',
+    fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.09em',
     background: active ? 'color-mix(in srgb, var(--fp-accent) 18%, transparent)' : 'transparent',
     color: active ? 'var(--fp-accent)' : 'var(--fp-text-3)',
     border: `1px solid ${active ? 'var(--fp-accent)' : 'var(--fp-border-subtle)'}`,
@@ -288,20 +290,22 @@ const LS: Record<string, any> = {
   canvasWrap: { flex: 1, minHeight: 0, position: 'relative' },
   scroll: { position: 'absolute', inset: 0, overflow: 'auto' },
   emptyBox: {
-    margin: 18, padding: 16, border: '1px dashed var(--fp-border-subtle)', borderRadius: 8,
+    margin: 18, padding: 16, border: '1px dashed var(--fp-border-subtle)', borderRadius: 2,
     color: 'var(--fp-text-2)', fontSize: 13, lineHeight: 1.7,
   },
   side: {
     width: 300, flexShrink: 0, borderLeft: '1px solid var(--fp-border-subtle)',
     padding: 12, overflow: 'auto', fontSize: 13,
   },
-  sideTitle: { fontWeight: 600, fontSize: 13, color: 'var(--fp-text-1)', marginBottom: 8 },
+  // 区段标题走制图等线字: 宽字距 + 大写, 不靠加粗(见 blueprint.css「制图等线字」节)
+  sideTitle: { fontWeight: 500, fontSize: 'var(--fp-fs-3)', color: 'var(--fp-text-2)', marginBottom: 8,
+    fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.18em' },
   kv: { display: 'flex', gap: 6, marginTop: 6 },
   k: { color: 'var(--fp-text-3)', fontSize: 12, flexShrink: 0 },
   v: { color: 'var(--fp-text-2)', fontSize: 12, wordBreak: 'break-all' },
   rejected: {
     padding: '4px 8px', marginTop: 4, borderLeft: '2px solid var(--fp-err)',
     background: 'color-mix(in srgb, var(--fp-err) 6%, transparent)', fontSize: 12,
-    color: 'var(--fp-text-2)', borderRadius: '0 4px 4px 0',
+    color: 'var(--fp-text-2)', borderRadius: '0 2px 2px 0',
   },
 }

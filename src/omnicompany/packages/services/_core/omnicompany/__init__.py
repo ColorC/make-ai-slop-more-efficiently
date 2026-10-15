@@ -1,20 +1,12 @@
 # [OMNI] origin=claude-code domain=omnicompany/omnicompany ts=2026-04-20T00:00:00Z type=config
 # [OMNI] material_id="material:omnicompany.module_aggregate.exports.py"
-"""omnicompany — Worker / Material / Stock 激活驱动层 (L1 黑板架构 Phase 1 pilot).
+"""Worker/Material/Team vocabulary and Material-ledger activation.
 
-核心认知（用户 2026-04-20 洞察）:
-  stock = EventBus（已有的 SQLiteBus / MemoryBus, 不需新造）
-  material = FactoryEvent（payload + event_type + trace_id 完整映射）
-  worker = Router 子类（FORMAT_IN 订阅 → 激活产 FORMAT_OUT）
-
-本目录提供**激活驱动 dispatcher**, 让 Worker 在 EventBus 上订阅激活,
-而非通过 pipeline.edges 显式指定下游。
-
-用户洞察落地路径:
-  "大部分是重命名 + 设计思维调整 + 原本不严谨的内容清除,
-   转成 bus 驱动如果有问题, 通常意味着之前就不严谨, 而不是有新需求."
-
-所以本模块的意义是**暴露不严谨**, 而非引入新需求。
+Material bodies and subscription activation belong to a direct Material
+authority.  The compatibility MaterialDispatcher uses a run-scoped ledger;
+EventBus receives only optional bodyless audit projections.  Cross-run
+Material query/subscription is provided by the canonical Material authority
+and BlackboardCoordinator, never by replaying EventBus as inventory.
 """
 from .worker import Worker, Material, Team
 from .material_dispatcher import MaterialDispatcher

@@ -1,0 +1,914 @@
+{
+    "Omni@NoOp": {
+        "doc": "阳性对照：必然成功且立即返回。用于判定 Custom/task_names 通道本身是否可用，把「通道坏了」与「屏上没有目标」区分开。",
+        "algorithm": "JustReturn",
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@GuideOverlay-Detect": {
+        "doc": "检测新手引导遮罩。MAA 原生不处理引导，这是本项目的增量。只识别不点击。",
+        "algorithm": "OcrDetect",
+        "text": ["欢迎来到终端", "点击前往", "高亮区域"],
+        "roi": [0, 0, 1280, 400],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@GuideOverlay-ClickTarget": {
+        "doc": "点击引导指定的高亮目标。坐标由 OCR 给出，不硬编码。",
+        "algorithm": "OcrDetect",
+        "text": ["前往上一次作战"],
+        "roi": [900, 480, 380, 240],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 3
+    },
+
+    "Omni@GuideOverlay-ClickStageName": {
+        "doc": "点击高亮卡片的关卡名部分（卡片主体，命中区比顶部标签更可靠）。",
+        "algorithm": "OcrDetect",
+        "text": ["龙门之行"],
+        "roi": [900, 480, 380, 240],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 3
+    },
+
+    "Omni@GuideOverlay-ClickStageCode": {
+        "doc": "点击高亮卡片的关卡编号部分。",
+        "algorithm": "OcrDetect",
+        "text": ["2-1"],
+        "roi": [900, 480, 380, 240],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 3
+    },
+
+    "Omni@Guide-ClickMainThemeNav": {
+        "doc": "引导步骤：底部导航「曲谱」。OCR 定位相邻的「终端」文案不可靠（会点错），故用主题名。",
+        "algorithm": "OcrDetect",
+        "text": ["曲谱"],
+        "roi": [0, 600, 1280, 120],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Guide-ClickTerminalNav": {
+        "doc": "引导步骤：底部导航「终端」。",
+        "algorithm": "OcrDetect",
+        "text": ["终端"],
+        "roi": [0, 600, 300, 120],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Guide-ClickAnyConfirm": {
+        "doc": "引导步骤兜底：确认/继续/知道了 一类按钮。",
+        "algorithm": "OcrDetect",
+        "text": ["确认", "确定", "继续", "知道了", "我知道了", "下一步", "跳过"],
+        "roi": [0, 0, 1280, 720],
+        "action": "ClickSelf",
+        "postDelay": 1500,
+        "maxTimes": 2
+    },
+
+    "Omni@Probe-ClickTerminalLabel": {
+        "doc": "执行端连通性探针：点击底部导航「终端」。在主界面上这是幂等的（已在终端页则无变化），用于判断点击是否真的落地。",
+        "algorithm": "OcrDetect",
+        "text": ["终端"],
+        "roi": [0, 620, 300, 100],
+        "action": "ClickSelf",
+        "postDelay": 1500,
+        "maxTimes": 1
+    },
+
+    "Omni@Terminal-Detect": {
+        "doc": "主界面锚点（自建，OCR 而非模板，不受遮罩压暗影响）。",
+        "algorithm": "OcrDetect",
+        "text": ["终端"],
+        "roi": [0, 620, 300, 100],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Formation-Detect": {
+        "doc": "编队界面锚点。实测该页底部有「本次行动配置不可更改」，右侧为「开始行动」。",
+        "algorithm": "OcrDetect",
+        "text": ["本次行动配置不可更改", "快捷编队", "助战干员"],
+        "roi": [0, 0, 1280, 720],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@DataSyncPrompt-Detect": {
+        "doc": "编队后偶发的数据更新同步模态，只读检测；不得把它当战斗 HUD 超时。",
+        "algorithm": "OcrDetect",
+        "text": ["数据已更新", "即将进行同步"],
+        "roi": [250, 220, 780, 260],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@DataSyncPrompt-Confirm": {
+        "doc": "仅在 DataSyncPrompt-Detect 已确认后点击模态下方勾选按钮。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [600, 455, 80, 70],
+        "postDelay": 3000,
+        "maxTimes": 1
+    },
+
+    "Omni@DailySupply-Detect": {
+        "doc": "数据同步或跨日后出现的登录配给页，只读识别。",
+        "algorithm": "OcrDetect",
+        "text": ["今日配给", "采购凭证"],
+        "roi": [350, 20, 580, 650],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@DailySupply-Confirm": {
+        "doc": "仅在 DailySupply-Detect 已确认后点击下方勾选，一次调用只领取当前一页。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [600, 595, 80, 85],
+        "postDelay": 3000,
+        "maxTimes": 1
+    },
+
+    "Omni@MonthlySignIn-Detect": {
+        "doc": "每日配给后可能展开的月签到总览，只读识别。",
+        "algorithm": "OcrDetect",
+        "text": ["常规配给"],
+        "roi": [790, 90, 320, 160],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@MonthlySignIn-Close": {
+        "doc": "仅在 MonthlySignIn-Detect 已确认后点击右上关闭按钮。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [1175, 25, 80, 85],
+        "postDelay": 2500,
+        "maxTimes": 1
+    },
+
+    "Omni@SevenDaySignIn-Detect": {
+        "doc": "新手七日连续登录总览，只读识别。",
+        "algorithm": "OcrDetect",
+        "text": ["连续登录", "七日签到活动"],
+        "roi": [30, 60, 1120, 610],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@SevenDaySignIn-Close": {
+        "doc": "仅在 SevenDaySignIn-Detect 已确认后点击右上关闭按钮。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [1200, 35, 75, 80],
+        "postDelay": 2500,
+        "maxTimes": 1
+    },
+
+    "Omni@EventSignIn-Detect": {
+        "doc": "限时签到活动奖励页，只读识别。",
+        "algorithm": "OcrDetect",
+        "text": ["透明信笺", "清甜"],
+        "roi": [20, 350, 470, 340],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@EventSignIn-Close": {
+        "doc": "仅在 EventSignIn-Detect 已确认后点击右上关闭按钮。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [1185, 35, 80, 90],
+        "postDelay": 2500,
+        "maxTimes": 1
+    },
+
+    "Omni@WishWall-Detect": {
+        "doc": "许愿墙活动选择页，只读识别；不得随机选择许愿签。",
+        "algorithm": "OcrDetect",
+        "text": ["剩余可选签数", "请选择许愿签", "许愿墙"],
+        "roi": [20, 60, 1190, 620],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@WishWall-Close": {
+        "doc": "仅在 WishWall-Detect 已确认后关闭，不触碰任何许愿签。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [1185, 35, 80, 90],
+        "postDelay": 2500,
+        "maxTimes": 1
+    },
+
+    "Omni@Announcement-Detect": {
+        "doc": "登录弹窗链末尾的活动公告总览，只读识别。",
+        "algorithm": "OcrDetect",
+        "text": ["活动公告", "系统公告", "资讯速报"],
+        "roi": [300, 55, 900, 160],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Announcement-Close": {
+        "doc": "仅在 Announcement-Detect 已确认后点击右上关闭按钮。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [1170, 35, 90, 90],
+        "postDelay": 2500,
+        "maxTimes": 1
+    },
+
+    "Omni@Home-GoLastStage": {
+        "doc": "主界面右下的「前往上一次作战」快捷卡片，一步跳到上次关卡的详情页。比逐级章节导航稳，且纯 OCR 定位。",
+        "algorithm": "OcrDetect",
+        "text": ["前往上一次作战"],
+        "roi": [880, 460, 400, 260],
+        "action": "ClickSelf",
+        "postDelay": 2500,
+        "maxTimes": 2
+    },
+
+    "Omni@Home-OpenTerminal": {
+        "doc": "主页打开终端。用于主页已不显示「前往上一次作战」快捷卡片的新布局；由 OCR 定位大号「终端」入口。",
+        "algorithm": "OcrDetect",
+        "text": ["终端"],
+        "roi": [650, 80, 400, 240],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@TerminalHub-Detect": {
+        "doc": "终端总览锚点。该页右下有「前往上一次作战」，不同于章节地图。",
+        "algorithm": "OcrDetect",
+        "text": ["前往上一次作战", "P.R.T.S.", "MAIN THEME"],
+        "roi": [400, 0, 880, 720],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Terminal-GoCurrentMainTheme": {
+        "doc": "终端总览进入当前主线进度卡。只在 TerminalHub-Detect 已确认后调用；OCR 取账号当前显示的关卡号，不依赖活动主题模板。",
+        "algorithm": "OcrDetect",
+        "text": ["2-1", "2-2", "2-3"],
+        "roi": [500, 180, 500, 330],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Detect": {
+        "doc": "结算界面锚点（行动结束）。用于判断战斗已结束，避免把结算页误当战斗中。",
+        "algorithm": "OcrDetect",
+        "text": ["行动结束", "MISSION RESULTS"],
+        "roi": [0, 130, 700, 320],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@PostBattleStoryPrompt-Detect": {
+        "doc": "First-clear post-battle story skip confirmation; read-only proof before advancing to settlement.",
+        "algorithm": "OcrDetect",
+        "text": ["是否跳过剧情", "行动后"],
+        "roi": [250, 180, 750, 360],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@PostBattleStoryPrompt-ConfirmSkip": {
+        "doc": "Only after PostBattleStoryPrompt-Detect, confirm skipping the already identified post-battle story to reach settlement.",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [765, 430, 65, 65],
+        "postDelay": 3000,
+        "maxTimes": 1
+    },
+
+    "Omni@ProxyUnlockedPrompt-Detect": {
+        "doc": "First-clear acknowledgement that proxy command is now available; read-only detection.",
+        "algorithm": "OcrDetect",
+        "text": ["可以使用代理指挥了"],
+        "roi": [900, 140, 380, 180],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@ProxyUnlockedPrompt-Confirm": {
+        "doc": "Acknowledge the visually confirmed proxy-unlocked modal without enabling or running proxy.",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [1070, 225, 70, 70],
+        "postDelay": 1500,
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stars3": {
+        "doc": "只读匹配结算页三星图标；不进入 Copilot 作业链，也不点击或关闭结算。",
+        "algorithm": "MatchTemplate",
+        "template": "StageDrops-Stars-3.png",
+        "templThreshold": 0.8,
+        "roi": [50, 270, 250, 100],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stage-1-7-Detect": {
+        "doc": "Read-only stage-code truth on the 1-7 mission results screen.",
+        "algorithm": "OcrDetect",
+        "text": ["1-7"],
+        "roi": [0, 20, 280, 140],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stage-2-1-Detect": {
+        "doc": "Read-only stage-code truth on the 2-1 mission results screen.",
+        "algorithm": "OcrDetect",
+        "text": ["2-1", "龙门之行"],
+        "roi": [0, 20, 320, 150],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stage-S2-1-Detect": {
+        "doc": "Read-only stage-code truth on the S2-1 mission results screen.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-1", "迟缓-1"],
+        "roi": [0, 20, 320, 150],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stage-2-2-Detect": {
+        "doc": "Read-only stage-code truth on the 2-2 mission results screen.",
+        "algorithm": "OcrDetect",
+        "text": ["2-2", "兵不接刃"],
+        "roi": [0, 20, 320, 150],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stage-S2-2-Detect": {
+        "doc": "Read-only stage-code truth on the S2-2 mission results screen.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-2", "迟缓-2"],
+        "roi": [0, 20, 320, 150],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stage-S2-3-Detect": {
+        "doc": "Read-only stage-code truth on the S2-3 mission results screen.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-3"],
+        "roi": [0, 20, 320, 150],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Stage-2-3-Detect": {
+        "doc": "Read-only stage-code truth on the 2-3 mission results screen.",
+        "algorithm": "OcrDetect",
+        "text": ["2-3", "无罪推定"],
+        "roi": [0, 20, 320, 150],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@MissionFailed-Detect": {
+        "doc": "只读识别任务失败文字，不点击、不重试、不进入 Fight 恢复链。",
+        "algorithm": "OcrDetect",
+        "text": ["任务失败"],
+        "roi": [36, 226, 482, 269],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@MissionFailed-Dismiss": {
+        "doc": "仅在 MissionFailed-Detect 已确认后，点击『点击画面以继续』文案；一次调用只前进一页。",
+        "algorithm": "OcrDetect",
+        "text": ["点击画面以继续"],
+        "roi": [380, 600, 520, 120],
+        "action": "ClickSelf",
+        "postDelay": 1800,
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-Dismiss": {
+        "doc": "点掉结算页回到章节地图。实机验证右上角在失败返还页无效，改用全屏『点击继续』允许的中央安全区。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [580, 330, 120, 60],
+        "postDelay": 2000,
+        "maxTimes": 1
+    },
+
+    "Omni@Settlement-RejectProxySave": {
+        "doc": "Reject the post-clear request to save a proxy squad; only call after visual prompt proof.",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [930, 220, 100, 90],
+        "postDelay": 1200,
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-TakeOverConfirm-Detect": {
+        "doc": "接管作战的确认弹窗。实测踩过：点了「接管作战」会弹出此模态，未确认时它会挡住整个战斗 HUD —— 于是战斗锚点全部失配、SingleStep 部署仍返回成功但毫无效果。必须显式处理。",
+        "algorithm": "OcrDetect",
+        "text": ["确认要接管作战", "将无法回到代理指挥"],
+        "roi": [0, 260, 1280, 140],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-TakeOverConfirm": {
+        "doc": "点击确认弹窗的对勾。该按钮是纯图标无文字，故只能用矩形；位置为固定模态，rect 取自实测帧（确认条 y≈458..533，右半为✓）。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [790, 470, 110, 52],
+        "postDelay": 2000,
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-OpenSettings": {
+        "doc": "暂停战斗后打开左上角设置页，只用于故障清理后调用 MAA 的 NormalBattleAbandon。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [45, 20, 80, 80],
+        "postDelay": 500,
+        "maxTimes": 1
+    },
+
+    "Omni@BattlePlotSkip-Detect": {
+        "doc": "Read-only detection of MAA's existing in-battle plot/tutorial skip affordance.",
+        "algorithm": "MatchTemplate",
+        "template": "Battle/Plot/SkipThePreBattlePlot.png",
+        "roi": [1096, 0, 182, 131],
+        "templThreshold": 0.7,
+        "action": "DoNothing",
+        "next": [],
+        "maxTimes": 1
+    },
+
+    "Omni@BattlePlotSkip-Click": {
+        "doc": "Click one freshly recognized in-battle plot skip affordance without entering MAA's recursive plot chain.",
+        "algorithm": "MatchTemplate",
+        "template": "Battle/Plot/SkipThePreBattlePlot.png",
+        "roi": [1096, 0, 182, 131],
+        "templThreshold": 0.7,
+        "action": "ClickSelf",
+        "postDelay": 50,
+        "next": [],
+        "maxTimes": 1
+    },
+
+    "Omni@BattlePlotSkipConfirm-Detect": {
+        "doc": "Read-only detection of the plot-skip confirmation dialog.",
+        "algorithm": "MatchTemplate",
+        "template": "Battle/Plot/SkipThePreBattlePlotConfirm.png",
+        "roi": [721, 290, 149, 244],
+        "templThreshold": 0.7,
+        "action": "DoNothing",
+        "next": [],
+        "maxTimes": 1
+    },
+
+    "Omni@BattlePlotSkipConfirm-Click": {
+        "doc": "Confirm a freshly recognized plot-skip dialog exactly once.",
+        "algorithm": "MatchTemplate",
+        "template": "Battle/Plot/SkipThePreBattlePlotConfirm.png",
+        "roi": [721, 290, 149, 244],
+        "templThreshold": 0.7,
+        "action": "ClickSelf",
+        "postDelay": 50,
+        "next": [],
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-FreezeAtFirstHUD": {
+        "doc": "Match the native running-HUD pause icon and immediately pause inside one MAA Custom chain, before Python/OCR round trips can consume battle time.",
+        "algorithm": "MatchTemplate",
+        "template": "BattleOfficiallyBegin.png",
+        "roi": [1165, 20, 75, 65],
+        "maskRange": [100, 255],
+        "templThreshold": 0.7,
+        "action": "ClickSelf",
+        "postDelay": 200,
+        "next": [],
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-Detect": {
+        "doc": "战斗态锚点。不能用 MAA 的 BattleOfficiallyBegin 判断「是否在战斗中」——它匹配的是暂停按钮模板，暂停后按钮变成播放图标必然失配（实测踩过）。改用战斗 HUD 独有文字，暂停与否都成立。",
+        "algorithm": "OcrDetect",
+        "text": ["剩余可放置角色", "剩余可放置"],
+        "roi": [900, 520, 380, 90],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-Paused": {
+        "doc": "战斗是否处于暂停态。",
+        "algorithm": "OcrDetect",
+        "text": ["暂停中", "PAUSE"],
+        "roi": [400, 260, 480, 140],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-ResumeOnce": {
+        "doc": "Resume a confirmed paused battle with exactly one click; unlike BattlePauseCancel this cannot repeat into settlement.",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [1170, 20, 60, 60],
+        "postDelay": 50,
+        "maxTimes": 1
+    },
+
+    "Omni@Battle-Skill-S2-3-2-3": {
+        "doc": "S2-3 calibrated tile center for Melantha; call only after fresh skill-ready proof.",
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [417, 258, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-1-2": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [194, 196, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-1-3": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [186, 309, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-1-4": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [142, 385, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-4-1": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [522, 143, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-4-3": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [512, 309, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-4-5": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [498, 516, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-5-2": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [620, 196, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-5-4": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [620, 385, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-6-2": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [727, 196, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-6-4": {
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [739, 385, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+    "Omni@Battle-Skill-7-3": {
+        "doc": "2-1/2-2 calibrated tile center; call only after fresh skill-ready proof.",
+        "algorithm": "JustReturn", "action": "ClickRect", "specificRect": [837, 309, 40, 40],
+        "postDelay": 400, "next": ["BattleUseSkillJustClick"], "maxTimes": 1
+    },
+
+    "Omni@Battle-TakeOver": {
+        "doc": "从代理指挥接管作战，取得手动控制权。代理指挥在跑时下发的 SingleStep 动作会与其冲突。",
+        "algorithm": "OcrDetect",
+        "text": ["接管作战"],
+        "roi": [280, 600, 400, 120],
+        "action": "ClickSelf",
+        "postDelay": 1500,
+        "maxTimes": 2
+    },
+
+    "Omni@Battle-ProxyRunning": {
+        "doc": "代理指挥是否正在运行。",
+        "algorithm": "OcrDetect",
+        "text": ["代理指挥作战正常运行中", "正常运行中"],
+        "roi": [500, 610, 500, 90],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@SpendGuard-Detect": {
+        "doc": "消耗防护：屏上是否出现会花费资源或造成不可逆选择的控件。命中即禁止任何自动点击。为什么用否定清单而不是识别界面身份——四种视觉启发式（宽暗带／亮块质心／矩形描边／亮度分区）都在正常界面误报过，任何 UI 都有暗带与长亮线；而真正的危害总是伴随明确文字，直接盯文字才对症。",
+        "algorithm": "OcrDetect",
+        "text": [
+            "解锁", "消耗", "确认购买", "立即购买", "源石", "合成玉", "至纯源石",
+            "招募", "寻访", "抽取", "确认使用", "理智药剂", "碎石", "兑换",
+            "剿灭", "放弃", "删除", "重置", "跳过剧情"
+        ],
+        "roi": [0, 0, 1280, 720],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Home-Detect": {
+        "doc": "主界面锚点。用主界面独有的功能入口文字，而非「终端」或「编队」——后者也出现在编队页的「快捷编队」，曾造成实机假阳性。",
+        "algorithm": "OcrDetect",
+        "text": ["采购中心", "基建", "干员寻访"],
+        "roi": [650, 340, 630, 380],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Title-Detect": {
+        "doc": "游戏标题页锚点（「开始唤醒」）。MAA 的 StartToWakeUp 负责点它，这里只做识别。",
+        "algorithm": "OcrDetect",
+        "text": ["开始唤醒"],
+        "roi": [400, 400, 480, 200],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@ChapterScreen-Detect": {
+        "doc": "乐章／章节选择界面锚点。用于与主界面区分，避免把「进了子界面」误判为「在主界面」。",
+        "algorithm": "OcrDetect",
+        "text": ["乐章收录", "主题曲", "Main Story", "当前进度"],
+        "roi": [0, 0, 1280, 720],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-Stage-1-7-Detect": {
+        "doc": "Read-only 1-7 code truth on the chapter map after battle.",
+        "algorithm": "OcrDetect",
+        "text": ["1-7"],
+        "roi": [400, 130, 430, 210],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-Stage-2-1-Detect": {
+        "doc": "Read-only 2-1 code truth on the episode map.",
+        "algorithm": "OcrDetect",
+        "text": ["2-1"],
+        "roi": [0, 60, 1280, 580],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-Stage-S2-1-Detect": {
+        "doc": "Read-only S2-1 code truth on the episode map.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-1"],
+        "roi": [0, 60, 1280, 580],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-Stage-2-2-Detect": {
+        "doc": "Read-only 2-2 code truth on the episode map.",
+        "algorithm": "OcrDetect",
+        "text": ["2-2"],
+        "roi": [0, 60, 1280, 580],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-Stage-S2-2-Detect": {
+        "doc": "Read-only S2-2 code truth on the episode map.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-2"],
+        "roi": [0, 60, 1280, 580],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-Stage-S2-3-Detect": {
+        "doc": "Read-only S2-3 code truth on the episode map.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-3"],
+        "roi": [0, 60, 1280, 580],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-Stage-2-3-Detect": {
+        "doc": "Read-only 2-3 code truth on the episode map.",
+        "algorithm": "OcrDetect",
+        "text": ["2-3"],
+        "roi": [0, 60, 1280, 580],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-GoHome": {
+        "doc": "章节地图左上方的主页按钮；仅在 ChapterScreen-Detect 已独立确认后调用。",
+        "algorithm": "JustReturn",
+        "action": "ClickRect",
+        "specificRect": [190, 5, 160, 60],
+        "postDelay": 2000,
+        "maxTimes": 1
+    },
+
+    "Omni@NavOverlay-GoHome": {
+        "doc": "全局导航层左侧的首页入口；先从章节地图点开导航层，再按文字定位首页。",
+        "algorithm": "OcrDetect",
+        "text": ["首页"],
+        "roi": [0, 150, 200, 180],
+        "action": "ClickSelf",
+        "postDelay": 2500,
+        "maxTimes": 1
+    },
+
+    "Omni@Chapter-GoStage-1-7": {
+        "doc": "从第一章地图点击 1-7 节点。由 OCR 文案定位，不硬编码节点像素。",
+        "algorithm": "OcrDetect",
+        "text": ["1-7"],
+        "roi": [400, 130, 430, 210],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Chapter-GoStage-2-1": {
+        "doc": "从第二章地图点击 2-1 节点；只在章节地图锚点已确认后调用。",
+        "algorithm": "OcrDetect",
+        "text": ["2-1"],
+        "roi": [0, 60, 1280, 580],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Chapter-GoStage-S2-1": {
+        "doc": "Click the visible S2-1 node only after the episode-map anchor is confirmed.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-1"],
+        "roi": [0, 60, 1280, 580],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Chapter-GoStage-2-2": {
+        "doc": "从第二章地图点击 2-2 节点；只在章节地图锚点已确认后调用。",
+        "algorithm": "OcrDetect",
+        "text": ["2-2"],
+        "roi": [0, 60, 1280, 580],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Chapter-GoStage-S2-2": {
+        "doc": "Click the visible S2-2 node only after the episode-map anchor is confirmed.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-2"],
+        "roi": [0, 60, 1280, 580],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Chapter-GoStage-S2-3": {
+        "doc": "Click the visible S2-3 node only after the episode-map anchor is confirmed.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-3"],
+        "roi": [0, 60, 1280, 580],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@Chapter-GoStage-2-3": {
+        "doc": "从第二章地图点击 2-3 节点；只在章节地图锚点已确认后调用。",
+        "algorithm": "OcrDetect",
+        "text": ["2-3"],
+        "roi": [0, 60, 1280, 580],
+        "action": "ClickSelf",
+        "postDelay": 2000,
+        "maxTimes": 2
+    },
+
+    "Omni@StageDetail-Detect": {
+        "doc": "关卡详情界面锚点：出现开始行动类文案即认为已在关卡详情。",
+        "algorithm": "OcrDetect",
+        "text": ["开始行动", "开始作战", "开始推演"],
+        "roi": [960, 560, 320, 160],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-1-7-Detect": {
+        "doc": "关卡详情页的 1-7 代码锚点；与通用详情锚点合用，防止进入错误关卡。实机 PP-OCR 对该字体稳定输出 T-Z，作为冻结别名接受。",
+        "algorithm": "OcrDetect",
+        "text": ["1-7", "T-Z"],
+        "roi": [760, 20, 360, 190],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-2-1-Detect": {
+        "doc": "关卡详情页的 2-1 代码锚点。",
+        "algorithm": "OcrDetect",
+        "text": ["2-1", "龙门之行"],
+        "roi": [760, 20, 400, 200],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-S2-1-Detect": {
+        "doc": "Read-only S2-1 identity anchor on the stage-detail screen.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-1", "迟缓-1"],
+        "roi": [760, 20, 400, 200],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-2-2-Detect": {
+        "doc": "关卡详情页的 2-2 代码锚点。",
+        "algorithm": "OcrDetect",
+        "text": ["2-2", "兵不接刃"],
+        "roi": [760, 20, 400, 200],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-S2-2-Detect": {
+        "doc": "Read-only S2-2 identity anchor on the stage-detail screen.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-2", "迟缓-2"],
+        "roi": [760, 20, 400, 200],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-S2-3-Detect": {
+        "doc": "Read-only S2-3 identity anchor on the stage-detail screen.",
+        "algorithm": "OcrDetect",
+        "text": ["S2-3"],
+        "roi": [760, 20, 400, 200],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-2-3-Detect": {
+        "doc": "关卡详情页的 2-3 代码锚点。",
+        "algorithm": "OcrDetect",
+        "text": ["2-3", "无罪推定"],
+        "roi": [760, 20, 400, 200],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-ProxyEnabled": {
+        "doc": "关卡详情页的代理指挥开关已启用。复用 MAA 自带 NotUsePrts 模板，只检测不点击。",
+        "algorithm": "MatchTemplate",
+        "template": "NotUsePrts.png",
+        "roi": [1000, 550, 280, 90],
+        "action": "DoNothing",
+        "next": [],
+        "maxTimes": 1
+    },
+
+    "Omni@StageDetail-DisableProxy": {
+        "doc": "仅在代理开关已由同模板识别为启用时点击关闭；避免进战后代理先于 SingleStep 部署。",
+        "algorithm": "MatchTemplate",
+        "template": "NotUsePrts.png",
+        "roi": [1000, 550, 280, 90],
+        "action": "ClickSelf",
+        "postDelay": 1000,
+        "next": [],
+        "maxTimes": 1
+    },
+
+    "Omni@PracticeMode-Detect": {
+        "doc": "练习模式（模拟作战）入口检测。练习不消耗理智，只消耗演习券。",
+        "algorithm": "OcrDetect",
+        "text": ["模拟作战", "练习"],
+        "roi": [0, 0, 1280, 720],
+        "action": "DoNothing",
+        "maxTimes": 1
+    },
+
+    "Omni@PracticeMode-Enter": {
+        "doc": "Enter the rehearsal squad page from one OCR-proved stage-detail control.",
+        "algorithm": "OcrDetect",
+        "text": ["\u6f14\u4e60", "\u7ec3\u4e60", "\u6a21\u62df\u4f5c\u6218"],
+        "roi": [900, 600, 180, 120],
+        "action": "ClickSelf",
+        "preDelay": 200,
+        "postDelay": 1200,
+        "next": ["Stop"],
+        "maxTimes": 1
+    }
+}

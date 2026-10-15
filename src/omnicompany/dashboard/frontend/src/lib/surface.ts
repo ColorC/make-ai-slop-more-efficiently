@@ -54,7 +54,7 @@ export function notice(text: string, kind: 'pending' | 'ok' | 'err' = 'ok'): voi
       position: 'fixed', right: '16px', bottom: '16px', zIndex: '99999',
       maxWidth: '360px', padding: '10px 14px', borderRadius: '8px',
       fontSize: '13px', lineHeight: '1.5', color: '#e8eef6',
-      background: 'rgba(20,26,36,0.96)', border: '1px solid #3a4761',
+      background: 'rgba(20,26,36,0.96)', border: '1px solid var(--fp-border)',
       boxShadow: '0 6px 24px rgba(0,0,0,.45)', whiteSpace: 'pre-line',
     } as CSSStyleDeclaration)
     document.body.appendChild(el)

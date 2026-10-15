@@ -93,6 +93,44 @@ def _day_of(ts: str | None) -> str:
     return str(ts)[:10]
 
 
+def _session_completeness_key(row: SessionLedgerRow) -> tuple[int, int, int, int, int, str]:
+    metadata_score = sum(bool(value) for value in (row.cwd, row.started, row.ended))
+    model_score = len(row.by_model)
+    token_score = sum(
+        int(value or 0)
+        for model_usage in row.by_model.values()
+        for value in model_usage.values()
+        if isinstance(value, (int, float))
+    )
+    return (
+        metadata_score,
+        model_score,
+        row.calls,
+        token_score,
+        len(row.session_id),
+        row.cwd,
+    )
+
+
+def _deduplicate_sessions(sessions: list[SessionLedgerRow]) -> list[SessionLedgerRow]:
+    '''Keep one deterministic, most-complete row per provider/session pair.'''
+    unique: dict[tuple[str, str], SessionLedgerRow] = {}
+    order: list[tuple[str, str]] = []
+    for row in sessions:
+        if not row.session_id:
+            order.append(('', str(len(order))))
+            unique[order[-1]] = row
+            continue
+        key = (row.provider, row.session_id)
+        current = unique.get(key)
+        if current is None:
+            order.append(key)
+            unique[key] = row
+        elif _session_completeness_key(row) > _session_completeness_key(current):
+            unique[key] = row
+    return [unique[key] for key in order]
+
+
 def aggregate_token_ledger(
     claude: ClaudeCollectResult,
     codex: CodexCollectResult,
@@ -123,6 +161,7 @@ def aggregate_token_ledger(
             duration_est=_duration_est(s.started, s.ended),
         ))
 
+    sessions = _deduplicate_sessions(sessions)
     by_session = [s.to_dict() for s in sessions]
 
     # ── 按天聚合 ──

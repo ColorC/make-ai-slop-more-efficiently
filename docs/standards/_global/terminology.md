@@ -477,13 +477,13 @@ Agent loop。它不是 `AgentTeam` 新类型，也不是单 Worker + 迷你 stoc
 | 对象 | 发布门牌 | 完整长句 | 裁决 |
 |---|---|---|---|
 | omnicompany | MASME | Make AI Slop More Efficiently | 未来整体发布门牌；物理路径、包名、CLI 不改。 |
-| poof | POOF | Pop Overlay Onto Foreground | 悬浮层外设可能单独发布；旧 `Poof, There It Is` 解释废止。 |
+| Canvas | Canvas | 札记画布 | 现行用户可见名称；旧产品名仅允许出现在明确的兼容说明或历史墓碑中。 |
 | lofa | LOFA | Look Over From Afar | 移动端外设可能单独发布；修正原 `Look From Afar` 缩写不严。 |
 | language-anchoring-protocol | LAP | Language Anchoring Protocol | 公开理论仓，已是合格缩写。 |
 | vilo-wants-to-know | VWTK | Vilo Wants To Know | 作品 / 内容真源未来可发布；当前内容仓不急搬。 |
 | quant-lab | MAWO | Measure Assets Without Overfitting | 公开研究仓候选；现阶段保留 `quant-lab` 物理路径。 |
 
-不作为对外发布项目命名：`poof-notes`、`whatnow`、`webworks`、`cmd-flash-watchdog`、`hypothesis-workspace`、`demoworkspace`、`omnifactory-public`、`参考项目/*`。
+不作为对外发布项目命名：旧札记存储兼容名、`whatnow`、`webworks`、`cmd-flash-watchdog`、`hypothesis-workspace`、`demoworkspace`、`omnifactory-public`、`参考项目/*`。
 
 ### §15.4 新业务仓口径
 

@@ -77,7 +77,7 @@ function Milestones({ tasks }: { tasks: TaskNode[] }) {
     <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center', marginLeft: 6 }} title={`${tasks.filter((t) => isDone(t.status)).length}/${tasks.length} 里程碑达成`}>
       {dots.map((t) => (
         <span key={t.id} style={{
-          width: 8, height: 8, borderRadius: 4,
+          width: 8, height: 8, borderRadius: 3,
           background: isDone(t.status) ? 'var(--fp-ok)' : 'transparent',
           border: `1.5px solid ${isDone(t.status) ? 'var(--fp-ok)' : t.completion > 0 ? 'var(--fp-warn)' : 'var(--fp-border-strong)'}`,
         }} />
@@ -92,24 +92,24 @@ const S: Record<string, any> = {
   root: { position: 'relative', height: '100%', overflow: 'auto', background: 'transparent', color: 'var(--fp-text)', padding: '14px 18px 48px', boxSizing: 'border-box' },
   // 顶部工具行：占正常文档流（不再绝对定位压在首卡上），右对齐、行高紧凑。
   toolbar: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6, margin: '0 0 4px', minHeight: 30 },
-  iconBtn: { width: 30, height: 30, border: '1px solid transparent', borderRadius: 7, background: 'transparent', color: 'var(--fp-text-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'background 150ms cubic-bezier(0.175,0.885,0.32,1.1), color 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
+  iconBtn: { width: 30, height: 30, border: '1px solid transparent', borderRadius: 2, background: 'transparent', color: 'var(--fp-text-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'background 150ms cubic-bezier(0.175,0.885,0.32,1.1), color 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
   fu: { color: 'var(--fp-text-3)', fontSize: 12, flexShrink: 0, whiteSpace: 'nowrap' as const, fontVariantNumeric: 'tabular-nums' as const },
-  err: { color: 'var(--fp-err)', fontSize: 13.5, padding: '14px', border: '1px solid color-mix(in srgb, var(--fp-err) 40%, transparent)', borderRadius: 8, background: 'color-mix(in srgb, var(--fp-err) 12%, transparent)', margin: '10px 0', lineHeight: 1.6 },
+  err: { color: 'var(--fp-err)', fontSize: 13.5, padding: '14px', border: '1px solid color-mix(in srgb, var(--fp-err) 40%, transparent)', borderRadius: 2, background: 'color-mix(in srgb, var(--fp-err) 12%, transparent)', margin: '10px 0', lineHeight: 1.6 },
   domainTag: { color: 'var(--fp-text-3)', fontSize: 12, border: '1px solid var(--fp-border)', borderRadius: 999, padding: '0 8px', flexShrink: 0 },
   // 任务线卡 = 磨砂玻璃卡：blur + inset 高光 + r11 + token 描边；置顶/主线左缘一道琥珀提示条。
   goal: (main: boolean, pinned: boolean): React.CSSProperties => ({
     border: '1px solid var(--fp-border)',
     borderLeft: `3px solid ${main || pinned ? 'var(--fp-warn)' : 'var(--fp-border-strong)'}`,
-    borderRadius: 11, margin: '12px 0', padding: '14px 16px',
+    borderRadius: 3, margin: '12px 0', padding: '14px 16px',
     background: pinned ? 'color-mix(in srgb, var(--fp-warn) 7%, var(--fp-glass))' : 'var(--fp-glass)',
     backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
     boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
   }),
   goalHead: { display: 'flex', alignItems: 'center', gap: 8 },
   // 任务线徽章：主线/支线弱底 chip（次级层级）。
-  lineBadge: (main: boolean): React.CSSProperties => ({ fontSize: 12, fontWeight: 600, color: main ? 'var(--fp-warn)' : 'var(--fp-text-2)', background: main ? 'color-mix(in srgb, var(--fp-warn) 16%, transparent)' : 'rgba(255,255,255,.06)', border: '1px solid var(--fp-border)', borderRadius: 999, padding: '1px 8px', flexShrink: 0 }),
+  lineBadge: (main: boolean): React.CSSProperties => ({ fontSize: 12, fontWeight: 500, color: main ? 'var(--fp-warn)' : 'var(--fp-text-2)', background: main ? 'color-mix(in srgb, var(--fp-warn) 16%, transparent)' : 'rgba(255,255,255,.06)', border: '1px solid var(--fp-border)', borderRadius: 999, padding: '1px 8px', flexShrink: 0 }),
   // 任务线标题 = 卡片主焦点：16px / 650，点击展开。
-  goalTitle: { color: 'var(--fp-text)', fontSize: 16, fontWeight: 650, letterSpacing: '-0.01em', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+  goalTitle: { color: 'var(--fp-text)', fontSize: 16, fontWeight: 500, letterSpacing: '-0.01em', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
   taskRow: { display: 'grid', gridTemplateColumns: '28px 1fr auto', gap: 8, alignItems: 'center', padding: '7px 6px', borderTop: '1px solid var(--fp-border-subtle)' },
   tMid: { minWidth: 0 },
   tTitleRow: { display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' },
@@ -127,11 +127,11 @@ const S: Record<string, any> = {
   more: { color: 'var(--fp-text-3)', fontSize: 13, cursor: 'pointer', padding: '4px 0 0 6px', display: 'inline-flex', alignItems: 'center', gap: 4 },
   empty: { color: 'var(--fp-text-3)', fontSize: 13, padding: '4px 0 2px 6px' },
   // 外部收件箱分区标题：15px / 600（与样板 groupHead 同档）。
-  inboxHead: { display: 'flex', alignItems: 'center', gap: 8, margin: '28px 2px 8px', color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 600, flexWrap: 'wrap' as const },
+  inboxHead: { display: 'flex', alignItems: 'center', gap: 8, margin: '28px 2px 8px', color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 500, flexWrap: 'wrap' as const },
   inboxNote: { color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 400 },
   syncMsg: { color: 'var(--fp-text-3)', fontSize: 13, fontWeight: 400 },
   // 同步外部 = 收件箱区主操作（显眼但克制的 ghost 主钮）。
-  primaryBtn: { border: '1px solid var(--fp-accent)', background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', borderRadius: 7, cursor: 'pointer', padding: '5px 11px', fontSize: 14, fontWeight: 550, display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'filter 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
+  primaryBtn: { border: '1px solid rgba(255,240,235,.55)', background: 'var(--fp-bp-seal)', color: '#fff', borderRadius: 2, cursor: 'pointer', padding: '5px 11px', fontSize: 14, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6, transition: 'filter 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
 }
 
 type OpenTab = ReturnType<typeof usePanels.getState>['openTab']

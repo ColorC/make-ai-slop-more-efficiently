@@ -14,19 +14,19 @@ const S: Record<string, any> = {
   root: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' },
   body: { flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 },
   center: { flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden' },
-  right: { width: 380, borderLeft: '1px solid #222', display: 'flex', flexDirection: 'column', flexShrink: 0 },
-  rTabs: { display: 'flex', borderBottom: '1px solid #222', background: 'var(--fp-bg)' },
+  right: { width: 380, borderLeft: '1px solid var(--fp-border-subtle)', display: 'flex', flexDirection: 'column', flexShrink: 0 },
+  rTabs: { display: 'flex', borderBottom: '1px solid var(--fp-border-subtle)', background: 'var(--fp-bg)' },
   rTab: (active: boolean): React.CSSProperties => ({
     flex: 1, padding: '4px 8px',
-    background: active ? '#1a1a2a' : 'transparent',
+    background: active ? 'var(--fp-bp-paper-2)' : 'transparent',
     border: 'none',
     borderBottom: active ? '2px solid #90caf9' : '2px solid transparent',
-    color: active ? '#90caf9' : '#666',
+    color: active ? 'var(--fp-link)' : 'var(--fp-text-2)',
     cursor: 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace',
   }),
-  closeBtn: { background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', padding: '4px 8px', fontSize: 14 },
+  closeBtn: { background: 'transparent', border: 'none', color: 'var(--fp-text-3)', cursor: 'pointer', padding: '4px 8px', fontSize: 14 },
   rBody: { flex: 1, overflow: 'hidden' },
-  timeline: { height: 32, borderTop: '1px solid #222', display: 'flex', flexShrink: 0 },
+  timeline: { height: 32, borderTop: '1px solid var(--fp-border-subtle)', display: 'flex', flexShrink: 0 },
 }
 
 export default function SessionEditor({ entity }: { entity: SessionEntity }) {
@@ -96,7 +96,7 @@ export default function SessionEditor({ entity }: { entity: SessionEntity }) {
       {showTimeline && (
         <div style={S.timeline}>
           <EventTimeline />
-          <button style={{ ...S.closeBtn, borderLeft: '1px solid #222' }} onClick={() => setShowTimeline(false)}>×</button>
+          <button style={{ ...S.closeBtn, borderLeft: '1px solid var(--fp-border-subtle)' }} onClick={() => setShowTimeline(false)}>×</button>
         </div>
       )}
     </div>

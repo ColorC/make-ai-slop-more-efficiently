@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -89,7 +88,9 @@ def _match_research_processes(
 
 
 def _windows_process_rows() -> list[dict[str, Any]]:
-    powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+    from omnicompany.runtime.powershell_runtime import resolve_powershell7
+
+    powershell = resolve_powershell7()
     if not powershell:
         raise RuntimeError("PATH 中找不到 PowerShell，无法枚举 research worker")
     script = (

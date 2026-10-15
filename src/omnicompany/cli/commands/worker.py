@@ -12,6 +12,7 @@ import sqlite3
 import sys
 import uuid
 from pathlib import Path
+import re
 from typing import Any
 
 import click
@@ -21,6 +22,7 @@ from omnicompany.packages.services._core.agent.external_workers import (
     AgentContextEnvelope,
     AgentRuntimeProfile,
     AgentRuntimeRequest,
+    CodexExecWorker,
     ExternalAgentPermissionMode,
     ExternalAgentRunRequest,
     ExternalAgentStatus,
@@ -34,6 +36,27 @@ from omnicompany.packages.services._core.agent.spawn_surface import (
     ENTRY_EXTERNAL_WORKER_RUN,
     ensure_agent_spawn_metadata,
 )
+
+
+_E_SCOPE_TASK_TARGET = re.compile(r"(?i)(?<![A-Za-z0-9_])e:[\\/]")
+_E_SCOPE_RULE_POINTER = (
+    "[E-scope rule pointer]\n"
+    "This task targets E:\\. Before acting, read E:\\AGENTS.md and its referenced "
+    "C:/workspace/AGENTS.md; follow their file-placement and PROJECT_INDEX "
+    "directory-contract rules. This pointer applies only to this E: task."
+)
+
+
+_CODEX_REASONING_EFFORTS = ("minimal", "low", "medium", "high", "xhigh")
+
+
+def _provider_uses_codex_worker(provider: str) -> bool:
+    registry = build_default_external_agent_worker_registry()
+    try:
+        worker = registry.create(provider)
+    except KeyError:
+        return False
+    return isinstance(worker, CodexExecWorker)
 
 
 @click.group("worker")
@@ -120,6 +143,22 @@ def worker_providers(as_json: bool) -> None:
     default=None,
     help="LLM provider identity inside the selected harness (for example openai).",
 )
+@click.option(
+    "--reasoning-effort",
+    type=click.Choice(_CODEX_REASONING_EFFORTS),
+    default=None,
+    help="Codex reasoning effort for this task: minimal, low, medium, high, or xhigh.",
+)
+@click.option(
+    "--network-access",
+    type=click.Choice(["true", "false"]),
+    default=None,
+    help=(
+        "Codex workspace-write network access for this task. true permits general "
+        "outbound network access (not only localhost) when enabled; false keeps it "
+        "disabled. Omit to preserve the Codex default."
+    ),
+)
 @click.option("--profile", default=None, help="Provider profile override.")
 @click.option(
     "--runtime-profile",
@@ -142,7 +181,8 @@ def worker_providers(as_json: bool) -> None:
     is_flag=True,
     help=(
         "Use a narrow provider context for bounded review/schema tasks; Codex "
-        "skips ambient user config, memories, plugins, apps, and multi-agent tools."
+        "skips ambient user config, memories, plugins, apps, and multi-agent tools; "
+        "OpenCode uses --pure and disables external Claude/Agents skills and prompts."
     ),
 )
 @click.option(
@@ -209,7 +249,8 @@ def worker_providers(as_json: bool) -> None:
     default=None,
     help=(
         "Directory for an explicit UTF-8 run record. Writes prompt.md, "
-        "request.json, and result.json under <run-root>/<run-id>/."
+        "request.json, result.json, and a compact structured_output.json when "
+        "available under <run-root>/<run-id>/."
     ),
 )
 @click.option("--trace-id", default=None, help="Trace id to attach to audit events.")
@@ -243,6 +284,8 @@ def worker_run(
     allow_trusted_bypass: bool,
     model: str | None,
     model_provider: str | None,
+    reasoning_effort: str | None,
+    network_access: str | None,
     profile: str | None,
     runtime_profile: str | None,
     model_policy: str,
@@ -297,6 +340,13 @@ def worker_run(
     else:
         provider = provider or "claude-code"
 
+    if (reasoning_effort is not None or network_access is not None) and not _provider_uses_codex_worker(
+        provider
+    ):
+        raise click.UsageError(
+            "--reasoning-effort and --network-access are only supported for Codex worker adapters"
+        )
+
     cwd = cwd_path.expanduser().resolve()
     if not cwd.is_dir():
         raise click.UsageError(f"cwd must be an existing directory: {cwd}")
@@ -309,7 +359,7 @@ def worker_run(
     ]
 
     task = _read_task_text(prompt=prompt, spec_path=spec_path, from_stdin=from_stdin)
-    attached_context = _read_attached_context(
+    attached_context = list(_e_scope_rule_context(task, cwd)) + _read_attached_context(
         context_paths,
         context_texts,
         context_alias_items,
@@ -334,6 +384,19 @@ def worker_run(
         metadata["spec_source_path"] = str(spec_path.expanduser().resolve())
     if minimal_context:
         metadata["minimal_context"] = True
+    if reasoning_effort is not None or network_access is not None:
+        codex_config = metadata.get("codex_config")
+        if codex_config is None:
+            codex_config = {}
+        elif not isinstance(codex_config, dict):
+            raise click.UsageError("metadata codex_config must be a dict")
+        else:
+            codex_config = dict(codex_config)
+        if reasoning_effort is not None:
+            codex_config["model_reasoning_effort"] = json.dumps(reasoning_effort)
+        if network_access is not None:
+            codex_config["sandbox_workspace_write.network_access"] = network_access.lower()
+        metadata["codex_config"] = codex_config
     if run_dir is not None:
         metadata["run_record_dir"] = str(run_dir)
     env = _parse_key_values(env_items, option_name="--env")
@@ -447,6 +510,12 @@ def worker_run(
     if run_dir is not None:
         payload["run_record_dir"] = str(run_dir)
         _write_json_no_bom(run_dir / "result.json", payload)
+        structured_output = payload.get("structured_output")
+        if (
+            payload.get("status") == ExternalAgentStatus.SUCCEEDED.value
+            and isinstance(structured_output, dict)
+        ):
+            _write_json_no_bom(run_dir / "structured_output.json", structured_output)
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         _write_json_no_bom(output_path, payload)
@@ -456,7 +525,18 @@ def worker_run(
     else:
         _print_human_result(payload)
 
-    raise SystemExit(_exit_code_for_status(result.normalized_status()))
+    exit_code = _exit_code_for_status(result.normalized_status())
+    if (
+        exit_code == 0
+        and isinstance(result.structured_output, dict)
+        and str(result.structured_output.get("outcome") or "").strip().lower()
+        == "blocked"
+    ):
+        # A provider turn can complete normally while the domain task reports
+        # that it could not run. Scheduled callers need this to be a real
+        # failure signal instead of a green cron receipt.
+        exit_code = 2
+    raise SystemExit(exit_code)
 
 
 @cmd_worker.command("trace")
@@ -503,6 +583,13 @@ def _read_task_text(*, prompt: str | None, spec_path: Path | None, from_stdin: b
     if not task:
         raise click.UsageError("provide a task via --spec, --stdin, or --prompt")
     return task
+
+
+def _e_scope_rule_context(task: str, cwd: Path) -> tuple[str, ...]:
+    """Attach the E: entry rule as context while retaining the exact task body."""
+    if _E_SCOPE_TASK_TARGET.search(task) or cwd.drive.casefold() == "e:":
+        return (_E_SCOPE_RULE_POINTER,)
+    return ()
 
 
 def _prepare_run_record_dir(run_root_path: Path, run_id: str) -> Path:

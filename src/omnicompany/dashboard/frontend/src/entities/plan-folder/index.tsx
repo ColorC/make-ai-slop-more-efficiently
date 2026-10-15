@@ -89,37 +89,37 @@ const resolver: EntityResolver<PlanEntity> = {
 }
 
 const S: Record<string, any> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100%', background: '#0f0f0f', color: '#e0e0e0', fontFamily: 'Consolas, Menlo, monospace', overflow: 'hidden' },
-  header: { padding: '8px 12px', borderBottom: '1px solid #222', background: 'var(--fp-bg)', flexShrink: 0 },
-  title: { color: '#90caf9', fontSize: 18, fontWeight: 700 as const, marginBottom: 4 },
-  meta: { color: '#666', fontSize: 14 },
-  filesLabel: { color: '#7d8da0', fontSize: 14, fontWeight: 600 as const, margin: '4px 0 6px' },
+  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--fp-bp-solid)', color: 'var(--fp-text)', fontFamily: 'Consolas, Menlo, monospace', overflow: 'hidden' },
+  header: { padding: '8px 12px', borderBottom: '1px solid var(--fp-border-subtle)', background: 'var(--fp-bg)', flexShrink: 0 },
+  title: { color: 'var(--fp-link)', fontSize: 18, fontWeight: 500 as const, marginBottom: 4 },
+  meta: { color: 'var(--fp-text-2)', fontSize: 14 },
+  filesLabel: { color: 'var(--fp-link)', fontSize: 14, fontWeight: 500 as const, margin: '4px 0 6px' },
   // 时间线
   timeline: { marginBottom: 16 },
-  tlRow: { display: 'flex', alignItems: 'baseline', gap: 8, padding: '3px 8px', borderBottom: '1px solid #141a1f' },
-  tlTime: { color: '#5f7081', fontSize: 14, flexShrink: 0, width: 110, fontVariantNumeric: 'tabular-nums' as any },
-  tlDotProgress: { flexShrink: 0, width: 7, height: 7, borderRadius: 7, background: 'var(--fp-ok)', alignSelf: 'center' as const },
-  tlDotMaterial: { flexShrink: 0, width: 7, height: 7, borderRadius: 7, background: '#3a4a5a', alignSelf: 'center' as const },
-  tlText: { flex: 1, minWidth: 0, color: '#c2cdd8', fontSize: 14, lineHeight: 1.45, fontFamily: '-apple-system, "Segoe UI", Roboto, sans-serif' },
-  tlBy: { color: '#5f7081' },
-  badge: (color: string): React.CSSProperties => ({ display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: 14, color, background: '#1a1a1a', marginRight: 6 }),
+  tlRow: { display: 'flex', alignItems: 'baseline', gap: 8, padding: '3px 8px', borderBottom: '1px solid var(--fp-border-subtle)' },
+  tlTime: { color: 'var(--fp-link)', fontSize: 14, flexShrink: 0, width: 110, fontVariantNumeric: 'tabular-nums' as any },
+  tlDotProgress: { flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: 'var(--fp-ok)', alignSelf: 'center' as const },
+  tlDotMaterial: { flexShrink: 0, width: 7, height: 7, borderRadius: '50%', background: 'var(--fp-bp-paper-2)', alignSelf: 'center' as const },
+  tlText: { flex: 1, minWidth: 0, color: 'var(--fp-text)', fontSize: 14, lineHeight: 1.45, fontFamily: '-apple-system, "Segoe UI", Roboto, sans-serif' },
+  tlBy: { color: 'var(--fp-link)' },
+  badge: (color: string): React.CSSProperties => ({ display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: 14, color, background: 'var(--fp-bp-solid)', marginRight: 6 }),
   body: { flex: 1, overflow: 'auto', padding: 16 },
   fileList: { fontSize: 14 },
   // 每行 = 文件名行 + 一句简述行(用户要点: 每个计划文档一句简述)
   fileRow: (clickable: boolean): React.CSSProperties => ({
     display: 'flex', flexDirection: 'column', gap: 2, padding: '5px 8px', borderRadius: 3,
     cursor: clickable ? 'pointer' : 'default',
-    color: clickable ? '#bbb' : '#666',
-    borderBottom: '1px solid #161616',
+    color: clickable ? 'var(--fp-text)' : 'var(--fp-text-2)',
+    borderBottom: '1px solid var(--fp-border-subtle)',
   }),
   fileRowTop: { display: 'flex', gap: 12, alignItems: 'baseline' as const },
   // 2 整行(用户: 不要在回车处截断, 显示 2 行); -webkit-line-clamp 限两行省略。
-  fileSummary: { color: '#7d8da0', fontSize: 14, lineHeight: 1.4, marginLeft: 42, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden', fontFamily: '-apple-system, "Segoe UI", Roboto, sans-serif' },
+  fileSummary: { color: 'var(--fp-text-2)', fontSize: 14, lineHeight: 1.4, marginLeft: 42, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden', fontFamily: '-apple-system, "Segoe UI", Roboto, sans-serif' },
   fpath: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
-  fmd: { color: '#90caf9', flexShrink: 0, width: 30, textAlign: 'center' as const, fontSize: 14 },
-  fsize: { color: '#555', flexShrink: 0, width: 60, textAlign: 'right' as const, fontSize: 14 },
-  err: { padding: 16, color: '#ef5350' },
-  empty: { padding: 16, color: '#666', fontStyle: 'italic' as const },
+  fmd: { color: 'var(--fp-link)', flexShrink: 0, width: 30, textAlign: 'center' as const, fontSize: 14 },
+  fsize: { color: 'var(--fp-text-3)', flexShrink: 0, width: 60, textAlign: 'right' as const, fontSize: 14 },
+  err: { padding: 16, color: 'var(--fp-err)' },
+  empty: { padding: 16, color: 'var(--fp-text-2)', fontStyle: 'italic' as const },
 }
 
 function fmtBytes(n: number): string {
@@ -152,11 +152,11 @@ const RelatedCcSessions: React.FC<{ planId: string; binding?: BossSightBindingBu
   }, [planId])
 
   if (error) {
-    return <div style={{ color: '#ef5350', fontSize: 14, padding: 8 }}>载入 cc_sessions 失败: {error}</div>
+    return <div style={{ color: 'var(--fp-err)', fontSize: 14, padding: 8 }}>载入 cc_sessions 失败: {error}</div>
   }
-  if (sessions === null) return <div style={{ color: '#666', fontSize: 14, padding: 8 }}>loading…</div>
+  if (sessions === null) return <div style={{ color: 'var(--fp-text-2)', fontSize: 14, padding: 8 }}>loading…</div>
   if (sessions.length === 0) {
-    return <div style={{ color: '#666', fontSize: 14, padding: 8, fontStyle: 'italic' as const }}>(无 cc_session 绑定此 plan)</div>
+    return <div style={{ color: 'var(--fp-text-2)', fontSize: 14, padding: 8, fontStyle: 'italic' as const }}>(无 cc_session 绑定此 plan)</div>
   }
 
   const cwdLast = (cwd: string) => cwd.split(/[\\/]/).filter(Boolean).slice(-1)[0] || cwd
@@ -170,7 +170,7 @@ const RelatedCcSessions: React.FC<{ planId: string; binding?: BossSightBindingBu
   }
   return (
     <div data-related-cc-sessions style={{ marginTop: 16 }}>
-      <div style={{ color: '#888', fontSize: 14, marginBottom: 6, textTransform: 'uppercase' as const, fontWeight: 600 as const, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ color: 'var(--fp-text-2)', fontSize: 14, marginBottom: 6, textTransform: 'uppercase' as const, fontWeight: 500 as const, display: 'flex', alignItems: 'center', gap: 8 }}>
         关联 cc_sessions ({sessions.length})
         {/* chat+PTY 全覆盖的活跃数(本列表只含 chat session, 可能比这个数少) */}
         {binding && <ActiveConvoBadge active={binding.active} total={binding.total} sessions={binding.sessions} />}
@@ -184,17 +184,17 @@ const RelatedCcSessions: React.FC<{ planId: string; binding?: BossSightBindingBu
             onClick={() => openTab({ type: 'cc_session', id: s.id }, `${cwdLast(s.cwd)} · ${s.id.slice(-6)}`)}
             style={{
               display: 'flex', gap: 8, padding: '4px 8px', borderRadius: 3,
-              cursor: 'pointer', borderBottom: '1px solid #161616', alignItems: 'baseline' as const, fontSize: 14,
+              cursor: 'pointer', borderBottom: '1px solid var(--fp-border-subtle)', alignItems: 'baseline' as const, fontSize: 14,
             }}
             title={`${s.id} · ${s.cwd}`}
           >
-            <span style={{ color: isAlive ? '#4caf50' : '#666', fontSize: 14, minWidth: 70 }}>
+            <span style={{ color: isAlive ? 'var(--fp-ok)' : 'var(--fp-text-2)', fontSize: 14, minWidth: 70 }}>
               {isAlive ? '● alive' : '○ ended'}
             </span>
             <span style={{ flex: 1, color: 'var(--fp-link)', overflow: 'hidden' as const, textOverflow: 'ellipsis' as const, whiteSpace: 'nowrap' as const }}>
-              {cwdLast(s.cwd)} · <span style={{ color: '#666' }}>{s.id.slice(-6)}</span>
+              {cwdLast(s.cwd)} · <span style={{ color: 'var(--fp-text-2)' }}>{s.id.slice(-6)}</span>
             </span>
-            <span style={{ color: '#888', fontSize: 14, minWidth: 60, textAlign: 'right' as const }}>
+            <span style={{ color: 'var(--fp-text-2)', fontSize: 14, minWidth: 60, textAlign: 'right' as const }}>
               {fmtTs(s.started_at)}
             </span>
           </div>
@@ -292,12 +292,12 @@ const RunPlanButton: React.FC<{ planId: string }> = ({ planId }) => {
         data-testid="plan-run-button"
         onClick={start}
         disabled={state === 'starting'}
-        style={{ padding: '4px 12px', background: state === 'starting' ? '#1a3a1a' : '#143d14', border: '1px solid #2a5a2a', borderRadius: 4, color: 'var(--fp-ok)', cursor: state === 'starting' ? 'wait' : 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' }}
+        style={{ padding: '4px 12px', background: state === 'starting' ? 'color-mix(in srgb, var(--fp-ok) 14%, transparent)' : 'color-mix(in srgb, var(--fp-ok) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--fp-ok) 45%, transparent)', borderRadius: 3, color: 'var(--fp-ok)', cursor: state === 'starting' ? 'wait' : 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' }}
       >
         {state === 'starting' ? '启动中…' : '▶ 启动执行'}
       </button>
       {msg && (
-        <span style={{ fontSize: 13, color: state === 'started' ? '#56d364' : state === 'blocked' ? '#e3b341' : 'var(--fp-err)' }}>
+        <span style={{ fontSize: 13, color: state === 'started' ? 'var(--fp-ok)' : state === 'blocked' ? 'var(--fp-warn)' : 'var(--fp-err)' }}>
           {msg}
         </span>
       )}
@@ -351,7 +351,7 @@ const Editor: React.FC<{ entity: PlanEntity }> = ({ entity }) => {
         <div style={{ marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {planMd && (
             <button
-              style={{ padding: '4px 12px', background: '#1a2a3a', border: '1px solid #2a3a4a', borderRadius: 4, color: '#90caf9', cursor: 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' }}
+              style={{ padding: '4px 12px', background: 'var(--fp-bp-paper-2)', border: '1px solid var(--fp-border)', borderRadius: 3, color: 'var(--fp-link)', cursor: 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' }}
               {...openProps(() => planMd.note_id_if_md && openFileAsNote(planMd.note_id_if_md), () => planMd.note_id_if_md && openFileAsNote(planMd.note_id_if_md, true))}
             >📋 打开 plan.md</button>
           )}
@@ -387,7 +387,7 @@ const Editor: React.FC<{ entity: PlanEntity }> = ({ entity }) => {
         {/* 反查关联 cc_sessions (CC-PLAN-SESSION-CONTEXT 段四-3) */}
         {!entity.archived && <RelatedCcSessions planId={entity.id} binding={binding} />}
         {/* 针对本 plan 的札记(评论/草稿) — 中心 authored store 回显 */}
-        <div style={{ marginTop: 16, borderTop: '1px solid #222', paddingTop: 12 }}>
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--fp-border-subtle)', paddingTop: 12 }}>
           <NotesForTarget
             kind="plan"
             id={entity.id}

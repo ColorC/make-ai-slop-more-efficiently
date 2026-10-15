@@ -1,6 +1,7 @@
 import React from 'react'
 import { PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { usePanels } from '../stores/panelsStore'
+import ClipboardSyncToggle from './ClipboardSyncToggle'
 
 interface Props {
   sidebarVisible?: boolean
@@ -16,19 +17,19 @@ const S: Record<string, any> = {
     gap: 12,
     height: 22,
     padding: '0 8px',
-    background: '#1a2a3a',
-    color: '#90caf9',
+    background: 'var(--fp-bp-paper-2)',
+    color: 'var(--fp-link)',
     fontSize: 14,
     fontFamily: 'Consolas, Menlo, monospace',
     flexShrink: 0,
-    borderTop: '1px solid #222',
+    borderTop: '1px solid var(--fp-border-subtle)',
   },
   action: (active: boolean): React.CSSProperties => ({
     height: 18,
     border: 'none',
     borderRadius: 3,
     background: active ? 'rgba(144,202,249,.16)' : 'transparent',
-    color: active ? '#90caf9' : '#8a8f98',
+    color: active ? 'var(--fp-link)' : 'var(--fp-text-2)',
     cursor: 'pointer',
     display: 'inline-flex',
     alignItems: 'center',
@@ -49,15 +50,16 @@ export default function StatusBar({ sidebarVisible = true, bottomVisible = true,
   return (
     <div style={S.root}>
       <span>omnicompany</span>
-      <span style={{ color: '#666' }}>/</span>
+      <span style={{ color: 'var(--fp-text-2)' }}>/</span>
       <span>{tabs.length} 标签</span>
       {active && (
         <>
-          <span style={{ color: '#666' }}>/</span>
+          <span style={{ color: 'var(--fp-text-2)' }}>/</span>
           <span>当前：{active.title}</span>
         </>
       )}
       <span style={{ flex: 1 }} />
+      <ClipboardSyncToggle />
       {onToggleSidebar && (
         <button
           type="button"
@@ -84,7 +86,7 @@ export default function StatusBar({ sidebarVisible = true, bottomVisible = true,
           <span>事件</span>
         </button>
       )}
-      <span style={{ color: '#666' }}>Ctrl+K / Cmd+K 跨实体跳转</span>
+      <span style={{ color: 'var(--fp-text-2)' }}>Ctrl+K / Cmd+K 跨实体跳转</span>
     </div>
   )
 }

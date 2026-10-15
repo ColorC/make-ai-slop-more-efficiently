@@ -26,13 +26,16 @@ export function hasLivePtySurface(doc: Document = document): boolean {
   ))
 }
 
-/** Only a foreground connected terminal should defer a UI update.
+/** Only a hidden window should wait. A visible Dashboard applies the update
+ * itself — including windows that have a live PTY. Asking the user to close
+ * the page or click a banner is how torn CLIs linger after the fix already
+ * shipped.
  *
- * A hidden browser tab can safely reload immediately. Its new bundle will stay
- * detached from the PTY until that tab becomes visible again.
+ * Hidden views still wait until they are in front so every open window does
+ * not reconnect at the same instant.
  */
 export function shouldDeferUiReload(doc: Document = document): boolean {
-  return doc.visibilityState !== 'hidden' && hasLivePtySurface(doc)
+  return doc.visibilityState === 'hidden'
 }
 
 export function isUiUpdatePending(): boolean {
@@ -46,6 +49,9 @@ export function startDevReloadWatch(): void {
 
   const tick = async () => {
     try {
+      // Background tabs need neither a 3-second request nor an eager reload.
+      // The interval will detect the token within one tick after visibility.
+      if (document.visibilityState === 'hidden') return
       if (pendingToken !== null) {
         if (!shouldDeferUiReload()) window.location.reload()
         return

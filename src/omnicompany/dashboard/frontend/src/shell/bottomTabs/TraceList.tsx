@@ -2,37 +2,38 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { api, type TraceListItem } from '../../api/client'
 import { usePanels } from '../../stores/panelsStore'
 import { statusColorOf } from '../tokens'
+import { BlueprintSelect } from '../../components/BlueprintSelect'
 
 // 运行历史面 = TraceList 升级改造(决策本体阶段四,界面克制:不另起并列面板)。
 // 两档: 运行(trace 聚合) | 留痕(ledger 事件,含 consumed_decisions 消费与 deviation 偏离)。
 
 const S: Record<string, any> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', color: '#bbb', fontFamily: 'Consolas, Menlo, monospace', fontSize: 14 },
-  bar: { display: 'flex', gap: 6, padding: '4px 8px', borderBottom: '1px solid #222', alignItems: 'center' },
-  input: { flex: 1, background: '#111', border: '1px solid #333', borderRadius: 4, color: '#e0e0e0', padding: '3px 8px', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' },
-  meta: { color: '#666', fontSize: 14 },
+  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', color: 'var(--fp-text)', fontFamily: 'Consolas, Menlo, monospace', fontSize: 14 },
+  bar: { display: 'flex', gap: 6, padding: '4px 8px', borderBottom: '1px solid var(--fp-border-subtle)', alignItems: 'center' },
+  input: { flex: 1, background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, color: 'var(--fp-text)', padding: '3px 8px', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' },
+  meta: { color: 'var(--fp-text-2)', fontSize: 14 },
   list: { flex: 1, overflow: 'auto' },
   seg: (active: boolean): React.CSSProperties => ({
-    padding: '2px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 13,
-    background: active ? '#1a2a3a' : 'transparent',
-    color: active ? '#8fc7ff' : '#777',
+    padding: '2px 10px', borderRadius: 3, cursor: 'pointer', fontSize: 13,
+    background: active ? 'var(--fp-bp-paper-2)' : 'transparent',
+    color: active ? 'var(--fp-link)' : 'var(--fp-text-2)',
     border: active ? '1px solid #2a4a6a' : '1px solid #2a2a2a',
   }),
   row: (active: boolean): React.CSSProperties => ({
     display: 'flex', gap: 8, padding: '3px 8px', cursor: 'pointer',
-    background: active ? '#1a2a3a' : 'transparent',
-    borderBottom: '1px solid #161616',
+    background: active ? 'var(--fp-bp-paper-2)' : 'transparent',
+    borderBottom: '1px solid var(--fp-border-subtle)',
   }),
-  ts: { color: '#555', flexShrink: 0, width: 100 },
-  src: { color: '#888', flexShrink: 0, width: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  desc: { flex: 1, color: '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  ts: { color: 'var(--fp-text-3)', flexShrink: 0, width: 100 },
+  src: { color: 'var(--fp-text-2)', flexShrink: 0, width: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  desc: { flex: 1, color: 'var(--fp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   status: (s: string): React.CSSProperties => ({
     flexShrink: 0, width: 60, fontSize: 14,
     color: statusColorOf(s),
   }),
-  evct: { color: '#555', flexShrink: 0, width: 60, fontSize: 14, textAlign: 'right' as const },
+  evct: { color: 'var(--fp-text-3)', flexShrink: 0, width: 60, fontSize: 14, textAlign: 'right' as const },
   badge: (color: string): React.CSSProperties => ({
-    flexShrink: 0, fontSize: 12, padding: '0 6px', borderRadius: 8,
+    flexShrink: 0, fontSize: 12, padding: '0 6px', borderRadius: 2,
     border: `1px solid ${color}`, color, alignSelf: 'center',
   }),
 }
@@ -68,7 +69,7 @@ function LedgerRows({ deviationsOnly }: { deviationsOnly: boolean }) {
     return () => { cancelled = true }
   }, [deviationsOnly])
   if (!loading && items.length === 0) {
-    return <div style={{ padding: 12, color: '#444' }}>无留痕事件(管线跑过才有;消费留痕=consumed_decisions,偏离=omni ledger deviate)</div>
+    return <div style={{ padding: 12, color: 'var(--fp-text-3)' }}>无留痕事件(管线跑过才有;消费留痕=consumed_decisions,偏离=omni ledger deviate)</div>
   }
   return (
     <>
@@ -124,21 +125,22 @@ export default function TraceList() {
         {mode === 'runs' && (
           <>
             <input style={S.input} placeholder="过滤 task_desc..." value={filter} onChange={(e) => setFilter(e.target.value)} />
-            <select
-              style={{ ...S.input, flex: 0, width: 120 }}
+            <BlueprintSelect
+              style={{ flex: 'none', width: 120 }}
+              label="域"
+              aria-label="按域筛选"
               value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-            >
-              <option value="">全部域</option>
-              {domains.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
+              onChange={setDomain}
+              options={[{ value: '', label: '全部域' }, ...domains.map((d) => ({ value: d, label: d }))]}
+              data-testid="trace-domain"
+            />
             <span style={S.meta}>{loading ? '加载中...' : `${items.length}/${total}`}</span>
           </>
         )}
       </div>
       <div style={S.list}>
         {mode !== 'runs' && <LedgerRows deviationsOnly={mode === 'deviations'} />}
-        {mode === 'runs' && items.length === 0 && !loading && <div style={{ padding: 12, color: '#444' }}>无 trace</div>}
+        {mode === 'runs' && items.length === 0 && !loading && <div style={{ padding: 12, color: 'var(--fp-text-3)' }}>无 trace</div>}
         {mode === 'runs' && items.map((t) => {
           const tabId = `trace:${t.trace_id}`
           return (

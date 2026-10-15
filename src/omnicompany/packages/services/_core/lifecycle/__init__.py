@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+# The Poof* imports below are legacy API aliases. New callers use Overlay*.
 from omnicompany.packages.services._core.lifecycle.note_source import (
     OverlayNote,
     OverlayNoteSource,

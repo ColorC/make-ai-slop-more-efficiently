@@ -480,9 +480,20 @@ def produce_external_action_quality_samples(
         )
         previous_terminal = step.ended_at or step.action_ended_at or action_started_at
         evaluation = step.live_evaluation
-        expectation_measured = evaluation is not None
-        expectation_matched = evaluation.expectation_met if evaluation is not None else None
         expectation_kind = run.environment.get("expected_change_kind")
+        measurement_scope = run.environment.get("expected_change_measurement_scope")
+        # LiveStep currently measures only pixel-level visual effect.  That signal may
+        # prove that a tap changed the screen, but it cannot prove a natural-language
+        # business expectation such as resource consumption or board-item generation.
+        # A producer must opt in structurally after binding a typed semantic/resource
+        # measurement; keyword inspection of the expectation text is intentionally
+        # forbidden.
+        expectation_measured = bool(
+            evaluation is not None and measurement_scope == "declared_expectation"
+        )
+        expectation_matched = (
+            evaluation.expectation_met if expectation_measured and evaluation is not None else None
+        )
         evidence_complete = bool(
             run.status in {"passed", "failed"}
             and step.status in {"passed", "failed"}
@@ -498,7 +509,13 @@ def produce_external_action_quality_samples(
             evidence_complete and expectation_matched is False and action_run.status == "passed"
         )
         outcome = (
-            "confirmed" if confirmed_change else "no_effect" if measured_no_effect else "failed"
+            "confirmed"
+            if confirmed_change
+            else "no_effect"
+            if measured_no_effect
+            else "unsettled"
+            if evidence_complete and action_run.status == "passed"
+            else "failed"
         )
         command_id = _stable_command_id(
             invocation,

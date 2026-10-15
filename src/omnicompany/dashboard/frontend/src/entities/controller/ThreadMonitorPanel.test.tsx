@@ -5,11 +5,31 @@ import { ccApi } from '../../api/ccClient'
 import { ccChatApi } from '../../api/ccChatClient'
 import { CONTROLLER_TAB_ID, usePanels, withDefaultTabs } from '../../stores/panelsStore'
 import ThreadMonitorPanel from './ThreadMonitorPanel'
+import { selectBlueprintOption } from '../../components/blueprintSelectTestUtils'
+
+const tabStatusMock = vi.hoisted(() => ({
+  snapshot: {
+    states: {},
+    metas: {},
+    ptyLoaded: false,
+    chatLoaded: false,
+  } as any,
+}))
+
+vi.mock('../cc_session/tabStatus', () => ({
+  useCcTabStatusSnapshot: () => tabStatusMock.snapshot,
+}))
 
 describe('ThreadMonitorPanel', () => {
   beforeEach(() => {
     usePanels.setState({ tabs: withDefaultTabs([]), activeId: CONTROLLER_TAB_ID })
     vi.restoreAllMocks()
+    tabStatusMock.snapshot = {
+      states: {},
+      metas: {},
+      ptyLoaded: false,
+      chatLoaded: false,
+    }
   })
 
   it('opens a legacy web chat as a real resumed CLI tab', async () => {
@@ -78,11 +98,11 @@ describe('ThreadMonitorPanel', () => {
     expect(usePanels.getState().activeId).toBe('cc_session:pty-resumed-chat')
   })
 
-  it('creates and opens a remote Codex CLI session inside the dashboard', async () => {
+  it('creates and opens a Codex CLI Agent Worker inside the dashboard', async () => {
     vi.spyOn(ccChatApi, 'list').mockResolvedValue([])
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
     vi.spyOn(ccApi, 'list').mockResolvedValue([])
-    const create = vi.spyOn(ccApi, 'create').mockResolvedValue({
+    const create = vi.spyOn(ccApi, 'createAgentWorker').mockResolvedValue({
       id: 'pty-codex-1', cmd: ['codex'], cwd: 'C:/workspace/omnicompany',
       cols: 120, rows: 30, started_at: 1780272000, alive: true,
     })
@@ -93,8 +113,80 @@ describe('ThreadMonitorPanel', () => {
     fireEvent.change(screen.getByLabelText('选择执行者'), { target: { value: 'codex_cli' } })
     fireEvent.click(screen.getByTestId('thread-new-session'))
 
-    await waitFor(() => expect(create).toHaveBeenCalledWith({ cmd: ['codex'] }))
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ provider: 'codex', visibility: 'visible' }))
     expect(usePanels.getState().activeId).toBe('cc_session:pty-codex-1')
+  })
+
+  it('reloads when the live runtime catalogue discovers a session created elsewhere', async () => {
+    const externalSession = {
+      id: 'pty-created-elsewhere', cmd: ['codex'], provider: 'codex',
+      cwd: 'C:/workspace/', cols: 120, rows: 30,
+      started_at: 1780272000, alive: true, status: 'alive' as const,
+      display_title: 'Externally created session',
+    }
+    vi.spyOn(ccChatApi, 'list').mockResolvedValue([])
+    vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
+    vi.spyOn(ccChatApi, 'importable').mockResolvedValue([])
+    const list = vi.spyOn(ccApi, 'list')
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([externalSession])
+
+    const view = render(<ThreadMonitorPanel />)
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1))
+
+    tabStatusMock.snapshot = {
+      states: { 'pty-created-elsewhere': 'done' },
+      metas: {
+        'pty-created-elsewhere': {
+          kind: 'pty',
+          provider: 'codex',
+          title: 'Externally created session',
+        },
+      },
+      ptyLoaded: true,
+      chatLoaded: true,
+    }
+    view.rerender(<ThreadMonitorPanel />)
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Externally created session')).toBeTruthy()
+  })
+
+  it('creates a Codex CLI worker wired to the the_company API without touching the official subscription', async () => {
+    vi.spyOn(ccChatApi, 'list').mockResolvedValue([])
+    vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
+    vi.spyOn(ccApi, 'list').mockResolvedValue([])
+    const create = vi.spyOn(ccApi, 'createAgentWorker').mockResolvedValue({
+      id: 'pty-codex-the_company-1', cmd: ['codex', '-c'], cwd: 'C:/workspace/omnicompany',
+      cols: 120, rows: 30, started_at: 1780272000, alive: true,
+    })
+
+    render(<ThreadMonitorPanel />)
+    await screen.findByLabelText('选择执行者')
+    selectBlueprintOption('选择执行者', 'Codex CLI（the_company API）')
+    fireEvent.click(screen.getByTestId('thread-new-session'))
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ provider: 'codex_the_company', visibility: 'visible' }))
+    expect(usePanels.getState().activeId).toBe('cc_session:pty-codex-the_company-1')
+  })
+
+  it('creates Kiro through the unified CLI Agent Worker entrypoint', async () => {
+    vi.spyOn(ccChatApi, 'list').mockResolvedValue([])
+    vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
+    vi.spyOn(ccApi, 'list').mockResolvedValue([])
+    const create = vi.spyOn(ccApi, 'createAgentWorker').mockResolvedValue({
+      id: 'pty-kiro-1', cmd: ['kiro-cli', 'chat'], provider: 'kiro',
+      cwd: 'C:/workspace/omnicompany', cols: 120, rows: 30,
+      started_at: 1780272000, alive: true,
+    })
+
+    render(<ThreadMonitorPanel />)
+    await screen.findByLabelText('选择执行者')
+    selectBlueprintOption('选择执行者', 'Kiro CLI')
+    fireEvent.click(screen.getByTestId('thread-new-session'))
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ provider: 'kiro', visibility: 'visible' }))
+    expect(usePanels.getState().activeId).toBe('cc_session:pty-kiro-1')
   })
 
   it('creates a plain CLI shell that waits for a manually entered agent command', async () => {
@@ -102,16 +194,17 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
     vi.spyOn(ccApi, 'list').mockResolvedValue([])
     const create = vi.spyOn(ccApi, 'create').mockResolvedValue({
-      id: 'pty-shell-1', cmd: ['powershell', '-NoLogo'], provider: 'shell',
+      id: 'pty-shell-1', cmd: ['pwsh', '-NoLogo'], provider: 'shell',
       cwd: 'C:/workspace/omnicompany', cols: 120, rows: 30,
       started_at: 1780272000, alive: true,
     })
 
     render(<ThreadMonitorPanel />)
-    fireEvent.change(await screen.findByLabelText('选择执行者'), { target: { value: 'plain_cli' } })
+    await screen.findByLabelText('选择执行者')
+    selectBlueprintOption('选择执行者', '纯 CLI（手动唤起）')
     fireEvent.click(screen.getByTestId('thread-new-session'))
 
-    await waitFor(() => expect(create).toHaveBeenCalledWith({ cmd: ['powershell', '-NoLogo'] }))
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ cmd: ['pwsh', '-NoLogo'] }))
     expect(usePanels.getState().activeId).toBe('cc_session:pty-shell-1')
   })
 
@@ -132,7 +225,7 @@ describe('ThreadMonitorPanel', () => {
         started_at: 80, alive: false, status: 'recoverable',
       },
       {
-        id: 'pty-plain-shell', cmd: ['powershell', '-NoLogo'], provider: 'shell', cwd: 'E:/work/shell', cols: 120, rows: 30,
+        id: 'pty-plain-shell', cmd: ['pwsh', '-NoLogo'], provider: 'shell', cwd: 'E:/work/shell', cols: 120, rows: 30,
         started_at: 70, alive: true, subscribers: 0, status: 'alive',
       },
     ])
@@ -191,8 +284,8 @@ describe('ThreadMonitorPanel', () => {
       expect(ids).not.toContain('cc_session:0340ee96-empty')
       expect(state.activeId).toBe('cc_session:5da8c392-newer')
       const titles = state.tabs.map((tab) => tab.title)
-      expect(titles).toContain('OpenCode · WindowsWorkspace · 5da8c392')
-      expect(titles).toContain('OpenCode · WindowsWorkspace · 607b1d85')
+      expect(titles).toContain('OpenCode · 5da8c392')
+      expect(titles).toContain('OpenCode · 607b1d85')
     })
   })
 
@@ -201,11 +294,11 @@ describe('ThreadMonitorPanel', () => {
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
     vi.spyOn(ccApi, 'list').mockResolvedValue([
       {
-        id: 'pty-shell-a', cmd: ['powershell', '-NoLogo'], provider: 'shell', cwd: 'E:/work/a',
+        id: 'pty-shell-a', cmd: ['pwsh', '-NoLogo'], provider: 'shell', cwd: 'E:/work/a',
         cols: 120, rows: 30, started_at: 100, alive: true, subscribers: 0, status: 'alive',
       },
       {
-        id: 'pty-shell-b', cmd: ['powershell', '-NoLogo'], provider: 'shell', cwd: 'E:/work/b',
+        id: 'pty-shell-b', cmd: ['pwsh', '-NoLogo'], provider: 'shell', cwd: 'E:/work/b',
         cols: 120, rows: 30, started_at: 90, alive: true, subscribers: 0, status: 'alive',
       },
       {
@@ -409,13 +502,16 @@ describe('ThreadMonitorPanel', () => {
 
     render(<ThreadMonitorPanel />)
 
-    const titles = await screen.findAllByTestId('session-title')
+    // /active \u4e0e\u5b58\u6d3b\u4f1a\u8bdd\u5217\u8868\u662f\u5206\u522b\u5230\u8fbe\u7684(\u51b7\u542f\u65f6\u524d\u8005\u8981\u628a\u6240\u6709\u8d26\u53f7\u76ee\u5f55\u5168\u76d8\u626b\u63cf), \u7b49\u4e24\u6279\u90fd\u6e32\u67d3\u3002
+    await waitFor(() => {
+      expect(screen.getAllByTestId('session-title').map((node) => node.textContent))
+        .toEqual(expect.arrayContaining([
+          'Mobile session title',
+          'First title line',
+          'Codex \u00b7 pty-fall',
+        ]))
+    })
     const ids = await screen.findAllByTestId('session-id')
-    expect(titles.map((node) => node.textContent)).toEqual(expect.arrayContaining([
-      'Mobile session title',
-      'First title line',
-      'Codex \u00b7 beta',
-    ]))
     expect(ids.map((node) => node.textContent)).toEqual(expect.arrayContaining([
       'ID019f9dee-b673-7212-b948-3baa72c242f2',
       'IDpty-title-123456',

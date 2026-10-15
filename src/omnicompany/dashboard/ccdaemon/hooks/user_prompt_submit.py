@@ -5,11 +5,10 @@
 # [OMNI] material_id="material:dashboard.cc_wrapper.hooks.user_prompt_submit_plan_reinject.implementation.py"
 """UserPromptSubmit hook — re-inject minimal pointers after a plan switch.
 
-Triggered before each user prompt is sent to the LLM. Compares
-`active_plan_changed_ts` vs `last_plan_inject_ts` in `cc_sessions.json[pty_id]`;
-if a switch happened since last injection, emit `additionalContext` with the
-new plan's directory/start-file pointers, then advance the marker so we don't re-inject
-on subsequent turns.
+Triggered before each user prompt is sent to the LLM. Reads one tiny per-PTY
+handoff marker; if a switch happened since last injection, emit
+`additionalContext` with the new plan's directory/start-file pointers, then
+advance the marker so we don't re-inject on subsequent turns.
 
 This is alive-session re-injection (option b in CC-PLAN-SESSION-CONTEXT 段二
 审议). 不破系统提示词缓存 (additionalContext 是 per-turn 注入, 不进 system),
@@ -17,13 +16,14 @@ This is alive-session re-injection (option b in CC-PLAN-SESSION-CONTEXT 段二
 
 No-op when:
   - OMNI_CC_PTY_ID not set (claude not spawned via dashboard wrapper)
-  - cc_sessions.json missing or pty_id absent
-  - active_plan_changed_ts <= last_plan_inject_ts (already injected or never switched)
+  - the per-PTY marker is missing
+  - its generation was already injected
 """
 from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 try:
     sys.stdout.reconfigure(encoding="utf-8")
@@ -32,6 +32,59 @@ except (AttributeError, OSError):
     pass
 
 from . import _shared as sh
+
+
+def _daemon_predates_plan_trigger() -> bool:
+    """Whether the live daemon was started before the tiny trigger publisher."""
+
+    state_dir = Path(
+        os.environ.get("OMNI_CC_DAEMON_STATE_DIR") or (sh.repo_root() / "data")
+    )
+    pid_path = state_dir / "cc_daemon.pid"
+    route_path = Path(__file__).resolve().parents[1] / "pty_routes.py"
+    try:
+        return pid_path.stat().st_mtime_ns < route_path.stat().st_mtime_ns
+    except OSError:
+        return False
+
+
+def _legacy_pty_plan_reinject(pty_id: str, payload: dict) -> str | None:
+    """Rolling bridge for a pre-trigger daemon; reads the 0.36 MB binding ledger.
+
+    This path disappears automatically after ccdaemon's next maintenance
+    restart. It deliberately never touches the 10 MB cc_sessions registry.
+    """
+
+    if not _daemon_predates_plan_trigger():
+        return None
+    try:
+        from omnicompany.core.plan_context_trigger import publish_plan_change
+        from omnicompany.packages.services._core.identity import (
+            get_session_binding,
+            update_session_binding,
+        )
+
+        binding = get_session_binding(pty_id)
+        plan_id = str(binding.get("active_plan") or "")
+        if not plan_id or binding.get("last_plan_inject_id") == plan_id:
+            return None
+        plan_md = sh.repo_root() / "docs" / "plans" / plan_id / "plan.md"
+        plan_meta: dict = {}
+        if plan_md.is_file():
+            from omnicompany.dashboard.controlplane.plans import parse_plan_frontmatter
+
+            plan_meta = parse_plan_frontmatter(plan_md) or {}
+        text = _build_plan_summary(plan_id, plan_meta, payload)
+        update_session_binding(pty_id, last_plan_inject_id=plan_id)
+        publish_plan_change(pty_id, plan_id, already_injected=True)
+        sh.append_audit("user_prompt_submit_plan_reinject_legacy_bridge", {
+            "pty_id": pty_id,
+            "plan_id": plan_id,
+            "context_chars": len(text),
+        })
+        return text
+    except Exception:
+        return None
 
 
 def _build_plan_summary(plan_id: str, plan_meta: dict, payload: dict | None = None) -> str:
@@ -54,11 +107,17 @@ def _plan_reinject(payload: dict) -> str | None:
     if not pty_id:
         try:
             from omnicompany.packages.services._core.identity import (
-                get_session_binding,
+                binding_for_session,
                 update_session_binding,
             )
             trace_id = sh.trace_id_for(payload)
-            binding = get_session_binding(trace_id)
+            session_id = sh.provider_session_id(payload)
+            provider = sh.binding_provider(payload)
+            binding = binding_for_session(
+                trace_id=trace_id,
+                provider=provider,
+                session_id=session_id,
+            )
             plan_id = binding.get("active_plan")
             if not plan_id or binding.get("last_plan_inject_id") == plan_id:
                 return None
@@ -69,7 +128,10 @@ def _plan_reinject(payload: dict) -> str | None:
 
                 plan_meta = parse_plan_frontmatter(plan_md) or {}
             text = _build_plan_summary(str(plan_id), plan_meta, payload)
-            update_session_binding(trace_id, last_plan_inject_id=plan_id)
+            update_session_binding(
+                str(binding.get("trace_id") or trace_id),
+                last_plan_inject_id=plan_id,
+            )
             sh.append_audit("user_prompt_submit_plan_reinject", {
                 "trace_id": trace_id,
                 "provider": sh.binding_provider(payload),
@@ -80,21 +142,25 @@ def _plan_reinject(payload: dict) -> str | None:
         except Exception:
             return None
 
+    legacy = _legacy_pty_plan_reinject(pty_id, payload)
+    if legacy:
+        return legacy
+
     try:
-        from omnicompany.dashboard.ccdaemon.pty import (
-            _mutate_meta_store,
-            _read_meta_store,
+        from omnicompany.core.plan_context_trigger import (
+            claim_plan_change,
+            pending_plan_change,
         )
 
-        store = _read_meta_store(use_cache=False)
+        pending = pending_plan_change(pty_id)
     except (ImportError, OSError, ValueError):
         return None
-    entry = store.get(pty_id) or {}
-    changed_ts = entry.get("active_plan_changed_ts") or 0
-    last_inject_ts = entry.get("last_plan_inject_ts") or 0
-    plan_id = entry.get("active_plan")
-    if not changed_ts or not plan_id or changed_ts <= last_inject_ts:
-        return None  # no switch since last injection
+    if not pending:
+        return None
+    plan_id = str(pending.get("plan_id") or "")
+    generation = int(pending.get("generation") or 0)
+    if not plan_id or not generation:
+        return None
 
     root = sh.repo_root()
     plan_md = root / "docs" / "plans" / plan_id / "plan.md"
@@ -108,34 +174,21 @@ def _plan_reinject(payload: dict) -> str | None:
 
     text = _build_plan_summary(plan_id, plan_meta, payload)
 
-    claimed = False
-
-    def claim_current_switch(current: dict) -> None:
-        nonlocal claimed
-        current_entry = current.get(pty_id) or {}
-        # The plan may change again while the bounded context is being built.
-        # Claim only the exact generation we inspected. If it changed, the next
-        # prompt builds and injects the newer plan instead of acknowledging it
-        # with stale context.
-        if (
-            current_entry.get("active_plan") == plan_id
-            and (current_entry.get("active_plan_changed_ts") or 0) == changed_ts
-            and (current_entry.get("last_plan_inject_ts") or 0) < changed_ts
-        ):
-            current_entry["last_plan_inject_ts"] = changed_ts
-            current[pty_id] = current_entry
-            claimed = True
-
     try:
-        _mutate_meta_store(claim_current_switch)
+        # The plan may change while the bounded context is being built. Claim
+        # only the exact generation we inspected; a newer switch remains pending.
+        claimed = claim_plan_change(pty_id, generation)
     except OSError as e:
-        print(f"[ccdaemon] last_plan_inject_ts write failed: {e}", file=sys.stderr)
+        print(f"[ccdaemon] plan context claim failed: {e}", file=sys.stderr)
         return None
     if not claimed:
         return None
 
     sh.append_audit("user_prompt_submit_plan_reinject", {
-        "pty_id": pty_id, "plan_id": plan_id, "changed_ts": changed_ts, "context_chars": len(text),
+        "pty_id": pty_id,
+        "plan_id": plan_id,
+        "generation": generation,
+        "context_chars": len(text),
     })
     return text
 
@@ -157,7 +210,7 @@ def _bind_reminder(payload: dict) -> str | None:
         return None
     try:
         from omnicompany.packages.services._core.identity import (
-            get_session_binding,
+            binding_for_session,
             update_session_binding,
         )
     except Exception:
@@ -170,12 +223,18 @@ def _bind_reminder(payload: dict) -> str | None:
         return None
     cwd = payload.get("cwd") or ""
     provider = sh.binding_provider(payload)
-    b = get_session_binding(trace_id)
+    b = binding_for_session(
+        trace_id=trace_id,
+        provider=provider,
+        session_id=session_id,
+        pty_id=os.environ.get("OMNI_CC_PTY_ID"),
+    )
+    binding_trace_id = str(b.get("trace_id") or trace_id)
     turns = int(b.get("turns") or 0) + 1
     try:
         # universal capture + turns 计数(只写台账, 不碰 active 指针 → 不清当前 plan)
         update_session_binding(
-            trace_id,
+            binding_trace_id,
             session_id=session_id or None,
             claude_session_id=session_id if provider == "claude_code" else None,
             provider=provider,
@@ -184,19 +243,59 @@ def _bind_reminder(payload: dict) -> str | None:
         )
     except Exception:
         pass
-    bound = bool(b.get("active_plan") or b.get("task_id"))
+    # A project is the only required durable scope. Plans, workstreams and
+    # tasks are useful when they exist, but many focused jobs legitimately do
+    # not need one; do not spend hook context nagging those sessions.
+    bound = bool(b.get("project"))
     if turns < 3 or bound or b.get("reminded_bind"):
         return None
     try:
-        update_session_binding(trace_id, reminded_bind=True)
+        update_session_binding(binding_trace_id, reminded_bind=True)
     except Exception:
         pass
     sh.append_audit("user_prompt_submit_bind_reminder", {"trace_id": trace_id, "turns": turns})
-    return "Durable work is still unbound; bind it once with `omni plan use <id>`."
+    return "Durable work is unbound: `omni session bind --project <id> --workstream <id> --topic <one-focus>`."
+
+
+def _queued_feedback(payload: dict) -> str | None:
+    """Fallback delivery for messages queued while direct daemon input is unavailable."""
+    session_id = payload.get("session_id") or payload.get("sessionId") or os.environ.get("OMNI_CC_PTY_ID")
+    if not session_id:
+        return None
+    try:
+        from omnicompany.packages.services.boss_sight.services.agent_attention import pop_feedback
+
+        items = pop_feedback(str(session_id), mark=True)
+    except Exception:
+        return None
+    blocks: list[str] = []
+    for item in items:
+        message = str(item.get("message") or "").strip()
+        if not message:
+            continue
+        author = str(item.get("author") or "unknown").strip().lower()
+        kind = "AGENT MESSAGE" if author == "agent" else "USER FEEDBACK" if author == "user" else "SESSION FEEDBACK"
+        blocks.append(
+            f"[OMNI QUEUED {kind}]\n"
+            "Classification: queued session context; this is not the current user prompt.\n"
+            f"Author: {author}\n"
+            f"Content: {message}"
+        )
+    if not blocks:
+        return None
+    return "\n\n".join(blocks)
 
 
 def main() -> int:
     payload = sh.read_stdin_json()
+    # Capture before any plan/reminder text is injected so the companion sees
+    # the user's exact input rather than hook-generated context.
+    try:
+        from .session_companion import capture_user_prompt
+
+        capture_user_prompt(payload)
+    except Exception:
+        pass
     parts: list[str] = []
     try:
         r = _bind_reminder(payload)
@@ -204,6 +303,9 @@ def main() -> int:
         r = None
     if r:
         parts.append(r)
+    q = _queued_feedback(payload)
+    if q:
+        parts.append(q)
     p = _plan_reinject(payload)
     if p:
         parts.append(p)

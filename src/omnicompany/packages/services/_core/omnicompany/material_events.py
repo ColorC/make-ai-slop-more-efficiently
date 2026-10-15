@@ -11,6 +11,7 @@ import asyncio
 import logging
 import threading
 import uuid
+import sqlite3
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -46,11 +47,16 @@ async def _publish_material_event_async(
     trace_id: str | None,
     parent_id: str | None,
     tags: Sequence[str] | None,
+    event_id: str | None,
 ) -> str:
     from omnicompany.bus.sqlite import SQLiteBus
 
     payload_dict = dict(payload)
+    event_kwargs: dict[str, Any] = {}
+    if event_id:
+        event_kwargs["id"] = event_id
     event = FactoryEvent(
+        **event_kwargs,
         trace_id=_trace_id_for(event_type, payload_dict, trace_id),
         parent_id=parent_id,
         event_type=event_type,
@@ -61,7 +67,12 @@ async def _publish_material_event_async(
     bus = SQLiteBus()
     await bus.connect()
     try:
-        return await bus.publish(event)
+        try:
+            return await bus.publish(event)
+        except sqlite3.IntegrityError:
+            if event_id:
+                return event.id
+            raise
     finally:
         await bus.close()
 
@@ -117,6 +128,7 @@ def publish_material_event(
     trace_id: str | None = None,
     parent_id: str | None = None,
     tags: Sequence[str] | None = None,
+    event_id: str | None = None,
 ) -> str | None:
     """发布一条公司级材料事件。
 
@@ -131,6 +143,7 @@ def publish_material_event(
             trace_id=trace_id,
             parent_id=parent_id,
             tags=tags,
+            event_id=event_id,
         )
         # Always isolate the async SQLiteBus lifecycle in a short thread. Using
         # asyncio.run() in the caller thread clears that thread's default event

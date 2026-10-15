@@ -126,7 +126,7 @@ def _material_map() -> dict[str, dict[str, Any]]:
             return _MAT_CACHE["map"]
     m: dict[str, dict[str, Any]] = {}
     try:
-        from omnicompany.dashboard.boss_sight.material_registry import (
+        from omnicompany.packages.services.boss_sight.material_registry import (
             _gather_registry_items, _is_deleted, _workspace_root,
         )
         root = _workspace_root(None)

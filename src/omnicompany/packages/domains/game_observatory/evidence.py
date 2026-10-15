@@ -592,8 +592,9 @@ class EvidenceRecorder:
         artifact: ArtifactRef,
         *,
         run: EvidenceRun,
+        current_step: EvidenceStep | None = None,
     ) -> None:
-        """Fail before device mutation unless this is the prior published After."""
+        """Accept a published prior After or the passed prior step in this batch run."""
 
         path = Path(artifact.path)
         if (
@@ -608,26 +609,42 @@ class EvidenceRecorder:
         prior_run = self.store.get_evidence_run(prior_run_id)
         prior_step = self.store.get_evidence_step(prior_step_id)
         prior_manifest = self.store.get_evidence_manifest(prior_run_id)
+        published_prior = bool(
+            prior_run is not None
+            and prior_run.status == "passed"
+            and prior_run.ended_at
+            and prior_manifest is not None
+            and prior_manifest.publishable
+            and prior_step is not None
+            and artifact.id in prior_run.artifact_ids
+            and prior_step.action_run_id in prior_run.action_run_ids
+        )
+        same_running_batch = bool(
+            prior_run is not None
+            and prior_run.id == run.id
+            and prior_run.status == "running"
+            and not prior_run.ended_at
+            and prior_manifest is None
+            and prior_step is not None
+            and current_step is not None
+            and prior_step.step_index + 1 == current_step.step_index
+        )
         if (
             artifact.metadata.get("evidence_role") != "after"
             or prior_run is None
             or prior_run.target_id != run.target_id
-            or prior_run.status != "passed"
-            or not prior_run.ended_at
             or prior_step is None
             or prior_step.evidence_run_id != prior_run.id
             or prior_step.status != "passed"
             or not prior_step.ended_at
             or prior_step.after_frame_id != artifact.id
             or artifact.id not in prior_step.artifact_ids
-            or artifact.id not in prior_run.artifact_ids
             or not prior_step.action_run_id
-            or prior_step.action_run_id not in prior_run.action_run_ids
-            or prior_manifest is None
-            or not prior_manifest.publishable
+            or not (published_prior or same_running_batch)
         ):
             raise EvidenceRecorderError(
-                "reused route-boundary Before is not a published prior After"
+                "reused route-boundary Before is neither a published prior After nor "
+                "the passed prior step of this running batch"
             )
         prior_lease_id = prior_run.environment.get("device_gateway_lease_id")
         current_lease_id = run.environment.get("device_gateway_lease_id")
@@ -959,7 +976,9 @@ class EvidenceRecorder:
         terminal_condition: EvidenceTerminalCondition | None = None,
         dynamic_scene_profile: EvidenceDynamicSceneProfile | None = None,
         before_action: Callable[[EvidenceStep], None] | None = None,
-        capture_profile: Literal["full", "compact_static"] = "full",
+        capture_profile: Literal[
+            "full", "compact_static", "guarded_batch_checkpoint"
+        ] = "full",
         action_task_id: str | None = None,
         reused_before_artifact_id: str | None = None,
         trusted_terminal_reference_artifact_id: str | None = None,
@@ -969,7 +988,8 @@ class EvidenceRecorder:
         if self.adapter is None:
             raise EvidenceRecorderError("recording a step requires a connected adapter")
         if reused_before_artifact_id is not None and (
-            capture_profile != "compact_static" or dynamic_scene_profile is not None
+            capture_profile not in {"compact_static", "guarded_batch_checkpoint"}
+            or dynamic_scene_profile is not None
         ):
             raise EvidenceRecorderError(
                 "route-boundary Before reuse requires compact static capture"
@@ -1049,7 +1069,11 @@ class EvidenceRecorder:
                         else (
                             "trusted-reference-or-static"
                             if trusted_terminal_reference is not None
-                            else "static-consecutive"
+                            else (
+                                "guarded-batch-checkpoint"
+                                if capture_profile == "guarded_batch_checkpoint"
+                                else "static-consecutive"
+                            )
                         )
                     ),
                     threshold=(
@@ -1116,7 +1140,7 @@ class EvidenceRecorder:
                     raise EvidenceRecorderError(
                         "reused route-boundary Before screenshot is missing"
                     )
-                self._assert_reusable_route_boundary(before, run=run)
+                self._assert_reusable_route_boundary(before, run=run, current_step=step)
                 decoded = cv2.imread(before.path, cv2.IMREAD_UNCHANGED)
                 if decoded is None:
                     raise EvidenceRecorderError(
@@ -1212,9 +1236,13 @@ class EvidenceRecorder:
 
             interval = max(0.05, min(sample_interval_seconds, 10.0))
             timeout = max(interval, min(settle_timeout_seconds, 60.0))
-            max_frames = max(
-                stability.required_consecutive + 1,
-                math.floor(timeout / interval) + 1,
+            max_frames = (
+                0
+                if capture_profile == "guarded_batch_checkpoint"
+                else max(
+                    stability.required_consecutive + 1,
+                    math.floor(timeout / interval) + 1,
+                )
             )
             consecutive = 0
             final_distance: float | None = None
@@ -1353,6 +1381,8 @@ class EvidenceRecorder:
                 }
             )
 
+            if capture_profile == "guarded_batch_checkpoint":
+                self.sleep(interval)
             if (
                 capture_profile == "compact_static"
                 and motion_settled
@@ -1396,7 +1426,7 @@ class EvidenceRecorder:
                 or bool(terminal_evaluation and terminal_evaluation.passed)
             )
             stability = stability.model_copy(update={"settled": settled})
-            if not motion_settled:
+            if not motion_settled and capture_profile != "guarded_batch_checkpoint":
                 if dynamic_scene_profile is not None:
                     quality_issues.append(
                         "dynamic terminal motion exceeded the bounded recent-window policy"
@@ -1460,6 +1490,9 @@ class EvidenceRecorder:
                 if capture_profile == "compact_static" and not intermediate
                 else 0
             ),
+            "guarded_batch_checkpoint": capture_profile
+            == "guarded_batch_checkpoint",
+            "canonical_terminal": capture_profile != "guarded_batch_checkpoint",
         }
         if not action_attempted:
             quality_issues.append("action was not executed because the pre-action gate failed")

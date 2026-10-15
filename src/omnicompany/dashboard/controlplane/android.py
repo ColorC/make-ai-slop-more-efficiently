@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import html
 import ipaddress
 import json
 import mimetypes
@@ -153,7 +154,13 @@ def _authorized_device(req: Request, device_id: str, bucket: dict | None = None)
     return _device_token_matches(device_id, supplied, bucket)
 
 
-def _web_session_device(req: Request) -> str:
+def lofa_web_session_device(req: Request) -> str:
+    """Paired device behind this request's `omni_lofa_session` cookie ("" if none).
+
+    Public because a LOFA device session **is** a gateway session: other
+    control-plane routes (session-state reflection above all) must be able to
+    recognize it instead of only knowing about desktop cookies.
+    """
     raw = str(req.cookies.get(LOFA_WEB_SESSION_COOKIE) or "")
     if "." not in raw:
         return ""
@@ -162,14 +169,18 @@ def _web_session_device(req: Request) -> str:
     return device_id if _device_token_matches(device_id, token) else ""
 
 
+# Historical private name; kept so in-module callers read unchanged.
+_web_session_device = lofa_web_session_device
+
+
 def _review_store():
-    from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+    from omnicompany.packages.services.boss_sight.reviewstage.routes import get_store
 
     return get_store()
 
 
 def _review_remote_url(material_id: str) -> str | None:
-    from omnicompany.dashboard.boss_sight.reviewstage.remote_preflight import (
+    from omnicompany.packages.services.boss_sight.reviewstage.remote_preflight import (
         review_remote_material_url,
     )
 
@@ -179,7 +190,7 @@ def _review_remote_url(material_id: str) -> str | None:
 def _material_sample_sha256(store, material) -> str:
     live_url = str((material.extra or {}).get("live_url") or "").strip()
     if live_url:
-        from omnicompany.dashboard.boss_sight.reviewstage.routes import build_live_url_shell
+        from omnicompany.packages.services.boss_sight.reviewstage.routes import build_live_url_shell
 
         return hashlib.sha256(
             build_live_url_shell(live_url, title=material.title or "").encode("utf-8")[:4096]
@@ -408,12 +419,51 @@ def _save_cmds(d: dict) -> None:
         pass
 
 
-def _release_dir() -> Path:
-    """LOFA APK 自更新发布目录: PC 构建后把 APK + manifest 放这, app 从 /apk/* 拉。"""
+ANDROID_RELEASE_PRODUCTS = {
+    "lofa": {
+        "name": "LOFA",
+        "apk_name": "lofa-latest.apk",
+        "directory": (),
+    },
+    "litework-pad": {
+        "name": "LiTeWork Pad",
+        "apk_name": "litework-pad-latest.apk",
+        "directory": ("litework-pad",),
+    },
+}
+
+
+def _release_product(product: str) -> dict:
+    try:
+        return ANDROID_RELEASE_PRODUCTS[str(product)]
+    except KeyError as exc:
+        raise ValueError(f"unknown Android release product: {product}") from exc
+
+
+def _release_dir(product: str = "lofa") -> Path:
+    """APK 发布目录。旧 LOFA 目录保持不变，新产品使用自己的子目录。"""
     root = _ws_root()
     d = root / "data" / "android" / "releases"
+    for part in _release_product(product)["directory"]:
+        d /= part
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _release_manifest(product: str) -> dict | None:
+    fp = _release_dir(product) / "manifest.json"
+    if not fp.is_file():
+        return None
+    try:
+        value = json.loads(fp.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else None
+    except Exception:
+        return None
+
+
+def _release_apk_path(product: str) -> Path:
+    spec = _release_product(product)
+    return _release_dir(product) / str(spec["apk_name"])
 
 
 def _log_dir() -> Path:
@@ -564,19 +614,13 @@ def android_device():
 @android_router.get("/apk/version")
 def apk_version():
     """返回已发布 APK 的版本清单(versionCode/versionName/sha256/size)。app 拿它跟自身版本比对。"""
-    fp = _release_dir() / "manifest.json"
-    if not fp.is_file():
-        return {"ok": True, "manifest": None}
-    try:
-        return {"ok": True, "manifest": json.loads(fp.read_text(encoding="utf-8"))}
-    except Exception:
-        return {"ok": True, "manifest": None}
+    return {"ok": True, "manifest": _release_manifest("lofa")}
 
 
 @android_router.get("/apk/latest")
 def apk_latest():
     """下载最新 APK。app 自更新时拉这个, 然后走 PackageInstaller 自安装。"""
-    fp = _release_dir() / "lofa-latest.apk"
+    fp = _release_apk_path("lofa")
     if not fp.is_file():
         return JSONResponse({"ok": False, "error": "no_apk_published"}, status_code=404)
     return FileResponse(
@@ -584,6 +628,65 @@ def apk_latest():
         media_type="application/vnd.android.package-archive",
         filename="lofa-latest.apk",
     )
+
+
+@android_router.get("/products/{product}/apk/version")
+def product_apk_version(product: str):
+    """返回某个 Android 产品的独立版本清单，避免不同 application id 交叉升级。"""
+    if product not in ANDROID_RELEASE_PRODUCTS:
+        return JSONResponse({"ok": False, "error": "unknown_product"}, status_code=404)
+    return {"ok": True, "product": product, "manifest": _release_manifest(product)}
+
+
+@android_router.get("/products/{product}/apk/latest")
+def product_apk_latest(product: str):
+    """下载指定产品的最新 APK。"""
+    if product not in ANDROID_RELEASE_PRODUCTS:
+        return JSONResponse({"ok": False, "error": "unknown_product"}, status_code=404)
+    fp = _release_apk_path(product)
+    if not fp.is_file():
+        return JSONResponse({"ok": False, "error": "no_apk_published"}, status_code=404)
+    return FileResponse(
+        str(fp),
+        media_type="application/vnd.android.package-archive",
+        filename=str(_release_product(product)["apk_name"]),
+    )
+
+
+def _apk_install_html(product: str) -> str:
+    spec = _release_product(product)
+    manifest = _release_manifest(product) or {}
+    product_name = str(spec["name"])
+    version_name = html.escape(str(manifest.get("versionName") or "(未发布)"))
+    size_mb = round((manifest.get("size") or 0) / 1024 / 1024, 1)
+    has_apk = _release_apk_path(product).is_file()
+    latest_url = f"/api/android/products/{product}/apk/latest"
+    button = (
+        f'<a class="btn" href="{latest_url}">下载并安装 {product_name} {version_name}</a>'
+        if has_apk else '<div class="warn">尚未发布 APK。</div>'
+    )
+    return f"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>安装 {product_name}</title><style>
+ html,body{{margin:0;height:100%;background:#07101f;color:#edf3ff;
+  font-family:system-ui,-apple-system,"PingFang SC",sans-serif;display:grid;place-items:center}}
+ .card{{width:min(440px,92%);background:#0c182e;border:1px solid #2d416a;border-radius:16px;padding:28px}}
+ h1{{font-size:22px;margin:0 0 8px}} p{{color:#9dafd0;font-size:14px;line-height:1.7;margin:8px 0}}
+ .btn{{display:block;text-align:center;margin:22px 0 8px;background:#7775ff;color:white;
+  text-decoration:none;border-radius:10px;padding:15px;font-size:16px;font-weight:700}}
+ .warn{{color:#ff9caa;font-size:14px;margin:18px 0}}
+ .meta{{font-family:ui-monospace,monospace;color:#8295ba;font-size:12px}}
+</style></head><body><main class="card"><h1>{product_name}</h1>
+<p>这是独立安装的 Pad 薄客户端。安装后可在应用内继续自更新。</p>
+{button}<p class="meta">版本 {version_name} · {size_mb} MB</p>
+</main></body></html>"""
+
+
+@android_router.get("/products/{product}/install", response_class=HTMLResponse)
+def product_apk_install_page(product: str):
+    if product not in ANDROID_RELEASE_PRODUCTS:
+        return HTMLResponse("unknown Android product", status_code=404)
+    return _apk_install_html(product)
 
 
 @android_router.get("/install", response_class=HTMLResponse)
@@ -1015,14 +1118,18 @@ async def automation_poll(req: Request, device_id: str, wait_seconds: float = 25
 
     event = _automation_event(device_id)
     event.clear()
-    pending, now = take_pending()
+    # The state file is shared with the device registration/result endpoints and
+    # is updated on every poll.  Keep its synchronous JSON/atomic-replace work
+    # off the ASGI event loop so a slow filesystem or antivirus scan cannot
+    # stall unrelated Dashboard and PTY requests.
+    pending, now = await asyncio.to_thread(take_pending)
     if not pending:
         try:
             await asyncio.to_thread(event.wait, max(0.0, min(float(wait_seconds), 25.0)))
         except RuntimeError:
             pass
         event.clear()
-        pending, now = take_pending()
+        pending, now = await asyncio.to_thread(take_pending)
     _record_device(ip, device_id)
     return {"ok": True, "device_id": device_id, "commands": pending, "last_seen": now}
 

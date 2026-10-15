@@ -105,3 +105,19 @@ features:
           - "test_list_types_and_all_types_reflect_registrations"
           - "test_module_singleton_has_all_builtin_types_registered"
     status: covered
+
+  - id: registry.material_index_default_scopes
+    what: "MaterialIdIndex 的默认扫描范围必须覆盖 durable config，使项目 profile 等配置材料在登记后可由 material_id 稳定解析。"
+    should:
+      - "默认范围只由 material_index.default_material_scopes 提供，CLI 重建与 resolver 按需重建共用该定义"
+      - "默认范围包含 src/omnicompany、templates、docs 与 config"
+      - "config 下登记过的材料可经 omni resolve ref --verify 找到并校验存在"
+      - "项目 profile 登记的 canonical Wiki 根会进入默认重建范围，Material Wiki frontmatter 可被索引"
+      - "单条 canonical mutation 可原子 upsert，material_id 不得静默改指另一文件"
+    tests:
+      - file: ../../../../../../tests/services/_core/registry/test_material_index_scopes.py
+        cases:
+          - "test_default_material_index_scopes_include_durable_config"
+          - "test_material_index_reads_canonical_material_wiki_frontmatter"
+          - "test_material_index_upsert_is_atomic_and_rejects_retarget"
+    status: covered

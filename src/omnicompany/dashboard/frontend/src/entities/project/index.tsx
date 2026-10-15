@@ -2,10 +2,12 @@
 // 数据源 /api/projects (注册表 + PROJECT_INDEX.md frontmatter 浮出), 与 omni project CLI 同源。
 // 注册进 entity registry 后, 项目自动出现在全局搜索/命令面板(搜 name/id/tags)。
 
-import React from 'react'
 import type { Entity } from '../types'
 import type { EntityRegistration } from '../registry'
 import { projectsApi, type ProjectItem } from '../../api/projectsClient'
+import { lazy } from 'react'
+
+const ProjectDetail = lazy(() => import('./ProjectDetail'))
 
 export interface ProjectEntity extends Entity {
   type: 'project'
@@ -28,8 +30,6 @@ async function fetchList(): Promise<ProjectEntity[]> {
   _cache = { ts: Date.now(), items }
   return items
 }
-
-const ProjectDetail = React.lazy(() => import('./ProjectDetail'))
 
 export const projectRegistration: EntityRegistration<ProjectEntity> = {
   label: '项目',
@@ -61,7 +61,7 @@ export { default as ProjectBoard } from './ProjectBoard'
 // ── 项目工作板(首页) — 单例固定页签, 与总控并列且默认活跃 ──────────────────
 // 用户 /goal (2026-06-12): "首页也是工作板"。panelsStore 把它播种为开机第一页签。
 
-import ProjectBoardComp from './ProjectBoard'
+const ProjectBoardComp = lazy(() => import('./ProjectBoard'))
 
 const boardEntity: Entity = { type: 'project_board', id: 'main', title: '项目' }
 

@@ -4,7 +4,9 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../../lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-md border px-2.5 py-0.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  // 2026-08-06 蓝图: rounded-md 圆角标签 → 锐角细线标注框 + 打字机大写字距,
+// 与 blueprint.css 的 .bp-newtag / .st-status 同族(制图里一段标注就是个方框, 不是药丸)。
+'inline-flex items-center rounded-[2px] border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[.09em] font-[family-name:var(--fp-font-mono)] transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   {
     variants: {
       variant: {

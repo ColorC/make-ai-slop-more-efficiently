@@ -1,15 +1,15 @@
 # [OMNI] origin=claude-code domain=services/hypothesis ts=2026-07-10T00:00:00Z type=format status=active
 # [OMNI] material_id="material:services.learning.hypothesis.format_definitions.py"
-"""hypothesis.formats — 假设探索的语义类型定义(v5 决策库收编版,4 个 Format)。
+"""hypothesis.formats — 假设探索的语义类型定义(外置 AgentRuntime 版,4 个 Format)。
 
 数据流:
 
   hypothesis.session ──┐
-                       │  ExperimenterRouter (SOFT · AgentNodeLoop)
+                       │  ExperimenterWorker (SOFT · 外置只读证据提案)
   hypothesis.store  ───┘  (store=统一决策库 belief 快照)
                        出: hypothesis.factlog
-                           │  BeliefReflectorRouter (SOFT · AgentNodeLoop)
-                           │  用决策库五件套(list/record/challenge/resolve/link)直接改库
+                           │  BeliefReflectorRouter (SOFT · 外置零工具提案)
+                           │  Omni 整批校验后用 canonical decision library 应用
                        出: hypothesis.store_diff (=改库后终态快照)
 
 真源=统一决策库 records.jsonl(kind=belief);本服务不再有自有存储。
@@ -55,9 +55,10 @@ HYPOTHESIS_FACTLOG = Format(
     id="hypothesis.factlog",
     name="HypothesisFactlog",
     description=(
-        "Experimenter 单轮探索的完整行为轨迹:tool_use + tool_result 对的列表。"
-        "上游承诺:ExperimenterRouter 每轮探索结束时产出。"
-        "下游消费:BeliefReflectorRouter 对照轨迹维护统一决策库 belief。"
+        "Experimenter 单轮探索的 Omni 已验证证据轨迹；每条证据包含工作区相对路径、"
+        "精确行区间和逐字命中的引用，外置运行时原始私有会话不构成业务真源。"
+        "上游承诺:ExperimenterWorker 每轮探索结束时产出，伪造路径/行号/引文整批拒绝。"
+        "下游消费:BeliefReflectorRouter 对照轨迹提出操作,由 Omni 验证后维护统一决策库 belief。"
     ),
     tags=["domain.hypothesis", "stage.trace", "kind.internal"],
     json_schema={
@@ -72,6 +73,7 @@ HYPOTHESIS_FACTLOG = Format(
                         "args": {"type": "object"},
                         "result": {"type": "string"},
                     },
+                    "required": ["tool", "args", "result"],
                 },
             },
         },
@@ -87,7 +89,7 @@ HYPOTHESIS_STORE = Format(
         "本探索域在统一决策库里的 belief 快照(只读投影,真源=records.jsonl)。"
         "entries 每条含 id(BLF-...)/state(status)/trigger(evidence_query)/predicted(statement)。"
         "上游承诺:pipeline 每轮开跑前由 belief_tools.beliefs_snapshot() 现算。"
-        "下游消费:ExperimenterRouter 读它决定探什么。"
+        "下游消费:ExperimenterWorker 只读它决定探什么；DSH 不写该快照或决策库。"
     ),
     tags=["domain.hypothesis", "stage.snapshot", "kind.internal"],
     json_schema={
@@ -116,9 +118,9 @@ HYPOTHESIS_STORE_DIFF = Format(
     id="hypothesis.store_diff",
     name="HypothesisStoreDiff",
     description=(
-        "BeliefReflector 收工快照:本域 belief 改库后的终态(确定性现算,不靠 agent 自述)。"
-        "含 domain 与 snapshot(total/beliefs 列表)。"
-        "上游承诺:BeliefReflectorRouter 的 ExtractResult 产出。"
+        "BeliefReflector 收工快照:DSH 提案经 Omni 整批校验和 canonical library 应用后的终态。"
+        "含 domain、snapshot(total/beliefs 列表)、applied 与 applied_count；不靠 agent 自述。"
+        "上游承诺:BeliefReflectorRouter 回读决策库后产出。"
         "下游消费:pipeline 记事件/日志;30-知识 投影另由 knowledge_projection 重渲。"
     ),
     tags=["domain.hypothesis", "stage.result", "kind.sink"],

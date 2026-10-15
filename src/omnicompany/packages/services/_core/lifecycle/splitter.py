@@ -1,11 +1,11 @@
 # [OMNI] origin=claude-code domain=services/_core/lifecycle ts=2026-06-25T00:00:00Z type=infra status=active
-# [OMNI] summary="plan→task 拆分器: 走统一 run_json_agent 读 plan.md 拆成自包含 task 树(deps/test_strategy/复杂度/并行), 落 TaskStore"
+# [OMNI] summary="plan→task 拆分器: 走外置只读 AgentRuntime 读 plan.md 拆成自包含 task 树(deps/test_strategy/复杂度/并行), 落 TaskStore"
 # [OMNI] why="WORK-LIFECYCLE-AND-DISPATCH N-split: 过门 plan 拆成渐进执行 task; 抄 task-master 模型 + spec-kit [P] + BMAD 自包含"
 # [OMNI] tags=lifecycle,split,task,plan,unified-agent
 # [OMNI] material_id="material:services._core.lifecycle.splitter.py"
 """plan→task 拆分器。
 
-走**统一** AgentNodeLoop(run_json_agent), 不 fork agent。读 plan.md → LLM 拆成
+走语言无关 AgentRuntime，不自建循环。读 plan.md → LLM 拆成
 task 树 → 落 TaskStore。每个 task 自包含全部执行细节(BMAD story 理念), 带 test_strategy
 (spec-kit 覆盖矩阵硬门要查), dependencies 用 1-based 序号(回填成 task id), 复杂度 1-10,
 parallel = spec-kit [P] 标记。
@@ -18,12 +18,12 @@ import re
 from typing import Any
 
 from omnicompany.core.plans_catalogue import _plans_root
-from omnicompany.packages.services._core.agent.launch import run_json_agent
 from omnicompany.packages.services._core.lifecycle.task import (
     VALID_PRIORITY,
     Task,
     TaskStore,
 )
+from omnicompany.runtime.agent_runtime import run_readonly_structured_agent
 
 _SPLIT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -91,15 +91,15 @@ async def _run_split(plan_id: str, model: str | None) -> dict[str, Any]:
     )
     kwargs: dict[str, Any] = {
         "task": task,
-        "node_prompt": _NODE_PROMPT,
+        "instructions": _NODE_PROMPT,
         "result_schema": _SPLIT_SCHEMA,
-        "project_root": str(_plans_root().parent.parent),  # omni workspace root
-        "max_turns": 20,
+        "workspace_cwd": _plans_root().parent.parent,  # omni workspace root
+        "max_steps": 20,
         "caller": "plan_split",
     }
     if model:
         kwargs["model"] = model
-    return await run_json_agent(**kwargs)
+    return await run_readonly_structured_agent(**kwargs)
 
 
 def split_plan_to_tasks(

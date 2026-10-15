@@ -150,14 +150,13 @@ class PowerShellRouter(SingleToolRouter):
             )
 
         # spawn powershell.exe — prefer pwsh (PS7+) if available, fallback to powershell.exe (PS5)
-        import shutil as _shutil
-        ps_path = (
-            _shutil.which("pwsh")
-            or _shutil.which("pwsh.exe")
-            or _shutil.which("powershell")
-            or _shutil.which("powershell.exe")
-            or "powershell.exe"
-        )
+        from omnicompany.runtime.powershell_runtime import resolve_powershell7
+
+        ps_path = resolve_powershell7()
+        if not ps_path:
+            raise ToolExecutionError(
+                "PowerShell 7 (pwsh.exe) is not installed. Install it before using this tool."
+            )
         try:
             proc = subprocess.Popen(
                 [ps_path, "-NoProfile", "-NonInteractive", "-Command", cmd],

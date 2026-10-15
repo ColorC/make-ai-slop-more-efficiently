@@ -85,7 +85,7 @@ def run_conversation_audit(
 
     from omnicompany.core.config import omni_workspace_root
     rroot = repo_root or hit.get("cwd") or str(omni_workspace_root())
-    use_model = model or "gpt-5.5"  # audit 用 gpt-5.5(qwen 扛不住, claude 被密钥 403)
+    use_model = model or "deepseek-v4-flash"
     # 写成文件让 agent 用 read_file 分片读, 不塞进 prompt(渐进式 + 标准 compact 才能处理长对话)
     tfile, tchars = _write_work_transcript(f"convo-{session_id}", transcript, truncated)
 
@@ -102,17 +102,15 @@ def run_conversation_audit(
     }
 
     async def _go() -> Any:
-        from omnicompany.bus.memory import MemoryBus
         from omnicompany.packages.services._core.plan_audit.auditor import ConversationAuditor
 
-        bus = MemoryBus()
-        await bus.connect()
-        agent = ConversationAuditor(model=use_model, bus=bus)
+        agent = ConversationAuditor(model=use_model)
         return await agent.run(input_data)
 
     verdict = asyncio.run(_go())
     return {
-        "ok": True,
+        "ok": verdict.kind.value != "fail",
+        **({"error": verdict.diagnosis} if verdict.kind.value == "fail" else {}),
         "verdict_output": verdict.output if isinstance(verdict.output, dict) else {"raw": verdict.output},
         "verdict_kind": verdict.kind.value,
         "meta": {
@@ -148,7 +146,7 @@ def run_plan_audit(
 
     plan_md, fm = load_plan_md(plan_id)
     rroot = repo_root or str(omni_workspace_root())
-    use_model = model or "gpt-5.5"
+    use_model = model or "deepseek-v4-flash"
 
     candidates = discover_plan_conversations(plan_id)
     # 取最相关的前 N 条(cc_sessions 来源优先, 已在 discover 里靠前). 每条读 transcript.
@@ -197,17 +195,15 @@ def run_plan_audit(
     }
 
     async def _go() -> Any:
-        from omnicompany.bus.memory import MemoryBus
         from omnicompany.packages.services._core.plan_audit.auditor import PlanAuditor
 
-        bus = MemoryBus()
-        await bus.connect()
-        agent = PlanAuditor(model=use_model, bus=bus)
+        agent = PlanAuditor(model=use_model)
         return await agent.run(input_data)
 
     verdict = asyncio.run(_go())
     return {
-        "ok": True,
+        "ok": verdict.kind.value != "fail",
+        **({"error": verdict.diagnosis} if verdict.kind.value == "fail" else {}),
         "verdict_output": verdict.output if isinstance(verdict.output, dict) else {"raw": verdict.output},
         "verdict_kind": verdict.kind.value,
         "meta": {

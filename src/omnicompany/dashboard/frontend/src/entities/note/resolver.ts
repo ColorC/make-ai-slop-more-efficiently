@@ -9,6 +9,7 @@ export interface NoteEntity extends Entity {
 
 export interface NoteDetail extends NoteEntity {
   content: string
+  mtimeNs: string
 }
 
 export interface NoteLinks {
@@ -45,10 +46,11 @@ export async function fetchDetail(id: string): Promise<NoteDetail> {
     title: n.title,
     path: n.path,
     content: n.content,
+    mtimeNs: n.mtime_ns,
   }
 }
 
-export async function saveNote(id: string, content: string): Promise<{ ok: boolean; mtime: number; size: number }> {
+export async function saveNote(id: string, content: string): Promise<{ ok: boolean; mtime: number; mtime_ns: string; size: number }> {
   const r = await fetch(`/api/notes/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

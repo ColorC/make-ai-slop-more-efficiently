@@ -1,12 +1,13 @@
 # [OMNI] origin=claude-code domain=omnicompany/cli ts=2026-06-22 type=cli status=active
-# [OMNI] summary="omni atlas —— project_atlas 资源中心的审/导闭环:list 待审 / approve 入 canonical / export 到两个 AI 的 skills 目录 / reject。"
-# [OMNI] why="收集 worker 产出落在 staging(待人审);这条 CLI 把'人审→批准→export 到 ~/.claude+~/.codex'闭环补上,让 object-SKILL 真正被两个 AI 用上(防重复造轮)。"
+# [OMNI] summary="omni atlas —— project_atlas 资源中心的审/导闭环:list 待审 / approve 入 canonical / export 到各 Agent 的 skills 目录 / reject。"
+# [OMNI] why="收集 worker 产出落在 staging(待人审);这条 CLI 把'人审→批准→export 到 ~/.claude+~/.codex+~/.agents'闭环补上,让 object-SKILL 真正被各 Agent 用上(防重复造轮)。"
 # [OMNI] tags=cli,atlas,project_atlas,review,export
 """omni atlas —— project_atlas object-SKILL 审/导闭环。"""
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -23,7 +24,19 @@ from omnicompany.packages.domains.project_atlas._paths import (
 from omnicompany.packages.domains.project_atlas.spaces import SPACES
 
 _CLAUDE_SKILLS = Path.home() / ".claude" / "skills"
-_CODEX_SKILLS = Path.home() / ".codex" / "skills"
+# Codex 2 uses ``.codex-2`` on this host; keep CODEX_HOME as an override and
+# retain ``.codex`` for older installations.  Exporting to the legacy folder
+# was a source of silent duplication and made the active runtime drift.
+_CODEX_HOME = os.environ.get("CODEX_HOME", "").strip()
+_CODEX_SKILLS = (
+    Path(_CODEX_HOME).expanduser() / "skills"
+    if _CODEX_HOME
+    else (Path.home() / ".codex-2" / "skills"
+          if (Path.home() / ".codex-2").is_dir()
+          else Path.home() / ".codex" / "skills")
+)
+from omnicompany.packages.domains.project_atlas.retired import retired_direct_skill_names
+_AGENTS_SKILLS = Path.home() / ".agents" / "skills"
 
 
 def _last_health_summary() -> tuple[str, int] | None:
@@ -157,18 +170,32 @@ def atlas_reject(ref: str) -> None:
 
 @cmd_atlas.command("export")
 @click.option("--space", default=None, help="只导某空间")
-@click.option("--targets", default="claude,codex", help="导出目标(逗号分隔): claude,codex")
+@click.option("--name", "names", multiple=True, help="只导指定 Skill 名；可重复")
+@click.option("--targets", default="claude,codex,agents", help="导出目标(逗号分隔): claude,codex,agents")
 @click.option("--dry-run", is_flag=True)
-def atlas_export(space: str | None, targets: str, dry_run: bool) -> None:
-    """导出已批准的 canonical object-SKILL → ~/.claude/skills + ~/.codex/skills(各为 <name>/SKILL.md)。"""
-    tg = []
-    if "claude" in targets:
-        tg.append(_CLAUDE_SKILLS)
-    if "codex" in targets:
-        tg.append(_CODEX_SKILLS)
+def atlas_export(space: str | None, names: tuple[str, ...], targets: str, dry_run: bool) -> None:
+    """导出 canonical object-SKILL → Claude/Codex/跨 Agent skills 目录。"""
+    target_map = {
+        "claude": _CLAUDE_SKILLS,
+        "codex": _CODEX_SKILLS,
+        "agents": _AGENTS_SKILLS,
+    }
+    requested = [item.strip() for item in targets.split(",") if item.strip()]
+    unknown = sorted(set(requested) - set(target_map))
+    if unknown:
+        raise click.UsageError(f"未知 --targets: {', '.join(unknown)}")
+    tg = [target_map[name] for name in requested]
     if not tg:
-        raise click.UsageError("--targets 至少含 claude 或 codex")
-    items = [(sp, name, sk) for sp, name, sk in _iter_objects(SKILLS_ROOT) if not space or sp == space]
+        raise click.UsageError("--targets 至少含 claude、codex 或 agents")
+    selected_names = set(names)
+    retired_names = retired_direct_skill_names()
+    items = [
+        (sp, name, sk)
+        for sp, name, sk in _iter_objects(SKILLS_ROOT)
+        if (not space or sp == space)
+        and (not selected_names or name in selected_names)
+        and name not in retired_names
+    ]
     if not items:
         click.echo("canonical(skills/)为空——先 `omni atlas approve --all` 批准。")
         return
@@ -203,7 +230,7 @@ def _omni() -> str:
 def atlas_refresh(space: str | None, force: bool, no_recollect: bool, dry_run: bool) -> None:
     """月度更新闭环: 重采(重新 grounded 抓当前代码)→ approve → export 两个 AI。手动随时可跑。
 
-    SKILL 会随设施演进过期(实测 poof 数日即旧)。--force 清后重抓全部(重, 手动);
+    SKILL 会随设施演进过期。--force 清后重抓全部(重, 手动);
     默认只补缺 + 重导(轻, 适合月度 cron);--no-recollect 只重导。
     """
     omni = _omni()

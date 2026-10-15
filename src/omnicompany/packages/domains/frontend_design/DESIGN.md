@@ -17,7 +17,7 @@ status=design。方法与两分支拓扑已定并落地为可跑骨架; 确定�
 
 两条平级子管线(共用方法, 不同标尺):
 
-- `omni run frontend_design.dashboard` —— dashboard 类网页(驾驶舱/poof/lofa)。标尺真源 = frostpane DESIGN.md + theme.css(指针, 不复制)。
+- `omni run frontend_design.dashboard` —— dashboard 类网页(驾驶舱/Canvas/lofa)。标尺真源 = frostpane DESIGN.md + theme.css(指针, 不复制)。
 - `omni run frontend_design.webgame` —— webgame UI。标尺真源 = webworks/packages/tabletop-engine/README.md(跨消费方红线)+ walker docs/specs。
 
 数据契约(formats.py): `frontend_design.review_request`(入: 要审的界面 + archetype + 标尺 + 基准图 + project)→ `.intake` → `.gate_result`(确定性门禁, 证据列表不打分)→ `.vlm_review`(相对评审, 证据列表不打分)→ `.review_record`(改进建议 + 已沉淀决策)。

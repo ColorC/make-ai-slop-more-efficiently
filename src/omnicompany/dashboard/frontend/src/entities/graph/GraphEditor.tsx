@@ -8,10 +8,10 @@ import type { GraphEntity } from './index'
 
 const S: Record<string, any> = {
   root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent' },
-  bar: { padding: '6px 12px', borderBottom: '1px solid #222', color: '#666', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', display: 'flex', gap: 12, alignItems: 'center' },
-  badge: { color: '#90caf9' },
+  bar: { padding: '6px 12px', borderBottom: '1px solid var(--fp-border-subtle)', color: 'var(--fp-text-2)', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', display: 'flex', gap: 12, alignItems: 'center' },
+  badge: { color: 'var(--fp-link)' },
   cy: { flex: 1, minHeight: 0 },
-  empty: { padding: 16, color: '#666', fontStyle: 'italic' },
+  empty: { padding: 16, color: 'var(--fp-text-2)', fontStyle: 'italic' },
 }
 
 const GraphEditor: React.FC<{ entity: GraphEntity }> = () => {
@@ -94,8 +94,8 @@ const GraphEditor: React.FC<{ entity: GraphEntity }> = () => {
     return () => { cy.destroy(); cyRef.current = null }
   }, [graph, openTab])
 
-  if (error) return <div style={{ ...S.root, padding: 16, color: '#ef5350' }}>加载失败: {error}</div>
-  if (!graph) return <div style={{ ...S.root, padding: 16, color: '#666' }}>loading 链接图...</div>
+  if (error) return <div style={{ ...S.root, padding: 16, color: 'var(--fp-err)' }}>加载失败: {error}</div>
+  if (!graph) return <div style={{ ...S.root, padding: 16, color: 'var(--fp-text-2)' }}>loading 链接图...</div>
 
   return (
     <div style={S.root}>
@@ -105,11 +105,11 @@ const GraphEditor: React.FC<{ entity: GraphEntity }> = () => {
         <span><span style={S.badge}>{graph.node_count}</span> 节点</span>
         <span><span style={S.badge}>{graph.edge_count}</span> 边</span>
         <span style={{ flex: 1 }} />
-        <span style={{ color: '#444' }}>滚轮缩放 · 拖拽 · 点节点开 note tab</span>
+        <span style={{ color: 'var(--fp-text-3)' }}>滚轮缩放 · 拖拽 · 点节点开 note tab</span>
       </div>
       <div ref={containerRef} style={S.cy} />
       {graph.edge_count === 0 && (
-        <div style={{ position: 'absolute', top: 60, right: 16, padding: 12, background: '#0d0d0d', border: '1px solid #2a3a4a', borderRadius: 4, color: '#ffb74d', fontSize: 14, maxWidth: 280 }}>
+        <div style={{ position: 'absolute', top: 60, right: 16, padding: 12, background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border)', borderRadius: 3, color: 'var(--fp-warn)', fontSize: 14, maxWidth: 280 }}>
           docs/ 当前没有 [[wiki-link]] 形式的双链 (大部分笔记用普通 markdown 链接), 所以图谱基本是孤点. 把笔记里的相关引用改成 [[name]] 即会出现在图中.
         </div>
       )}

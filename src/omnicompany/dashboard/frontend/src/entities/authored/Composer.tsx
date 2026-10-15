@@ -34,7 +34,7 @@ function fileToDataUrl(file: File): Promise<string> {
 const toolBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
   height: 30, padding: '0 8px', background: 'transparent', color: 'var(--fp-text-3)',
-  border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+  border: 'none', borderRadius: 2, cursor: 'pointer', fontSize: 13,
 }
 
 export default function Composer({
@@ -84,7 +84,7 @@ export default function Composer({
       onDrop={onDrop}
       style={{
         border: `1px solid ${dragging ? 'var(--fp-accent)' : 'var(--fp-border)'}`,
-        borderRadius: 11, background: 'var(--fp-glass)',
+        borderRadius: 3, background: 'var(--fp-glass)',
         backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
@@ -102,7 +102,7 @@ export default function Composer({
         {onCancel && <button type="button" style={toolBtn} title="取消" onClick={onCancel}><X size={16} /></button>}
         <button
           type="button" onClick={() => void save()} disabled={!canSave} title="保存(Ctrl/⌘+Enter)"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 14px', background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', border: 'none', borderRadius: 7, fontSize: 14, fontWeight: 600, cursor: canSave ? 'pointer' : 'default', opacity: canSave ? 1 : 0.45 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 14px', background: 'var(--fp-bp-seal)', color: '#fff', border: '1px solid rgba(255,240,235,.55)', borderRadius: 2, fontSize: 14, fontWeight: 500, cursor: canSave ? 'pointer' : 'default', opacity: canSave ? 1 : 0.45 }}
         ><Save size={15} />{busy ? '保存中' : '保存'}</button>
       </div>
 
@@ -122,9 +122,9 @@ export default function Composer({
 
       {image && (
         <div style={{ position: 'relative', alignSelf: 'flex-start', margin: '0 16px 12px' }}>
-          <img src={image} alt="" style={{ maxHeight: 120, borderRadius: 7, border: '1px solid var(--fp-border)', display: 'block' }} />
+          <img src={image} alt="" style={{ maxHeight: 120, borderRadius: 2, border: '1px solid var(--fp-border)', display: 'block' }} />
           <button type="button" onClick={() => setImage(null)} title="移除图片"
-            style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: 11, border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-text-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-text-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={13} />
           </button>
         </div>

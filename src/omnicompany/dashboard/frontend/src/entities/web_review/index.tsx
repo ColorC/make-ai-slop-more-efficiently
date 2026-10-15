@@ -4,7 +4,7 @@ import type { EntityRegistration, EntityResolver } from '../registry'
 import { Gamepad2 } from 'lucide-react'
 import WebReviewPanel, { type WebReviewTarget } from './WebReviewPanel'
 import WebPagePanel from './WebPagePanel'
-import { decodeWebPageId, webTabTitle } from '../../lib/webTabHost'
+import { decodeWebPageTarget, webTabTitle, type WebProfile } from '../../lib/webTabHost'
 
 export interface WebReviewEntity extends Entity {
   type: 'web_review'
@@ -26,14 +26,14 @@ export const WEB_REVIEW_TARGETS: Record<string, WebReviewTarget> = {
 }
 
 function entityFor(id: string): WebReviewEntity {
-  const webPageUrl = decodeWebPageId(id)
-  if (webPageUrl) {
+  const webPage = decodeWebPageTarget(id)
+  if (webPage) {
     return {
       type: 'web_review',
       id,
-      title: webTabTitle(webPageUrl),
+      title: webTabTitle(webPage.url),
       tags: ['web'],
-      meta: { url: webPageUrl, webPage: true },
+      meta: { url: webPage.url, webPage: true, profile: webPage.profile },
     }
   }
   const t = WEB_REVIEW_TARGETS[id]
@@ -51,7 +51,7 @@ const resolver: EntityResolver<WebReviewEntity> = {
   },
 }
 
-const Editor: React.FC<{ entity: WebReviewEntity }> = ({ entity }) => {
+const Editor: React.FC<{ entity: WebReviewEntity; panelVisible?: boolean }> = ({ entity, panelVisible }) => {
   const target: WebReviewTarget =
     WEB_REVIEW_TARGETS[entity.id] ?? {
       title: entity.title,
@@ -59,7 +59,14 @@ const Editor: React.FC<{ entity: WebReviewEntity }> = ({ entity }) => {
       route: entity.meta?.route as string | undefined,
     }
   if (entity.meta?.webPage === true) {
-    return <WebPagePanel target={{ title: target.title, url: target.url }} />
+    return <WebPagePanel
+      panelVisible={panelVisible}
+      target={{
+        title: target.title,
+        url: target.url,
+        profile: (entity.meta?.profile as WebProfile | undefined) ?? 'human',
+      }}
+    />
   }
   return <WebReviewPanel target={target} />
 }

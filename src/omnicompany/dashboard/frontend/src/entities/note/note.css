@@ -4,7 +4,7 @@
      + 分屏拆为独立布局开关(不再混进模式单选) + 保存(唯一主按钮) + ⋯。
    · 侧栏三面板 → accordion: 头=可点按钮(批注·N/反链·N/外链·N 常显),空态面板默认折叠,
      批注为默认展开;窄屏(<720px 容器)侧栏自动收起,工具行给开关。
-   · 字号组(shell MarkdownRenderer 内件,本实体作用域内重皮): 三枚描边小方块 → 连体 stepper
+   · 字号组(历史 Note reader 样式,当前正文统一由 Wiki Core 渲染): 三枚描边小方块 → 连体 stepper
      观感(中段=只读数值位),mono 栈换 var(--fp-font-mono) 带 CJK 回落。
    · 触屏批注入口: coarse 指针下「+」常显(hover-only 的触屏补偿)。
    纹理分区铁律: 工具行/侧栏=chrome 格纸;正文阅读区=平滑纸面(文字面禁纹理)。
@@ -27,7 +27,7 @@
 .note-save { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
   border: 2px solid var(--fp-border-strong); border-radius: var(--fp-r1);
   background: var(--fp-bp-paper-2); color: var(--fp-text); font-size: var(--fp-fs-3);
-  font-weight: 600; font-family: inherit; padding: 4px 13px; box-shadow: var(--fp-shadow-sm);
+  font-weight: 500; font-family: inherit; padding: 4px 13px; box-shadow: var(--fp-shadow-sm);
   transition: all var(--fp-t-fast); white-space: nowrap; }
 .note-save:hover:not(:disabled) { border-color: #fff; background: var(--fp-bg-overlay); }
 .note-save:active:not(:disabled) { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(6,16,38,.5); }
@@ -56,7 +56,7 @@
 .note-sec-head { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left;
   padding: 8px 12px; border: 0; border-bottom: 1px solid var(--fp-border-subtle);
   background: transparent; cursor: pointer; font: inherit; box-sizing: border-box;
-  color: var(--fp-text-3); font-size: var(--fp-fs-4); font-weight: 600;
+  color: var(--fp-text-3); font-size: var(--fp-fs-4); font-weight: 500;
   letter-spacing: .08em; text-transform: uppercase; font-family: var(--fp-font-mono); }
 .note-sec-head:hover { color: var(--fp-text); }
 .note-sec-head .chev { display: inline-flex; flex: none; transition: transform var(--fp-t-fast) var(--fp-ease); }

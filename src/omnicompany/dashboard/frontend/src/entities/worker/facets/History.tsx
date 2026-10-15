@@ -11,15 +11,15 @@ interface TraceItem {
 }
 
 const S: Record<string, any> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', color: '#bbb', fontFamily: 'Consolas, Menlo, monospace', fontSize: 14 },
-  hint: { padding: '6px 12px', color: '#666', fontSize: 14, borderBottom: '1px solid #222' },
+  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent', color: 'var(--fp-text)', fontFamily: 'Consolas, Menlo, monospace', fontSize: 14 },
+  hint: { padding: '6px 12px', color: 'var(--fp-text-2)', fontSize: 14, borderBottom: '1px solid var(--fp-border-subtle)' },
   list: { flex: 1, overflow: 'auto' },
-  row: { display: 'flex', gap: 8, padding: '4px 12px', cursor: 'pointer', borderBottom: '1px solid #161616' },
-  ts: { color: '#555', flexShrink: 0, width: 100 },
-  domain: { color: '#888', flexShrink: 0, width: 110 },
-  tid: { flex: 1, color: '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  evct: { color: '#555', flexShrink: 0, width: 60, fontSize: 14, textAlign: 'right' as const },
-  empty: { padding: 16, color: '#666', fontStyle: 'italic' },
+  row: { display: 'flex', gap: 8, padding: '4px 12px', cursor: 'pointer', borderBottom: '1px solid var(--fp-border-subtle)' },
+  ts: { color: 'var(--fp-text-3)', flexShrink: 0, width: 100 },
+  domain: { color: 'var(--fp-text-2)', flexShrink: 0, width: 110 },
+  tid: { flex: 1, color: 'var(--fp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  evct: { color: 'var(--fp-text-3)', flexShrink: 0, width: 60, fontSize: 14, textAlign: 'right' as const },
+  empty: { padding: 16, color: 'var(--fp-text-2)', fontStyle: 'italic' },
 }
 
 function fmtTs(s: string | null | undefined): string {
@@ -45,10 +45,10 @@ export default function WorkerHistoryFacet({ entity }: { entity: WorkerEntity })
 
   return (
     <div style={S.root}>
-      <div style={S.hint}>历史 trace · 后端按 source = "<span style={{ color: '#90caf9' }}>{entity.title}</span>" 或 payload 含此名匹配</div>
+      <div style={S.hint}>历史 trace · 后端按 source = "<span style={{ color: 'var(--fp-link)' }}>{entity.title}</span>" 或 payload 含此名匹配</div>
       <div style={S.list}>
         {loading && <div style={S.empty}>加载中...</div>}
-        {error && <div style={{ ...S.empty, color: '#ef5350' }}>错误: {error}</div>}
+        {error && <div style={{ ...S.empty, color: 'var(--fp-err)' }}>错误: {error}</div>}
         {!loading && !error && items.length === 0 && (
           <div style={S.empty}>无历史 trace. 该 worker 被实际跑过后, 这里会列出相关 trace.</div>
         )}

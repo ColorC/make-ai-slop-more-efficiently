@@ -11,9 +11,12 @@ import {
   Network,
   PanelBottom,
   PanelRightOpen,
+  CopyMinus,
   Pin,
   RefreshCw,
+  RotateCcw,
   Send,
+  Smartphone,
   X,
 } from 'lucide-react'
 import EditorArea from './EditorArea'
@@ -25,19 +28,25 @@ import { useRefreshBus } from '../stores/refreshBus'
 import { useReviewMaximize } from '../stores/reviewMaximizeStore'
 import { bossSightApi, type BossSightBriefing, type BossSightWorkflowCtxSummary } from '../api/bossSightClient'
 import { reviewstageApi, type Material, type MaterialStats, type ReviewCaptureKind } from '../api/reviewstageClient'
-import { capturesApi } from '../api/capturesClient'
-import { CONTROLLER_TAB_ID, usePanels, saveTabSnapshot, loadTabSnapshot, type DockPlacement, type OpenedTab, type TabSnapshot } from '../stores/panelsStore'
+import { capturesApi, type CaptureSaveResult } from '../api/capturesClient'
+import { getConsoleLogEntries, installConsoleLogRing } from './consoleLogRing'
+import { canonicalizePanelTarget, CONTROLLER_TAB_ID, usePanels, saveTabSnapshot, loadTabSnapshot, type DockPlacement, type OpenedTab, type TabSnapshot } from '../stores/panelsStore'
+import { isDetachedDashboardUrl } from '../lib/detachedTabWindow'
 import { useReviewQueueFocus } from '../stores/reviewQueueFocusStore'
 import type { EntityType } from '../entities/types'
 import { useControllerView } from '../entities/controller/viewStore'
 import { useReviewStream } from '../entities/review/streamStore'
-import { materialTabTitle } from '../entities/review_material'
-import { StudioDemoMount } from '../entities/review-canvas'
+import { materialTabTitle } from '../entities/review_material/title'
 import { useBossSightObservability } from './useBossSightObservability'
 import { openProps } from '../utils/middleClick'
 import Tooltip from '../shared/view/ui/Tooltip'
 import { useBreakpoint, useTouchMode } from './useBreakpoint'
 import { UI_UPDATE_READY_EVENT, isUiUpdatePending } from '../lib/devReload'
+import { useDesktopHostMode } from './useDesktopHostMode'
+import { useLofaHostMode } from './useLofaHostMode'
+import LinkContextMenu from './LinkContextMenu'
+
+const StudioDemoMount = React.lazy(() => import('../entities/review-canvas/StudioDemoMount'))
 
 // 2026-07-19 壳层 A(侧栏主导,拍板=demo #/shell 候选 A):导航四套收编进左 56px rail
 // (悬停展开带文字,ShellRail.tsx);顶栏压成 28–32px 薄条(面包屑 + ⌘K + 通知 + ⋯);
@@ -77,7 +86,7 @@ type CaptureDialogState = {
 const S: Record<string, any> = {
   root: { position: 'relative' as const, display: 'flex', flexDirection: 'column', height: '100vh', background: 'transparent', color: 'var(--fp-text)', minWidth: 0 },
   popover: { position: 'fixed' as const, zIndex: 30, top: 44, left: 64, width: 320, maxWidth: 'calc(100vw - 76px)', maxHeight: '70vh', overflow: 'auto', border: '1px dashed var(--fp-border-strong)', borderRadius: 3, background: 'var(--fp-glass-2)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)', boxShadow: 'var(--fp-shadow-pop)', padding: 8 },
-  panelTitle: { color: 'var(--fp-text)', fontSize: 14, fontWeight: 700, padding: '4px 6px 8px' },
+  panelTitle: { color: 'var(--fp-text)', fontSize: 14, fontWeight: 500, padding: '4px 6px 8px' },
   resultButton: { width: '100%', display: 'grid', gap: 3, border: '1px solid transparent', background: 'transparent', color: 'var(--fp-text)', borderRadius: 3, padding: '7px 8px', cursor: 'pointer', textAlign: 'left' as const, minWidth: 0 },
   smallAction: { border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-text-2)', borderRadius: 3, padding: '5px 7px', fontSize: 14, cursor: 'pointer' },
   iconButton: { width: 32, height: 32, border: '1px solid var(--fp-border)', borderRadius: 3, background: 'var(--fp-card)', color: 'var(--fp-text-2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
@@ -89,7 +98,7 @@ const S: Record<string, any> = {
   rowTitle: { fontSize: 14, color: 'var(--fp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   rowMeta: { fontSize: 14, color: 'var(--fp-text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   bottom: (h: number): React.CSSProperties => ({ height: h, minHeight: 90, maxHeight: '65vh', borderTop: '1px solid var(--fp-border)' }),
-  error: { color: '#ff8a80', fontSize: 14 },
+  error: { color: 'var(--fp-err)', fontSize: 14 },
   captureBanner: { position: 'fixed' as const, zIndex: 80, top: 38, left: '50%', transform: 'translateX(-50%)', display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px dashed var(--fp-border-strong)', background: 'var(--fp-bp-tracing-strong)', color: 'var(--fp-text)', borderRadius: 2, padding: '8px 12px', backdropFilter: 'var(--fp-bp-tracing-blur)', WebkitBackdropFilter: 'var(--fp-bp-tracing-blur)', boxShadow: 'var(--fp-bp-shadow-pop)', font: '600 var(--fp-fs-3)/1.2 var(--fp-font-mono)', letterSpacing: '.04em' },
   captureOutline: (rect: ElementTarget['rect'], selected = false): React.CSSProperties => ({
     position: 'fixed', zIndex: selected ? 1 : 79,
@@ -103,7 +112,7 @@ const S: Record<string, any> = {
   modalBackdrop: { position: 'fixed' as const, zIndex: 90, inset: 0, background: 'rgba(4,12,28,.42)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modal: { position: 'relative' as const, zIndex: 2, width: 'min(560px, 100%)', border: 'var(--fp-bp-frame-w) solid var(--fp-border-strong)', borderRadius: 2, background: 'var(--fp-bp-paper)', color: 'var(--fp-text)', boxShadow: 'var(--fp-bp-shadow-pop)', padding: 16 },
   modalHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 },
-  modalTitle: { color: 'var(--fp-text)', fontSize: 16, fontWeight: 700, fontFamily: 'var(--fp-bp-font-display)' },
+  modalTitle: { color: 'var(--fp-text)', fontSize: 16, fontWeight: 500, fontFamily: 'var(--fp-bp-font-display)' },
   modalMeta: { color: 'var(--fp-text-2)', fontSize: 12, marginBottom: 10, padding: '7px 9px', border: '1px dashed var(--fp-border)', background: 'var(--fp-bp-solid)', fontFamily: 'var(--fp-font-mono)', overflowWrap: 'anywhere' as const },
   textArea: { width: '100%', minHeight: 110, resize: 'vertical' as const, boxSizing: 'border-box' as const, border: '1px dashed var(--fp-border)', outline: 'none', background: 'var(--fp-bp-solid)', color: 'var(--fp-text)', caretColor: 'var(--fp-bp-brass-hi)', borderRadius: 2, padding: 10, fontSize: 14, lineHeight: 1.55 },
   modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
@@ -239,7 +248,9 @@ function describeFormValues(el: Element): ElementTarget['form_values'] {
         control.tagName.toLowerCase(),
         160,
       ),
-      value: clipText(control.value || '', 8000),
+      value: control instanceof HTMLInputElement && control.type === 'password'
+        ? '[redacted]'
+        : (control.value || ''),
     }
     if (control.tagName.toLowerCase() === 'input' && (control.type === 'checkbox' || control.type === 'radio')) {
       item.checked = (control as HTMLInputElement).checked
@@ -250,7 +261,7 @@ function describeFormValues(el: Element): ElementTarget['form_values'] {
 
 function describeElement(el: Element): ElementTarget {
   const rect = el.getBoundingClientRect()
-  const text = compactText((el as HTMLElement).innerText || el.textContent || '', 500)
+  const text = ((el as HTMLElement).innerText || el.textContent || '').trim()
   const label = compactText(
     el.getAttribute('aria-label') ||
     el.getAttribute('title') ||
@@ -270,7 +281,7 @@ function describeElement(el: Element): ElementTarget {
     form_values: describeFormValues(el),
     rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
     page_rect: { x: rect.x + window.scrollX, y: rect.y + window.scrollY, width: rect.width, height: rect.height },
-    outer_html: clipText(el.outerHTML || '', 3000),
+    outer_html: el.outerHTML || '',
   }
 }
 
@@ -445,21 +456,21 @@ function ReviewPushToast({ material, onOpen, onClose }: {
       style={{
         position: 'fixed', bottom: 24, right: 24, padding: 16,
         background: 'var(--fp-solid)', border: '2px solid var(--fp-warn)',
-        borderRadius: 8, minWidth: 300, maxWidth: 480,
+        borderRadius: 2, minWidth: 300, maxWidth: 480,
         boxShadow: '0 4px 24px rgba(0,0,0,0.4)', zIndex: 1000, color: 'var(--fp-text)',
       }}
     >
-      <div style={{ fontSize: 14, color: 'var(--fp-warn)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}><Pin size={13} aria-hidden /> 总控推送</div>
-      <div style={{ fontSize: 15, fontWeight: 600, margin: '6px 0' }}>{material.title}</div>
+      <div style={{ fontSize: 14, color: 'var(--fp-warn)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5 }}><Pin size={13} aria-hidden /> 总控推送</div>
+      <div style={{ fontSize: 15, fontWeight: 500, margin: '6px 0' }}>{material.title}</div>
       <div style={{ fontSize: 14, color: 'var(--fp-text-3)' }}>{material.pushed_reason}</div>
       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
         <button type="button" onClick={onOpen} data-testid="push-toast-open" style={{
           padding: '4px 10px', background: 'var(--fp-accent-weak)', color: 'var(--fp-link)',
-          border: '1px solid var(--fp-accent)', borderRadius: 4, cursor: 'pointer',
+          border: '1px solid var(--fp-accent)', borderRadius: 3, cursor: 'pointer',
         }}>查看</button>
         <button type="button" onClick={onClose} style={{
           padding: '4px 10px', background: 'transparent',
-          color: 'var(--fp-text)', border: '1px solid var(--fp-border)', borderRadius: 4, cursor: 'pointer',
+          color: 'var(--fp-text)', border: '1px solid var(--fp-border)', borderRadius: 3, cursor: 'pointer',
         }}>关闭</button>
       </div>
     </div>
@@ -467,7 +478,13 @@ function ReviewPushToast({ material, onOpen, onClose }: {
 }
 
 export default function CockpitShell() {
+  // 浏览器日志环形缓冲(console.error/warn + window error + omni-notes-error):
+  // 整页快照的 logs 字段与圈选联动快照都从这里取, 幂等安装。
+  useEffect(() => { installConsoleLogRing() }, [])
+
   useBossSightObservability('cockpit-shell')
+  const studioDemoRequested = typeof window !== 'undefined'
+    && !!new URLSearchParams(window.location.search).get('demo')
   // 壳层 A 断点(2026-07-19): ≥600 显示左 rail(600–1024 即收起态默认, hover 展开);
   // <600(phone) rail 隐藏,导航收编进 V1 汉堡抽屉;评论栏窄档抽屉化(V1 行为沿用)。
   const bp = useBreakpoint()
@@ -491,6 +508,18 @@ export default function CockpitShell() {
   const [captureError, setCaptureError] = useState<string | null>(null)
   const [captureToast, setCaptureToast] = useState('')
   const [uiUpdatePending, setUiUpdatePending] = useState(isUiUpdatePending)
+  const [nonCriticalShellReady, setNonCriticalShellReady] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return new URLSearchParams(window.location.search).get('open_type') !== 'cc_session'
+  })
+  useEffect(() => {
+    if (nonCriticalShellReady) return undefined
+    // Keep notification/review telemetry out of the connection and worker
+    // budget needed to mount a deep-linked terminal.  This is a maximum delay:
+    // normal dashboard entries still load immediately.
+    const timer = window.setTimeout(() => setNonCriticalShellReady(true), 5_000)
+    return () => window.clearTimeout(timer)
+  }, [nonCriticalShellReady])
   useEffect(() => {
     const onReady = () => setUiUpdatePending(true)
     window.addEventListener(UI_UPDATE_READY_EVENT, onReady)
@@ -517,13 +546,22 @@ export default function CockpitShell() {
   })
   const openTab = usePanels((s) => s.openTab)
   const openTabBg = usePanels((s) => s.openTabBackground)
+  const closeOtherTabs = usePanels((s) => s.closeOtherTabs)
   const tabs = usePanels((s) => s.tabs)
   const activeTabId = usePanels((s) => s.activeId)
   const setTabs = usePanels((s) => s.setTabs)
+  const canCloseOtherTabs = tabs.length > 1 && !!activeTabId
   const setControllerView = useControllerView((s) => s.setView)
 
   // 重开恢复页签: 进来时捕获上次快照(在 save effect 覆盖前)。用户 2026-06-14: 默认直接恢复(像 VSCode 不问), 不再弹提示。
-  const restoreSnapshotRef = useRef<TabSnapshot>(loadTabSnapshot())
+  const detachedWindowRef = useRef(isDetachedDashboardUrl(window.location.href))
+  // A popup may inherit sessionStorage from its opener. A tear-off must start
+  // from only its explicit deep-linked tab, never the opener's full workspace.
+  const restoreSnapshotRef = useRef<TabSnapshot>(
+    detachedWindowRef.current
+      ? { exists: false, tabs: [], activeId: null }
+      : loadTabSnapshot(),
+  )
   const [showTabRestore, setShowTabRestore] = useState(false)  // 不再弹提示条; 保留 state 仅防旧 JSX 引用报错
   // 挂载即恢复上次页签与焦点(2026-07-20 用户: 恢复「上次退出界面」, 不再强制落总控); 老快照无 activeId → 回落总控。
   useEffect(() => {
@@ -569,8 +607,8 @@ export default function CockpitShell() {
   }
 
   useEffect(() => {
-    load()
-  }, [])
+    if (nonCriticalShellReady) load()
+  }, [nonCriticalShellReady])
 
   useEffect(() => { writePref('omni.cockpit.controllerRight', controllerRight) }, [controllerRight])
   // 把总控 dock 到中央页签的右侧(或挪回左侧)。复用搜索"右侧打开"同一 placement 机制。
@@ -580,7 +618,7 @@ export default function CockpitShell() {
     const st = usePanels.getState()
     const ref = st.tabs.find((t) => t.id !== CONTROLLER_TAB_ID)
     if (ref) st.requestDockPlacement(CONTROLLER_TAB_ID, { direction: next ? 'right' : 'left', referenceTabId: ref.id })
-    openTab({ type: 'controller', id: 'main' }, '总控')
+    openTab({ type: 'controller', id: 'main' }, '中枢')
   }, [controllerRight, openTab])
 
   // #3f 右键: 仅在聊天面板内、且选中文字像文件路径时, 接管右键菜单。
@@ -621,8 +659,23 @@ export default function CockpitShell() {
     if (!type || !id) return
     const facet = params.get('open_facet') || undefined
     const title = params.get('open_title') || id.split('/').pop() || id
-    openTab({ type, id }, title, facet)
-  }, [openTab])
+    const target = canonicalizePanelTarget({ type, id }, title, facet)
+    if (target.ref.type !== type || target.ref.id !== id || target.facet !== facet) {
+      params.set('open_type', target.ref.type)
+      params.set('open_id', target.ref.id)
+      params.set('open_title', target.title)
+      if (target.facet) params.set('open_facet', target.facet)
+      else params.delete('open_facet')
+      window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}${window.location.hash}`)
+    }
+    const openedId = detachedWindowRef.current
+      ? openTab(target.ref, target.title, target.facet, undefined, null)
+      : openTab(target.ref, target.title, target.facet)
+    if (detachedWindowRef.current) {
+      const opened = usePanels.getState().tabs.find((tab) => tab.id === openedId)
+      if (opened) setTabs([opened], openedId)
+    }
+  }, [openTab, setTabs])
 
   // R4: standalone 审阅台退役 — 浏览器标签 urgent 角标 + 总控推送 toast 上移到驾驶舱壳。
   // 同一条审阅 WS(streamStore, 引用计数), 事件驱动重拉 stats; urgent = 推送未读 + 必验收待审。
@@ -632,12 +685,16 @@ export default function CockpitShell() {
   const [reviewStats, setReviewStats] = useState<MaterialStats | null>(null)
   const [pushToast, setPushToast] = useState<Material | null>(null)
   const baseTitleRef = useRef(typeof document !== 'undefined' ? document.title : '')
-  useEffect(() => useReviewStream.getState().acquire(), [])
   useEffect(() => {
+    if (!nonCriticalShellReady) return undefined
+    return useReviewStream.getState().acquire()
+  }, [nonCriticalShellReady])
+  useEffect(() => {
+    if (!nonCriticalShellReady) return undefined
     let alive = true
     reviewstageApi.stats().then((s) => { if (alive) setReviewStats(s) }).catch(() => {})
     return () => { alive = false }
-  }, [reviewStreamVersion])
+  }, [nonCriticalShellReady, reviewStreamVersion])
   useEffect(() => {
     const urgent = (reviewStats?.pushed_unread || 0) + (reviewStats?.mandatory_unaccepted || 0)
     // 不覆盖驾驶舱原标题(index.html 静态标题), 只在有 urgent 时加 (N) 前缀。
@@ -738,13 +795,13 @@ export default function CockpitShell() {
   const handleSpine = (key: SpineKey) => {
     setActiveSpine(key)
     if (key === 'home') openTab({ type: 'project_board', id: 'main' }, '项目')
-    else if (key === 'authored') openTab({ type: 'authored', id: 'main' }, '草稿箱')
+    else if (key === 'authored') openTab({ type: 'authored', id: 'main' }, '画布')
     else if (key === 'review') {
       useReviewQueueFocus.getState().setFocused(null)
       openTab({ type: 'review_queue', id: 'main' }, '审阅')
     }
-    else if (key === 'multiagent') openTab({ type: 'multiagent', id: 'main' }, 'Multiagent')
-    else if (key === 'controller') openTab({ type: 'controller', id: 'main' }, '总控')
+    else if (key === 'multiagent') openTab({ type: 'multiagent', id: 'main' }, '会话')
+    else if (key === 'controller') openTab({ type: 'controller', id: 'main' }, '中枢')
     else if (key === 'settings') openTab({ type: 'settings', id: 'main' }, '设置')
   }
 
@@ -770,7 +827,7 @@ export default function CockpitShell() {
 
   // 整页网页快照(用户 2026-06-30 要求加回): 顶栏一键抓本页"所见全部内容"(含同源内嵌 iframe 递归的
   // 文字 + 完整 DOM + 主 canvas 截图) → 捕获对话框, 可复制路径或落盘 captures/pending。机器在本机,
-  // 走页内捕获不依赖 poof 的全局热键。capture 全套逻辑(collectVisibleText/collectFullDom/对话框/落盘)仍在。
+  // 走页内捕获，不依赖桌面截图设施的全局热键。capture 全套逻辑仍在。
   const openPageSnapshotDialog = () => {
     setCaptureDialog({ kind: 'page_snapshot', title: '页面快照' })
     setCaptureComment('')
@@ -871,14 +928,10 @@ export default function CockpitShell() {
       }
     }
     visit(document, '宿主页面(驾驶舱外壳)', 0, false)
-    const EMBED_CAP = 150000 // 被审阅应用: 大预算(walker 整页元素树)
-    const HOST_CAP = 50000 //  宿主外壳: 限额(只为对照, 别淹没内嵌内容)
     const ordered = [...segs].sort((a, b) => Number(b.embedded) - Number(a.embedded)) // 内嵌优先
     return ordered
       .map((s) => {
-        const cap = s.embedded ? EMBED_CAP : HOST_CAP
-        const body = s.html.length > cap ? `${s.html.slice(0, cap)}\n<!-- …(已截断, 原长 ${s.html.length}) -->` : s.html
-        return `<!-- ──[ ${s.label} ]── -->\n${body || '(空)'}`
+        return `<!-- ──[ ${s.label} ]── -->\n${s.html || '(空)'}`
       })
       .join('\n\n')
       .trim()
@@ -924,6 +977,29 @@ export default function CockpitShell() {
     return found[0].url
   }
 
+  // P1.2 静默整页快照(圈选联动): 复用与 openPageSnapshotDialog 对话框提交同一套抓取管线
+  // (collectVisibleText / collectFullDom / capturePrimaryCanvas + 日志环形缓冲), 不弹第二个对话框;
+  // 失败只记 warning(自动进薄顶栏警告徽标), 不打断主流程。
+  const savePageSnapshotSilent = async (comment: string): Promise<CaptureSaveResult | null> => {
+    try {
+      return await capturesApi.save({
+        capture_kind: 'page_snapshot',
+        title: '页面快照(圈选联动)',
+        comment,
+        url: window.location.href,
+        route: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        text_snapshot: collectVisibleText(),
+        dom_snapshot: collectFullDom(),
+        image_data_url: capturePrimaryCanvas() || undefined,
+        logs: getConsoleLogEntries().slice(),
+        enqueue: false,
+      })
+    } catch (e) {
+      console.warn(`圈选联动快照保存失败: ${(e instanceof Error ? e.message : String(e)).trim()}`)
+      return null
+    }
+  }
+
   // 2026-06-03 用户明示捕获两个动作分离, 都**不进审阅队列**(审阅队列只给用户看 subagent 产出):
   //   复制 = 纯剪贴板(纯客户端, 不调后端, 见下);
   //   提交 = 保存到文件(data/boss_sight/captures/pending/, 见 submitCaptureToFile), 攒着;
@@ -955,7 +1031,8 @@ export default function CockpitShell() {
       }
       // 用户明示 2026-06-04: 还是太长, 剪贴板就留一个文件路径。完整内容(含 HTML/页面文本)写到 clips 文件,
       // enqueue:false → 不进 dispatch 批次、不计入待处理数。剪贴板 = 仅文件路径一行(无链接则退化为选择器)。
-      let savedPath = ''
+      // P1.2 快照 URL 化: page_snapshot 复制优先给可访问 URL(弃本地路径)。
+      let savedUrl = ''
       try {
         const res = await capturesApi.save({
           capture_kind: captureDialog.kind,
@@ -964,20 +1041,19 @@ export default function CockpitShell() {
           url,
           route,
           target: captureDialog.target,
-          text_snapshot: clipText(bodyText, 60000),
-          dom_snapshot: clipText(fullDom, 200000),
+          text_snapshot: bodyText,
+          dom_snapshot: fullDom,
           image_data_url: shot || undefined,
+          logs: captureDialog.kind === 'page_snapshot' ? getConsoleLogEntries().slice() : undefined,
           enqueue: false,
         })
-        savedPath = res.saved_path
-      } catch { /* 写文件失败也别挡复制: 退化为复制选择器 */ }
-      const text = savedPath || (captureDialog.target?.selector ? `选择器: ${captureDialog.target.selector}` : '(捕获)')
-      const copied = await copyToClipboard(text)
-      setCaptureToast(
-        copied
-          ? (savedPath ? '已复制文件路径' : '已复制选择器')
-          : '复制失败(剪贴板不可用)',
-      )
+        savedUrl = res.share_status === 'ready' ? (res.canonical_url || '') : ''
+        if (!savedUrl) throw new Error(res.share_error || '分享中心未返回可用链接')
+      } catch (e) {
+        throw new Error(`捕获已保存，但链接未发布：${e instanceof Error ? e.message : String(e)}`)
+      }
+      const copied = await copyToClipboard(savedUrl)
+      setCaptureToast(copied ? '已复制分享链接' : '分享已生成，但剪贴板不可用')
       setCaptureDialog(null)
       setCaptureComment('')
     } catch (e) {
@@ -1018,14 +1094,37 @@ export default function CockpitShell() {
         url,
         route,
         target: captureDialog.target,
-        text_snapshot: clipText(bodyText, 60000),
-        dom_snapshot: clipText(fullDom, 200000),
+        text_snapshot: bodyText,
+        dom_snapshot: fullDom,
         image_data_url: shot || undefined,
+        // P1.2 快照带日志: 整页快照附带浏览器日志环形缓冲(最近 50 条), 助诊断。
+        logs: captureDialog.kind === 'page_snapshot' ? getConsoleLogEntries().slice() : undefined,
         enqueue: false,
       })
-      setCaptureToast(res.saved_path ? `已保存捕获文件: ${res.saved_path}` : '已保存捕获文件')
+      const baseToast = res.canonical_url && res.share_status === 'ready'
+        ? `捕获已保存: ${res.canonical_url}`
+        : `捕获已保存，但分享未就绪${res.share_error ? `：${res.share_error}` : ''}`
       setCaptureDialog(null)
       setCaptureComment('')
+      if (captureDialog.kind === 'page_snapshot') {
+        // P1.2 快照 URL 化: 保存成功后把可访问 URL 放进提示条与剪贴板(弃本地路径)。
+        const snapUrl = res.share_status === 'ready' ? (res.canonical_url || '') : ''
+        setCaptureToast(snapUrl ? `快照已保存: ${snapUrl}` : baseToast)
+        if (snapUrl) {
+          const copied = await copyToClipboard(snapUrl)
+          if (!copied) console.warn('快照 URL 复制失败(剪贴板不可用), 请在提示条中手动复制')
+        }
+      } else {
+        setCaptureToast(baseToast)
+        if (captureDialog.kind === 'element_comment') {
+          // P1.2 圈选附带快照: 提交成功后静默追加一份整页快照, 两者以 URL 互相关联。
+          const commentRef = res.canonical_url || res.saved_path
+          void (async () => {
+            const snap = await savePageSnapshotSilent(`自动附带 · 关联圈选评论: ${commentRef}`)
+            if (snap?.canonical_url && snap.share_status === 'ready') setCaptureToast(`${baseToast}\n已自动附带快照: ${snap.canonical_url}`)
+          })()
+        }
+      }
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).trim()
       if (/\b(404|405)\b/.test(msg)) {
@@ -1067,25 +1166,35 @@ export default function CockpitShell() {
   // urgent 角标(通知 bell badge;与浏览器标签 (N) 前缀同口径): 推送未读 + 必验收待审。
   const urgentCount = (reviewStats?.pushed_unread || 0) + (reviewStats?.mandatory_unaccepted || 0)
   const togglePalette = () => window.dispatchEvent(new CustomEvent('omni:toggle-command-palette'))
+  const desktopHost = useDesktopHostMode()
+  // LOFA 壳能力收进本菜单后, 壳撤掉了盖在页面右上角的悬浮按钮(见 useLofaHostMode)。
+  const lofaHost = useLofaHostMode()
 
   return (
-    <div style={S.root} data-testid="cockpit-shell" data-fp-breakpoint={bp} data-fp-touch={touch ? 'true' : undefined}>
+    <div
+      style={S.root}
+      data-testid="cockpit-shell"
+      data-fp-breakpoint={bp}
+      data-fp-touch={touch ? 'true' : undefined}
+      data-omnicompany-host={desktopHost.available ? 'desktop' : undefined}
+      data-omnicompany-fullscreen={desktopHost.available ? String(desktopHost.fullscreen) : undefined}
+    >
       {showTabRestore && (
         <div
           data-testid="tab-restore-bar"
-          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 14px', background: 'var(--fp-accent-weak)', borderBottom: '1px solid #1f3b5c', color: '#cdd9e5', fontSize: 14 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 14px', background: 'var(--fp-accent-weak)', borderBottom: '1px solid var(--fp-border)', color: 'var(--fp-text)', fontSize: 14 }}
         >
           <span>上次关闭时还开着 <b style={{ color: 'var(--fp-link)' }}>{restoreSnapshotRef.current.tabs.length}</b> 个页签,要恢复吗?</span>
           <button
             type="button"
             data-testid="tab-restore-yes"
-            style={{ border: '1px solid var(--fp-accent)', background: 'var(--fp-accent-weak)', color: 'var(--fp-link)', borderRadius: 4, padding: '2px 12px', cursor: 'pointer', fontSize: 14 }}
+            style={{ border: '1px solid var(--fp-accent)', background: 'var(--fp-accent-weak)', color: 'var(--fp-link)', borderRadius: 3, padding: '2px 12px', cursor: 'pointer', fontSize: 14 }}
             onClick={() => { setTabs(restoreSnapshotRef.current.tabs, restoreSnapshotRef.current.activeId || CONTROLLER_TAB_ID); setShowTabRestore(false) }}
           >恢复页签</button>
           <button
             type="button"
             data-testid="tab-restore-no"
-            style={{ border: '1px solid var(--fp-border)', background: 'transparent', color: 'var(--fp-text-3)', borderRadius: 4, padding: '2px 12px', cursor: 'pointer', fontSize: 14 }}
+            style={{ border: '1px solid var(--fp-border)', background: 'transparent', color: 'var(--fp-text-3)', borderRadius: 3, padding: '2px 12px', cursor: 'pointer', fontSize: 14 }}
             onClick={() => setShowTabRestore(false)}
           >不用</button>
         </div>
@@ -1123,6 +1232,19 @@ export default function CockpitShell() {
           <div style={S.moreMenu} data-testid="cockpit-more-menu" data-omni-capture-ignore="true">
             <button
               type="button"
+              style={{
+                ...moreItemBtn,
+                opacity: canCloseOtherTabs ? 1 : 0.45,
+                cursor: canCloseOtherTabs ? 'pointer' : 'default',
+              }}
+              data-testid="cockpit-more-close-other-tabs"
+              disabled={!canCloseOtherTabs}
+              onClick={() => { setMoreOpen(false); closeOtherTabs() }}
+            >
+              <CopyMinus size={15} /><span>只留当前页签</span>
+            </button>
+            <button
+              type="button"
               style={moreItemBtn}
               data-testid="cockpit-more-page-snapshot"
               onClick={() => { setMoreOpen(false); openPageSnapshotDialog() }}
@@ -1145,6 +1267,37 @@ export default function CockpitShell() {
             >
               <RefreshCw size={15} /><span>刷新</span>
             </button>
+            {desktopHost.available && (
+              <button
+                type="button"
+                style={moreItemBtn}
+                data-testid="cockpit-more-desktop-fullscreen"
+                onClick={() => { setMoreOpen(false); void desktopHost.toggleFullscreen() }}
+              >
+                {desktopHost.fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                <span>{desktopHost.fullscreen ? '退出窗口全屏' : '窗口全屏'}</span>
+              </button>
+            )}
+            {lofaHost.canReloadShell && (
+              <button
+                type="button"
+                style={moreItemBtn}
+                data-testid="cockpit-more-lofa-reload"
+                onClick={() => { setMoreOpen(false); void lofaHost.reloadShell() }}
+              >
+                <RotateCcw size={15} /><span>重载 Dashboard</span>
+              </button>
+            )}
+            {lofaHost.canOpenShellSettings && (
+              <button
+                type="button"
+                style={moreItemBtn}
+                data-testid="cockpit-more-lofa-settings"
+                onClick={() => { setMoreOpen(false); void lofaHost.openShellSettings() }}
+              >
+                <Smartphone size={15} /><span>LOFA 设置</span>
+              </button>
+            )}
             <button
               type="button"
               style={moreItemBtn}
@@ -1229,6 +1382,20 @@ export default function CockpitShell() {
             <div style={S.navDrawerSep} />
             <button
               type="button"
+              style={{
+                ...S.navDrawerItem(false),
+                opacity: canCloseOtherTabs ? 1 : 0.45,
+                cursor: canCloseOtherTabs ? 'pointer' : 'default',
+              }}
+              data-testid="cockpit-more-close-other-tabs"
+              disabled={!canCloseOtherTabs}
+              onClick={() => { setNavDrawerOpen(false); closeOtherTabs() }}
+            >
+              <CopyMinus size={18} />
+              <span>只留当前页签</span>
+            </button>
+            <button
+              type="button"
               style={S.navDrawerItem(false)}
               data-testid="cockpit-more-page-snapshot"
               onClick={() => { setNavDrawerOpen(false); openPageSnapshotDialog() }}
@@ -1254,6 +1421,39 @@ export default function CockpitShell() {
               <RefreshCw size={18} />
               <span>刷新</span>
             </button>
+            {desktopHost.available && (
+              <button
+                type="button"
+                style={S.navDrawerItem(false)}
+                data-testid="cockpit-drawer-desktop-fullscreen"
+                onClick={() => { setNavDrawerOpen(false); void desktopHost.toggleFullscreen() }}
+              >
+                {desktopHost.fullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                <span>{desktopHost.fullscreen ? '退出窗口全屏' : '窗口全屏'}</span>
+              </button>
+            )}
+            {lofaHost.canReloadShell && (
+              <button
+                type="button"
+                style={S.navDrawerItem(false)}
+                data-testid="cockpit-drawer-lofa-reload"
+                onClick={() => { setNavDrawerOpen(false); void lofaHost.reloadShell() }}
+              >
+                <RotateCcw size={18} />
+                <span>重载 Dashboard</span>
+              </button>
+            )}
+            {lofaHost.canOpenShellSettings && (
+              <button
+                type="button"
+                style={S.navDrawerItem(false)}
+                data-testid="cockpit-drawer-lofa-settings"
+                onClick={() => { setNavDrawerOpen(false); void lofaHost.openShellSettings() }}
+              >
+                <Smartphone size={18} />
+                <span>LOFA 设置</span>
+              </button>
+            )}
             <button
               type="button"
               style={S.navDrawerItem(false)}
@@ -1284,7 +1484,7 @@ export default function CockpitShell() {
           </nav>
         </>
       )}
-      {error && <div style={{ ...S.error, padding: '4px 12px', borderBottom: '1px solid var(--fp-border)', background: '#160d0d' }} data-testid="cockpit-load-error">加载失败: {error}</div>}
+      {error && <div style={{ ...S.error, padding: '4px 12px', borderBottom: '1px solid var(--fp-border)', background: 'var(--fp-bp-solid)' }} data-testid="cockpit-load-error">加载失败: {error}</div>}
       {captureToast && <div style={S.toast} data-omni-capture-ignore="true" data-testid="cockpit-capture-toast">{captureToast}</div>}
       {uiUpdatePending && (
         <div
@@ -1381,6 +1581,9 @@ export default function CockpitShell() {
               onToggleNotifications: () => setNotificationsOpen((v) => !v),
               enterMaximizeVisible: !isReviewMaximized && selectedTab?.ref.type === 'web_review',
               onEnterMaximize: () => enterReviewMaximize(),
+              desktopFullscreenVisible: desktopHost.available,
+              desktopFullscreen: desktopHost.fullscreen,
+              onToggleDesktopFullscreen: () => { void desktopHost.toggleFullscreen() },
               moreOpen,
               onToggleMore: () => setMoreOpen((v) => !v),
               debugReady: !!debugHandoff,
@@ -1388,8 +1591,8 @@ export default function CockpitShell() {
           />
         )}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* 主区只承载 Dockview。页签相关的伴随/评价侧栏由 EditorArea 挂到当前页签内容层，
-              因而保留完整页签条，只替换页签下面的正文标题栏空间。 */}
+          {/* 主区只承载 EditorArea。会话伴随/Multiagent 与评价侧栏由 EditorArea 在
+              Dockview 外共享挂载，切换同类页签时只更新活动实体，不重建侧栏状态。 */}
           <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', overflow: 'hidden' }}>
             <main style={S.main}>
               <div style={S.editor}>
@@ -1408,7 +1611,12 @@ export default function CockpitShell() {
         </div>
       </div>
       {/* 统一设计工作室引导演示挂载钩:仅 URL 带 ?demo=<tourId> 时挂覆盖层,否则零渲染(玩家/日常面零泄漏)。 */}
-      <StudioDemoMount />
+      {studioDemoRequested && (
+        <React.Suspense fallback={null}>
+          <StudioDemoMount />
+        </React.Suspense>
+      )}
+      <LinkContextMenu />
     </div>
   )
 }

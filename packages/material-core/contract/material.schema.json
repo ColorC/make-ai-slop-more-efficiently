@@ -1,0 +1,685 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omni.local/contracts/material-core/0.3.0/material.schema.json",
+  "title": "Omni Material Graph",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "graph_id",
+    "generated_at",
+    "materials"
+  ],
+  "properties": {
+    "contract_version": {
+      "enum": [
+        "0.1.0",
+        "0.2.0",
+        "0.3.0"
+      ]
+    },
+    "graph_id": {
+      "$ref": "#/$defs/non_empty"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "active_view_id": {
+      "$ref": "#/$defs/non_empty"
+    },
+    "materials": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/material"
+      }
+    }
+  },
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "contract_version": { "const": "0.3.0" }
+        }
+      },
+      "then": {
+        "properties": {
+          "materials": {
+              "items": {
+                "required": ["metadata"],
+                "properties": {
+                  "metadata": {
+                    "required": ["classification_ref", "classification_context_ref"]
+                  },
+                  "representations": {
+                  "items": {
+                    "required": ["format_tag"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "non_empty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_ref": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "ref": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "selector": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "revision_ref": {
+      "type": "object",
+      "required": [
+        "provider",
+        "object",
+        "revision"
+      ],
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "object": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "revision": {
+          "$ref": "#/$defs/non_empty"
+        }
+      },
+      "additionalProperties": false
+    },
+    "version_ref": {
+      "type": "object",
+      "required": [
+        "material_id",
+        "revision_ref"
+      ],
+      "properties": {
+        "material_id": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "revision_ref": {
+          "$ref": "#/$defs/revision_ref"
+        }
+      },
+      "additionalProperties": false
+    },
+    "actor_ref": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "ref": {
+          "$ref": "#/$defs/non_empty"
+        }
+      },
+      "additionalProperties": false
+    },
+    "preset_ref": {
+      "type": "object",
+      "required": [
+        "profile_id",
+        "profile_revision",
+        "preset_id"
+      ],
+      "properties": {
+        "profile_id": { "$ref": "#/$defs/non_empty" },
+        "profile_revision": { "$ref": "#/$defs/non_empty" },
+        "preset_id": { "$ref": "#/$defs/non_empty" }
+      },
+      "additionalProperties": false
+    },
+    "classification_ref": {
+      "type": "object",
+      "required": ["schema", "profile_id", "profile_revision", "primary_path", "facets"],
+      "properties": {
+        "schema": { "const": "omni.material-classification-ref/v1" },
+        "profile_id": { "$ref": "#/$defs/non_empty" },
+        "profile_revision": { "$ref": "#/$defs/non_empty" },
+        "primary_path": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/non_empty" } },
+        "facets": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/non_empty" } } } }
+      },
+      "additionalProperties": true
+    },
+    "classification_context_ref": {
+      "type": "object",
+      "required": ["schema", "profile_id", "profile_revision", "project_id", "profile_ref", "read_via"],
+      "properties": {
+        "schema": { "const": "omni.material-classification-context-ref/v1" },
+        "profile_id": { "$ref": "#/$defs/non_empty" },
+        "profile_revision": { "$ref": "#/$defs/non_empty" },
+        "project_id": { "$ref": "#/$defs/non_empty" },
+        "profile_ref": { "type": "string", "pattern": "^(workspace|omnicompany|mount):\\S+$" },
+        "read_via": { "enum": ["omni material profile show", "omni material profile classify"] }
+      },
+      "additionalProperties": true
+    },
+    "authority_scope": {
+      "type": "object",
+      "required": [
+        "object",
+        "purpose",
+        "scope"
+      ],
+      "properties": {
+        "object": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "purpose": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "scope": {
+          "$ref": "#/$defs/non_empty"
+        }
+      },
+      "additionalProperties": false
+    },
+    "formal_artifact_ref": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref",
+        "revision_ref"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "ref": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "revision_ref": {
+          "$ref": "#/$defs/revision_ref"
+        }
+      },
+      "additionalProperties": false
+    },
+    "representation": {
+      "type": "object",
+      "required": [
+        "id",
+        "media_type",
+        "role",
+        "source_ref"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "media_type": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "role": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "title": {
+          "type": "string"
+        },
+        "source_ref": {
+          "$ref": "#/$defs/source_ref"
+        },
+        "renderer_hint": {
+          "type": "string"
+        },
+        "format_tag": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+        },
+        "content": {
+          "type": "string"
+        },
+        "content_format": {
+          "enum": ["markdown", "text", "json", "html", "latex", "mermaid"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "view_member": {
+      "type": "object",
+      "required": [
+        "material_id"
+      ],
+      "properties": {
+        "material_id": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "representation_id": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "order": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "formal_domain": {
+      "type": "object",
+      "required": [
+        "product_ref",
+        "semantic_scope",
+        "formal_artifact_kinds",
+        "authority_scopes",
+        "rule_set_ref",
+        "responsibility_model",
+        "index_policy",
+        "lifecycle",
+        "adapter_ref"
+      ],
+      "properties": {
+        "product_ref": {
+          "$ref": "#/$defs/source_ref"
+        },
+        "semantic_scope": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "formal_artifact_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/non_empty"
+          }
+        },
+        "authority_scopes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/authority_scope"
+          }
+        },
+        "rule_set_ref": {
+          "$ref": "#/$defs/version_ref"
+        },
+        "responsibility_model": {
+          "type": "object",
+          "required": [
+            "required_roles"
+          ],
+          "properties": {
+            "required_roles": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/non_empty"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "index_policy": {
+          "type": "object",
+          "required": [
+            "default_visibility",
+            "history_visibility"
+          ],
+          "properties": {
+            "default_visibility": {
+              "$ref": "#/$defs/non_empty"
+            },
+            "history_visibility": {
+              "$ref": "#/$defs/non_empty"
+            }
+          },
+          "additionalProperties": true
+        },
+        "lifecycle": {
+          "type": "object",
+          "required": [
+            "operations"
+          ],
+          "properties": {
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/non_empty"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "adapter_ref": {
+          "$ref": "#/$defs/source_ref"
+        },
+        "extensions": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "formalization": {
+      "type": "object",
+      "required": [
+        "operation",
+        "outcome",
+        "domain_ref",
+        "input_material",
+        "artifacts",
+        "sources",
+        "responsibility",
+        "rule_results",
+        "authority_effect",
+        "occurred_at",
+        "idempotency_key"
+      ],
+      "properties": {
+        "operation": {
+          "enum": [
+            "enter",
+            "revise",
+            "supersede",
+            "withdraw"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "succeeded",
+            "rejected"
+          ]
+        },
+        "domain_ref": {
+          "$ref": "#/$defs/version_ref"
+        },
+        "input_material": {
+          "$ref": "#/$defs/version_ref"
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/formal_artifact_ref"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/source_ref"
+          }
+        },
+        "responsibility": {
+          "type": "object",
+          "required": [
+            "execution",
+            "content",
+            "maintenance"
+          ],
+          "properties": {
+            "execution": {
+              "$ref": "#/$defs/actor_ref"
+            },
+            "content": {
+              "$ref": "#/$defs/actor_ref"
+            },
+            "maintenance": {
+              "$ref": "#/$defs/actor_ref"
+            }
+          },
+          "additionalProperties": false
+        },
+        "base_revision_ref": {
+          "$ref": "#/$defs/revision_ref"
+        },
+        "rule_results": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "rule_id",
+              "status",
+              "evidence"
+            ],
+            "properties": {
+              "rule_id": {
+                "$ref": "#/$defs/non_empty"
+              },
+              "status": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "waived"
+                ]
+              },
+              "evidence": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/source_ref"
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "authority_effect": {
+          "type": "object",
+          "required": [
+            "action",
+            "scopes"
+          ],
+          "properties": {
+            "action": {
+              "enum": [
+                "establish",
+                "replace",
+                "withdraw",
+                "none"
+              ]
+            },
+            "scopes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/authority_scope"
+              }
+            },
+            "replaces": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/version_ref"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "extensions": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "material": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "labels",
+        "revision_ref",
+        "representations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "title": {
+          "$ref": "#/$defs/non_empty"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/non_empty"
+          }
+        },
+        "revision_ref": {
+          "$ref": "#/$defs/revision_ref"
+        },
+        "preset_ref": {
+          "$ref": "#/$defs/preset_ref"
+        },
+        "representations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/representation"
+          }
+        },
+        "relationship": {
+          "type": "object",
+          "required": [
+            "from",
+            "predicate",
+            "to"
+          ],
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/non_empty"
+            },
+            "predicate": {
+              "$ref": "#/$defs/non_empty"
+            },
+            "to": {
+              "$ref": "#/$defs/non_empty"
+            }
+          },
+          "additionalProperties": false
+        },
+        "view": {
+          "type": "object",
+          "required": [
+            "members"
+          ],
+          "properties": {
+            "members": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/view_member"
+              }
+            },
+            "presentation": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": true
+        },
+        "formal_domain": {
+          "$ref": "#/$defs/formal_domain"
+        },
+        "formalization": {
+          "$ref": "#/$defs/formalization"
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "classification_ref": { "$ref": "#/$defs/classification_ref" },
+            "classification_context_ref": { "$ref": "#/$defs/classification_context_ref" }
+          },
+          "additionalProperties": true
+        },
+        "workbench_links": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "href"],
+            "properties": {
+              "id": { "$ref": "#/$defs/non_empty" },
+              "label": { "$ref": "#/$defs/non_empty" },
+              "href": { "$ref": "#/$defs/non_empty" },
+              "query": {
+                "type": "object",
+                "additionalProperties": { "type": ["string", "number", "boolean"] }
+              },
+              "display": {
+                "type": "object",
+                "properties": {
+                  "placement": { "enum": ["toolbar", "menu", "both"] },
+                  "target": { "enum": ["same", "new"] },
+                  "icon": { "enum": ["map", "material", "external"] },
+                  "tone": { "enum": ["default", "primary"] }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "display_name": {
+          "$ref": "#/$defs/non_empty",
+          "description": "面向用户的中文名。id 用英文、display_name 用中文；由 kinds.json 的 naming 规则校验。"
+        },
+        "flow_role": {
+          "type": "string",
+          "description": "流程角色轴（封闭值集，见 kinds.json axes.flow_role）。与 artifact_kind 正交，两轴缺一不可。"
+        },
+        "artifact_kind": {
+          "type": "string",
+          "description": "来源轴。值由域文件注册，注册时必须声明 content_class 与 project_scope。"
+        },
+        "visibility": {
+          "enum": [
+            "browsable",
+            "hidden"
+          ],
+          "description": "默认 hidden。只有显式 browsable 才进导航树；隐藏材料仍可检索可解析，寄宿于所属组。"
+        },
+        "authority": {
+          "enum": [
+            "source_of_truth",
+            "projection"
+          ],
+          "description": "projection 一律只读 —— 规范出现两份等于没有规范。"
+        },
+        "derivation": {
+          "type": "object",
+          "required": [
+            "generator",
+            "generator_revision",
+            "input_fingerprint"
+          ],
+          "description": "机采/可重生产物的身份：绑生成器与输入指纹，不绑文件字节。"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

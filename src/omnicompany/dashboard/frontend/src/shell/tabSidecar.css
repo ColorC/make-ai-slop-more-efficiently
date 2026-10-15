@@ -23,7 +23,50 @@
   min-height: 0;
   overflow: hidden;
   border-left: 1px solid var(--fp-border);
-  background: var(--fp-bg);
+  /* 2026-08-06: 原本是 var(--fp-bg) 纯底色(scene 的底色, 不含格纸), 把 #bp-grid 盖死了。
+     侧栏盖在 CLI 之上不能透明, 故铺一份视口对齐的私有格纸 —— 详见 blueprint.css
+     「不透明但仍带格纸的面板」。 */
+  background: var(--fp-bp-scene-grad), var(--fp-bp-scene);
+  background-attachment: fixed;
+}
+
+/* 手机档(宿主 < 侧栏最小宽 + 主区最小宽): 侧栏整幅接管同一格位, 主区让位不参与并排。
+   仍是 flex 子项、没有 position:fixed、没有 scrim —— 不是浮层, 是同位二选一。 */
+.tab-sidecar-layout[data-sidecar-stacked="1"] .tab-sidecar-aside {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  padding-left: 30px;
+  border-left: 0;
+}
+
+.tab-sidecar-layout[data-sidecar-stacked="1"][data-sidecar-collapsed="0"] .tab-sidecar-main {
+  display: none;
+}
+
+.tab-sidecar-back {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30px;
+  display: grid;
+  /* 整条都可点(触控目标够大), 但箭头钉在顶部 —— 与页签行同高, 一眼能找到。 */
+  place-items: start center;
+  padding: 14px 0 0;
+  border: 0;
+  border-right: 1px solid var(--fp-border);
+  background: var(--fp-bp-panel);
+  color: var(--fp-text-2);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.tab-sidecar-back:hover,
+.tab-sidecar-back:focus-visible {
+  color: var(--fp-text);
+  background: var(--fp-bp-panel-hover);
+  outline: none;
 }
 
 .tab-sidecar-resize {
@@ -35,6 +78,18 @@
   width: 10px;
   cursor: col-resize;
   touch-action: none;
+}
+
+@media (pointer: coarse) {
+  .tab-sidecar-resize {
+    left: -14px;
+    width: 28px;
+  }
+
+  .tab-sidecar-resize:hover::after,
+  .tab-sidecar-resize:focus-visible::after {
+    left: 13px;
+  }
 }
 
 .tab-sidecar-resize:hover::after,
@@ -74,20 +129,3 @@
   outline: none;
 }
 
-.tab-sidecar-scrim {
-  position: absolute;
-  z-index: 5;
-  inset: 0;
-  border: 0;
-  background: rgba(4, 12, 28, .48);
-  cursor: default;
-}
-
-.tab-sidecar-layout[data-sidecar-drawer="1"] .tab-sidecar-aside {
-  position: absolute;
-  z-index: 6;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  box-shadow: var(--fp-shadow-pop);
-}

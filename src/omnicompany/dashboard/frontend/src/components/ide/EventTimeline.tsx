@@ -37,7 +37,7 @@ export default function EventTimeline() {
 
   if (rawEvents.length === 0) {
     return (
-      <div style={{ padding: 8, color: '#444', fontSize: 14 }}>No events yet</div>
+      <div style={{ padding: 8, color: 'var(--fp-text-3)', fontSize: 14 }}>No events yet</div>
     )
   }
 

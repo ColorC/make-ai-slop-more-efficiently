@@ -1,0 +1,1 @@
+grok-color.png is the SpaceXAI / Grok brand mark, sourced from xAI's official website media (media.x.ai, referenced in the official xai-org/grok-build README). Brand mark used for product identification in the CLI Hub provider icon row.

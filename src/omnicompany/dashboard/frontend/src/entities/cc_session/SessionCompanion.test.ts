@@ -1,33 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import type { ReviewReadbackItem } from '../../api/reviewstageClient'
 import {
   companionSurfaceUrl,
-  dedupeReviewReadback,
+  companionHostTabId,
   DEFAULT_COMPANION_PAGE,
   requestSiblingSession,
+  sessionNotesUrl,
 } from './SessionCompanion'
 
-function item(id: string, title: string): ReviewReadbackItem {
-  return {
-    id,
-    title,
-    status: 'pending',
-    tier: 'important',
-    kind: 'markdown',
-    plan_id: null,
-    reason: null,
-    has_concrete_content: true,
-    presentation: 'background',
-    mentioned_in_conversation: true,
-    mention_evidence: id,
-    association: 'conversation_mention',
-    created_at: '2026-07-30T00:00:00Z',
-  }
-}
-
 describe('SessionCompanion helpers', () => {
-  it('opens Multiagent as the first/default companion page', () => {
-    expect(DEFAULT_COMPANION_PAGE).toBe('multiagent')
+  it('opens the project wiki overview as the first/default companion page', () => {
+    expect(DEFAULT_COMPANION_PAGE).toBe('overview')
   })
 
   it('builds a copyable standalone surface URL for the CLI session', () => {
@@ -36,12 +18,17 @@ describe('SessionCompanion helpers', () => {
     )
   })
 
-  it('keeps the first authoritative material row for each material id', () => {
-    const first = { ...item('material:a', '正式关联'), association: 'session_binding' as const }
-    const duplicate = item('material:a', '对话重复提及')
-    const second = item('material:b', '另一个材料')
+  it('binds the note surface to exactly one CLI session id', () => {
+    const url = new URL(sessionNotesUrl('pty-1', 'https://dashboard.test:12443'))
+    expect(url.pathname).toBe('/api/embed/notes-web/notes-web.html')
+    expect(url.searchParams.get('bridge_prefix')).toBe('/api/embed')
+    expect(url.searchParams.get('session')).toBe('pty-1')
+  })
 
-    expect(dedupeReviewReadback([first, duplicate, second])).toEqual([first, second])
+  it('places a material to the left of the current companion host', () => {
+    expect(companionHostTabId('pty-1', 'embedded')).toBe('cc_session:pty-1')
+    expect(companionHostTabId('pty-1', 'tab')).toBe('cc_companion:pty-1')
+    expect(companionHostTabId('pty-1', 'surface')).toBeNull()
   })
 
   it('waits for the mounted editor to finish creating the sibling session', async () => {

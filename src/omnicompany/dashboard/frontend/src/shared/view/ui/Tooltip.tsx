@@ -18,16 +18,17 @@ type TooltipProps = {
 
 function getArrowClasses(position: TooltipPosition): string {
   switch (position) {
+    // 2026-08-06: 箭头原本跟着 gray-900/gray-100 走(暗色下是白箭头), 改为跟随描图纸底色。
     case 'top':
-      return 'top-full left-1/2 transform -translate-x-1/2 border-t-gray-900 dark:border-t-gray-100';
+      return 'top-full left-1/2 transform -translate-x-1/2 border-t-[color:var(--fp-bp-solid)]';
     case 'bottom':
-      return 'bottom-full left-1/2 transform -translate-x-1/2 border-b-gray-900 dark:border-b-gray-100';
+      return 'bottom-full left-1/2 transform -translate-x-1/2 border-b-[color:var(--fp-bp-solid)]';
     case 'left':
-      return 'left-full top-1/2 transform -translate-y-1/2 border-l-gray-900 dark:border-l-gray-100';
+      return 'left-full top-1/2 transform -translate-y-1/2 border-l-[color:var(--fp-bp-solid)]';
     case 'right':
-      return 'right-full top-1/2 transform -translate-y-1/2 border-r-gray-900 dark:border-r-gray-100';
+      return 'right-full top-1/2 transform -translate-y-1/2 border-r-[color:var(--fp-bp-solid)]';
     default:
-      return 'top-full left-1/2 transform -translate-x-1/2 border-t-gray-900 dark:border-t-gray-100';
+      return 'top-full left-1/2 transform -translate-x-1/2 border-t-[color:var(--fp-bp-solid)]';
   }
 }
 
@@ -188,8 +189,15 @@ function Tooltip({
           ref={tooltipRef}
           style={tooltipStyle || { position: 'fixed', top: '-9999px', left: '-9999px', opacity: 0 }}
           className={cn(
-            'px-2 py-1 text-sm font-medium text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 rounded shadow-lg whitespace-nowrap pointer-events-none',
-            'animate-in fade-in-0 zoom-in-95 duration-200',
+            // 2026-08-06 蓝图: 原本 `dark:bg-gray-100 dark:text-gray-900` —— 暗色下是个白底提示框,
+            // 悬浮在蓝图图板上格外扎眼。悬浮物在 G 里一律走描图纸族: 深图板底 + 白色绘图线边
+            // + 纸叠纸硬错位影 + 打字机小字, 锐角不圆。
+            'px-2.5 py-1 text-xs whitespace-nowrap pointer-events-none',
+            'font-[family-name:var(--fp-font-mono)] tracking-[.06em]',
+            'text-[color:var(--fp-bp-text)] bg-[color:var(--fp-bp-solid)]',
+            'border border-[color:var(--fp-border)] rounded-[2px]',
+            'shadow-[var(--fp-bp-shadow-sm)]',
+            'mo-drop',
             className
           )}
         >

@@ -68,7 +68,7 @@ export function PickerMenu({ label, options, selected, onChange }: {
       {open && (
         <div style={POP} role="group" aria-label={label}>
           <span style={FOLD} aria-hidden="true" />
-          <div style={{ fontSize: 'var(--fp-fs-4)', color: 'var(--fp-text-3)', padding: '6px 10px 3px', fontWeight: 600, fontFamily: 'var(--fp-font-mono)', letterSpacing: '.1em', textTransform: 'uppercase' }}>{label}(多选)</div>
+          <div style={{ fontSize: 'var(--fp-fs-4)', color: 'var(--fp-text-3)', padding: '6px 10px 3px', fontWeight: 500, fontFamily: 'var(--fp-font-mono)', letterSpacing: '.1em', textTransform: 'uppercase' }}>{label}(多选)</div>
           {options.map((o) => {
             const on = selected.includes(o.value)
             return (

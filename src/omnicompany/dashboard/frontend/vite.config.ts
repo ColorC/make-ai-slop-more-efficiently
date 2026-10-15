@@ -7,18 +7,30 @@ const here = dirname(fileURLToPath(import.meta.url))
 // 共用 wiki 核（唯一正本在 webworks 仓）: markdown 材料渲染走它, 不再自带极简实现。
 // 依赖按目录就近解析(wiki-core 自带 node_modules), 本工程无需加装 markdown-it 系。
 const wikiCore = resolve(here, '../../../../packages/wiki-core')
+const materialCore = resolve(here, '../../../../packages/material-core')
+const materialClient = resolve(here, '../../../../packages/material-client')
+const materialViewReact = resolve(here, '../../../../packages/material-view-react')
+const materialNoteCore = resolve(here, '../../../../packages/material-note-core')
+const overlayNotes = resolve(here, '../notes-web/src')
+const bsideMaterialPlugin = resolve(here, '../../../../packages/material-http-plugin/index.ts')
 
 const serverPort = Number(process.env.OMNI_VITE_PORT || '5173')
 const dashboardProxyPort = process.env.OMNI_DASHBOARD_PROXY_PORT
   || process.env.OMNI_E2E_DASHBOARD_PORT
   || '8200'
+// A plain `npm run build` is a local/CI build, not a deployment.  Pointing it
+// at the live static directory lets Vite's emptyOutDir remove the running UI
+// for several minutes while terser is still working.  The canonical
+// `omni dashboard ui-update` command supplies an isolated staging directory
+// here and atomically publishes the completed build.
+const buildOutDir = process.env.OMNI_DASHBOARD_BUILD_OUT_DIR || 'dist'
 // 把运行中的 walker-game 开发服务挂到 dashboard 同源路径 /walker-game/, 这样审阅 iframe 与
 // dashboard 同源, 圈选元素(读 iframe.contentDocument)才不被浏览器跨域拦截。游戏侧用
 // `npm run dev:dashboard` 以 base=/walker-game/ 启动(默认 5176)。
 const walkerGameTarget = process.env.OMNI_WALKER_GAME_URL || 'http://127.0.0.1:5176'
 // Vilo 当前 demo 是 tabletop-simulator 的静态 http.server, 不是以 /vilo-demo/ 为 base 的 Vite app。
-// 因此代理时要 strip prefix: /vilo-demo/turn-ui.js -> http://127.0.0.1:8892/turn-ui.js。
-const viloDemoTarget = process.env.OMNI_VILO_DEMO_URL || 'http://127.0.0.1:8892'
+// 因此代理时要 strip prefix: /vilo-demo/turn-ui.js -> http://127.0.0.1:8992/turn-ui.js。
+const viloDemoTarget = process.env.OMNI_VILO_DEMO_URL || 'http://127.0.0.1:8992'
 const viloOsTarget = process.env.OMNI_VILO_OS_URL || 'http://127.0.0.1:5186'
 
 export default defineConfig({
@@ -26,12 +38,26 @@ export default defineConfig({
   resolve: {
     alias: {
       '@wiki-core': wikiCore,
+      '@material-core': materialCore,
+      '@omni/material-core': materialCore,
+      '@material-client': materialClient,
+      '@omni/material-client': materialClient,
+      '@material-view-react': materialViewReact,
+      '@material-view-react/styles.css': resolve(materialViewReact, 'styles.css'),
+      '@material-note-core': materialNoteCore,
+      '@bside-material-plugin': bsideMaterialPlugin,
+      '@overlay-notes': overlayNotes,
+      '@xyflow/react': resolve(here, 'node_modules/@xyflow/react'),
+      'lucide-react': resolve(here, 'node_modules/lucide-react'),
+      react: resolve(here, 'node_modules/react'),
+      'react-dom': resolve(here, 'node_modules/react-dom'),
     },
+    dedupe: ['react', 'react-dom', 'lucide-react', '@xyflow/react'],
   },
   server: {
     port: serverPort,
     // 默认 fs.allow 只有本工程根; wiki-core 在仓外, dev 模式要显式放行。
-    fs: { allow: [here, wikiCore] },
+    fs: { allow: [here, wikiCore, materialCore, materialClient, materialNoteCore, overlayNotes, bsideMaterialPlugin] },
     proxy: {
       '/api': {
         target: `http://localhost:${dashboardProxyPort}`,
@@ -67,7 +93,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../static',
+    outDir: buildOutDir,
     emptyOutDir: true,
     // esbuild 0.21 corrupts xterm 6's requestMode enum initializer in a
     // minified production chunk (undeclared variable at runtime). Terser keeps

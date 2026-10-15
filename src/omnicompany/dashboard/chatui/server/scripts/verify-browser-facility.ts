@@ -14,6 +14,14 @@ const clickSelectors = process.env.BROWSER_FACILITY_VERIFY_CLICK_SELECTORS
 const selectors = process.env.BROWSER_FACILITY_VERIFY_SELECTORS
   ? JSON.parse(process.env.BROWSER_FACILITY_VERIFY_SELECTORS) as string[]
   : ['.office-scene', '.factory-playback-status', '.factory-timeline-dock'];
+const wheelSteps = process.env.BROWSER_FACILITY_VERIFY_WHEEL_STEPS
+  ? JSON.parse(process.env.BROWSER_FACILITY_VERIFY_WHEEL_STEPS) as Array<{
+      deltaX?: number;
+      deltaY: number;
+      x?: number;
+      y?: number;
+    }>
+  : [];
 
 async function main() {
   const priorSettings = appConfigDb.get(SETTINGS_KEY);
@@ -34,6 +42,12 @@ async function main() {
         selector,
       });
       await browserUseService.agentWaitFor(session.id, { timeoutMs: 2_000 });
+    }
+    for (const wheelStep of wheelSteps) {
+      await browserUseService.agentWheel(session.id, wheelStep);
+    }
+    if (wheelSteps.length > 0) {
+      await browserUseService.agentWaitFor(session.id, { timeoutMs: 800 });
     }
     if (exercisePlayback) {
       await browserUseService.agentClick(session.id, {

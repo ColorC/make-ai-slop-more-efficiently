@@ -37,12 +37,12 @@ def _now_iso() -> str:
 def _get_store():
     """审阅台 MaterialStore(与 omni review submit 同一构造路径)。"""
     try:
-        from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+        from omnicompany.packages.services.boss_sight.reviewstage.routes import get_store
         return get_store()
     except Exception:
         from omnicompany.core.config import omni_workspace_root
-        from omnicompany.dashboard.boss_sight.reviewstage import MaterialStore
-        from omnicompany.dashboard.boss_sight.reviewstage.material_types import (
+        from omnicompany.packages.services.boss_sight.reviewstage import MaterialStore
+        from omnicompany.packages.services.boss_sight.reviewstage.material_types import (
             default_review_format_registry,
         )
         return MaterialStore(

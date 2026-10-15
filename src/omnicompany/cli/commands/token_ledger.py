@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import click
@@ -125,7 +126,10 @@ def cmd_token_ledger() -> None:
 
 @cmd_token_ledger.command("run")
 @click.option("--json", "as_json", is_flag=True, default=False, help="JSON 输出摘要")
-def token_ledger_run(as_json: bool) -> None:
+@click.option("--session", "sessions", multiple=True, help="Native session ID; scoped event-index backfill (repeatable)")
+@click.option("--start", help="Inclusive usage-report timestamp, ISO 8601 with timezone")
+@click.option("--end", help="Exclusive usage-report timestamp, ISO 8601 with timezone")
+def token_ledger_run(as_json: bool, sessions: tuple[str, ...] = (), start: str | None = None, end: str | None = None) -> None:
     """按水位线增量跑一遍三路收集 + 聚合, 与已落盘的历史合并后重写 data/llm/token_ledger/。
 
     合并语义: 会话按 session_id、内部调用按 (caller, day, model) 累加, 不会被本次
@@ -136,13 +140,41 @@ def token_ledger_run(as_json: bool) -> None:
         collect_internal_usage, write_token_ledger,
     )
 
+    from omnicompany.packages.services._core.token_ledger.event_index import query_index, source_roots, update_index
+
     out_dir = _out_dir()
+    if sessions or start or end:
+        if not sessions:
+            raise click.UsageError("Window backfill requires --session (repeatable); show queries the existing index only")
+        try:
+            query_index(out_dir / "events.sqlite", sessions, start, end)  # validate before writes
+            update_index(out_dir / "events.sqlite", source_roots(), sessions)
+            view = query_index(out_dir / "events.sqlite", sessions, start, end)
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        click.echo(json.dumps(view, ensure_ascii=False, indent=2))
+        return
     prior = _load_prior_watermark(out_dir)
     prior_sessions = _load_prior_jsonl(out_dir / "sessions.jsonl")
     prior_internal = _load_prior_jsonl(out_dir / "internal_by_caller_day.jsonl")
 
     claude = collect_claude_sessions(_claude_projects_root(), watermark_state=prior.get("claude"))
     codex = collect_codex_sessions(_codex_sessions_root(), watermark_state=prior.get("codex"))
+    primary_roots = {str(p.resolve()).casefold() for p in (_claude_projects_root(), _codex_sessions_root())}
+    for provider, root in source_roots():
+        if str(root.resolve()).casefold() in primary_roots:
+            continue
+        if provider.startswith("codex"):
+            extra = collect_codex_sessions(root, watermark_state=codex.new_watermark_state)
+            codex.sessions.extend(extra.sessions)
+            codex.new_watermark_state.update(extra.new_watermark_state)
+            codex.skipped_bad_lines += extra.skipped_bad_lines
+            codex.skipped_dirty_rounds += extra.skipped_dirty_rounds
+        else:
+            extra = collect_claude_sessions(root, watermark_state=claude.new_watermark_state)
+            claude.sessions.extend(extra.sessions)
+            claude.new_watermark_state.update(extra.new_watermark_state)
+            claude.skipped_bad_lines += extra.skipped_bad_lines
     internal = collect_internal_usage(_meter_path(), watermark_state=prior.get("internal"))
 
     known_llm_tasks, all_tasks = _known_and_all_cron_task_names()
@@ -187,11 +219,23 @@ def token_ledger_run(as_json: bool) -> None:
 
 @cmd_token_ledger.command("show")
 @click.option("--json", "as_json", is_flag=True, default=False, help="JSON 输出")
-def token_ledger_show(as_json: bool) -> None:
+@click.option("--session", "sessions", multiple=True, help="Native session ID in the event index (repeatable)")
+@click.option("--start", help="Inclusive usage-report timestamp, ISO 8601 with timezone")
+@click.option("--end", help="Exclusive usage-report timestamp, ISO 8601 with timezone")
+def token_ledger_show(as_json: bool, sessions: tuple[str, ...] = (), start: str | None = None, end: str | None = None) -> None:
     """只读打印落盘产物聚合(读 data/llm/token_ledger/, 与看板 /api/boss-sight/token-ledger 同一份读法;
     未跑过 `omni token-ledger run` 时 available=false, 不会现场重扫 GB 级原始日志)。"""
-    from omnicompany.dashboard.boss_sight.token_ledger_view import build_token_ledger_view
+    from omnicompany.packages.services.boss_sight.token_ledger_view import build_token_ledger_view
 
+    if sessions or start or end:
+        from omnicompany.packages.services._core.token_ledger.event_index import query_index
+
+        try:
+            view = query_index(_out_dir() / "events.sqlite", sessions, start, end)
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        click.echo(json.dumps(view, ensure_ascii=False, indent=2))
+        return
     view = build_token_ledger_view()
     if as_json:
         click.echo(json.dumps(view, ensure_ascii=False, indent=2))
@@ -202,6 +246,42 @@ def token_ledger_show(as_json: bool) -> None:
     click.echo(f"生成于: {view['generated_at']}")
     click.echo(f"会话: {len(view['by_session'])} · 按天: {len(view['by_day'])} · 按项目: {len(view['by_project'])}")
     click.echo(f"未关联: {len(view['unlinked_bucket'])} · 内部调用行: {len(view['internal_by_caller_day'])}")
+
+
+@cmd_token_ledger.command("cost")
+@click.option("--session", "session_id", required=True, help="Native session ID for one customer quote.")
+@click.option("--fx-rate", default="7.0", show_default=True, help="Downward CNY per USD estimate.")
+@click.option("--output", "output_path", type=click.Path(dir_okay=False, path_type=Path), default=None, help="Redacted JSONL output path.")
+@click.option("--json", "as_json", is_flag=True, default=False, help="JSON receipt output.")
+def token_ledger_cost(session_id: str, fx_rate: str, output_path: Path | None, as_json: bool) -> None:
+    """Price one recorded session and write a redacted customer JSONL receipt."""
+    try:
+        fx = Decimal(str(fx_rate))
+    except (InvalidOperation, ValueError):
+        raise click.UsageError("--fx-rate must be a positive decimal") from None
+    if fx <= 0:
+        raise click.UsageError("--fx-rate must be a positive decimal")
+    ledger_path = _out_dir() / "sessions.jsonl"
+    rows = [row for row in _load_prior_jsonl(ledger_path) if row.get("session_id") == session_id]
+    if not rows:
+        raise click.ClickException(
+            f"session not found in {ledger_path.resolve()}; run omni token-ledger run first"
+        )
+    if output_path is None:
+        suffix = str(session_id)[-8:] or "unknown"
+        output_path = _out_dir() / f"cost_{suffix}.jsonl"
+    from omnicompany.packages.services._core.token_ledger.pricing import export_session_cost
+
+    receipt = export_session_cost(rows, out_path=output_path, fx_rate_cny_per_usd=fx)
+    receipt.update({
+        "session": f"{rows[0].get('provider') or 'unknown'}:{str(session_id)[-8:]}",
+        "fx_rate_cny_per_usd": str(fx),
+    })
+    if as_json:
+        click.echo(json.dumps(receipt, ensure_ascii=False, indent=2))
+    else:
+        click.echo(f"JSONL: {receipt['path']}")
+        click.echo(f"已计价: {receipt['priced']} · 行数: {receipt['rows']} · 汇率: {fx} CNY/USD")
 
 
 __all__ = ["cmd_token_ledger"]

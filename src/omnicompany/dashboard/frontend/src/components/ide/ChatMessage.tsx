@@ -4,31 +4,31 @@ import type { ChatMessage as ChatMessageType } from '../../stores/ideStore'
 const roleStyles: Record<string, React.CSSProperties> = {
   user: {
     alignSelf: 'flex-end',
-    background: '#1a2a3a',
+    background: 'var(--fp-bp-paper-2)',
     borderRadius: '12px 12px 4px 12px',
     maxWidth: '80%',
   },
   assistant: {
     alignSelf: 'flex-start',
-    background: '#1a1a2a',
+    background: 'var(--fp-bp-paper-2)',
     borderRadius: '12px 12px 12px 4px',
     maxWidth: '85%',
   },
   thinking: {
     alignSelf: 'flex-start',
-    background: '#1a1a1a',
-    borderRadius: 8,
+    background: 'var(--fp-bp-solid)',
+    borderRadius: 'var(--fp-bp-r1)',
     maxWidth: '85%',
     opacity: 0.7,
     fontStyle: 'italic' as const,
   },
   system: {
     alignSelf: 'center',
-    background: '#222',
-    borderRadius: 6,
+    background: 'var(--fp-bp-solid)',
+    borderRadius: 'var(--fp-bp-r1)',
     maxWidth: '90%',
     fontSize: 14,
-    color: '#888',
+    color: 'var(--fp-text-2)',
   },
 }
 
@@ -50,14 +50,14 @@ export default function ChatMessage({ message }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', padding: '4px 12px' }}>
       <div style={{ ...style, padding: '8px 12px' }}>
-        <div style={{ fontSize: 14, color: '#666', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 14, color: 'var(--fp-text-2)', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
           <span>{roleLabels[message.role] || message.role}</span>
           <span>{new Date(message.timestamp).toLocaleTimeString()}</span>
         </div>
         {message.role === 'thinking' && !expanded ? (
           <div
             onClick={() => setExpanded(true)}
-            style={{ cursor: 'pointer', color: '#90caf9', fontSize: 14 }}
+            style={{ cursor: 'pointer', color: 'var(--fp-link)', fontSize: 14 }}
           >
             Show reasoning...
           </div>
@@ -69,7 +69,7 @@ export default function ChatMessage({ message }: Props) {
         {message.role === 'thinking' && expanded && (
           <div
             onClick={() => setExpanded(false)}
-            style={{ cursor: 'pointer', color: '#666', fontSize: 14, marginTop: 4 }}
+            style={{ cursor: 'pointer', color: 'var(--fp-text-2)', fontSize: 14, marginTop: 4 }}
           >
             Hide reasoning
           </div>

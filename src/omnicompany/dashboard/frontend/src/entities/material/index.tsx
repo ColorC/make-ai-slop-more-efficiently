@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { lazy, Suspense, useEffect, useState } from 'react'
 import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
-import CodeFileEditor, { type CodeFileDetail } from '../../shell/CodeFileEditor'
+import type { CodeFileDetail } from '../../shell/CodeFileEditor'
 import EmptyState from '../../shell/EmptyState'
 import { CodeFileSidebar } from '../team/sidebar'
+
+const CodeFileEditor = lazy(() => import('../../shell/CodeFileEditor'))
 
 export interface MaterialEntity extends Entity {
   type: 'material'
@@ -64,7 +66,11 @@ const Editor: React.FC<{ entity: MaterialEntity }> = ({ entity }) => {
   }, [entity.id])
   if (error) return <EmptyState text={`加载失败: ${error}`} />
   if (!detail) return <EmptyState text="加载中..." />
-  return <CodeFileEditor detail={detail} defaultView="source" />
+  return (
+    <Suspense fallback={<EmptyState text="加载编辑器..." />}>
+      <CodeFileEditor detail={detail} defaultView="source" />
+    </Suspense>
+  )
 }
 
 export const materialRegistration: EntityRegistration<MaterialEntity> = {

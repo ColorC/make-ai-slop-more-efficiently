@@ -19,18 +19,18 @@ const ST = {
   } as React.CSSProperties,
   menu: {
     position: 'fixed', zIndex: 10021, minWidth: 228, maxWidth: 340,
-    border: '1px solid var(--fp-border-strong)', borderRadius: 5,
+    border: '1px solid var(--fp-border-strong)', borderRadius: 2,
     background: 'var(--fp-solid)', boxShadow: 'var(--fp-shadow-pop)',
     padding: 6, fontFamily: 'var(--fp-font-sans)',
   } as React.CSSProperties,
   title: {
-    padding: '5px 9px 8px', color: 'var(--fp-text-3)', fontSize: 11,
+    padding: '5px 9px 8px', color: 'var(--fp-text-3)', fontSize: 12,
     fontFamily: 'var(--fp-font-mono)', overflow: 'hidden',
     textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   } as React.CSSProperties,
   item: {
     display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-    border: 0, borderRadius: 4, padding: '8px 9px', background: 'transparent',
+    border: 0, borderRadius: 3, padding: '8px 9px', background: 'transparent',
     color: 'var(--fp-text)', textAlign: 'left', fontSize: 13, cursor: 'pointer',
   } as React.CSSProperties,
   divider: {

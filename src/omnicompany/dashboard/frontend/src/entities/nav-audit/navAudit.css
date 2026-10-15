@@ -15,7 +15,7 @@
 /* 结论工具行(chrome): 大数字 + 比例条 + 筛选 + ghost 返回 */
 .na-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
 .na-verdict { display: flex; align-items: baseline; gap: 8px; }
-.na-big { font-family: var(--fp-bp-font-display); font-size: 30px; font-weight: 700; line-height: 1; }
+.na-big { font-family: var(--fp-bp-font-display); font-size: 30px; font-weight: 500; line-height: 1; }
 .na-big.bad { color: var(--fp-err); }
 .na-big.ok { color: var(--fp-ok); }
 .na-verdict .lab { color: var(--fp-text-2); font-size: var(--fp-fs-3); }
@@ -51,7 +51,7 @@
 .na-table tr[data-island="true"] td { background: color-mix(in srgb, var(--fp-err) 7%, transparent); }
 .na-table tr[data-openable="true"] { cursor: pointer; }
 .na-table tr[data-openable="true"]:hover td { background: var(--fp-bg-overlay); }
-.na-fn { display: flex; align-items: center; gap: 7px; color: var(--fp-text); font-weight: 550; }
+.na-fn { display: flex; align-items: center; gap: 7px; color: var(--fp-text); font-weight: 500; }
 .na-fn .go { color: var(--fp-text-3); flex: none; }
 /* 类型 tag: 色点 + mono 短签(桌面独立列;窄屏并入功能格) */
 .na-type { display: inline-flex; align-items: center; gap: 5px; font-family: var(--fp-font-mono);

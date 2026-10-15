@@ -283,6 +283,14 @@ async def auto_compact(
             "[compact] 成功: %d 条消息 → %d 条 (摘要 %d chars)",
             len(messages), len(compacted), len(summary),
         )
+        try:
+            from omnicompany.dashboard.ccdaemon.hooks.session_companion import (
+                enqueue_native_compact,
+            )
+
+            enqueue_native_compact(messages, summary)
+        except Exception:
+            logger.debug("[compact] companion enqueue skipped", exc_info=True)
         return compacted, 0  # 重置失败计数
 
     except Exception as e:

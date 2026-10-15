@@ -1,0 +1,395 @@
+.play-map {
+  --map-ink: #e8edf3;
+  --map-muted: #a9b3c0;
+  --map-line: #394553;
+  --map-accent: #75a9d8;
+  position: relative;
+  min-height: 30rem;
+  color: var(--map-ink);
+  background: #171d24;
+  border: 1px solid var(--map-line);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+/* The map is an optional workspace.  Keep the play surface clear until the
+   user opens it, then give the graph the full viewport width. */
+#play-map {
+  display: none;
+}
+
+#play-map.is-open {
+  position: fixed;
+  inset: 1rem;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100vh - 2rem);
+  box-shadow: 0 1rem 4rem rgb(0 0 0 / 45%);
+}
+
+.play-map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: center;
+  padding: .8rem 1rem;
+  background: #202832;
+  border-bottom: 1px solid var(--map-line);
+}
+
+.play-map-title {
+  flex: 0 0 auto;
+  margin: 0 .25rem 0 0;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+.play-map-search {
+  flex: 1 1 18rem;
+  min-width: 10rem;
+  padding: .55rem .75rem;
+  color: var(--map-ink);
+  background: #171d24;
+  border: 1px solid var(--map-line);
+  border-radius: .55rem;
+}
+
+.play-map button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.play-map-main,
+.play-map-close {
+  padding: .5rem .75rem;
+  color: #10161c;
+  background: var(--map-accent);
+  border: 0;
+  border-radius: .55rem;
+  white-space: nowrap;
+}
+
+.play-map-graph {
+  flex: 1 1 auto;
+  min-height: 28rem;
+  height: 65vh;
+  padding: 1rem;
+}
+
+.play-map-graph-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: .7rem;
+}
+
+.play-map-node,
+.play-map-edge {
+  display: block;
+  width: 100%;
+  padding: .8rem;
+  text-align: left;
+  color: var(--map-ink);
+  background: #202832;
+  border: 1px solid var(--map-line);
+  border-radius: .65rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play-map-observation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: .75rem;
+}
+
+.play-map-latest {
+  max-width: 20rem;
+  margin-bottom: 1rem;
+}
+
+.play-map-latest h3 {
+  margin-bottom: .55rem;
+}
+
+.play-map-latest-thumb {
+  display: block;
+  width: 100%;
+  padding: .25rem;
+  background: #202832;
+  border: 1px solid var(--map-line);
+  border-radius: .55rem;
+}
+
+.play-map-latest-thumb .play-map-screenshot {
+  max-height: 22rem;
+}
+
+.play-map-gaps {
+  margin-top: 1rem;
+  color: var(--map-muted);
+}
+
+.play-map-gaps summary {
+  cursor: pointer;
+}
+
+.play-map-observation {
+  min-width: 0;
+  color: var(--map-muted);
+  font-size: .85rem;
+}
+
+.play-map-observation p {
+  margin: .35rem 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-map-observation-thumb {
+  display: block;
+  width: 100%;
+  min-height: 8rem;
+  padding: .25rem;
+  color: var(--map-ink);
+  background: #202832;
+  border: 1px solid var(--map-line);
+  border-radius: .55rem;
+  cursor: pointer;
+}
+
+.play-map-observation-thumb .play-map-screenshot {
+  max-height: 13rem;
+}
+
+.play-map-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .8rem;
+  margin-top: 1rem;
+  color: var(--map-muted);
+}
+
+.play-map-page {
+  padding: .45rem .7rem;
+  color: var(--map-ink);
+  background: #202832;
+  border: 1px solid var(--map-line);
+  border-radius: .45rem;
+}
+
+.play-map-page:disabled {
+  cursor: default;
+  opacity: .45;
+}
+
+.play-map-muted {
+  color: var(--map-muted);
+}
+
+.play-map-node:hover,
+.play-map-node:focus-visible,
+.play-map-edge:hover,
+.play-map-edge:focus-visible,
+.play-map-hotspot:hover,
+.play-map-hotspot:focus-visible {
+  border-color: var(--map-accent);
+  outline: 2px solid #5d83a4;
+  outline-offset: 1px;
+}
+
+.play-map-edge {
+  color: var(--map-muted);
+  background: #202832;
+}
+
+.play-map-detail {
+  position: absolute;
+  inset: 4.25rem 0 0;
+  z-index: 2;
+  overflow: auto;
+  padding: 1rem;
+  background: #171d24;
+  border-top: 1px solid var(--map-line);
+}
+
+.play-map-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .8rem;
+}
+
+.play-map-detail h2,
+.play-map-detail h3 {
+  margin: 0;
+}
+
+.play-map-state-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.play-map-state {
+  padding: .75rem;
+  background: #202832;
+  border: 1px solid var(--map-line);
+  border-radius: .75rem;
+}
+
+.play-map-state h3 {
+  margin-bottom: .6rem;
+  color: var(--map-muted);
+  font-size: .95rem;
+}
+
+.play-map-screenshot-host {
+  min-height: 5rem;
+  margin-bottom: .65rem;
+  background: #222c37;
+  border-radius: .45rem;
+  overflow: hidden;
+}
+
+.play-map-screenshot {
+  display: block;
+  width: 100%;
+  max-height: 28rem;
+  object-fit: contain;
+}
+
+.play-map-hotspot {
+  width: 100%;
+  padding: .5rem .65rem;
+  color: var(--map-accent);
+  background: #202832;
+  border: 1px dashed var(--map-line);
+  border-radius: .45rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play-map-related {
+  display: grid;
+  gap: .5rem;
+  margin-top: .65rem;
+}
+
+@media (max-width: 42rem) {
+  .play-map-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .play-map-detail {
+    inset: 7.8rem 0 0;
+  }
+
+  #play-map:target {
+    inset: .5rem;
+    max-height: calc(100vh - 1rem);
+  }
+}
+
+/* 2026-09-17: interface catalog — category legend and per-surface summary. */
+.play-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .9rem;
+  padding: .5rem 1rem;
+  background: #1b222b;
+  border-bottom: 1px solid var(--map-line);
+  font-size: .85rem;
+  color: var(--map-muted);
+}
+
+.play-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  white-space: nowrap;
+}
+
+.play-map-legend-item i {
+  display: inline-block;
+  width: .7rem;
+  height: .7rem;
+  border-radius: .2rem;
+}
+
+.play-map-catalog {
+  margin: 0 0 1rem;
+  padding: .8rem .9rem;
+  background: #202832;
+  border: 1px solid var(--map-line);
+  border-radius: .75rem;
+  line-height: 1.6;
+}
+
+.play-map-catalog p {
+  margin: .45rem 0 0;
+}
+
+.play-map-catalog h3 {
+  margin-top: .8rem;
+  font-size: .95rem;
+  color: var(--map-muted);
+}
+
+.play-map-catalog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+
+.play-map-chip {
+  padding: .1rem .55rem;
+  border-radius: 999px;
+  font-size: .8rem;
+  color: #fff;
+}
+
+.play-map-chip-quiet {
+  color: var(--map-ink);
+  background: #2c3642;
+}
+
+.play-map-group {
+  margin: .9rem 0 .35rem;
+  font-size: .9rem;
+  color: var(--map-muted);
+}
+
+/* 2026-09-17: the detail is a right-hand drawer, so the selected surface's
+   highlighted links stay visible on the graph beside it. */
+@media (min-width: 900px) {
+  .play-map-detail {
+    left: auto;
+    width: min(30rem, 42%);
+    border-top: 0;
+    border-left: 1px solid var(--map-line);
+    box-shadow: -1rem 0 2.5rem rgb(0 0 0 / 35%);
+  }
+}
+
+/* 2026-09-17: the map is the embedded Spark Workshop game map. */
+.play-map-frame {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: #fff;
+}
+
+.play-map-message {
+  margin: 0;
+  padding: 1.5rem;
+  color: var(--map-muted);
+}

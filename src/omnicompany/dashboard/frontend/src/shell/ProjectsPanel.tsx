@@ -43,24 +43,24 @@ const S: Record<string, any> = {
   // 标准①: 无标题头 —— "项目"标题栏退役(VSCode section/页签已标识)。仅留右上角浮动控件簇(刷新 + ⋯), 零行高不占头部。
   ctrls: { position: 'absolute' as const, top: 4, right: 6, zIndex: 5, display: 'flex', gap: 2 },
   // 图标按钮 = 安静近无形, hover 才浮出极淡玻璃; 放大触达 (Fitts)
-  iconBtn: { width: 28, height: 28, border: '1px solid transparent', borderRadius: 7, background: 'transparent', color: 'var(--fp-text-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: `all 150ms ${EASE}` },
+  iconBtn: { width: 28, height: 28, border: '1px solid transparent', borderRadius: 2, background: 'transparent', color: 'var(--fp-text-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: `all 150ms ${EASE}` },
   // 用量块 = 安静近实色玻璃面板: 与下方项目卡分层, 顶部高光勾边
   usage: {
     background: 'var(--fp-glass)', backdropFilter: GLASS, WebkitBackdropFilter: GLASS,
-    border: '1px solid var(--fp-border)', borderRadius: 11, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
+    border: '1px solid var(--fp-border)', borderRadius: 3, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
     padding: '10px 12px', margin: '0 4px 12px',
   },
   // 块标题 = 次级弱灰微字, 不与项目区标题抢焦点
-  usageHead: { color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 600 as const, letterSpacing: '.02em', margin: '0 0 6px' },
+  usageHead: { color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 500 as const, letterSpacing: '.02em', margin: '0 0 6px' },
   usageRow: { display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' as const, padding: '2px 0' },
   // 提供方名 = 冷蓝次级标签
-  usageName: { color: 'var(--fp-link)', fontSize: 13, fontWeight: 550 as const, width: 50, flexShrink: 0 },
+  usageName: { color: 'var(--fp-link)', fontSize: 13, fontWeight: 500 as const, width: 50, flexShrink: 0 },
   // 数值 = 主文本色等宽, 便于对齐扫读 (frostpane: 数字/ID 用等宽)
   usageVal: { color: 'var(--fp-text-2)', fontSize: 13, fontFamily: MONO },
   // 最次 = 弱灰微字
   usageDim: { color: 'var(--fp-text-3)', fontSize: 12, fontFamily: MONO },
   // 分组标题 = 次级弱灰小字 + 计数, 用间距编码分组 (组间 > 组内)
-  groupHead: { display: 'flex', alignItems: 'baseline', gap: 6, color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 600 as const, letterSpacing: '.02em', margin: '14px 8px 6px' },
+  groupHead: { display: 'flex', alignItems: 'baseline', gap: 6, color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 500 as const, letterSpacing: '.02em', margin: '14px 8px 6px' },
   groupCount: { color: 'var(--fp-text-3)', fontSize: 12, fontWeight: 400 as const, fontFamily: MONO },
   // 卡片网格: 照 ThreadMonitorPanel 的 auto-fill 网格, 侧栏窄 → minmax 收到 208; 4px 栅格 gap=8
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(208px, 1fr))', gap: 8, margin: '0 4px' },
@@ -69,16 +69,16 @@ const S: Record<string, any> = {
   card: {
     position: 'relative' as const, display: 'flex', flexDirection: 'column' as const, minWidth: 0,
     background: 'var(--fp-glass)', backdropFilter: GLASS, WebkitBackdropFilter: GLASS,
-    border: '1px solid var(--fp-border)', borderRadius: 11,
+    border: '1px solid var(--fp-border)', borderRadius: 3,
     boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
     padding: 12, cursor: 'pointer', transition: `border-color 150ms ${EASE}, transform 150ms ${EASE}`,
   },
   // 卡头一行: 图章 + 标题(flex1 撑开醒目) + ⋯ 菜单
   cardTop: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
   // 项目图章: 项目背景图缩成 28 圆角方块(有 bg 用图, 无则落 ProjectIcon lucide/字母)
-  stamp: { width: 28, height: 28, borderRadius: 7, flexShrink: 0, overflow: 'hidden', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--fp-border)' },
+  stamp: { width: 28, height: 28, borderRadius: 2, flexShrink: 0, overflow: 'hidden', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--fp-border)' },
   // 卡名 = 卡内主焦点: 15px / 650, 主文本色; 单行省略
-  cardName: { flex: 1, minWidth: 0, color: 'var(--fp-text)', fontSize: 15, fontWeight: 650 as const, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+  cardName: { flex: 1, minWidth: 0, color: 'var(--fp-text)', fontSize: 15, fontWeight: 500 as const, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
   // 脚注一行: 活跃格 + 相对时间; 弱灰微字, 等宽便于扫读
   foot: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 },
   footTime: { color: 'var(--fp-text-3)', fontSize: 12, fontFamily: MONO, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
@@ -116,7 +116,7 @@ function StatusChip({ p }: { p: ProjectItem }) {
     <Tooltip content={p.index_stale ? (p.stale_reason || 'index 久未核对, 状态可能过期') : undefined} position="left">
       <span
         data-testid="projects-panel-status"
-        style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, borderRadius: 999, padding: '1px 8px', color: m.color, background: m.bg, border: `1px solid ${m.border}` }}
+        style={{ flexShrink: 0, fontSize: 12, fontWeight: 500, borderRadius: 999, padding: '1px 8px', color: m.color, background: m.bg, border: `1px solid ${m.border}` }}
       >
         {m.label}
       </span>
@@ -159,6 +159,7 @@ function remainColor(pct: number): string {
 }
 
 function UsageMeter() {
+  const openTab = usePanels((s) => s.openTab)
   const [data, setData] = useState<{ claude?: ProvUsage; codex?: ProvUsage; internal?: RuntimeUsage } | null>(null)
   const load = useCallback(() => {
     fetch('/api/boss-sight/usage')
@@ -219,7 +220,15 @@ function UsageMeter() {
   }
   return (
     <div style={S.usage} data-testid="workboard-usage">
-      <div style={S.usageHead}>用量 · 官方剩余配额</div>
+      <div style={{ ...S.usageHead, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>用量 · 官方剩余配额</span>
+        <button
+          type="button"
+          style={{ ...S.iconBtn, width: 'auto', height: 22, padding: '0 6px', fontSize: 12 }}
+          data-testid="workboard-usage-all"
+          onClick={() => openTab({ type: 'settings', id: 'subscriptions' }, '订阅配额')}
+        >全部</button>
+      </div>
       {data === null && <div style={S.usageDim}>加载中…</div>}
       {data !== null && (<>{row('Claude', data.claude)}{row('Codex', data.codex)}{runtimeRow(data.internal)}</>)}
     </div>
@@ -313,7 +322,7 @@ function ProjectsPanel() {
           items={[
             {
               label: '在驾驶舱打开项目板', icon: <LayoutGrid size={15} />, testid: 'projects-panel-board',
-              onClick: () => { openTab({ type: 'controller', id: 'main' }, '总控'); useControllerView.getState().setView('project') },
+              onClick: () => { openTab({ type: 'controller', id: 'main' }, '中枢'); useControllerView.getState().setView('project') },
             },
             {
               label: '打开任务窗口', icon: <ClipboardList size={15} />, testid: 'projects-panel-open-quests',

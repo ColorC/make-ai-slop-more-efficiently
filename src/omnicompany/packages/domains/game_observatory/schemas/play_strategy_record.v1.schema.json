@@ -1,0 +1,745 @@
+{
+  "$defs": {
+    "ApplicabilityScopeV1": {
+      "additionalProperties": false,
+      "properties": {
+        "account_scope_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Account Scope Id"
+        },
+        "build_scope_id": {
+          "minLength": 1,
+          "title": "Build Scope Id",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "game_version": {
+          "minLength": 1,
+          "title": "Game Version",
+          "type": "string"
+        },
+        "locale": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locale"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_through": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid Through"
+        }
+      },
+      "required": [
+        "environment_id",
+        "game_id",
+        "build_scope_id",
+        "game_version"
+      ],
+      "title": "ApplicabilityScopeV1",
+      "type": "object"
+    },
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "FactRecordV1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_refs": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "inferred",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "rationale": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "rationale"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "contradicted"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "conflict_fact_ids": {
+                "minItems": 1
+              },
+              "evidence_refs": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "evidence_refs",
+              "conflict_fact_ids"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "applicability": {
+          "$ref": "#/$defs/ApplicabilityScopeV1"
+        },
+        "conflict_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Conflict Fact Ids",
+          "type": "array"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "inferred",
+            "unknown",
+            "contradicted"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "supersedes_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supersedes Fact Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "statement",
+        "status",
+        "applicability",
+        "recorded_at"
+      ],
+      "title": "FactRecordV1",
+      "type": "object"
+    },
+    "StrategyCandidateV1": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expected_benefits": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Expected Benefits",
+          "type": "array"
+        },
+        "hypothesis": {
+          "minLength": 1,
+          "title": "Hypothesis",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "legal_actions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Legal Actions",
+          "type": "array"
+        },
+        "long_term_effects": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Long Term Effects",
+          "type": "array"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "opportunity_costs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Opportunity Costs",
+          "type": "array"
+        },
+        "risks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risks",
+          "type": "array"
+        },
+        "short_term_effects": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Short Term Effects",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "hypothesis",
+        "legal_actions",
+        "expected_benefits"
+      ],
+      "title": "StrategyCandidateV1",
+      "type": "object"
+    },
+    "StrategyMetricDefinitionV1": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "enum": [
+            "maximize",
+            "minimize",
+            "target"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "primary": {
+          "default": false,
+          "title": "Primary",
+          "type": "boolean"
+        },
+        "safety_critical": {
+          "default": false,
+          "title": "Safety Critical",
+          "type": "boolean"
+        },
+        "target_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Value"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "direction",
+        "unit"
+      ],
+      "title": "StrategyMetricDefinitionV1",
+      "type": "object"
+    },
+    "StrategyTrialResultV1": {
+      "additionalProperties": false,
+      "properties": {
+        "action_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Action Ids",
+          "type": "array"
+        },
+        "candidate_id": {
+          "minLength": 1,
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "choice_rationale": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Choice Rationale"
+        },
+        "confounders": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Confounders",
+          "type": "array"
+        },
+        "considered_candidate_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Considered Candidate Ids",
+          "type": "array"
+        },
+        "decision_point_id": {
+          "minLength": 1,
+          "title": "Decision Point Id",
+          "type": "string"
+        },
+        "deviations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deviations",
+          "type": "array"
+        },
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "metric_values": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Metric Values",
+          "type": "object"
+        },
+        "observed_constraints": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Observed Constraints",
+          "type": "array"
+        },
+        "pre_state": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Pre State",
+          "type": "array"
+        },
+        "realized_opportunity_costs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Realized Opportunity Costs",
+          "type": "array"
+        },
+        "result_summary": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result Summary"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "aborted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "decision_point_id",
+        "candidate_id",
+        "environment_id",
+        "started_at",
+        "ended_at",
+        "status",
+        "evidence_refs"
+      ],
+      "title": "StrategyTrialResultV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "baseline_candidate_id": {
+      "minLength": 1,
+      "title": "Baseline Candidate Id",
+      "type": "string"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/StrategyCandidateV1"
+      },
+      "minItems": 2,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "conclusion": {
+      "default": "baseline_only",
+      "enum": [
+        "baseline_only",
+        "inconclusive",
+        "evaluated_not_better",
+        "provisionally_better",
+        "verified_better"
+      ],
+      "title": "Conclusion",
+      "type": "string"
+    },
+    "conclusion_notes": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Conclusion Notes",
+      "type": "array"
+    },
+    "constraints": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Constraints",
+      "type": "array"
+    },
+    "counterexamples": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Counterexamples",
+      "type": "array"
+    },
+    "decision_problem": {
+      "minLength": 1,
+      "title": "Decision Problem",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "external_guide_facts": {
+      "items": {
+        "$ref": "#/$defs/FactRecordV1"
+      },
+      "title": "External Guide Facts",
+      "type": "array"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "metrics": {
+      "items": {
+        "$ref": "#/$defs/StrategyMetricDefinitionV1"
+      },
+      "minItems": 1,
+      "title": "Metrics",
+      "type": "array"
+    },
+    "objective_priority": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Objective Priority",
+      "type": "array"
+    },
+    "preconditions": {
+      "items": {
+        "$ref": "#/$defs/FactRecordV1"
+      },
+      "minItems": 1,
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.play-strategy-record.v1",
+      "default": "game-observatory.play-strategy-record.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "selected_candidate_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Selected Candidate Id"
+    },
+    "trial_results": {
+      "items": {
+        "$ref": "#/$defs/StrategyTrialResultV1"
+      },
+      "title": "Trial Results",
+      "type": "array"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "game_id",
+    "environment_id",
+    "decision_problem",
+    "objective_priority",
+    "preconditions",
+    "constraints",
+    "metrics",
+    "candidates",
+    "baseline_candidate_id",
+    "conclusion_notes",
+    "updated_at"
+  ],
+  "title": "PlayStrategyRecordV1",
+  "type": "object"
+}

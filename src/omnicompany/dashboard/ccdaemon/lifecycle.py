@@ -110,13 +110,21 @@ def read_status(probe: bool = True) -> DaemonStatus:
         # 端口有人听 → 必须确认占用者是 ccdaemon 本身 (查 /health 签名), 否则被别的
         # 进程抢端口时会误判 daemon 活着 → 代理静默 404。命中则顺手把真 pid 从
         # /health 取回, 让 status/stop/restart 仍能正常工作。
-        health_pid = _daemon_health_pid(port)
+        health_pid = _daemon_health_pid(port, expected_pid=pid if alive else None)
         if health_pid is not None:
             serving = True
             if not alive:
                 alive = True
                 if pid is None:
                     pid = health_pid
+                    # A previous daemon can fail its bind after writing the
+                    # shared marker.  Restore the marker from the signed health
+                    # response so every proxy request does not fall back to a
+                    # synchronous /health probe.
+                    try:
+                        write_pid(health_pid)
+                    except OSError:
+                        logger.debug("restore ccdaemon pid marker failed", exc_info=True)
     return DaemonStatus(pid=pid, port=port, alive=alive, serving=serving)
 
 
@@ -160,7 +168,7 @@ def _port_alive(port: int) -> bool:
         return False
 
 
-def _daemon_health_pid(port: int) -> int | None:
+def _daemon_health_pid(port: int, *, expected_pid: int | None = None) -> int | None:
     """端口被占时确认占用者就是 ccdaemon 本身 — 命中 /health 看签名, 返回其 daemon_pid.
 
     为什么需要: pid 文件丢/陈旧时 read_status 只靠 `_port_alive` 判活, 但任何进程
@@ -180,6 +188,30 @@ def _daemon_health_pid(port: int) -> int | None:
                 return None
             data = json.loads(r.read(8192).decode("utf-8", "replace"))
     except Exception:
+        # Rolling compatibility: old daemons still make /health discover every
+        # detached PTY. If we already own a live pid file, verify the same port
+        # through the cheap chat-health signature instead of declaring a false
+        # zombie during CPU pressure. A missing/stale pid still requires the
+        # stronger /health response with daemon_pid.
+        if not expected_pid:
+            return None
+        try:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/cc/chat/health", timeout=0.5
+            ) as response:
+                if response.status != 200:
+                    return None
+                fallback = json.loads(
+                    response.read(8192).decode("utf-8", "replace")
+                )
+        except Exception:
+            return None
+        if (
+            isinstance(fallback, dict)
+            and fallback.get("status") == "ok"
+            and "claude_agent_sdk_version" in fallback
+        ):
+            return expected_pid
         return None
     if not isinstance(data, dict) or "boss_sight" not in data:
         return None
@@ -202,8 +234,14 @@ def write_port(port: int) -> None:
 def clear_pid() -> None:
     pf = pid_file()
     try:
+        # Multiple short-lived startup attempts can share this marker.  Only
+        # the process that owns the current value may remove it; a failed bind
+        # from an older attempt must not erase the live daemon's marker.
+        marker = int(pf.read_text(encoding="utf-8").strip() or "0")
+        if marker != os.getpid():
+            return
         pf.unlink()
-    except FileNotFoundError:
+    except (FileNotFoundError, ValueError):
         pass
     except OSError as e:
         logger.warning("clear_pid failed: %s", e)

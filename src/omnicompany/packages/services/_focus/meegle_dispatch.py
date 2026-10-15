@@ -208,7 +208,7 @@ def route_meegle_item(
         }
     else:
         if router is None:
-            from omnicompany.dashboard.boss_sight.services.dispatch_router import route
+            from omnicompany.packages.services.boss_sight.services.dispatch_router import route
 
             router = route
         decision = router(
@@ -286,7 +286,7 @@ async def _submit_managed_pane(pane_id: str, message: str) -> dict[str, Any]:
     """经 ccdaemon 的受管终端通道粘贴并提交，不借用户键盘。"""
     import websockets
 
-    from omnicompany.dashboard.ccdaemon.lifecycle import read_status
+    from omnicompany.dashboard.ccdaemon.api import read_status
 
     daemon = read_status()
     if not daemon.serving or not daemon.port:
@@ -346,7 +346,7 @@ async def start_routed_meegle_item(
     kind = str(decision.get("kind") or "")
     task_id = str(item.get("id") or "")
     if kind == "send_active_window":
-        from omnicompany.dashboard.boss_sight.services import agent_registry, winjump
+        from omnicompany.packages.services.boss_sight.services import agent_registry, winjump
 
         target_key = str(decision.get("target_key") or "")
         if str(item.get("assignee") or "") != target_key:
@@ -402,9 +402,10 @@ async def start_routed_meegle_item(
             )
         return response
 
-    if kind == "send_poof_pane":
+    if kind in {"send_managed_pane", "send_poof_pane"}:  # legacy decision compatibility
         pane_id = str(decision.get("target_pane") or "")
-        target_key = str(decision.get("target_key") or f"poof:{pane_id}")
+        key_prefix = "managed" if kind == "send_managed_pane" else "poof"
+        target_key = str(decision.get("target_key") or f"{key_prefix}:{pane_id}")
         if str(item.get("assignee") or "") != target_key:
             return {
                 "ok": False,

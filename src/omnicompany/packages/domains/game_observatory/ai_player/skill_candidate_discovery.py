@@ -263,6 +263,7 @@ def crystallize_repeated_atomic_skill_candidates(
     store: AIPlayerStore,
     environment_id: str,
     *,
+    current_state_id: str | None = None,
     minimum_evidence_samples: int = 1,
     limit: int = 8,
 ) -> SkillCandidateDiscoveryReport:
@@ -272,6 +273,11 @@ def crystallize_repeated_atomic_skill_candidates(
     signed SkillRun validation; it is no longer required before the first replay trial.
     """
 
+    # Callers can provide the just-observed state to keep the discovery call
+    # aligned with the action boundary.  Candidate selection is deliberately
+    # still environment-wide: a successful edge may be reusable from a prior
+    # state and the existing validation rules own that eligibility decision.
+    _ = current_state_id
     if minimum_evidence_samples < 1:
         raise ValueError("automatic skill discovery requires at least one evidence sample")
     environment = store.get_environment(environment_id)

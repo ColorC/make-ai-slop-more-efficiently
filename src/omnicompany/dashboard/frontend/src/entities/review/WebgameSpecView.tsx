@@ -25,19 +25,19 @@ const S: Record<string, React.CSSProperties> = {
   // 内容区: 撑满, 列向。
   body: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' },
   // 文档阅读区: 安静实表面(护眼), 浮在渐变上。
-  doc: { flex: 1, minHeight: 0, overflow: 'auto', margin: '0 10px 10px', padding: '20px 24px', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 11, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)', fontFamily: 'var(--fp-font-sans)' },
+  doc: { flex: 1, minHeight: 0, overflow: 'auto', margin: '0 10px 10px', padding: '20px 24px', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 3, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)', fontFamily: 'var(--fp-font-sans)' },
   // 演示外壳: 玻璃卡浮其上(磨砂 + 边缘高光 + token 描边)。
-  demoShell: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', margin: '0 10px 10px', borderRadius: 11, overflow: 'hidden', background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)', border: '1px solid var(--fp-border)', boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)' },
+  demoShell: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', margin: '0 10px 10px', borderRadius: 3, overflow: 'hidden', background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)', border: '1px solid var(--fp-border)', boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)' },
   // 演示卡头: 主操作单显(打开本体) + 弱次级状态字; 长说明只进 tooltip。
   demoHead: { display: 'flex', gap: 10, alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--fp-border-subtle)', flexShrink: 0 },
   // 主操作钮: 显眼(primary), 整段说明撤出界面。
-  primaryBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', border: '1px solid var(--fp-accent)', borderRadius: 7, cursor: 'pointer', fontWeight: 550, fontSize: 14, transition: 'filter 150ms var(--fp-ease)' },
+  primaryBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'var(--fp-bp-seal)', color: '#fff', border: '1px solid rgba(255,240,235,.55)', borderRadius: 2, cursor: 'pointer', fontWeight: 500, fontSize: 14, transition: 'filter 150ms var(--fp-ease)' },
   // 次级状态字: 13px 弱灰。
   demoNote: { fontSize: 13, color: 'var(--fp-text-3)' },
   iframe: { flex: 1, minHeight: 0, border: 'none', background: '#fff', width: '100%' },
   // 文件树外壳: 长 mono 列表保持安静实表面, 不盖死渐变。
-  treeShell: { flex: 1, minHeight: 0, overflow: 'auto', margin: '0 10px 10px', borderRadius: 11, background: 'var(--fp-surface)', border: '1px solid var(--fp-border)' },
-  filePane: { flex: 1, minHeight: 0, overflow: 'auto', margin: '0 10px 10px', padding: 10, borderRadius: 11, background: 'var(--fp-surface)', border: '1px solid var(--fp-border)' },
+  treeShell: { flex: 1, minHeight: 0, overflow: 'auto', margin: '0 10px 10px', borderRadius: 3, background: 'var(--fp-surface)', border: '1px solid var(--fp-border)' },
+  filePane: { flex: 1, minHeight: 0, overflow: 'auto', margin: '0 10px 10px', padding: 10, borderRadius: 3, background: 'var(--fp-surface)', border: '1px solid var(--fp-border)' },
   empty: { padding: 16, color: 'var(--fp-text-3)', fontSize: 13 },
 }
 
@@ -87,7 +87,7 @@ export function WebgameSpecView({ m }: { m: Material }) {
             background: active ? 'var(--fp-surface)' : 'transparent',
             color: active ? 'var(--fp-text)' : 'var(--fp-text-3)',
             border: active ? '1px solid var(--fp-border)' : '1px solid transparent',
-            borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: active ? 550 : 400,
+            borderRadius: 2, cursor: 'pointer', fontSize: 14, fontWeight: active ? 550 : 400,
             whiteSpace: 'nowrap', transition: 'background 150ms var(--fp-ease), color 150ms var(--fp-ease)',
           }}
         >

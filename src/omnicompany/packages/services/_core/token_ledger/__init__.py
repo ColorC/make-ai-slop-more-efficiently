@@ -29,6 +29,7 @@ from .codex_source import CodexCollectResult, CodexSessionUsage, collect_codex_s
 from .internal_source import InternalCallerDayRow, InternalCollectResult, collect_internal_usage
 from .aggregate import SessionLedgerRow, TokenLedgerAggregate, aggregate_token_ledger
 from .writer import write_token_ledger
+from .pricing import export_session_cost, lookup_model_price, price_session_row
 
 __all__ = [
     "ClaudeCollectResult",
@@ -44,4 +45,7 @@ __all__ = [
     "TokenLedgerAggregate",
     "aggregate_token_ledger",
     "write_token_ledger",
+    "export_session_cost",
+    "lookup_model_price",
+    "price_session_row",
 ]

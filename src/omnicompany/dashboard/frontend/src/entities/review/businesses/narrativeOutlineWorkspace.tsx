@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Check, GitCompare, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
+import { BlueprintSelect } from '../../../components/BlueprintSelect'
 
 const API = '/narrative-studio/api'
 
@@ -125,7 +126,7 @@ export function NarrativeOutlineWorkspace() {
       summary: isBeat ? selectedEntity.summary?.sentence || '' : '',
       function: isBeat ? selectedEntity.function || '' : '',
       status: isBeat ? selectedEntity.status || 'todo' : '',
-      color: 'color' in selectedEntity ? selectedEntity.color || '#8b94a3' : '',
+      color: 'color' in selectedEntity ? selectedEntity.color || 'var(--fp-text-2)' : '',
       review_status: selectedEntity.review_status || 'pending',
       review_note: selectedEntity.review_note || '',
     })
@@ -178,7 +179,7 @@ export function NarrativeOutlineWorkspace() {
     await mutate(
       () => jsonRequest('/entity/storylines', {
         method: 'POST', body: JSON.stringify({
-          id, title, color: '#8b94a3', review_status: 'draft', review_note: null, reviewed_at: null,
+          id, title, color: 'var(--fp-link)', review_status: 'draft', review_note: null, reviewed_at: null,
         }),
       }),
       '已新增剧情线',
@@ -327,17 +328,21 @@ export function NarrativeOutlineWorkspace() {
                     <Field label="大纲说明" value={form.summary || ''} multiline onChange={(value) => setForm({ ...form, summary: value })} />
                     <Field label="作用（可空）" value={form.function || ''} multiline onChange={(value) => setForm({ ...form, function: value })} />
                     <label style={S.label}>制作进度
-                      <select style={S.input} value={form.status || 'todo'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                        <option value="todo">未开始</option><option value="tocomplete">待补全</option><option value="done">完成</option>
-                      </select>
+                      <BlueprintSelect style={{ width: '100%' }} label="制作进度" aria-label="制作进度"
+                        value={form.status || 'todo'} onChange={(v) => setForm({ ...form, status: v })}
+                        options={[
+                          { value: 'todo', label: '未开始' },
+                          { value: 'tocomplete', label: '待补全' },
+                          { value: 'done', label: '完成' },
+                        ]} />
                     </label>
                   </>
                 )}
                 {'color' in selectedEntity && <Field label="颜色" value={form.color || ''} onChange={(value) => setForm({ ...form, color: value })} />}
                 <label style={S.label}>审阅状态
-                  <select style={S.input} value={form.review_status || 'pending'} onChange={(e) => setForm({ ...form, review_status: e.target.value })}>
-                    {Object.entries(REVIEW_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                  </select>
+                  <BlueprintSelect style={{ width: '100%' }} label="审阅状态" aria-label="审阅状态"
+                    value={form.review_status || 'pending'} onChange={(v) => setForm({ ...form, review_status: v })}
+                    options={Object.entries(REVIEW_LABEL).map(([value, label]) => ({ value, label }))} />
                 </label>
                 <Field label="审阅意见" value={form.review_note || ''} multiline onChange={(value) => setForm({ ...form, review_note: value })} />
                 <div style={S.row}>
@@ -409,10 +414,11 @@ function Field({ label, value, onChange, multiline = false }: {
 
 function VersionSelect({ value, versions, onChange }: { value: string; versions: VersionInfo[]; onChange: (value: string) => void }) {
   return (
-    <select style={{ ...S.input, flex: 1 }} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="_working">当前工作内容</option>
-      {versions.map((version) => <option key={version.name} value={version.name}>{version.name}</option>)}
-    </select>
+    <BlueprintSelect style={{ flex: 1 }} label="版本" aria-label="选择版本" value={value} onChange={onChange}
+      options={[
+        { value: '_working', label: '当前工作内容' },
+        ...versions.map((version) => ({ value: version.name, label: version.name })),
+      ]} />
   )
 }
 
@@ -441,27 +447,27 @@ const S: Record<string, CSSProperties> = {
   boardWrap: { minWidth: 0, flex: 1, overflow: 'auto', padding: 14 },
   board: { display: 'grid', gap: 8, alignItems: 'start' },
   side: { width: 340, flexShrink: 0, overflow: 'auto', padding: 12, borderLeft: '1px solid var(--fp-border)', background: 'var(--fp-surface)' },
-  panel: { display: 'flex', flexDirection: 'column', gap: 9, padding: 12, marginBottom: 12, border: '1px solid var(--fp-border)', borderRadius: 8, background: 'var(--fp-bg)' },
+  panel: { display: 'flex', flexDirection: 'column', gap: 9, padding: 12, marginBottom: 12, border: '1px solid var(--fp-border)', borderRadius: 2, background: 'var(--fp-bg)' },
   heading: { margin: 0, fontSize: 13.5 },
   corner: { padding: 10, fontSize: 12, color: 'var(--fp-text-3)' },
-  line: { minHeight: 74, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 7, padding: 10, textAlign: 'left', color: 'inherit', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderLeftWidth: 4, borderRadius: 7, cursor: 'pointer' },
-  cell: { minHeight: 74, display: 'flex', flexDirection: 'column', gap: 6, padding: 6, border: '1px dashed var(--fp-border)', borderRadius: 7 },
-  card: { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 9, color: 'inherit', textAlign: 'left', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 7, cursor: 'pointer' },
+  line: { minHeight: 74, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 7, padding: 10, textAlign: 'left', color: 'inherit', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderLeftWidth: 4, borderRadius: 2, cursor: 'pointer' },
+  cell: { minHeight: 74, display: 'flex', flexDirection: 'column', gap: 6, padding: 6, border: '1px dashed var(--fp-border)', borderRadius: 2 },
+  card: { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6, padding: 9, color: 'inherit', textAlign: 'left', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 2, cursor: 'pointer' },
   stage: { minHeight: 96, borderTop: '3px solid var(--fp-accent)' },
-  summary: { display: 'block', fontSize: 11.5, lineHeight: 1.55, color: 'var(--fp-text-2)' },
-  reviewNote: { fontSize: 11.5, lineHeight: 1.5, color: 'var(--fp-text-2)', padding: 6, borderRadius: 5, background: 'var(--fp-surface)' },
-  pill: { flexShrink: 0, padding: '1px 5px', border: '1px solid', borderRadius: 999, fontSize: 10.5, lineHeight: 1.3 },
-  label: { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11.5, color: 'var(--fp-text-2)' },
-  input: { boxSizing: 'border-box', width: '100%', padding: '7px 8px', color: 'var(--fp-text-1)', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 5, font: 'inherit' },
+  summary: { display: 'block', fontSize: 12, lineHeight: 1.55, color: 'var(--fp-text-2)' },
+  reviewNote: { fontSize: 12, lineHeight: 1.5, color: 'var(--fp-text-2)', padding: 6, borderRadius: 2, background: 'var(--fp-surface)' },
+  pill: { flexShrink: 0, padding: '1px 5px', border: '1px solid', borderRadius: 999, fontSize: 12, lineHeight: 1.3 },
+  label: { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12, color: 'var(--fp-text-2)' },
+  input: { boxSizing: 'border-box', width: '100%', padding: '7px 8px', color: 'var(--fp-text-1)', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 2, font: 'inherit' },
   row: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  button: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 9px', color: 'var(--fp-text-1)', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 5, cursor: 'pointer' },
-  primary: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 10px', color: 'white', background: 'var(--fp-accent)', border: 0, borderRadius: 5, cursor: 'pointer' },
-  danger: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 10px', color: 'var(--fp-danger)', background: 'transparent', border: '1px solid var(--fp-danger)', borderRadius: 5, cursor: 'pointer' },
-  tiny: { display: 'inline-flex', alignItems: 'center', gap: 3, padding: '4px 6px', color: 'var(--fp-text-2)', background: 'transparent', border: '1px solid var(--fp-border)', borderRadius: 4, cursor: 'pointer', fontSize: 11 },
-  addCard: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 4, color: 'var(--fp-text-3)', background: 'transparent', border: 0, cursor: 'pointer', fontSize: 11 },
-  hint: { fontSize: 11.5, color: 'var(--fp-text-3)' },
+  button: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 9px', color: 'var(--fp-text-1)', background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 2, cursor: 'pointer' },
+  primary: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 10px', color: 'white', background: 'var(--fp-bp-seal)', border: '1px solid rgba(255,240,235,.55)', borderRadius: 2, cursor: 'pointer' },
+  danger: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 10px', color: 'var(--fp-danger)', background: 'transparent', border: '1px solid var(--fp-danger)', borderRadius: 2, cursor: 'pointer' },
+  tiny: { display: 'inline-flex', alignItems: 'center', gap: 3, padding: '4px 6px', color: 'var(--fp-text-2)', background: 'transparent', border: '1px solid var(--fp-border)', borderRadius: 3, cursor: 'pointer', fontSize: 12 },
+  addCard: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3, padding: 4, color: 'var(--fp-text-3)', background: 'transparent', border: 0, cursor: 'pointer', fontSize: 12 },
+  hint: { fontSize: 12, color: 'var(--fp-text-3)' },
   notice: { padding: '7px 14px', fontSize: 12, borderBottom: '1px solid var(--fp-border)' },
   empty: { padding: 8, color: 'var(--fp-text-3)', fontSize: 12 },
-  version: { display: 'flex', flexDirection: 'column', gap: 6, padding: 8, border: '1px solid var(--fp-border)', borderRadius: 6 },
-  diff: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4, padding: 8, fontSize: 11.5, lineHeight: 1.55, background: 'var(--fp-surface)', borderRadius: 5 },
+  version: { display: 'flex', flexDirection: 'column', gap: 6, padding: 8, border: '1px solid var(--fp-border)', borderRadius: 2 },
+  diff: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4, padding: 8, fontSize: 12, lineHeight: 1.55, background: 'var(--fp-surface)', borderRadius: 2 },
 }

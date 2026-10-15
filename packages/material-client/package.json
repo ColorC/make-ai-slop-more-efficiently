@@ -1,0 +1,20 @@
+{
+  "name": "@omni/material-client",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Provider-neutral Material graph, representation and revision-aware write client.",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "peerDependencies": {
+    "@omni/material-core": ">=0.2.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

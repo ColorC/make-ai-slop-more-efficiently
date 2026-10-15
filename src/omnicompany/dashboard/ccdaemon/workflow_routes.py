@@ -25,7 +25,7 @@ class RunWorkflowBody(BaseModel):
 
 
 def _orch():
-    from ..boss_sight.services.workflow_orchestrator import get_orchestrator
+    from omnicompany.packages.services.boss_sight.services.workflow_orchestrator import get_orchestrator
 
     return get_orchestrator()
 

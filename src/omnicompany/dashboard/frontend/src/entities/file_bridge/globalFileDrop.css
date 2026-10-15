@@ -42,7 +42,7 @@
 
 .gfd-target strong {
   color: var(--fp-text);
-  font: 650 17px/1.2 var(--fp-font-sans);
+  font: 500 17px/1.2 var(--fp-font-sans);
 }
 
 .gfd-target span {
@@ -93,7 +93,7 @@
   background: var(--fp-bp-panel-hover);
   color: var(--fp-link);
   cursor: pointer;
-  font: 650 11px/1 var(--fp-font-sans);
+  font: 500 11px/1 var(--fp-font-sans);
 }
 
 .gfd-spin {

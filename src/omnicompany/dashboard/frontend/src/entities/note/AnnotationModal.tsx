@@ -13,14 +13,14 @@ interface Props {
 }
 
 const S: Record<string, any> = {
-  snippet: { padding: 8, background: '#111', borderRadius: 4, color: '#999', fontSize: 14, fontStyle: 'italic' as const, marginBottom: 12 },
-  label: { color: '#90caf9', fontSize: 14, marginBottom: 6, marginTop: 12, textTransform: 'uppercase' as const },
-  ann: { padding: 10, background: '#111', border: '1px solid #1a1a1a', borderRadius: 4, marginBottom: 8, fontSize: 14 },
-  meta: { color: '#666', fontSize: 14, marginTop: 4, display: 'flex', gap: 8, alignItems: 'center' },
-  delBtn: { background: 'transparent', border: '1px solid #4a2222', color: '#ef5350', cursor: 'pointer', padding: '1px 8px', fontSize: 14, borderRadius: 3, fontFamily: 'inherit' },
-  textarea: { width: '100%', minHeight: 80, background: '#111', border: '1px solid #333', borderRadius: 4, color: '#e0e0e0', padding: 8, fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', resize: 'vertical' as const, boxSizing: 'border-box' as const },
-  hint: { color: '#666', fontSize: 14, marginTop: 6 },
-  err: { color: '#ef5350', fontSize: 14, marginTop: 6 },
+  snippet: { padding: 8, background: 'var(--fp-bp-solid)', borderRadius: 3, color: 'var(--fp-text-2)', fontSize: 14, fontStyle: 'italic' as const, marginBottom: 12 },
+  label: { color: 'var(--fp-link)', fontSize: 14, marginBottom: 6, marginTop: 12, textTransform: 'uppercase' as const },
+  ann: { padding: 10, background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, marginBottom: 8, fontSize: 14 },
+  meta: { color: 'var(--fp-text-2)', fontSize: 14, marginTop: 4, display: 'flex', gap: 8, alignItems: 'center' },
+  delBtn: { background: 'transparent', border: '1px solid color-mix(in srgb, var(--fp-err) 45%, transparent)', color: 'var(--fp-err)', cursor: 'pointer', padding: '1px 8px', fontSize: 14, borderRadius: 3, fontFamily: 'inherit' },
+  textarea: { width: '100%', minHeight: 80, background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, color: 'var(--fp-text)', padding: 8, fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', resize: 'vertical' as const, boxSizing: 'border-box' as const },
+  hint: { color: 'var(--fp-text-2)', fontSize: 14, marginTop: 6 },
+  err: { color: 'var(--fp-err)', fontSize: 14, marginTop: 6 },
 }
 
 function fmtTs(ts: number): string {
@@ -69,7 +69,7 @@ export default function AnnotationModal({ noteId, open, onClose, anchor, existin
           <div style={S.label}>已有 {existing.length} 条</div>
           {existing.map((a) => (
             <div key={a.id} style={S.ann}>
-              <div style={{ color: '#ccc' }}>{a.comment}</div>
+              <div style={{ color: 'var(--fp-text)' }}>{a.comment}</div>
               <div style={S.meta}>
                 <span>{a.author}</span>
                 <span>·</span>

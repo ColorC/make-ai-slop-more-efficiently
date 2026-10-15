@@ -1,0 +1,24 @@
+{
+  "kind": "run.start",
+  "protocol_version": "0.1.0",
+  "request_id": "req-missing-grant",
+  "run_id": "run-missing-grant",
+  "session_id": "session-missing-grant",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "workspace_cwd": "C:/workspace/omnicompany",
+  "input": {
+    "text": "Run without a grant.",
+    "material_refs": [],
+    "artifact_refs": []
+  },
+  "context": {
+    "context_refs": [],
+    "material_refs": [],
+    "artifact_refs": [],
+    "inline_context": [],
+    "provenance": []
+  },
+  "budget": {}
+}
+

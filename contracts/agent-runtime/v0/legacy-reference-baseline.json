@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-08-15",
+  "source_root": "src/omnicompany",
+  "excluded": [
+    "_graveyard",
+    "_archive*",
+    "_legacy*"
+  ],
+  "symbols": [
+    "AgentNodeLoop",
+    "AgentNodeLoopWithRetry",
+    "ConfigurableAgent",
+    "run_json_agent"
+  ],
+  "consumer_reference_count": 30,
+  "consumer_file_count": 14,
+  "authority_reference_count": 12,
+  "authority_file_count": 5
+}

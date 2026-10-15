@@ -10,7 +10,7 @@
  *   不触达真实后端(截图只验证表现层,不污染真实审阅数据)。
  *
  * 用法(在 frontend/ 目录下跑):
- *   node tests/e2e/visual/v2-blueprint-wave2-shots.mjs [--out <目录>] [--lofa-api https://10.3.43.246:12443]
+ *   node tests/e2e/visual/v2-blueprint-wave2-shots.mjs [--out <目录>] [--lofa-api https://192.0.2.10:12443]
  */
 import { chromium } from 'playwright';
 import { readFile, mkdir } from 'fs/promises';
@@ -19,7 +19,7 @@ import { extname, join, normalize } from 'path';
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const OUT = arg('out', join(process.cwd(), 'tests/e2e/visual/_shots/v2-blueprint-wave2'));
-const LOFA_API = arg('lofa-api', 'https://10.3.43.246:12443');
+const LOFA_API = arg('lofa-api', 'https://192.0.2.10:12443');
 const WWW = arg('lofa-www', 'C:/workspace/lofa/app/www');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 

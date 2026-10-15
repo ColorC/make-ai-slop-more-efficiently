@@ -86,6 +86,8 @@ def run_command_capped(cmd: str, timeout_s: int = 1800) -> subprocess.CompletedP
             (err or "") + f"\n[cron] 超时 {timeout_s}s, 已杀进程树(taskkill /T)")
 
 _CADENCE_SECONDS = {
+    "@every1m": 60,
+    "@every10m": 600,
     "@every15m": 900,  # 2026-07-03 批3: 笔记消费任务水位线级扫描(纯确定性, 无变更零 LLM)
     "@hourly": 3600,
     "@daily": 86400,
@@ -93,6 +95,12 @@ _CADENCE_SECONDS = {
     "@monthly": 2592000,
     "@yearly": 31536000,
 }
+
+# Windows Task Scheduler wakes on wall-clock minute boundaries, while a task's
+# last_run_at is recorded a few seconds into the tick. Without a small
+# tolerance, an exact @every10m task misses every next heartbeat and runs every
+# 20 minutes instead. Keep the tolerance much smaller than the shortest preset.
+_DUE_CLOCK_SKEW_TOLERANCE_SECONDS = 30
 
 # 本部门标准治理任务(ensure 时若缺则建)
 _GOVERNANCE_TASKS = [
@@ -102,9 +110,6 @@ _GOVERNANCE_TASKS = [
     {"name": "gov-docs-refs-daily", "schedule": "@daily",
      "command": "omni governance docs-refs",
      "description": "每日: 文档引用完整性(断链/失效行锚, 确定性)"},
-    {"name": "gov-commit-daily", "schedule": "@daily",
-     "command": "omni governance commit-run --apply --model qwen3.6-plus",
-     "description": "每日: 性价比模型严格分批提交(防 git 改动堆积; 默认 deepseek 对 commit-run 返空 JSON, 固定 qwen3.6-plus)"},
     {"name": "gov-decisions-daily", "schedule": "@daily",
      "command": "omni governance decisions-run",
      "description": "每日: 标记 llm_input 的札记 → 结构化决策(进总控 ctx)"},
@@ -284,7 +289,9 @@ def is_due(task: dict[str, Any], now: datetime | None = None) -> bool:
             last_dt = last_dt.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
         return True
-    return (now - last_dt).total_seconds() >= _cadence_seconds(task.get("schedule", ""))
+    elapsed = (now - last_dt).total_seconds()
+    cadence = _cadence_seconds(task.get("schedule", ""))
+    return elapsed + _DUE_CLOCK_SKEW_TOLERANCE_SECONDS >= cadence
 
 
 def is_work_due(task: dict[str, Any], current_value: int, now: datetime | None = None) -> bool:

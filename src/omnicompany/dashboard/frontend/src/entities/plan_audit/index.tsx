@@ -29,7 +29,7 @@ const S: Record<string, any> = {
   head: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' },
   // 状态药丸: 14px, 语义色描边 + 同色淡底(token color-mix)。
   pill: (tone: string): React.CSSProperties => ({
-    display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, borderRadius: 999, padding: '3px 11px',
+    display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 500, borderRadius: 999, padding: '3px 11px',
     color: tone, background: `color-mix(in srgb, ${tone} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${tone} 38%, transparent)`,
   }),
   dot: (tone: string): React.CSSProperties => ({ width: 6, height: 6, borderRadius: '50%', background: tone }),
@@ -40,14 +40,14 @@ const S: Record<string, any> = {
   // 运行态玻璃卡: 磨砂 + rim 高光 + token 描边。
   card: {
     background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
-    border: '1px solid var(--fp-border)', borderRadius: 11, boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
+    border: '1px solid var(--fp-border)', borderRadius: 3, boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
   },
   running: { display: 'flex', alignItems: 'center', gap: 10, color: 'var(--fp-link)', fontSize: 14, padding: '16px 18px' },
   spinner: { width: 14, height: 14, border: '2px solid var(--fp-border)', borderTopColor: 'var(--fp-link)', borderRadius: '50%', display: 'inline-block', animation: 'omni-spin 0.8s linear infinite', flexShrink: 0 },
   // 长 mono 报告: 阅读区保持安静 —— 极淡 surface 不盖死渐变, token 描边, 13px 行高 1.65。
-  report: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--fp-font-mono)', fontSize: 13, lineHeight: 1.65, color: 'var(--fp-text)', background: 'var(--fp-surface)', border: '1px solid var(--fp-border-subtle)', borderRadius: 11, padding: '16px 18px' },
+  report: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--fp-font-mono)', fontSize: 13, lineHeight: 1.65, color: 'var(--fp-text)', background: 'var(--fp-surface)', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, padding: '16px 18px' },
   // 错误态: 语义红, color-mix 淡底替代写死 hex。
-  err: { color: 'var(--fp-err)', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'color-mix(in srgb, var(--fp-err) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--fp-err) 34%, transparent)', borderRadius: 11, padding: '14px 16px' },
+  err: { color: 'var(--fp-err)', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', background: 'color-mix(in srgb, var(--fp-err) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--fp-err) 34%, transparent)', borderRadius: 3, padding: '14px 16px' },
 }
 
 function PlanAuditView({ entity }: { entity: Entity }) {

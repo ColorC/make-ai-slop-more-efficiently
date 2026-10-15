@@ -1,0 +1,1 @@
+zhipu-color.png is the Z.ai / Zhipu brand mark, sourced from the official zai-org GitHub organization avatar (https://github.com/zai-org). Brand mark used for product identification in the CLI Hub provider icon row.

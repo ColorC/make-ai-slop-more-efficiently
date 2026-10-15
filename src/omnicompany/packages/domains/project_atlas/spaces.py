@@ -11,7 +11,6 @@ SPACES: dict[str, dict] = {
     "omnicompany": {"root": r"C:/workspace/omnicompany", "tier": "auto", "group": "omnicompany"},
     "quant-lab": {"root": r"C:/workspace/quant-lab", "tier": "auto", "group": "omnicompany"},
     "webworks": {"root": r"C:/workspace/webworks", "tier": "auto", "group": "omnicompany"},
-    "overlay-shell": {"root": r"C:/workspace/overlay-shell", "tier": "auto", "group": "omnicompany"},
     "aiworkspace": {"root": r"C:/workspace/AIWorkSpace/", "tier": "snapshot", "group": "demogame"},
     "walker": {"root": r"C:/workspace/webworks\apps\walker-game", "tier": "auto", "group": "omnicompany"},
 }

@@ -1,5 +1,5 @@
 # [OMNI] origin=claude-code domain=omnicompany/cli ts=2026-07-03T23:50:00+08:00 type=cli status=active
-# [OMNI] summary="omni testmap —— 功能点-测试台账面: list/show/verify/gaps(只读查询, show/list 顶部/行尾带 OMNI-100 提醒与门禁红展示)+ sync(注册表接线, attrs 增写 reminders)+ gates-run(门禁真跑)+ review(理论覆盖再评, run_json_agent 性价比模型)。"
+# [OMNI] summary="omni testmap —— 功能点-测试台账面: list/show/verify/gaps(只读查询, show/list 顶部/行尾带 OMNI-100 提醒与门禁红展示)+ sync(注册表接线, attrs 增写 reminders)+ gates-run(门禁真跑)+ review(外置 AgentRuntime 理论覆盖再评)。"
 # [OMNI] why="用户 2026-07-03: 缺乏统一的功能点和对应测试管理设施, 需要能集中查询各仓 testmap.yaml 覆盖情况的 CLI, 首要消费方是 AI。巡检批补齐注册表接线+门禁真跑+LLM 再评三件; 标准位置留痕批(2026-07-04)补 OMNI-100 提醒读侧派生展示(上位 plan.md「分批与验收锚」)。"
 # [OMNI] tags=cli,testmap,governance,test-ledger
 """omni testmap —— 功能点-测试台账面(list/show/verify/gaps/sync/gates-run/review)。"""
@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 import click
 
 from omnicompany.core.config import omni_workspace_root
-from omnicompany.packages.services._core.agent.launch import run_json_agent
 from omnicompany.packages.services._core.registry import get_registry
 from omnicompany.packages.services._core.registry.instance import InstanceEntry
 from omnicompany.packages.services._governance import testmap as testmap_lib
@@ -304,7 +303,7 @@ def testmap_gates_run(app: str | None, gate_id: str | None, timeout_s: int, as_j
 @click.argument("app", required=False)
 @click.option("--json", "as_json", is_flag=True)
 def testmap_review(app: str | None, as_json: bool) -> None:
-    """理论覆盖再评: 对目标 testmap 调一次 run_json_agent(gpt-5.5), 列证据不打分。"""
+    """理论覆盖再评: 经外置只读 AgentRuntime 列证据，不打分。"""
     root = omni_workspace_root()
     result = testmap_lib.discover_testmaps(root)
     targets = result.testmaps
@@ -325,17 +324,24 @@ def testmap_review(app: str | None, as_json: bool) -> None:
     had_error = False
     for tm in targets:
         task = testmap_lib.build_review_task(tm, root)
-        agent_result = asyncio.run(run_json_agent(
+        # AgentRuntime pulls in JSON Schema validation and provider adapters.
+        # Only the semantic review subcommand needs it; list/show/verify and
+        # omni's top-level discovery path must stay lightweight.
+        from omnicompany.runtime.agent_runtime import run_readonly_structured_agent
+
+        agent_result = asyncio.run(run_readonly_structured_agent(
             task=task,
-            node_prompt=testmap_lib.REVIEW_NODE_PROMPT,
-            model="gpt-5.5",
+            instructions=testmap_lib.REVIEW_NODE_PROMPT,
             result_schema=testmap_lib.REVIEW_RESULT_SCHEMA,
-            project_root=str(root),
+            workspace_cwd=root,
             caller="testmap.review",
         ))
         if not agent_result["ok"]:
             had_error = True
-            reports[tm.app] = {"ok": False, "error": agent_result.get("error") or "run_json_agent 失败"}
+            reports[tm.app] = {
+                "ok": False,
+                "error": agent_result.get("error") or "AgentRuntime 失败",
+            }
             continue
 
         findings = (agent_result["final"] or {}).get("findings", [])

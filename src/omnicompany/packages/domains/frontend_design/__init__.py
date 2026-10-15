@@ -5,6 +5,6 @@
 """frontend_design —— 前端设计与制作管线域。见 SKILL.md / DESIGN.md。
 
 两条平级子分支(同一方法脊柱, 不同标尺):
-- frontend_design.dashboard —— dashboard 类网页(驾驶舱/poof/lofa)设计管线; 标尺真源 frostpane。
+- frontend_design.dashboard —— dashboard 类网页(驾驶舱/Canvas/lofa)设计管线; 标尺真源 frostpane。
 - frontend_design.webgame   —— webgame UI 前端管线; 标尺真源 tabletop-engine/README + walker specs。
 """

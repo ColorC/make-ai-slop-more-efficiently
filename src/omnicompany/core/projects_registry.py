@@ -26,10 +26,11 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import re
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -39,9 +40,10 @@ from omnicompany.packages.services._core.omnicompany.formats import PROJECT
 from omnicompany.packages.services._core.omnicompany.material_events import publish_material_event
 
 # 主分组(可自由扩展, 这里是展示顺序的默认值; 用户 2026-06-12 给的常用组)
-DEFAULT_GROUPS_ORDER: list[str] = ["demogame", "omnicompany", "indie-game", "other"]
+DEFAULT_GROUPS_ORDER: list[str] = ["demogame", "spark", "omnicompany", "indie-game", "other"]
 GROUP_LABELS: dict[str, str] = {
     "demogame": "demogame",
+    "spark": "Spark",
     "omnicompany": "Omnicompany",
     "indie-game": "Indie Game",
     "other": "其他",
@@ -54,10 +56,26 @@ STALE_AFTER_DAYS = 7
 
 _OPTIONAL_FIELDS = (
     "name", "short", "group", "tags", "desc", "roots", "index_path", "bg", "icon",
-    "plan_categories", "links", "pinned", "team_ids", "primary_team_id",
+    "icon_url", "plan_categories", "links", "pinned", "team_ids", "primary_team_id",
 )
 
 _lock = threading.Lock()
+
+
+class ProjectSetResult(dict[str, Any]):
+    """A registry record annotated with whether this call created it.
+
+    ``created`` is deliberately an attribute rather than a dictionary key, so it
+    is neither persisted in projects.json nor exposed by normal JSON responses.
+    Callers that only need the registry record can continue treating this as a
+    regular dictionary.
+    """
+
+    created: bool
+
+    def __init__(self, item: dict[str, Any], *, created: bool) -> None:
+        super().__init__(item)
+        self.created = created
 
 
 def _now() -> str:
@@ -97,7 +115,17 @@ def _read() -> dict[str, Any]:
     if not isinstance(data, dict):
         return {"version": 1, "projects": [], "groups_order": list(DEFAULT_GROUPS_ORDER)}
     data.setdefault("projects", [])
-    data.setdefault("groups_order", list(DEFAULT_GROUPS_ORDER))
+    stored_order = data.get("groups_order")
+    if not isinstance(stored_order, list):
+        stored_order = []
+    order = [group for group in stored_order if isinstance(group, str) and group]
+    for index, group in enumerate(DEFAULT_GROUPS_ORDER):
+        if group in order:
+            continue
+        preceding = [candidate for candidate in DEFAULT_GROUPS_ORDER[:index] if candidate in order]
+        insert_at = order.index(preceding[-1]) + 1 if preceding else 0
+        order.insert(insert_at, group)
+    data["groups_order"] = order
     return data
 
 
@@ -112,6 +140,80 @@ def _write(data: dict[str, Any]) -> None:
 
 def list_projects() -> list[dict[str, Any]]:
     return list(_read().get("projects", []))
+
+
+_PROJECT_SEARCH_ALIASES: dict[str, tuple[str, ...]] = {
+    # 常见的人类称呼只用于召回，不改变项目注册表的权威字段。
+    "画布": ("canvas",),
+    "工作台": ("workbench", "workspace"),
+    "工作坊": ("workshop",),
+    "创作": ("creative",),
+}
+
+
+def _search_normalize(value: Any) -> str:
+    return " ".join(str(value or "").casefold().replace("_", "-").split())
+
+
+def search_projects(query: str, *, limit: int = 8, group: str | None = None) -> list[dict[str, Any]]:
+    """Search the raw project registry without enriching plans or scanning roots.
+
+    This is intentionally separate from ``enrich_projects``: agents often need to
+    resolve a human shorthand before they know which project to enter, and the
+    full project board is much too large for that cold-start lookup.
+    """
+    raw_query = _search_normalize(query)
+    if not raw_query:
+        return []
+    terms = [raw_query, *_PROJECT_SEARCH_ALIASES.get(raw_query, ())]
+    terms = list(dict.fromkeys(term for term in terms if term))
+    rows: list[dict[str, Any]] = []
+    for item in list_projects():
+        if group and item.get("group") != group:
+            continue
+        fields = {
+            "id": _search_normalize(item.get("id")),
+            "name": _search_normalize(item.get("name")),
+            "short": _search_normalize(item.get("short")),
+            "group": _search_normalize(item.get("group")),
+            "tags": _search_normalize(" ".join(str(x) for x in item.get("tags") or [])),
+            "desc": _search_normalize(item.get("desc")),
+            "roots": _search_normalize(" ".join(str(x) for x in item.get("roots") or [])),
+            "plans": _search_normalize(" ".join(str(x) for x in item.get("plan_categories") or [])),
+            "index": _search_normalize(item.get("index_path")),
+        }
+        score = 0
+        matched: list[str] = []
+        for term in terms:
+            for field, weight in (("id", 120), ("name", 110), ("short", 100),
+                                  ("tags", 70), ("plans", 55), ("group", 45),
+                                  ("desc", 35), ("roots", 30), ("index", 20)):
+                value = fields[field]
+                if not value or term not in value:
+                    continue
+                score += weight if term == value else max(8, weight // 2)
+                if field not in matched:
+                    matched.append(field)
+        if not score:
+            continue
+        rows.append({
+            "id": item.get("id"),
+            "name": item.get("name") or item.get("id"),
+            "group": item.get("group"),
+            "score": score,
+            "matched": matched,
+            "desc": item.get("desc") or "",
+            "roots": list(item.get("roots") or []),
+            "index_path": item.get("index_path"),
+            "tags": list(item.get("tags") or []),
+            "links": list(item.get("links") or []),
+        })
+    rows.sort(key=lambda row: (-int(row["score"]), str(row["name"]).casefold(), str(row["id"])))
+    # An exact human name/id should not be diluted by weak description matches.
+    # Keep ambiguity when candidates are close, but return the clear winner alone.
+    if len(rows) > 1 and int(rows[0]["score"]) >= 100 and int(rows[0]["score"]) >= int(rows[1]["score"]) * 3:
+        rows = rows[:1]
+    return rows[: max(1, min(int(limit), 50))]
 
 
 def groups_order() -> list[str]:
@@ -147,7 +249,7 @@ def _normalize_team_ids(value: Any) -> list[str]:
     return normalized
 
 
-def set_project(project_id: str, *, by: str = "human", **fields: Any) -> dict[str, Any]:
+def set_project(project_id: str, *, by: str = "human", **fields: Any) -> ProjectSetResult:
     """新增/更新一个项目(字段不传则保留原值)。"""
     project_id = (project_id or "").strip()
     if not project_id or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project_id):
@@ -166,6 +268,7 @@ def set_project(project_id: str, *, by: str = "human", **fields: Any) -> dict[st
         projects: list[dict] = data["projects"]
         existing = next((p for p in projects if p.get("id") == project_id), None)
         if existing is None:
+            created = True
             item: dict[str, Any] = {
                 "id": project_id,
                 "created_at": _now(),
@@ -174,6 +277,7 @@ def set_project(project_id: str, *, by: str = "human", **fields: Any) -> dict[st
             }
             projects.append(item)
         else:
+            created = False
             item = existing
             item["updated_at"] = _now()
             item["updated_by"] = by
@@ -193,7 +297,7 @@ def set_project(project_id: str, *, by: str = "human", **fields: Any) -> dict[st
         item.setdefault("group", "other")
         _write(data)
         publish_material_event(PROJECT.id, item, source="core.projects_registry")
-        return dict(item)
+        return ProjectSetResult(item, created=created)
 
 
 def remove_project(project_id: str) -> bool:
@@ -217,6 +321,15 @@ def remove_project(project_id: str) -> bool:
 # index 文件 frontmatter 的必填键(强结构化契约; quick_actions/links 可为空列表)
 INDEX_REQUIRED_KEYS = ("omni_project", "name", "group", "roots")
 
+# 新项目目录契约。旧 PROJECT_INDEX 仍可被普通读取，以免看板/历史项目因治理
+# 升级整体失效；`omni project index-check --require-layout` 才要求已 ready。
+DIRECTORY_CONTRACT_VERSION = 1
+DIRECTORY_CONTRACT_ROLE_KEYS = ("src", "docs", "tests", "input", "drafts", "runtime", "tmp", "archive")
+DIRECTORY_CONTRACT_PLACEMENT_KEYS = ("worktrees", "references", "publish")
+DIRECTORY_CONTRACT_LIFECYCLE_KEYS = ("tmp", "runtime", "archive")
+# 2026-10-12 目录语义档案：位置（placements）也可以写寿命，写了就进档案；不写不报错。
+DIRECTORY_CONTRACT_OPTIONAL_LIFECYCLE_KEYS = DIRECTORY_CONTRACT_PLACEMENT_KEYS
+
 # index 解析 TTL 缓存 — index 文件常在外部盘(d:\P4 网络盘, 读一次几百 ms),
 # 首页/侧栏/实体三处并发请求时若每次都现读, /api/projects 冷启动会拖到秒级(2026-06-12 实测)。
 _INDEX_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -235,49 +348,329 @@ def parse_index_file_cached(index_path: str | Path) -> dict[str, Any]:
     return parsed
 
 
-def parse_index_file(index_path: str | Path) -> dict[str, Any]:
+def _index_error(code: str, message: str, *, path: str = "", data: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return a stable, machine-readable PROJECT_INDEX validation error."""
+    result: dict[str, Any] = {"ok": False, "error": message, "error_code": code}
+    if path:
+        result["error_path"] = path
+    if data is not None:
+        result["data"] = data
+    return result
+
+
+def _resolve_index_path(raw: str, index_dir: Path) -> Path:
+    path = Path(raw)
+    return (path if path.is_absolute() else index_dir / path).resolve()
+
+
+def _same_path(left: Path, right: Path) -> bool:
+    return os.path.normcase(str(left)) == os.path.normcase(str(right))
+
+
+def _is_within(path: Path, boundary: Path) -> bool:
+    try:
+        path.relative_to(boundary)
+        return True
+    except ValueError:
+        return False
+
+
+def _is_filesystem_root(path: Path) -> bool:
+    """True for a drive/root share boundary on the current platform.
+
+    ``Path.anchor`` covers drive roots and UNC share roots on Windows; the
+    parent self-check is retained for providers/pathlib variants that expose a
+    root without a useful anchor.
+    """
+    try:
+        return _same_path(path, Path(path.anchor)) or _same_path(path, path.parent)
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
+def _validate_directory_contract(
+    fm: dict[str, Any], *, index_dir: Path, require_layout: bool,
+) -> dict[str, Any]:
+    """Validate the optional v1 directory contract without touching the filesystem.
+
+    Paths may not exist yet: index-init deliberately creates a draft contract instead
+    of guessing a layout or creating empty directories.  Every declared path is still
+    bounded by an explicitly declared project root.
+    """
+    contract = fm.get("directory_contract")
+    if contract is None:
+        if require_layout:
+            return _index_error(
+                "LAYOUT_CONTRACT_MISSING",
+                "缺少 directory_contract；新项目首次业务写入前须声明并设为 ready",
+                path="directory_contract", data=fm,
+            )
+        return {"ok": True, "warnings": ["缺少 directory_contract（历史项目兼容；新项目请补齐）"],
+                "warning_codes": ["LAYOUT_CONTRACT_MISSING"]}
+    if not isinstance(contract, dict):
+        return _index_error("LAYOUT_CONTRACT_TYPE", "directory_contract 必须是映射", path="directory_contract", data=fm)
+    version = contract.get("version")
+    if isinstance(version, bool) or not isinstance(version, int) or version != DIRECTORY_CONTRACT_VERSION:
+        return _index_error(
+            "LAYOUT_CONTRACT_VERSION",
+            f"directory_contract.version 必须为 {DIRECTORY_CONTRACT_VERSION}",
+            path="directory_contract.version", data=fm,
+        )
+    status = contract.get("status")
+    if not isinstance(status, str) or status not in {"draft", "ready"}:
+        return _index_error(
+            "LAYOUT_CONTRACT_STATUS",
+            "directory_contract.status 必须为 draft 或 ready",
+            path="directory_contract.status", data=fm,
+        )
+
+    raw_roots = fm.get("roots")
+    if not isinstance(raw_roots, list) or not raw_roots:
+        return _index_error(
+            "LAYOUT_DECLARED_ROOTS_TYPE", "directory_contract 要求 roots 为非空列表",
+            path="roots", data=fm,
+        )
+    repo_root = omni_workspace_root().resolve()
+    workspace_parent = repo_root.parent
+    drive_root = workspace_parent.parent
+    declared_roots: list[Path] = []
+    for i, root_item in enumerate(raw_roots):
+        raw = root_item.get("path") if isinstance(root_item, dict) else root_item
+        if not isinstance(raw, str) or not raw.strip():
+            return _index_error(
+                "LAYOUT_DECLARED_ROOT_INVALID", "roots 中每项须为路径字符串或含 path 的映射",
+                path=f"roots[{i}]", data=fm,
+            )
+        try:
+            root_path = _resolve_index_path(raw, index_dir)
+        except (OSError, RuntimeError, ValueError) as exc:
+            return _index_error(
+                "LAYOUT_DECLARED_ROOT_INVALID", f"roots 路径无法解析: {exc}",
+                path=f"roots[{i}]", data=fm,
+            )
+        if (_is_filesystem_root(root_path) or _same_path(root_path, workspace_parent)
+                or _same_path(root_path, drive_root)):
+            return _index_error(
+                "LAYOUT_DECLARED_ROOT_FORBIDDEN", "roots 不能把工作区父目录或盘根作为宽泛边界",
+                path=f"roots[{i}]", data=fm,
+            )
+        declared_roots.append(root_path)
+
+    canonical_raw = contract.get("canonical_root")
+    if not isinstance(canonical_raw, str) or not canonical_raw.strip():
+        return _index_error(
+            "LAYOUT_CANONICAL_ROOT_INVALID", "canonical_root 必须为非空路径字符串",
+            path="directory_contract.canonical_root", data=fm,
+        )
+    try:
+        canonical_root = _resolve_index_path(canonical_raw, index_dir)
+    except (OSError, RuntimeError, ValueError) as exc:
+        return _index_error(
+            "LAYOUT_CANONICAL_ROOT_INVALID", f"canonical_root 无法解析: {exc}",
+            path="directory_contract.canonical_root", data=fm,
+        )
+    if not any(_same_path(canonical_root, root) for root in declared_roots):
+        return _index_error(
+            "LAYOUT_CANONICAL_ROOT_UNDECLARED",
+            "canonical_root 必须精确匹配 roots 中一个已声明项目根；多仓项目不强压为单根",
+            path="directory_contract.canonical_root", data=fm,
+        )
+    if (_is_filesystem_root(canonical_root) or _same_path(canonical_root, workspace_parent)
+            or _same_path(canonical_root, drive_root)):
+        return _index_error(
+            "LAYOUT_CANONICAL_ROOT_FORBIDDEN",
+            "canonical_root 不能是工作区根或盘根",
+            path="directory_contract.canonical_root", data=fm,
+        )
+
+    def mapping(name: str, expected_keys: tuple[str, ...], optional_keys: tuple[str, ...] = ()) -> dict[str, Any] | None:
+        value = contract.get(name)
+        if not isinstance(value, dict):
+            return None
+        keys = set(value)
+        expected = set(expected_keys)
+        if not expected <= keys or not keys <= expected | set(optional_keys):
+            return None
+        return value
+
+    roles = mapping("roles", DIRECTORY_CONTRACT_ROLE_KEYS)
+    if roles is None:
+        return _index_error(
+            "LAYOUT_ROLE_KEYS",
+            f"roles 必须显式且只包含 {list(DIRECTORY_CONTRACT_ROLE_KEYS)}",
+            path="directory_contract.roles", data=fm,
+        )
+    placements = mapping("placements", DIRECTORY_CONTRACT_PLACEMENT_KEYS)
+    if placements is None:
+        return _index_error(
+            "LAYOUT_PLACEMENT_KEYS",
+            f"placements 必须显式且只包含 {list(DIRECTORY_CONTRACT_PLACEMENT_KEYS)}",
+            path="directory_contract.placements", data=fm,
+        )
+    lifecycle = mapping("lifecycle", DIRECTORY_CONTRACT_LIFECYCLE_KEYS, DIRECTORY_CONTRACT_OPTIONAL_LIFECYCLE_KEYS)
+    if lifecycle is None:
+        return _index_error(
+            "LAYOUT_LIFECYCLE_KEYS",
+            f"lifecycle 必须显式包含 {list(DIRECTORY_CONTRACT_LIFECYCLE_KEYS)}，"
+            f"另外只能写位置 {list(DIRECTORY_CONTRACT_OPTIONAL_LIFECYCLE_KEYS)} 的寿命",
+            path="directory_contract.lifecycle", data=fm,
+        )
+
+    resolved_roles: dict[str, Path] = {}
+    resolved_placements: dict[str, Path] = {}
+    for section, values in (("roles", roles), ("placements", placements)):
+        for key, raw in values.items():
+            field_path = f"directory_contract.{section}.{key}"
+            if raw is None:
+                continue
+            if not isinstance(raw, str) or not raw.strip():
+                return _index_error("LAYOUT_PATH_TYPE", "目录角色和位置必须为路径字符串或 null", path=field_path, data=fm)
+            try:
+                resolved = _resolve_index_path(raw, canonical_root)
+            except (OSError, RuntimeError, ValueError) as exc:
+                return _index_error(
+                    "LAYOUT_PATH_INVALID", f"路径无法解析: {exc}", path=field_path, data=fm,
+                )
+            if not any(_is_within(resolved, root) for root in declared_roots):
+                return _index_error(
+                    "LAYOUT_PATH_OUT_OF_BOUNDS",
+                    "路径必须相对 canonical_root，或以绝对路径落在一个已声明 roots 边界内",
+                    path=field_path, data=fm,
+                )
+            if section == "roles":
+                resolved_roles[key] = resolved
+            else:
+                resolved_placements[key] = resolved
+    for key, text in lifecycle.items():
+        if text is not None and (not isinstance(text, str) or not text.strip()):
+            return _index_error("LAYOUT_LIFECYCLE_TYPE", "lifecycle 值必须为非空说明文字或 null", path=f"directory_contract.lifecycle.{key}", data=fm)
+
+    declared_roles = list(resolved_roles.items())
+    for index, (role, role_path) in enumerate(declared_roles):
+        for other_role, other_path in declared_roles[index + 1:]:
+            if _is_within(role_path, other_path) or _is_within(other_path, role_path):
+                return _index_error(
+                    "LAYOUT_ROLE_CONFLICT",
+                    f"已声明角色 {role} 与 {other_role} 路径重合或互为祖先；角色目录必须职责分离",
+                    path=f"directory_contract.roles.{role}", data=fm,
+                )
+
+    for placement in ("worktrees", "publish", "references"):
+        placement_path = resolved_placements.get(placement)
+        if placement_path is None:
+            continue
+        protected_roles = ("tmp",) if placement == "references" else ("src", "docs", "tests", "input", "tmp")
+        for role in protected_roles:
+            role_path = resolved_roles.get(role)
+            if role_path is not None and (_is_within(placement_path, role_path) or _is_within(role_path, placement_path)):
+                return _index_error(
+                    "LAYOUT_PLACEMENT_CONFLICT",
+                    f"位置 {placement} 与角色 {role} 重合或互为祖先；正式与可清理目录不得混用",
+                    path=f"directory_contract.placements.{placement}", data=fm,
+                )
+
+    # 2026-10-12 目录语义档案新增的可选键（records_root / copies_root / areas / external_roots）。
+    from omnicompany.core.dir_archive import validate_contract_extensions
+
+    try:
+        extension_error = validate_contract_extensions(
+            contract, declared_roots=declared_roots, resolved_roles=resolved_roles,
+            resolve=lambda raw: _resolve_index_path(raw, canonical_root), within=_is_within,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        extension_error = ("LAYOUT_EXT_PATH_INVALID", f"路径无法解析: {exc}", "directory_contract")
+    if extension_error is not None:
+        code, message, field = extension_error
+        return _index_error(code, message, path=field, data=fm)
+
+    layout_warnings: list[str] = []
+    layout_warning_codes: list[str] = []
+    if status == "draft":
+        if require_layout:
+            return _index_error(
+                "LAYOUT_STATUS_DRAFT",
+                "directory_contract 仍为 draft；首次业务写入前须明确填写并设为 ready",
+                path="directory_contract.status", data=fm,
+            )
+        layout_warnings.append("directory_contract 为 draft（尚不可作为新项目业务写入前的严格契约）")
+        layout_warning_codes.append("LAYOUT_STATUS_DRAFT")
+    else:
+        if not any(value is not None for value in roles.values()):
+            return _index_error(
+                "LAYOUT_READY_ROLE_REQUIRED",
+                "status=ready 时 roles 至少一个实际角色须非 null",
+                path="directory_contract.roles", data=fm,
+            )
+        for key in DIRECTORY_CONTRACT_LIFECYCLE_KEYS:
+            text = lifecycle.get(key)
+            if not isinstance(text, str) or not text.strip():
+                return _index_error(
+                    "LAYOUT_LIFECYCLE_REQUIRED",
+                    "status=ready 时 tmp/runtime/archive 的 lifecycle 必须都有文字说明",
+                    path=f"directory_contract.lifecycle.{key}", data=fm,
+                )
+    return {"ok": True, "warnings": layout_warnings, "warning_codes": layout_warning_codes}
+
+
+def parse_index_file(index_path: str | Path, *, require_layout: bool = False) -> dict[str, Any]:
     """解析 index 文件的 YAML frontmatter。返回 {ok, data?, error?, mtime?}。"""
     p = Path(index_path)
     if not p.is_file():
-        return {"ok": False, "error": f"index 文件不存在: {p}"}
+        return _index_error("INDEX_FILE_MISSING", f"index 文件不存在: {p}")
     try:
         text = p.read_text(encoding="utf-8")
     except OSError as e:
-        return {"ok": False, "error": f"读失败: {e}"}
+        return _index_error("INDEX_READ_FAILED", f"读失败: {e}")
     m = re.match(r"\A---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
     if not m:
-        return {"ok": False, "error": "缺少 YAML frontmatter (--- ... ---)"}
+        return _index_error("INDEX_FRONTMATTER_MISSING", "缺少 YAML frontmatter (--- ... ---)")
     try:
         import yaml
         fm = yaml.safe_load(m.group(1)) or {}
     except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"frontmatter YAML 解析失败: {e}"}
+        return _index_error("INDEX_FRONTMATTER_INVALID", f"frontmatter YAML 解析失败: {e}")
     if not isinstance(fm, dict):
-        return {"ok": False, "error": "frontmatter 不是映射"}
+        return _index_error("INDEX_FRONTMATTER_TYPE", "frontmatter 不是映射")
     missing = [k for k in INDEX_REQUIRED_KEYS if k not in fm]
     if missing:
-        return {"ok": False, "error": f"frontmatter 缺必填键: {missing}", "data": fm}
+        return _index_error("INDEX_REQUIRED_KEYS_MISSING", f"frontmatter 缺必填键: {missing}", data=fm)
     try:
         mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat()
     except OSError:
         mtime = None
     # threads(可选): 工作线结构化状态。结构不对只警告不让整份 index 失败 —— 向后兼容无 threads 的旧档。
     warnings: list[str] = []
+    warning_codes: list[str] = []
     threads = fm.get("threads")
     if threads is not None:
         if not isinstance(threads, list):
             warnings.append("threads 应为列表 [{name, status, updated, note}]")
+            warning_codes.append("THREADS_TYPE_INVALID")
         else:
             for i, t in enumerate(threads):
                 if not isinstance(t, dict) or not str(t.get("name") or "").strip():
                     warnings.append(f"threads[{i}] 缺 name")
+                    warning_codes.append("THREAD_NAME_MISSING")
                     continue
                 st = str(t.get("status") or "").strip().lower()
                 if st not in THREAD_STATUSES:
                     warnings.append(f"threads[{i}]({t.get('name')}) status 非法 {t.get('status')!r}(应取 {THREAD_STATUSES})")
+                    warning_codes.append("THREAD_STATUS_INVALID")
+    layout = _validate_directory_contract(fm, index_dir=p.parent, require_layout=require_layout)
+    if not layout["ok"]:
+        return layout
+    layout_warnings = layout.get("warnings") or []
+    layout_warning_codes = layout.get("warning_codes") or []
+    warnings.extend(layout_warnings)
+    warning_codes.extend(layout_warning_codes)
     result: dict[str, Any] = {"ok": True, "data": fm, "mtime": mtime}
     if warnings:
         result["warnings"] = warnings
+    if warning_codes:
+        result["warning_codes"] = warning_codes
+    if layout_warnings:
+        result["layout_warnings"] = layout_warnings
+        result["layout_warning_codes"] = layout_warning_codes
     return result
 
 
@@ -362,13 +755,21 @@ def _plan_mtime_iso(folder_path: str) -> str | None:
         return None
 
 
-def _progress_ts_all(ref_ids: set[str]) -> list[str]:
-    """progress.json 里这些 plan/project ref 的全部条目时间(近一周活跃格 + 最后活跃共用)。"""
+def _progress_entries() -> list[dict[str, Any]]:
+    """Read the progress ledger once for one project-board enrichment pass."""
     try:
-        from omnicompany.dashboard.boss_sight.progress import list_entries
-        entries = list_entries(None, None)
+        from omnicompany.packages.services.boss_sight.progress import list_entries
+
+        return list_entries(None, None)
     except Exception:  # noqa: BLE001
         return []
+
+
+def _progress_ts_all(
+    ref_ids: set[str],
+    entries: list[dict[str, Any]],
+) -> list[str]:
+    """Return timestamps matching plan/project refs from a shared ledger read."""
     out: list[str] = []
     for e in entries:
         rid = str(e.get("ref_id") or "")
@@ -389,8 +790,13 @@ _ACTIVITY_CACHE: dict[str, tuple[float, list[str]]] = {}
 # 过期/未命中时立刻返回旧值(没有就空), 后台线程刷新写回缓存。_ACTIVITY_REFRESHING 防同项目并发重刷。
 _ACTIVITY_REFRESHING: set[str] = set()
 _ACTIVITY_REFRESH_LOCK = threading.Lock()
-# 上限 2 个后台线程: 22 个项目一次性开 22 线程会 GIL 抢占、拖慢事件循环。封顶后排队跑, 一样最终补齐。
-_ACTIVITY_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="activity-refresh")
+# 项目根目录可能位于大型 P4 checkout。os.walk/stat + git 的 Python 外层会
+# 长时间占住 GIL；放到一个独立进程，避免 Dashboard 的 PTY 代理和事件循环被
+# 看板后台刷新拖住。单进程保持磁盘访问有界，任务仍按项目排队补齐。
+_ACTIVITY_EXECUTOR = ProcessPoolExecutor(
+    max_workers=1,
+    mp_context=multiprocessing.get_context("spawn"),
+)
 
 
 def _refresh_activity_async(item: dict[str, Any], pid: str) -> None:
@@ -400,15 +806,9 @@ def _refresh_activity_async(item: dict[str, Any], pid: str) -> None:
             return
         _ACTIVITY_REFRESHING.add(pid)
 
-    def _work() -> None:
+    def _done(future: Any) -> None:
         try:
-            roots = _project_roots(item)
-            # 排除 index 文件自身: 它常住在某个 root 下, 不排除则"改 index"会被 os.walk 当成项目改动。
-            exclude: set[str] = set()
-            ip = item.get("index_path")
-            if ip:
-                exclude.add(os.path.normcase(os.path.abspath(str(ip))))
-            ts = _recent_file_ts(roots, exclude=exclude) + _git_commit_ts(roots)
+            ts = future.result()
             _ACTIVITY_CACHE[pid] = (time.time() + 90.0, ts)
         except Exception:  # noqa: BLE001 — 后台刷新失败不该影响请求; 下轮再试
             pass
@@ -416,7 +816,12 @@ def _refresh_activity_async(item: dict[str, Any], pid: str) -> None:
             with _ACTIVITY_REFRESH_LOCK:
                 _ACTIVITY_REFRESHING.discard(pid)
 
-    _ACTIVITY_EXECUTOR.submit(_work)
+    try:
+        future = _ACTIVITY_EXECUTOR.submit(_collect_activity_signals, item)
+        future.add_done_callback(_done)
+    except Exception:
+        with _ACTIVITY_REFRESH_LOCK:
+            _ACTIVITY_REFRESHING.discard(pid)
 
 
 def _project_roots(item: dict[str, Any]) -> list[Path]:
@@ -429,6 +834,18 @@ def _project_roots(item: dict[str, Any]) -> list[Path]:
         except (OSError, ValueError):
             continue
     return out
+
+
+def _collect_activity_signals(item: dict[str, Any]) -> list[str]:
+    """Worker-process entry point for the expensive project activity scan."""
+    roots = _project_roots(item)
+    # 排除 index 文件自身: 它常住在某个 root 下, 不排除则"改 index"会被
+    # os.walk 当成项目改动。
+    exclude: set[str] = set()
+    ip = item.get("index_path")
+    if ip:
+        exclude.add(os.path.normcase(os.path.abspath(str(ip))))
+    return _recent_file_ts(roots, exclude=exclude) + _git_commit_ts(roots)
 
 
 def _recent_file_ts(roots: list[Path], days: int = 8, cap: int = 3000,
@@ -479,7 +896,7 @@ def _git_commit_ts(roots: list[Path], days: int = 8) -> list[str]:
     for root in roots:
         try:
             top = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"],
-                                 capture_output=True, text=True, timeout=3,
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3,
                                  creationflags=_NO_WINDOW)
             if top.returncode != 0:
                 continue
@@ -490,6 +907,7 @@ def _git_commit_ts(roots: list[Path], days: int = 8) -> list[str]:
             r = subprocess.run(["git", "-C", top.stdout.strip(), "log",
                                 f"--since={days} days ago", "--format=%cI", "--", str(root)],
                                capture_output=True, text=True, timeout=4,
+                               encoding="utf-8", errors="replace",
                                creationflags=_NO_WINDOW)
             if r.returncode == 0:
                 out.extend(ln.strip() for ln in r.stdout.splitlines() if ln.strip())
@@ -612,6 +1030,7 @@ def enrich_projects(fresh: bool = False) -> dict[str, Any]:
         _INDEX_CACHE.clear()
     data = _read()
     catalogue = _plan_catalogue()
+    progress_entries = _progress_entries()
     out: list[dict[str, Any]] = []
     for p in data.get("projects", []):
         item = dict(p)
@@ -629,7 +1048,9 @@ def enrich_projects(fresh: bool = False) -> dict[str, Any]:
             ts = _plan_mtime_iso(it.get("folder_path") or "")
             if ts:
                 candidates.append(ts)
-        candidates.extend(_progress_ts_all(set(cats) | {item["id"]}))
+        candidates.extend(
+            _progress_ts_all(set(cats) | {item["id"]}, progress_entries)
+        )
         candidates.extend(_activity_signals(item))  # + 文件改动 + git 记录(2026-06-19, 已排除 index 自身)
         # 真活跃 = 上述信号最大值。不含 index mtime: 否则"改一下 index"就刷绿(循环自证),
         # 还会盖掉"文件在动但叙事冻住"的过期(2026-06-26 治本 + 禁写死)。

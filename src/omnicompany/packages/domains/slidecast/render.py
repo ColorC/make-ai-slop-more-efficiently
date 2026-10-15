@@ -50,7 +50,7 @@ def _fence(code: str, lang: str = "text") -> str:
 
 
 def _ascii_banner(text: str, font: str = "standard") -> str:
-    """英文/数字大字 → figlet ASCII 复古 banner(像 colorc.cc 的 webworks logo)。CJK 不行,失败返空。
+    """英文/数字大字 → figlet ASCII 复古 banner(像 example.com 的 webworks logo)。CJK 不行,失败返空。
     用 standard(纯 ASCII 线条)而非 ansi_shadow(实心 Unicode 块)——后者缩放时块对不齐会畸变。"""
     t = _s(text)
     if not t or not re.search(r"[A-Za-z0-9]", t):
@@ -173,13 +173,13 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
         fm = {"layout": "cover", "docNumber": doc}
         if _s(s.get("date")) or _s((meta or {}).get("date")):
             fm["date"] = _s(s.get("date")) or _s((meta or {}).get("date"))
-        fm["classification"] = _s((meta or {}).get("info")) or "据 colorc.cc 原文自动生成"
+        fm["classification"] = _s((meta or {}).get("info")) or "据 example.com 原文自动生成"
         # ASCII 标题不再作为主题默认件。它会强行把不同视觉方向拉回同一套
         # “终端海报”语法；只有内容 IR 明确 opt-in 时才渲染。
         banner = ""
         if bool((meta or {}).get("use_ascii_banner")):
             banner = _ascii_banner(_s(s.get("banner")) or _s((meta or {}).get("banner")))
-        if banner:  # figlet ASCII logo(英文,像 colorc.cc 的 webworks)
+        if banner:  # figlet ASCII logo(英文,像 example.com 的 webworks)
             body.append(f'<pre class="fm-ascii">\n{banner}\n</pre>')
         # 封面标题按长度缩放:长标题(LLM 偶尔写成整句)自动缩小,避免挤成多行
         n = len(title)
@@ -335,7 +335,7 @@ def _render_slide(s: dict, flatten: bool = False, meta: dict | None = None) -> t
 
     elif layout == "end":
         fm = {"layout": "end", "docNumber": doc, "endLabel": ui_labels["end"]}
-        fm["classification"] = _s((meta or {}).get("info")) or "据 colorc.cc 原文自动生成"
+        fm["classification"] = _s((meta or {}).get("info")) or "据 example.com 原文自动生成"
         body.append(_slot("title", title or "完"))
         contact = (
             _s(s.get("subtitle"))

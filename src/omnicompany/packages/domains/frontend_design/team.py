@@ -69,7 +69,7 @@ def _build_review_pipeline(branch: str, title: str, standard: str) -> TeamSpec:
 
 
 def build_dashboard_review_pipeline() -> TeamSpec:
-    """dashboard 类网页(驾驶舱/poof/lofa)审查管线。标尺 = frostpane。"""
+    """dashboard 类网页(驾驶舱/Canvas/lofa)审查管线。标尺 = frostpane。"""
     return _build_review_pipeline(
         "dashboard", "前端设计·dashboard 分支",
         "docs/projects/frontend-design/dashboard(设计语言.md + theme.css)",

@@ -39,7 +39,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   // 主操作: 安静图标钮(重载), hover 才浮一层极淡底 —— 唯一常显操作, 其余收进 ⋯。
   iconBtn: {
-    width: 30, height: 30, border: '1px solid transparent', borderRadius: 7,
+    width: 30, height: 30, border: '1px solid transparent', borderRadius: 2,
     background: 'transparent', color: 'var(--fp-text-3)', cursor: 'pointer',
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0,
     transition: 'background 150ms var(--fp-ease, ease), color 150ms var(--fp-ease, ease)',

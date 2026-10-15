@@ -6,6 +6,20 @@
 const BASE = '/api/cc'
 const PTY_CLIENT_PROTOCOL = 'focused-visible-v1'
 
+/** assistant 会话主题标记(与后端 ccdaemon/assistant.py ASSISTANT_TOPIC 一致)。 */
+export const ASSISTANT_TOPIC = 'assistant'
+
+/** 本机记住 assistant 会话 id 的 localStorage 键(后端重启前后都能复用同一个会话)。 */
+const ASSISTANT_SESSION_KEY = 'omni.assistant.sessionId'
+
+export function rememberAssistantSession(id: string): void {
+  try { window.localStorage.setItem(ASSISTANT_SESSION_KEY, id) } catch { /* privacy mode */ }
+}
+
+export function rememberedAssistantSession(): string | null {
+  try { return window.localStorage.getItem(ASSISTANT_SESSION_KEY) } catch { return null }
+}
+
 export type AgentIntegrationProvider = 'claude_code' | 'codex'
 
 export interface CcSessionMeta {
@@ -16,14 +30,25 @@ export interface CcSessionMeta {
   rows: number
   started_at: number
   alive: boolean
-  /** True only after a real prompt submission while agent output is still active. */
+  /** Whether a user/browser or another agent created this PTY. */
+  origin?: 'human' | 'agent'
+  /** visible = normal list; hidden = omit; background = pin to the back. */
+  visibility?: 'visible' | 'hidden' | 'background'
+  /** Runtime that owns the terminal transport. Omitted means OmniCompany. */
+  runtime_host?: 'omnicompany' | 'litework' | string
+  /** True only while the provider is refreshing an explicit busy marker. */
   working?: boolean
+  working_source?: string | null
+  provider_runtime_state?: 'working' | 'idle'
+  provider_runtime_marker_at?: number | null
+  /** False only while a reconnected legacy PTY has not yielded an authoritative marker yet. */
+  provider_runtime_known?: boolean
   /** Whether this PTY has ever received a non-empty submitted user turn. */
   has_user_turn?: boolean
   last_submit_at?: number | null
   last_output_at?: number | null
   /** Runtime provider detected from the initial command or a CLI launched in a plain shell. */
-  provider?: 'shell' | 'claude_code' | 'codex' | 'codebuddy' | 'kimi' | 'opencode' | string
+  provider?: 'shell' | 'claude_code' | 'codex' | 'codebuddy' | 'kimi' | 'opencode' | 'qoder' | string
   /** Provider-native durable conversation id used only after the PTY is gone. */
   provider_session_id?: string | null
   /** Native conversation title, when the provider exposes one. */
@@ -38,11 +63,27 @@ export interface CcSessionMeta {
   buffered_chunks?: number
   buffered_bytes?: number
   replay_truncated?: boolean
-  status?: 'alive' | 'recoverable'
+  status?: 'alive' | 'recoverable' | 'ended'
+  /** Web-display sessions: the pane renders an iframe instead of xterm. */
+  display_kind?: 'web'
+  /** Web UI origin announced by the supervisor (e.g. http://127.0.0.1:PORT). */
+  web_url?: string | null
+  /** Supervisor phase: starting / ready / ended. */
+  web_phase?: string
   claude_session_id?: string | null
   active_plan?: string | null
+  /** Agent Worker 主题(如 'assistant'); shell 会话缺省。 */
+  topic?: string | null
+  project?: string | null
+  workstream?: string | null
+  binding_source?: string | null
+  /** 费用问题(欠费/配额/余额类报错)被后端识别后置真; 前端据此弹切换按钮。 */
+  billing_issue?: boolean
   ended_at?: number | null
   exit_reason?: string | null
+  /** False for a preserved human tombstone whose provider history is missing. */
+  resumable?: boolean
+  recovery_unavailable_reason?: string | null
 }
 
 export interface SessionsList {
@@ -50,6 +91,8 @@ export interface SessionsList {
   alive_count: number
   recoverable: CcSessionMeta[]
   recoverable_count: number
+  remembered?: CcSessionMeta[]
+  remembered_count?: number
 }
 
 /**
@@ -58,7 +101,11 @@ export interface SessionsList {
  * 不依赖某个终端页签是否挂载, 刷新后首轮轮询即准。
  */
 export interface CcTabStatesPayload {
-  pty: Array<Pick<CcSessionMeta, 'id' | 'alive' | 'working' | 'has_user_turn' | 'status' | 'provider' | 'cwd' | 'provider_title' | 'display_title' | 'provider_session_id' | 'started_at' | 'last_submit_at' | 'last_output_at'>>
+  pty: Array<Pick<CcSessionMeta, 'id' | 'alive' | 'working' | 'working_source' | 'provider_runtime_state' | 'provider_runtime_marker_at' | 'provider_runtime_known' | 'has_user_turn' | 'status' | 'provider' | 'cwd' | 'provider_title' | 'display_title' | 'provider_session_id' | 'project' | 'workstream' | 'active_plan' | 'topic' | 'binding_source' | 'started_at' | 'last_submit_at' | 'last_output_at' | 'origin' | 'visibility' | 'runtime_host'> & {
+    /** Old PTY id retained solely so an already-open tab can follow a resumed runtime. */
+    resume_alias_for?: string
+  }>
+  web: Array<Pick<CcSessionMeta, 'id' | 'alive' | 'status' | 'provider' | 'cwd' | 'started_at' | 'web_url' | 'web_phase' | 'origin' | 'working' | 'provider_runtime_state' | 'display_title'>>
   chat: Array<{
     id: string
     alive: boolean
@@ -89,6 +136,46 @@ export interface CreateSessionBody {
   cols?: number
   rows?: number
   safe_mode?: boolean
+}
+
+export interface CreateAgentWorkerBody {
+  provider: string
+  model?: string
+  effort?: string
+  task?: string
+  cwd?: string
+  project?: string
+  workstream?: string
+  active_plan?: string
+  topic?: string
+  parent_agent_id?: string
+  visibility?: 'visible' | 'hidden' | 'background'
+  from_controller?: boolean
+  safe_mode?: boolean
+  resume_provider_session_id?: string
+  fork_from_provider_session_id?: string
+}
+
+export interface AgentWorkerCatalogOption {
+  id: string
+  label: string
+  kind: 'agent_worker' | 'shell'
+  provider?: string
+  default_model?: string | null
+  models?: string[]
+  model_labels?: Record<string, string>
+  model_efforts?: Record<string, string[]>
+  model_default_efforts?: Record<string, string | null>
+  default_effort?: string | null
+  efforts?: string[]
+  surface?: 'pty' | 'web'
+  cmd?: string[]
+}
+
+export interface AgentWorkerCatalog {
+  schema_version: number
+  options: AgentWorkerCatalogOption[]
+  assistant: { label?: string; provider: string; model?: string | null; effort?: string | null }
 }
 
 export interface ResumeProviderSessionBody {
@@ -146,6 +233,7 @@ export interface SessionContext {
     cwd?: string | null
     provider?: string | null
     provider_session_id?: string | null
+    session_summary?: string | null
     trace_id?: string | null
     claude_session_id?: string | null
     started_at?: number | null
@@ -161,6 +249,22 @@ export interface SessionContext {
   event_count: number
 }
 
+// Several always-mounted panels need the same session catalogue during cold
+// start.  Share only the in-flight request: callers still get fresh data on
+// their next poll, while a startup burst cannot parse the 10MB metadata store
+// four times in parallel and occupy all browser connections.
+const sessionListRequests = new Map<boolean, Promise<CcSessionMeta[]>>()
+
+async function fetchSessionList(includeRecoverable: boolean): Promise<CcSessionMeta[]> {
+  const r = await fetch(`${BASE}/sessions?include_recoverable=${includeRecoverable}`)
+  if (!r.ok) throw new Error(`cc/sessions list: ${r.status}`)
+  const d = await r.json() as SessionsList
+  const alive = (d.items || []).map(m => ({ ...m, status: (m.status || 'alive') }))
+  const rec = (d.recoverable || []).map(m => ({ ...m, status: 'recoverable' as const, resumable: true }))
+  const remembered = (d.remembered || []).map(m => ({ ...m, status: 'ended' as const, resumable: false }))
+  return [...alive, ...rec, ...remembered]
+}
+
 export const ccApi = {
   async health(): Promise<{ status: string; claude_cli_found: boolean; session_count: number; default_cwd: string }> {
     const r = await fetch(`${BASE}/health`)
@@ -171,20 +275,25 @@ export const ccApi = {
   async list(options: { includeRecoverable?: boolean } = {}): Promise<CcSessionMeta[]> {
     // Returns BOTH alive + recoverable, fused into one list with status fields.
     const includeRecoverable = options.includeRecoverable !== false
-    const r = await fetch(`${BASE}/sessions?include_recoverable=${includeRecoverable}`)
-    if (!r.ok) throw new Error(`cc/sessions list: ${r.status}`)
-    const d = await r.json() as SessionsList
-    const alive = (d.items || []).map(m => ({ ...m, status: 'alive' as const }))
-    const rec = (d.recoverable || []).map(m => ({ ...m, status: 'recoverable' as const }))
-    return [...alive, ...rec]
+    const existing = sessionListRequests.get(includeRecoverable)
+    if (existing) return existing
+    const request = fetchSessionList(includeRecoverable)
+    sessionListRequests.set(includeRecoverable, request)
+    try {
+      return await request
+    } finally {
+      if (sessionListRequests.get(includeRecoverable) === request) {
+        sessionListRequests.delete(includeRecoverable)
+      }
+    }
   },
 
   /** 页签活跃徽章专用的高频轻量快照(纯内存, 无磁盘 IO)。 */
   async tabStates(): Promise<CcTabStatesPayload> {
-    const r = await fetch(`${BASE}/tab-states`)
+    const r = await fetch(`${BASE}/tab-states`, { cache: 'no-store' })
     if (!r.ok) throw new Error(`cc/tab-states: ${r.status}`)
     const d = await r.json() as Partial<CcTabStatesPayload>
-    return { pty: d.pty || [], chat: d.chat || [] }
+    return { pty: d.pty || [], web: d.web || [], chat: d.chat || [] }
   },
 
   async create(body?: CreateSessionBody): Promise<CcSessionMeta> {
@@ -196,6 +305,29 @@ export const ccApi = {
     if (!r.ok) {
       const err = await r.json().catch(() => ({ detail: r.statusText }))
       throw new Error(err.detail || `cc/sessions create: ${r.status}`)
+    }
+    return r.json()
+  },
+
+  async agentWorkerCatalog(): Promise<AgentWorkerCatalog> {
+    const r = await fetch(`${BASE}/agent-workers/catalog`, { cache: 'no-store' })
+    if (!r.ok) throw new Error(`cc/agent-workers catalog: ${r.status}`)
+    const catalog = await r.json() as AgentWorkerCatalog
+    if (catalog.schema_version !== 1 || !Array.isArray(catalog.options)) {
+      throw new Error('cc/agent-workers catalog: incompatible schema')
+    }
+    return catalog
+  },
+
+  async createAgentWorker(body: CreateAgentWorkerBody): Promise<CcSessionMeta> {
+    const r = await fetch(`${BASE}/agent-workers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }))
+      throw new Error(err.detail || `cc/agent-workers create: ${r.status}`)
     }
     return r.json()
   },
@@ -225,6 +357,30 @@ export const ccApi = {
   async kill(id: string): Promise<void> {
     const r = await fetch(`${BASE}/sessions/${id}`, { method: 'DELETE' })
     if (!r.ok) throw new Error(`cc/sessions delete: ${r.status}`)
+  },
+
+  /**
+   * 费用问题后的自动交接: 后端杀掉旧 assistant 会话, 起回退 provider 的新会话并播交接种子。
+   * 返回新会话 meta(旧会话已死)。
+   */
+  async switchProvider(
+    sessionId: string,
+    options: { toProvider?: string; model?: string } = {},
+  ): Promise<CcSessionMeta & { switched_from?: string; reason?: string }> {
+    const r = await fetch(`${BASE}/agent-workers/switch-provider`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sessionId,
+        to_provider: options.toProvider,
+        model: options.model,
+      }),
+    })
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }))
+      throw new Error(err.detail || `cc/agent-workers switch-provider: ${r.status}`)
+    }
+    return r.json()
   },
 
   async context(id: string): Promise<SessionContext> {

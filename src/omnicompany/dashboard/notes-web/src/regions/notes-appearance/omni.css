@@ -1,0 +1,204 @@
+/* Omni 札记完整外观。结构层只消费 token；本文件写完整暗色 + 直角。
+   选择器不依赖 workshop 覆写。缺省（无 data-notes-theme）也走这里。 */
+html:not([data-notes-theme='workshop']) {
+  color-scheme: dark;
+  background: #0b1830;
+  --notes-r: 0;
+  --notes-r2: 0;
+  --notes-r3: 0;
+  --notes-shadow: 0 14px 36px rgba(6, 16, 38, 0.34);
+  --notes-shadow-menu: 0 16px 40px rgba(6, 16, 38, 0.38);
+  --notes-shadow-pop: 0 24px 70px rgba(6, 16, 38, 0.56);
+}
+
+html:not([data-notes-theme='workshop']),
+html:not([data-notes-theme='workshop']) body {
+  background: #0b1830;
+  color: var(--fp-text);
+}
+
+html:not([data-notes-theme='workshop']) .material-notes-workspace {
+  --fp-r1: 0;
+  --fp-r2: 0;
+  --fp-r3: 0;
+  --fp-r-pill: 0;
+  --fp-r-sheet: 0;
+  --fp-bp-r1: 0;
+  --fp-bp-r2: 0;
+  --fp-bp-r3: 0;
+}
+
+html:not([data-notes-theme='workshop']) input,
+html:not([data-notes-theme='workshop']) textarea,
+html:not([data-notes-theme='workshop']) select,
+html:not([data-notes-theme='workshop']) option,
+html:not([data-notes-theme='workshop']) button {
+  color-scheme: dark;
+  color: var(--fp-text);
+  background: var(--fp-bp-solid);
+  border-color: var(--fp-border);
+  caret-color: var(--fp-text);
+}
+
+html:not([data-notes-theme='workshop']) input::placeholder,
+html:not([data-notes-theme='workshop']) textarea::placeholder {
+  color: var(--fp-text-3);
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-menu-trigger,
+html:not([data-notes-theme='workshop']) .material-canvas-menu,
+html:not([data-notes-theme='workshop']) .material-context-menu,
+html:not([data-notes-theme='workshop']) .material-dialog,
+html:not([data-notes-theme='workshop']) .material-relation-toolbar {
+  color: var(--fp-text);
+  background: var(--fp-bp-solid);
+  border-color: var(--fp-border-subtle);
+  box-shadow: var(--notes-shadow-menu);
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-menu > button,
+html:not([data-notes-theme='workshop']) .material-context-menu button,
+html:not([data-notes-theme='workshop']) .material-view-switch button,
+html:not([data-notes-theme='workshop']) .doc-outline-item,
+html:not([data-notes-theme='workshop']) .doc-toolbar button,
+html:not([data-notes-theme='workshop']) .material-toolbar-actions button,
+html:not([data-notes-theme='workshop']) .material-dialog button,
+html:not([data-notes-theme='workshop']) .material-canvas-boot button {
+  color: var(--fp-text);
+  background: var(--fp-bp-solid);
+  border-color: var(--fp-border-subtle);
+}
+
+html:not([data-notes-theme='workshop']) .material-view-switch button {
+  background: transparent;
+  border-color: transparent;
+}
+
+html:not([data-notes-theme='workshop']) .material-view-switch button.active,
+html:not([data-notes-theme='workshop']) .material-canvas-menu > button:hover,
+html:not([data-notes-theme='workshop']) .material-context-menu button:hover:not(:disabled),
+html:not([data-notes-theme='workshop']) .doc-outline-item:hover,
+html:not([data-notes-theme='workshop']) .doc-toolbar button:hover,
+html:not([data-notes-theme='workshop']) .material-toolbar-actions button:hover,
+html:not([data-notes-theme='workshop']) .material-dialog button:hover {
+  color: var(--fp-text);
+  background: var(--fp-bp-paper-2);
+  border-color: var(--fp-border-subtle);
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-name,
+html:not([data-notes-theme='workshop']) .doc-editor,
+html:not([data-notes-theme='workshop']) .material-card-body textarea,
+html:not([data-notes-theme='workshop']) .material-relation-toolbar input,
+html:not([data-notes-theme='workshop']) .material-search-form input {
+  color: var(--fp-text);
+  background: var(--fp-bp-solid);
+  border-color: var(--fp-border-subtle);
+}
+
+html:not([data-notes-theme='workshop']) .doc-outline,
+html:not([data-notes-theme='workshop']) .doc-block.editing,
+html:not([data-notes-theme='workshop']) .doc-block:hover {
+  color: var(--fp-text);
+  background: var(--fp-bp-tracing);
+  border-color: var(--fp-border-subtle);
+}
+
+html:not([data-notes-theme='workshop']) .doc-block-tools button,
+html:not([data-notes-theme='workshop']) .doc-fullscreen-body header button,
+html:not([data-notes-theme='workshop']) .material-markdown-mode-button {
+  color: var(--fp-text-2);
+  background: var(--fp-bp-tracing-strong);
+  border-color: var(--fp-border-subtle);
+}
+
+html:not([data-notes-theme='workshop']) .doc-fullscreen-body,
+html:not([data-notes-theme='workshop']) .material-fullscreen-layer,
+html:not([data-notes-theme='workshop']) .material-canvas-card,
+html:not([data-notes-theme='workshop']) .material-markdown-preview,
+html:not([data-notes-theme='workshop']) .doc-view {
+  color: var(--fp-text);
+  background: var(--fp-bp-paper);
+  border-color: var(--fp-border-subtle);
+}
+
+html:not([data-notes-theme='workshop']) .material-font-size-combobox,
+html:not([data-notes-theme='workshop']) .material-font-size-combobox input {
+  color: var(--fp-text);
+  background: var(--fp-bp-tracing);
+  border-color: var(--fp-border);
+}
+
+html:not([data-notes-theme='workshop']) .material-node-toolbar .material-font-size-toggle {
+  color: var(--fp-text-2);
+  background: var(--fp-bp-tracing);
+  border-left-color: var(--fp-border);
+}
+
+html:not([data-notes-theme='workshop']) .material-font-size-options {
+  color: var(--fp-text);
+  background: var(--fp-bp-solid);
+  border-color: var(--fp-border);
+  box-shadow: var(--notes-shadow-menu);
+}
+
+html:not([data-notes-theme='workshop']) .material-font-size-options button,
+html:not([data-notes-theme='workshop']) .material-node-toolbar .material-font-size-options button {
+  color: var(--fp-text);
+  background: transparent;
+}
+
+html:not([data-notes-theme='workshop']) .material-font-size-options button[aria-selected="true"],
+html:not([data-notes-theme='workshop']) .material-font-size-options button:hover {
+  color: var(--fp-text);
+  background: color-mix(in srgb, var(--fp-link) 28%, transparent);
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-stage .react-flow__controls,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid var(--fp-border-subtle) !important;
+  border-radius: var(--notes-r) !important;
+  background: var(--fp-bp-solid) !important;
+  box-shadow: none !important;
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-stage .react-flow__controls-button,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__controls-button {
+  color: var(--fp-text-2) !important;
+  fill: var(--fp-text-2) !important;
+  background: var(--fp-bp-solid) !important;
+  border-color: var(--fp-border-subtle) !important;
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-stage .react-flow__controls-button svg,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__controls-button svg {
+  fill: currentColor !important;
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-stage .react-flow__controls-button:hover,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__controls-button:hover {
+  background: var(--fp-border-subtle) !important;
+}
+
+html:not([data-notes-theme='workshop']) .material-node-toolbar {
+  color: var(--fp-text);
+  background: var(--fp-bp-tracing-strong);
+  border-color: var(--fp-border);
+}
+
+html:not([data-notes-theme='workshop']) .material-canvas-boot,
+html:not([data-notes-theme='workshop']) .material-preview-message,
+html:not([data-notes-theme='workshop']) .doc-loading {
+  color: var(--fp-text-2);
+}
+
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__controls,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__controls-button,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__minimap,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__panel,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__node,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__nodesselection-rect,
+html:not([data-notes-theme='workshop']) .material-notes-workspace .react-flow__attribution {
+  border-radius: var(--notes-r);
+}

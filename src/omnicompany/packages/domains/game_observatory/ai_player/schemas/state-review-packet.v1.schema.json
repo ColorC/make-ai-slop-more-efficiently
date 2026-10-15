@@ -430,7 +430,8 @@
           "enum": [
             "static-consecutive",
             "bounded-motion-terminal",
-            "trusted-reference-or-static"
+            "trusted-reference-or-static",
+            "guarded-batch-checkpoint"
           ],
           "title": "Profile",
           "type": "string"

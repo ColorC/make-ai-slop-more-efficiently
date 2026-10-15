@@ -104,7 +104,7 @@ export function AnnotationsAndComments({
       display: 'flex', flexDirection: 'column', background: COLORS.panel, color: COLORS.text,
       flexShrink: 0,
     }}>
-      <div style={{ padding: '8px 12px', borderBottom: `1px solid ${COLORS.border}`, fontWeight: 600 }}>
+      <div style={{ padding: '8px 12px', borderBottom: `1px solid ${COLORS.border}`, fontWeight: 500 }}>
         批注 + 评论 <span style={{ color: COLORS.textDim, fontWeight: 400, fontSize: 14 }}>(§4.4 / §4.5)</span>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -113,7 +113,7 @@ export function AnnotationsAndComments({
         )}
         {material.annotations.map(a => (
           <div key={a.id} style={{
-            padding: 8, borderRadius: 4, background: '#1a2730',
+            padding: 8, borderRadius: 3, background: 'var(--fp-bp-paper-2)',
             borderLeft: `3px solid ${COLORS.borderActive}`,
           }} data-testid="annotation-item">
             <div style={{ fontSize: 14, color: COLORS.textDim, marginBottom: 4 }}>
@@ -127,7 +127,7 @@ export function AnnotationsAndComments({
         ))}
         {material.comments.map(c => (
           <div key={c.id} style={{
-            padding: 8, borderRadius: 4, background: '#1a1f30',
+            padding: 8, borderRadius: 3, background: 'var(--fp-bp-paper-2)',
             borderLeft: `3px solid ${COLORS.accepted}`,
           }} data-testid="comment-item">
             <div style={{ fontSize: 14, color: COLORS.textDim, marginBottom: 4 }}>
@@ -142,7 +142,7 @@ export function AnnotationsAndComments({
                 {getTargetMentions(c.target).map(m => (
                   <span key={m.uri} title={m.uri} style={{
                     fontSize: 14, color: COLORS.borderActive, border: `1px solid ${COLORS.border}`,
-                    borderRadius: 3, padding: '1px 5px', background: '#0d2440',
+                    borderRadius: 3, padding: '1px 5px', background: 'var(--fp-bp-paper-2)',
                   }}>{m.display}</span>
                 ))}
               </div>
@@ -161,7 +161,7 @@ export function AnnotationsAndComments({
                     minHeight: 28,
                     minWidth: 64,
                     padding: '5px 10px',
-                    borderRadius: 4,
+                    borderRadius: 3,
                     border: `1px solid ${COLORS.border}`,
                     background: c.feedback_status === status ? COLORS.border : 'var(--fp-bg)',
                     color: COLORS.text,
@@ -180,7 +180,7 @@ export function AnnotationsAndComments({
         {addingTarget && (
           <div style={{
             fontSize: 14, color: COLORS.borderActive, marginBottom: 6,
-            padding: 6, background: '#0d2440', borderRadius: 4,
+            padding: 6, background: 'var(--fp-bp-paper-2)', borderRadius: 3,
           }}>
             带定位: {JSON.stringify(addingTarget).slice(0, 60)}
             <button
@@ -203,14 +203,14 @@ export function AnnotationsAndComments({
           style={{
             width: '100%', minHeight: 60, padding: 8,
             background: 'var(--fp-bg)', color: COLORS.text,
-            border: `1px solid ${COLORS.border}`, borderRadius: 4,
+            border: `1px solid ${COLORS.border}`, borderRadius: 3,
             fontSize: 15, fontFamily: 'inherit', resize: 'vertical',
           }}
         />
         {mentionOptions.length > 0 && (
           <div style={{
             maxHeight: 180, overflowY: 'auto', marginTop: 6,
-            border: `1px solid ${COLORS.border}`, borderRadius: 4, background: 'var(--fp-bg)',
+            border: `1px solid ${COLORS.border}`, borderRadius: 3, background: 'var(--fp-bg)',
           }} data-testid="entity-mention-menu">
             {mentionOptions.map(item => (
               <button
@@ -237,7 +237,7 @@ export function AnnotationsAndComments({
           style={{
             marginTop: 6, width: '100%', padding: '6px 12px',
             background: !draft.trim() ? COLORS.border : COLORS.borderActive,
-            color: '#fff', border: 'none', borderRadius: 4,
+            color: '#fff', border: 'none', borderRadius: 3,
             cursor: !draft.trim() ? 'not-allowed' : 'pointer', fontSize: 15,
           }}
         >

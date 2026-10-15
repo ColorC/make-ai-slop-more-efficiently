@@ -12,18 +12,18 @@ import { api } from '../../api/client'
 import type { AssistantContext, Goal, Plan, HistoryEntry, ExtraItem, Workspace } from '../../api/client'
 
 const S: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--fp-bg)', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', color: '#e0e0e0' },
-  header: { padding: '6px 10px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
-  search: { background: '#111', border: '1px solid #222', borderRadius: 3, color: '#e0e0e0', padding: '3px 7px', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', width: '100%', boxSizing: 'border-box' as const },
+  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--fp-bg)', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', color: 'var(--fp-text)' },
+  header: { padding: '6px 10px', borderBottom: '1px solid var(--fp-border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
+  search: { background: 'var(--fp-bp-solid)', border: '1px dashed var(--fp-border)', borderRadius: 'var(--fp-bp-r1)', color: 'var(--fp-text)', padding: '3px 7px', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', width: '100%', boxSizing: 'border-box' as const },
   body: { flex: 1, overflowY: 'auto', padding: '4px 0' },
-  section: { borderBottom: '1px solid #111', paddingBottom: 2 },
-  sectionHdr: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', cursor: 'pointer', color: '#555', fontSize: 14 },
-  sectionHdrOpen: { color: '#90caf9' },
+  section: { borderBottom: '1px solid var(--fp-border-subtle)', paddingBottom: 2 },
+  sectionHdr: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', cursor: 'pointer', color: 'var(--fp-text-3)', fontSize: 14 },
+  sectionHdrOpen: { color: 'var(--fp-link)' },
   item: { padding: '4px 10px 4px 16px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4 },
-  itemHover: { background: '#141414' },
-  badge: { display: 'inline-block', padding: '0px 4px', borderRadius: 2, fontSize: 14 },
-  loadBtn: { background: '#1a2a3a', border: '1px solid #2a3a4a', borderRadius: 3, color: '#90caf9', padding: '1px 5px', cursor: 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', flexShrink: 0 },
-  detail: { padding: '4px 10px 6px 16px', color: '#666', fontSize: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word' as const },
+  itemHover: { background: 'var(--fp-bp-solid)' },
+  badge: { display: 'inline-block', padding: '0px 4px', borderRadius: 'var(--fp-bp-r1)', fontSize: 14 },
+  loadBtn: { background: 'var(--fp-bp-paper-2)', border: '1px solid var(--fp-border)', borderRadius: 'var(--fp-bp-r1)', color: 'var(--fp-link)', padding: '1px 5px', cursor: 'pointer', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace', flexShrink: 0 },
+  detail: { padding: '4px 10px 6px 16px', color: 'var(--fp-text-2)', fontSize: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word' as const },
 }
 
 const statusColor: Record<string, string> = { planned: '#888', active: '#42a5f5', done: '#4caf50', cancelled: '#444' }
@@ -89,16 +89,16 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
         {goals.map(g => (
           <React.Fragment key={g.goal_id}>
             <div
-              style={{ ...S.item, background: hoveredItem === g.goal_id ? '#141414' : 'transparent' }}
+              style={{ ...S.item, background: hoveredItem === g.goal_id ? 'var(--fp-bp-solid)' : 'transparent' }}
               onMouseEnter={() => setHoveredItem(g.goal_id)}
               onMouseLeave={() => setHoveredItem(null)}
             >
               <div style={{ flex: 1, minWidth: 0 }} onClick={() => toggleItem(g.goal_id)}>
                 <span style={{ color: statusColor[g.status], marginRight: 4 }}>●</span>
-                <span style={{ color: '#ccc' }}>{g.title}</span>
+                <span style={{ color: 'var(--fp-text)' }}>{g.title}</span>
               </div>
               <button
-                style={{ ...S.loadBtn, color: loaded.has(g.goal_id) ? '#4caf50' : '#90caf9' }}
+                style={{ ...S.loadBtn, color: loaded.has(g.goal_id) ? 'var(--fp-ok)' : 'var(--fp-link)' }}
                 onClick={() => loadGoal(g)}
                 title="Load into conversation"
               >{loaded.has(g.goal_id) ? '✓' : '+'}</button>
@@ -108,7 +108,7 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
             )}
           </React.Fragment>
         ))}
-        {goals.length === 0 && <div style={{ padding: '4px 16px', color: '#444' }}>No goals. Add in PM tab.</div>}
+        {goals.length === 0 && <div style={{ padding: '4px 16px', color: 'var(--fp-text-3)' }}>No goals. Add in PM tab.</div>}
       </Section>
     )
   }
@@ -129,22 +129,22 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
         {plans.map(p => (
           <div
             key={p.plan_id}
-            style={{ ...S.item, background: hoveredItem === p.plan_id ? '#141414' : 'transparent' }}
+            style={{ ...S.item, background: hoveredItem === p.plan_id ? 'var(--fp-bp-solid)' : 'transparent' }}
             onMouseEnter={() => setHoveredItem(p.plan_id)}
             onMouseLeave={() => setHoveredItem(null)}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
-              {p.current_phase && <div style={{ color: '#555', fontSize: 14 }}>📍 {p.current_phase}</div>}
+              <div style={{ color: 'var(--fp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+              {p.current_phase && <div style={{ color: 'var(--fp-text-3)', fontSize: 14 }}>📍 {p.current_phase}</div>}
             </div>
             <button
-              style={{ ...S.loadBtn, color: loaded.has(p.plan_id) ? '#4caf50' : '#90caf9' }}
+              style={{ ...S.loadBtn, color: loaded.has(p.plan_id) ? 'var(--fp-ok)' : 'var(--fp-link)' }}
               onClick={() => loadPlan(p)}
               title="Load into conversation"
             >{loaded.has(p.plan_id) ? '✓' : '+'}</button>
           </div>
         ))}
-        {plans.length === 0 && <div style={{ padding: '4px 16px', color: '#444' }}>No active plans.</div>}
+        {plans.length === 0 && <div style={{ padding: '4px 16px', color: 'var(--fp-text-3)' }}>No active plans.</div>}
       </Section>
     )
   }
@@ -165,15 +165,15 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
         {ws.map(w => (
           <div
             key={w.key}
-            style={{ ...S.item, background: hoveredItem === w.key ? '#141414' : 'transparent' }}
+            style={{ ...S.item, background: hoveredItem === w.key ? 'var(--fp-bp-solid)' : 'transparent' }}
             onMouseEnter={() => setHoveredItem(w.key)}
             onMouseLeave={() => setHoveredItem(null)}
           >
             <div style={{ flex: 1, minWidth: 0 }} onClick={() => toggleItem(w.key)}>
-              <span style={{ color: '#90caf9' }}>{w.key}</span>
-              <span style={{ color: '#555', marginLeft: 6 }}>{w.title}</span>
+              <span style={{ color: 'var(--fp-link)' }}>{w.key}</span>
+              <span style={{ color: 'var(--fp-text-3)', marginLeft: 6 }}>{w.title}</span>
               {expandedItems.has(w.key) && (
-                <div style={{ color: '#555', fontSize: 14, marginTop: 2 }}>
+                <div style={{ color: 'var(--fp-text-3)', fontSize: 14, marginTop: 2 }}>
                   {w.path && <div>{w.path}</div>}
                   {w.description && <div>{w.description}</div>}
                   {w.key_files?.length > 0 && <div>{w.key_files.join(', ')}</div>}
@@ -181,12 +181,12 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
               )}
             </div>
             <button
-              style={{ ...S.loadBtn, color: loaded.has(w.key) ? '#4caf50' : '#90caf9' }}
+              style={{ ...S.loadBtn, color: loaded.has(w.key) ? 'var(--fp-ok)' : 'var(--fp-link)' }}
               onClick={() => loadWs(w)}
             >{loaded.has(w.key) ? '✓' : '+'}</button>
           </div>
         ))}
-        {ws.length === 0 && <div style={{ padding: '4px 16px', color: '#444' }}>No workspaces.</div>}
+        {ws.length === 0 && <div style={{ padding: '4px 16px', color: 'var(--fp-text-3)' }}>No workspaces.</div>}
       </Section>
     )
   }
@@ -207,18 +207,18 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
         {entries.map(h => (
           <React.Fragment key={h.session_id}>
             <div
-              style={{ ...S.item, background: hoveredItem === h.session_id ? '#141414' : 'transparent' }}
+              style={{ ...S.item, background: hoveredItem === h.session_id ? 'var(--fp-bp-solid)' : 'transparent' }}
               onMouseEnter={() => setHoveredItem(h.session_id)}
               onMouseLeave={() => setHoveredItem(null)}
             >
               <div style={{ flex: 1, minWidth: 0 }} onClick={() => toggleItem(h.session_id)}>
-                <span style={{ color: '#888' }}>{fmtTs(h.compacted_at)}</span>
+                <span style={{ color: 'var(--fp-text-2)' }}>{fmtTs(h.compacted_at)}</span>
                 {h.open_todos.length > 0 && (
-                  <span style={{ ...S.badge, background: '#2a1a00', color: '#ffb74d', marginLeft: 6 }}>{h.open_todos.length} todo</span>
+                  <span style={{ ...S.badge, background: 'color-mix(in srgb, var(--fp-warn) 14%, transparent)', color: 'var(--fp-warn)', marginLeft: 6 }}>{h.open_todos.length} todo</span>
                 )}
               </div>
               <button
-                style={{ ...S.loadBtn, color: loaded.has(h.session_id) ? '#4caf50' : '#90caf9' }}
+                style={{ ...S.loadBtn, color: loaded.has(h.session_id) ? 'var(--fp-ok)' : 'var(--fp-link)' }}
                 onClick={() => loadHistory(h)}
               >{loaded.has(h.session_id) ? '✓' : '+'}</button>
             </div>
@@ -227,7 +227,7 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
             )}
           </React.Fragment>
         ))}
-        {entries.length === 0 && <div style={{ padding: '4px 16px', color: '#444' }}>No history yet.</div>}
+        {entries.length === 0 && <div style={{ padding: '4px 16px', color: 'var(--fp-text-3)' }}>No history yet.</div>}
       </Section>
     )
   }
@@ -254,24 +254,24 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
     return (
       <Section id="extra" title={`Extra Help (${total})`} openSections={openSections} onToggle={toggleSection}>
         {filtered.length > SHOW_MAX && !q && (
-          <div style={{ padding: '2px 16px', color: '#555', fontSize: 14 }}>
+          <div style={{ padding: '2px 16px', color: 'var(--fp-text-3)', fontSize: 14 }}>
             Showing {SHOW_MAX} of {total} — use search to filter
           </div>
         )}
         {filtered.slice(0, q ? undefined : SHOW_MAX).map(item => (
           <React.Fragment key={item.item_id}>
             <div
-              style={{ ...S.item, background: hoveredItem === item.item_id ? '#141414' : 'transparent' }}
+              style={{ ...S.item, background: hoveredItem === item.item_id ? 'var(--fp-bp-solid)' : 'transparent' }}
               onMouseEnter={() => setHoveredItem(item.item_id)}
               onMouseLeave={() => setHoveredItem(null)}
             >
               <div style={{ flex: 1, minWidth: 0 }} onClick={() => toggleItem(item.item_id)}>
-                <span style={{ ...S.badge, background: '#111', color: kindColor[item.kind], marginRight: 4 }}>{item.kind}</span>
-                <span style={{ color: '#ccc' }}>{item.title}</span>
-                {item.format_in && <div style={{ color: '#555', fontSize: 14, paddingLeft: 4 }}>↳ {item.format_in}</div>}
+                <span style={{ ...S.badge, background: 'var(--fp-bp-solid)', color: kindColor[item.kind], marginRight: 4 }}>{item.kind}</span>
+                <span style={{ color: 'var(--fp-text)' }}>{item.title}</span>
+                {item.format_in && <div style={{ color: 'var(--fp-text-3)', fontSize: 14, paddingLeft: 4 }}>↳ {item.format_in}</div>}
               </div>
               <button
-                style={{ ...S.loadBtn, color: loaded.has(item.item_id) ? '#4caf50' : '#90caf9' }}
+                style={{ ...S.loadBtn, color: loaded.has(item.item_id) ? 'var(--fp-ok)' : 'var(--fp-link)' }}
                 onClick={() => loadExtra(item)}
               >{loaded.has(item.item_id) ? '✓' : '+'}</button>
             </div>
@@ -280,7 +280,7 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
             )}
           </React.Fragment>
         ))}
-        {allExtra.length === 0 && <div style={{ padding: '4px 16px', color: '#444' }}>No extra help items. Add in PM tab.</div>}
+        {allExtra.length === 0 && <div style={{ padding: '4px 16px', color: 'var(--fp-text-3)' }}>No extra help items. Add in PM tab.</div>}
       </Section>
     )
   }
@@ -288,14 +288,14 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
   return (
     <div style={S.root}>
       <div style={S.header}>
-        <span style={{ color: '#90caf9', fontWeight: 'bold', fontSize: 14 }}>Context</span>
+        <span style={{ color: 'var(--fp-link)', fontWeight: 500, fontSize: 14 }}>Context</span>
         <button
           onClick={load}
-          style={{ background: 'transparent', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: 0 }}
+          style={{ background: 'transparent', border: 'none', color: 'var(--fp-text-3)', cursor: 'pointer', fontSize: 14, padding: 0 }}
           title="Refresh"
         >↺</button>
       </div>
-      <div style={{ padding: '4px 8px', borderBottom: '1px solid #111', flexShrink: 0 }}>
+      <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--fp-border-subtle)', flexShrink: 0 }}>
         <input
           style={S.search}
           placeholder="Search context..."
@@ -309,7 +309,7 @@ export default function ContextPanel({ onLoadContext }: ContextPanelProps) {
         {renderWorkspaces()}
         {renderHistory()}
         {renderExtra()}
-        {!ctx && <div style={{ padding: 16, color: '#444', textAlign: 'center' }}>Loading context...</div>}
+        {!ctx && <div style={{ padding: 16, color: 'var(--fp-text-3)', textAlign: 'center' }}>Loading context...</div>}
       </div>
     </div>
   )

@@ -2,7 +2,7 @@
 
 # project_atlas — 设计
 
-跨工作空间的"可复用能力"收集与登记:把各空间(omnicompany/quant-lab/webworks/poof/aiworkspace/walker…)的工具/管线/能力,语义策展成按"操作/生产对象"切的 object-SKILL,供 Claude Code 与 Codex 按 description 认领,防重复造轮。
+跨工作空间的"可复用能力"收集与登记:把各空间(omnicompany/quant-lab/webworks/aiworkspace/walker…)的工具/管线/能力,语义策展成按"操作/生产对象"切的 object-SKILL,供 Claude Code 与 Codex 按 description 认领,防重复造轮。
 
 ## 状态
 
@@ -29,7 +29,7 @@ collect 内部:`_omni_inventory`(仅 omnicompany)→ enumerate worker 写 `objec
 
 ## 已知局限
 
-- enumerate 现只喂 omni 注册命令(**CLI-中心**),非 CLI 资产(app/项目类,如 aigc-lab/poof)靠"补漏轮"才登——待让 enumerate 兼顾非 CLI。
+- enumerate 现只喂 omni 注册命令(**CLI-中心**),非 CLI 资产(app/项目类,如 aigc-lab)靠"补漏轮"才登——待让 enumerate 兼顾非 CLI。
 - 拓扑由第一版 5 节点(裸 LLM classify/author/write 翻车)重做为 4 节点(worker)。
 - 审后正式名录化(并入 `omni project`)、跨仓二次差集自动化 未建。
 

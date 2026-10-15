@@ -1,105 +1,90 @@
-<!-- [OMNI] origin=claude-code domain=services/code_runtime_test ts=2026-04-26T00:00:00Z type=design status=active -->
+<!-- [OMNI] origin=codex domain=services/code_runtime_test ts=2026-08-09T00:00:00Z type=design status=active -->
 <!-- [OMNI] material_id="material:utility.runtime_test.code.design_specification.md" -->
 
-# code_runtime_test · 代码产物测试团队
+# code-runtime-test 设计
 
-## 1 · 名称与定位
+## 状态
 
-`code_runtime_test` 是测试**代码产物类型**目标团队 (例: csv-to-md 产 markdown 文本) 的测试团队. 跟 `absorption_runtime_test` 平行, 同为特化测试团队, 但对应不同产物形态.
+`code-runtime-test` 是当前保留的通用确定性代码产物测试管线。它只验证存在明确 ground truth 的代码型产物；已退役的 `absorption-runtime-test` 与 runtime-test builder 不再是入口，也不得据此恢复。
 
-> ⚠️ "代码产物 / absorption" 是当前两个有具体测试团队的特化领域, **不是穷尽分类**. 真通用层 (针对 target 生成假设的 meta 层) 在 Phase B/C 立, 见 `docs/plans/[2026-04-26]VERIFICATION-AS-HYPOTHESIS-METHOD/plan.md`.
+团队级运行健康检查由 `team-supervisor` 承担。本设施不负责持续学习编排，不是 AI Learning Observatory 的替代主线。
 
-**关键差别**: 代码产物**有 ground truth** (人写的标杆输出). 验证方式以**对标 + 边界探测**为主, 不需要多源 LLM 互验.
+## 核心接口
 
-立项: 2026-04-26 · sediment 自 tests/teams/csv_to_md/test_contract.py 现成 contract test 模式.
-
-## 2 · 职责
-
-接收用例集 (input fixture + expected output 对), 跑目标团队, 验证:
-- 路 1 标杆对标: success cases byte-diff 跟 expected 比
-- 路 2 错误处理: error cases verdict + diagnosis 关键词检查
-- 路 3 重现性: 同 input 跑两次 byte-identical
-- 路 4 边界探测 (可选): 喂极端 input 看健壮性
-
-## 3 · 输入与输出
-
-### 3.1 输入 `code_runtime_test.target_spec`
+输入为 `code_runtime_test.target_spec`：
 
 ```json
 {
   "target_team_id": "csv-to-md",
   "test_cases": [
-    {"name": "case_1_basic", "kind": "success", "input": {"path": "..."}, "expected_path": "..."},
-    {"name": "error_file_not_found", "kind": "error", "input": {...}, "expected_verdict": "FAIL", "diagnosis_keywords": ["not found"]},
-    {"name": "case_repro", "kind": "reproducibility", "input": {...}}
+    {
+      "name": "case_1_basic",
+      "kind": "success",
+      "input": {"path": "..."},
+      "expected_path": "..."
+    },
+    {
+      "name": "error_file_not_found",
+      "kind": "error",
+      "input": {"path": "..."},
+      "expected_verdict": "FAIL",
+      "diagnosis_keywords": ["not found"]
+    },
+    {
+      "name": "case_repro",
+      "kind": "reproducibility",
+      "input": {"path": "..."}
+    }
   ],
   "output_extractor": "report_markdown"
 }
 ```
 
-### 3.2 输出 `code_runtime_test.portrait`
+输出为 `code_runtime_test.portrait`，至少包含：
 
-跟 absorption 同形态 (verdict/三问 brief/做得好/漏 句子列表), 但**梯度更细** — 因为代码产物有量化:
+- success case 的 byte-exact 通过率与差异计数；
+- error case 的 verdict 与诊断关键词命中率；
+- 同输入重复执行的 byte-identical 结果；
+- 可复核的执行耗时与证据位置。
 
-- success cases byte-exact 比例 (PASS 严要求)
-- 平均 byte_diff_count (即使 fail 也告诉差多少)
-- error cases diagnosis 命中关键词比例
-- 重现性 byte-identical (二元)
+## 架构决策
 
-## 4 · 拓扑
+- 全部验证器为 HARD worker，不使用 LLM 代替确定性断言。
+- 目标程序通过受控 subprocess/dispatch 执行，验证逻辑与目标实现隔离。
+- portrait 使用自然语言结论和物理度量，不生成抽象好坏标签。
+- 只有存在稳定预期输出或契约的代码产物才能接入。
 
+## 数据流 / 拓扑
+
+```text
+TargetIngressWorker
+  ├─> GoldenContractRunner
+  ├─> ErrorPathRunner
+  └─> ReproducibilityRunner
+          │
+          └─> PortraitAssemblerWorker
 ```
-TargetIngressWorker (HARD)
-  ↓
-  ├──→ GoldenContractRunner (HARD · 跑 success cases · diff)
-  ├──→ ErrorPathRunner (HARD · 跑 error cases · 验 verdict + diag)
-  └──→ ReproducibilityRunner (HARD · 同 input 跑 2 次 · byte 比)
-        ↓ 3 路 fan-in
-   PortraitAssemblerWorker (HARD · sink)
-```
 
-5 节点. 全 HARD, 无 LLM, 跑得快 (秒级到分钟级取决于目标团队).
+关键 material：
 
-## 5 · Material (5 个)
-
-| ID | producer | consumer |
+| material | producer | consumer |
 |---|---|---|
-| `code_runtime_test.target_spec` | 外部 | TargetIngress |
-| `code_runtime_test.target_metadata` | TargetIngress | 3 验证器 |
-| `code_runtime_test.golden_evidence` | GoldenContractRunner | PortraitAssembler |
-| `code_runtime_test.error_evidence` | ErrorPathRunner | PortraitAssembler |
-| `code_runtime_test.reproducibility_evidence` | ReproducibilityRunner | PortraitAssembler |
-| `code_runtime_test.portrait` | PortraitAssembler | sink |
+| `code_runtime_test.target_spec` | 外部调用方 | TargetIngressWorker |
+| `code_runtime_test.target_metadata` | TargetIngressWorker | 三个验证器 |
+| `code_runtime_test.golden_evidence` | GoldenContractRunner | PortraitAssemblerWorker |
+| `code_runtime_test.error_evidence` | ErrorPathRunner | PortraitAssemblerWorker |
+| `code_runtime_test.reproducibility_evidence` | ReproducibilityRunner | PortraitAssemblerWorker |
+| `code_runtime_test.portrait` | PortraitAssemblerWorker | 调用方 |
 
-(实际 6 个 material · entry/sink + 4 中间)
+## 已知局限
 
-## 6 · 边界与约束
+- 不适合开放式研究、文案质量、模型判断或缺乏唯一预期输出的任务。
+- ground truth 变更必须显式版本化，否则结果不可跨版本比较。
+- 本设计只定义测试语义；具体目标团队仍需维护 fixture、expected output 与超时边界。
+- 已退役的 repo absorption 历史实现只允许作为归档证据读取，不得注册为新目标或新管线。
 
-### 6.1 全 HARD · 不调 LLM
+## 参考资料
 
-代码产物有 ground truth, 不需要 LLM 互验. byte-diff 是确定性算法.
-
-### 6.2 嵌套 dispatch · subprocess
-
-跟 absorption_runtime_test 一样用 subprocess 跑目标 dispatch.
-
-### 6.3 反模式禁令
-
-按 feedback_semantic_sentences_not_classification:
-- portrait 字段全自然语言句子
-- 物理度量 (byte_diff_count / pass_rate / elapsed_sec) 允许
-- 禁打分/标签
-
-### 6.4 适用产物类型
-
-仅适合**代码产物** (有确定性 ground truth):
-- ✅ csv-to-md (input csv → output markdown · 有标杆)
-- ✅ team_builder (input 需求 → output Python 代码 · 标杆是"能编译能跑")
-- ✅ 配表生成 (input 表 → output csv · 有 historical baseline diff)
-- ❌ repo_absorption (absorption 类 · 走 absorption_runtime_test)
-
-### 6.5 红绿基线在哪做
-
-每个 verifier 都有内置红绿:
-- GoldenContractRunner 的"红"是"故意改坏 expected" (verifier 应捕到), "绿"是"用 expected 当 actual" (verifier 应认 100% match)
-- 校准脚本在 scratch/calibration_<verifier>.py
+- AI Learning Observatory 唯一主线：`docs/projects/ai-learning-observatory/PROJECT_INDEX.md`
+- 持续学习退役策略：`docs/projects/ai-learning-observatory/docs/RETIREMENT_POLICY.md`
+- 通用团队健康检查：`team-supervisor` skill 与同名管线

@@ -28,7 +28,7 @@ const ST: Record<string, CSSProperties> = {
   // 展开面板: 合并栏里挂在 chip 下方的浮层(绝对定位, 不撑开顶栏行高)。
   rulPanelFloat: {
     position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 20, width: 340, maxHeight: 320, overflow: 'auto',
-    padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 10,
+    padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 3,
     background: 'var(--fp-surface)', border: '1px solid var(--fp-border)',
     boxShadow: '0 8px 24px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.06)',
   },
@@ -69,8 +69,8 @@ function NarrativeRulings({ m }: { m: Material }) {
         <div style={ST.rulPanelFloat} data-testid="narrative-rulings-panel">
           {step.adopted_rulings.map((r) => (
             <div key={r.id} style={ST.rulItem}>
-              <span style={{ fontSize: 11.5, color: 'var(--fp-text-3)', fontFamily: MONO }}>{r.id}</span>
-              <div style={{ fontSize: 12.5, lineHeight: 1.5 }}>{r.statement}</div>
+              <span style={{ fontSize: 12, color: 'var(--fp-text-3)', fontFamily: MONO }}>{r.id}</span>
+              <div style={{ fontSize: 13, lineHeight: 1.5 }}>{r.statement}</div>
               {r.anchor && r.anchor !== r.statement && (
                 <div style={ST.rulQuote}>“{r.anchor}”</div>
               )}

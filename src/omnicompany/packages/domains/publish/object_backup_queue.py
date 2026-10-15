@@ -7,20 +7,23 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import os
 import queue
 import re
 import sqlite3
+import stat
 import subprocess
 import sys
 import threading
 import time
+from ctypes import wintypes
 from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, TextIO
 
 
@@ -130,6 +133,7 @@ class BackupConfig:
     upload_limit_kib: int
     items: tuple[QueueItem, ...]
     schedule: dict[str, Any] = field(default_factory=dict)
+    sqlite_staging_root: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -154,6 +158,18 @@ def load_config(path: str | Path) -> BackupConfig:
     repository = str(raw.get("repository", ""))
     if ":" not in catalog_remote or not repository.startswith("rclone:"):
         raise ValueError("catalog_remote must be an rclone remote and repository must use rclone:")
+    staging_root = None
+    if "sqlite_staging_root" in raw:
+        configured_root = raw["sqlite_staging_root"]
+        if not isinstance(configured_root, str) or not configured_root.strip():
+            raise ValueError("sqlite_staging_root must be a non-empty absolute path string")
+        expanded_root = os.path.expandvars(os.path.expanduser(configured_root))
+        staging_root = Path(expanded_root)
+        if not staging_root.is_absolute():
+            raise ValueError("sqlite_staging_root must be an absolute path")
+        staging_root = Path(os.path.abspath(staging_root))
+        _assert_no_reparse_ancestors(staging_root)
+        _assert_staging_root_away_from_sources(staging_root, items)
     return BackupConfig(
         path=config_path,
         catalog_remote=catalog_remote,
@@ -166,6 +182,7 @@ def load_config(path: str | Path) -> BackupConfig:
         daily_limit_bytes=int(float(raw.get("daily_limit_gib", 5)) * GIB),
         upload_limit_kib=max(1, int(raw.get("upload_limit_kib", 8192))),
         items=items,
+        sqlite_staging_root=staging_root,
         schedule=dict(raw.get("schedule") or {}),
     )
 
@@ -189,6 +206,16 @@ def save_state(config: BackupConfig, state: dict[str, Any]) -> None:
 
 
 def item_is_due(item: QueueItem, status: dict[str, Any], *, now: datetime | None = None) -> bool:
+    if status.get("status") in {"failed", "estimate_failed", "partial"}:
+        return True
+    chunks = status.get("chunks", {})
+    for unit in chunk_units(item):
+        unit_status = chunks.get(unit_state_key(unit), {})
+        if unit_status.get("status") in {"failed", "estimate_failed"}:
+            return True
+        if unit.source.is_file() or isinstance(unit_status.get("source_metadata"), dict):
+            if unit_is_due(item, unit, unit_status, now=now):
+                return True
     if not status.get("ever_completed"):
         return True
     last_completed_at = status.get("last_completed_at")
@@ -261,13 +288,99 @@ def item_payload_reference(config: BackupConfig, item: QueueItem) -> str:
     return f"{config.repository} · tag=item:{item.id} · logical={item.destination}"
 
 
-def create_sqlite_snapshot(item: QueueItem, state_root: Path) -> Path:
+def _path_key(path: Path) -> str:
+    return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+
+def _is_path_ancestor(ancestor: Path, path: Path) -> bool:
+    ancestor_key = _path_key(ancestor)
+    path_key = _path_key(path)
+    return path_key == ancestor_key or path_key.startswith(ancestor_key.rstrip("\\/") + os.sep)
+
+
+def _assert_no_reparse_ancestors(path: Path) -> None:
+    """Refuse staging paths that would traverse an existing link or junction."""
+    absolute = Path(os.path.abspath(path))
+    for candidate in reversed((absolute, *absolute.parents)):
+        try:
+            info = candidate.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & getattr(
+            stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400
+        ):
+            raise ValueError(f"SQLite staging path contains a reparse point: {candidate}")
+
+
+def _assert_staging_root_away_from_sources(staging_root: Path, items: Iterable[QueueItem]) -> None:
+    for item in items:
+        if item.source_type == "sqlite" and _is_path_ancestor(staging_root, item.source):
+            raise ValueError(
+                f"sqlite_staging_root must not equal or contain SQLite source {item.id}: {item.source}"
+            )
+
+
+def _assert_safe_staging_fragment(value: str, label: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"SQLite staging {label} must be a non-empty relative path")
+    windows_path = PureWindowsPath(value)
+    if Path(value).is_absolute() or windows_path.is_absolute() or windows_path.drive:
+        raise ValueError(f"SQLite staging {label} must not be absolute or drive-relative: {value!r}")
+    components = value.replace("\\", "/").split("/")
+    if ".." in components:
+        raise ValueError(f"SQLite staging {label} must not contain parent traversal: {value!r}")
+
+
+def _is_strict_path_descendant(root: Path, candidate: Path) -> bool:
+    root_key = _path_key(root).rstrip("\\/")
+    candidate_key = _path_key(candidate)
+    return candidate_key.startswith(root_key + os.sep)
+
+
+def _assert_safe_snapshot_destination(item: QueueItem, source: Path, target: Path, temporary: Path) -> None:
+    _assert_no_reparse_ancestors(target)
+    for candidate in (target, temporary):
+        if _path_key(candidate) == _path_key(source):
+            raise ValueError(f"{item.id}: SQLite staging destination matches source: {candidate}")
+        try:
+            info = candidate.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & getattr(
+            stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400
+        ):
+            raise ValueError(f"{item.id}: SQLite staging destination is a reparse point: {candidate}")
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError(f"{item.id}: SQLite staging destination is not a regular file: {candidate}")
+        if info.st_nlink != 1:
+            reason = "multiple hard links" if info.st_nlink > 1 else "unknown hard-link count"
+            raise ValueError(f"{item.id}: SQLite staging destination has {reason}: {candidate}")
+
+
+def create_sqlite_snapshot(
+    item: QueueItem,
+    state_root: Path,
+    staging_root: Path | None = None,
+) -> Path:
     if not item.source.is_file():
         raise FileNotFoundError(item.source)
-    snapshot_dir = state_root / "snapshots" / item.id
-    snapshot_dir.mkdir(parents=True, exist_ok=True)
-    target = snapshot_dir / (item.snapshot_name or item.source.name)
+    selected_root = staging_root if staging_root is not None else state_root / "snapshots"
+    if not selected_root.is_absolute():
+        raise ValueError(f"{item.id}: SQLite staging root must be absolute: {selected_root}")
+    snapshot_name = item.snapshot_name or item.source.name
+    _assert_safe_staging_fragment(item.id, "item id")
+    _assert_safe_staging_fragment(snapshot_name, "snapshot name")
+    _assert_no_reparse_ancestors(selected_root)
+    _assert_staging_root_away_from_sources(selected_root, (item,))
+    snapshot_dir = selected_root / item.id
+    target = snapshot_dir / snapshot_name
     temporary = target.with_suffix(target.suffix + ".tmp")
+    for label, candidate in (("snapshot directory", snapshot_dir), ("target", target), ("temporary", temporary)):
+        if not _is_strict_path_descendant(selected_root, candidate):
+            raise ValueError(f"{item.id}: SQLite staging {label} escapes staging root: {candidate}")
+    _assert_safe_snapshot_destination(item, item.source, target, temporary)
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    _assert_safe_snapshot_destination(item, item.source, target, temporary)
     temporary.unlink(missing_ok=True)
     source_uri = f"file:{item.source.as_posix()}?mode=ro"
     with closing(sqlite3.connect(source_uri, uri=True, timeout=30)) as source_db:
@@ -325,7 +438,114 @@ def latest_mtime(path: Path) -> float:
     return latest
 
 
-def unit_is_due(item: QueueItem, unit: BackupUnit, status: dict[str, Any]) -> bool:
+def file_source_metadata(path: Path) -> dict[str, Any] | None:
+    """Capture stable file identity and change metadata without using Windows ctime."""
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        return None
+
+    metadata: dict[str, Any] = {
+        "version": 1,
+        "size": int(info.st_size),
+        "mtime_ns": int(info.st_mtime_ns),
+        "device": int(info.st_dev),
+        "file_id": int(info.st_ino),
+    }
+    if os.name == "nt":
+        class FileBasicInfo(ctypes.Structure):
+            _fields_ = [
+                ("creation_time", ctypes.c_longlong),
+                ("last_access_time", ctypes.c_longlong),
+                ("last_write_time", ctypes.c_longlong),
+                ("change_time", ctypes.c_longlong),
+                ("file_attributes", wintypes.DWORD),
+            ]
+
+        class ByHandleFileInformation(ctypes.Structure):
+            _fields_ = [
+                ("file_attributes", wintypes.DWORD),
+                ("creation_time_low", wintypes.DWORD),
+                ("creation_time_high", wintypes.DWORD),
+                ("last_access_time_low", wintypes.DWORD),
+                ("last_access_time_high", wintypes.DWORD),
+                ("last_write_time_low", wintypes.DWORD),
+                ("last_write_time_high", wintypes.DWORD),
+                ("volume_serial_number", wintypes.DWORD),
+                ("file_size_high", wintypes.DWORD),
+                ("file_size_low", wintypes.DWORD),
+                ("number_of_links", wintypes.DWORD),
+                ("file_index_high", wintypes.DWORD),
+                ("file_index_low", wintypes.DWORD),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel32.CreateFileW
+        create_file.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        create_file.restype = wintypes.HANDLE
+        get_basic_info = kernel32.GetFileInformationByHandleEx
+        get_basic_info.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD]
+        get_basic_info.restype = wintypes.BOOL
+        get_file_info = kernel32.GetFileInformationByHandle
+        get_file_info.argtypes = [wintypes.HANDLE, ctypes.POINTER(ByHandleFileInformation)]
+        get_file_info.restype = wintypes.BOOL
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+
+        handle = create_file(
+            str(path),
+            0x80,  # FILE_READ_ATTRIBUTES
+            0x1 | 0x2 | 0x4,  # share read/write/delete
+            None,
+            3,  # OPEN_EXISTING
+            0x02000000,  # FILE_FLAG_BACKUP_SEMANTICS
+            None,
+        )
+        invalid_handle = ctypes.c_void_p(-1).value
+        if handle == invalid_handle:
+            return None
+        try:
+            basic = FileBasicInfo()
+            identity = ByHandleFileInformation()
+            if not get_basic_info(handle, 0, ctypes.byref(basic), ctypes.sizeof(basic)):
+                return None
+            if not get_file_info(handle, ctypes.byref(identity)):
+                return None
+            metadata["change_time_100ns"] = int(basic.change_time)
+            metadata["volume_serial"] = int(identity.volume_serial_number)
+            metadata["file_id"] = (int(identity.file_index_high) << 32) | int(identity.file_index_low)
+        finally:
+            close_handle(handle)
+    else:
+        metadata["change_time_ns"] = int(info.st_ctime_ns)
+    return metadata
+
+
+def unit_is_due(
+    item: QueueItem,
+    unit: BackupUnit,
+    status: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> bool:
+    if status.get("status") in {"failed", "estimate_failed"}:
+        return True
+    if unit.source.is_file() or isinstance(status.get("source_metadata"), dict):
+        checkpoint = status.get("source_metadata")
+        current = file_source_metadata(unit.source)
+        if not isinstance(checkpoint, dict) or current is None or checkpoint != current:
+            return True
     if not status.get("completed_at"):
         return True
     try:
@@ -338,7 +558,7 @@ def unit_is_due(item: QueueItem, unit: BackupUnit, status: dict[str, Any]) -> bo
         return True
     if item.chunk_depth:
         return False
-    return datetime.now(timezone.utc) >= completed + timedelta(days=item.refresh_days)
+    return (now or datetime.now(timezone.utc)) >= completed + timedelta(days=item.refresh_days)
 
 
 def resolve_included_files(item: QueueItem) -> list[Path]:
@@ -387,7 +607,12 @@ def write_file_list(config: BackupConfig, item: QueueItem) -> Path:
 
 
 def restic_base_command(config: BackupConfig) -> list[str]:
-    rclone_args = "serve restic --stdio --b2-hard-delete --transfers 1 --checkers 4"
+    # 2026-09-01: OpenList→百度 上传大 pack 常超 rclone 默认 5m 响应超时("timeout awaiting response headers"),
+    # 导致 restic exit=1 整块失败; 放宽 IO 超时 + 提高底层重试, 并把 restic→rclone 并发压到 2 路, 少打爆上游。
+    rclone_args = (
+        "serve restic --stdio --b2-hard-delete --transfers 1 --checkers 4 "
+        "--timeout 30m --contimeout 2m --low-level-retries 20 --retries 5"
+    )
     return [
         config.restic_executable,
         "--repo",
@@ -402,6 +627,8 @@ def restic_base_command(config: BackupConfig) -> list[str]:
         "rclone.program=rclone",
         "--option",
         f"rclone.args={rclone_args}",
+        "--option",
+        "rclone.connections=2",
     ]
 
 
@@ -417,12 +644,13 @@ def build_restic_backup_command(
     *,
     prepared_source: Path | None = None,
     dry_run: bool = False,
+    file_unit: bool | None = None,
 ) -> list[str]:
+    is_file_unit = unit.source.is_file() if file_unit is None else file_unit
     command = [
         *restic_base_command(config),
         "backup",
         "--json",
-        "--skip-if-unchanged",
         "--tag",
         f"item:{item.id}",
         "--tag",
@@ -430,6 +658,10 @@ def build_restic_backup_command(
         "--tag",
         chunk_tag(unit),
     ]
+    if is_file_unit:
+        command.append("--force")
+    else:
+        command.append("--skip-if-unchanged")
     if dry_run:
         command.append("--dry-run")
     for pattern in item.excludes:
@@ -826,15 +1058,29 @@ def publish_catalog(
 def assert_repository_ready(config: BackupConfig, logger: RunLogger) -> None:
     if not config.restic_password_file.is_file():
         raise RuntimeError(f"restic password file is missing: {config.restic_password_file}")
-    command = [*restic_base_command(config), "snapshots", "--json", "--latest", "1"]
+    command = build_repository_ready_command(config)
     return_code, output = run_text_command(command, logger, environment=restic_environment(config))
     if return_code != 0:
         raise RuntimeError(f"restic repository is not ready: {output[-500:]}")
 
 
-def prepare_source(item: QueueItem, state_root: Path) -> Path | None:
+def build_repository_ready_command(config: BackupConfig) -> list[str]:
+    """Check that the configured repository can be opened and decrypted.
+
+    ``snapshots --latest 1`` is still grouped across snapshot paths and can
+    emit a very large catalog. Reading the small repository config validates
+    repository reachability and password without enumerating snapshots.
+    """
+    return [*restic_base_command(config), "cat", "config"]
+
+
+def prepare_source(
+    item: QueueItem,
+    state_root: Path,
+    staging_root: Path | None = None,
+) -> Path | None:
     if item.source_type == "sqlite":
-        return create_sqlite_snapshot(item, state_root)
+        return create_sqlite_snapshot(item, state_root, staging_root)
     return None
 
 
@@ -842,9 +1088,62 @@ def unit_state_key(unit: BackupUnit) -> str:
     return hashlib.sha256(unit.key.encode("utf-8")).hexdigest()[:16]
 
 
+def _validate_chunk_selection(
+    config: BackupConfig,
+    item_ids: set[str] | None,
+    phase: int | None,
+    chunk_key: str | None,
+) -> tuple[QueueItem, BackupUnit] | None:
+    if chunk_key is None:
+        return None
+    if not isinstance(chunk_key, str):
+        raise ValueError("--chunk must be a relative file-unit key string")
+    if not item_ids or len(item_ids) != 1:
+        raise ValueError("--chunk requires exactly one --item")
+    windows_key = PureWindowsPath(chunk_key)
+    posix_key = PurePosixPath(chunk_key.replace("\\", "/"))
+    if (
+        not chunk_key
+        or windows_key.is_absolute()
+        or bool(windows_key.drive)
+        or posix_key.is_absolute()
+        or ".." in posix_key.parts
+        or ".." in chunk_key.replace("\\", "/").split("/")
+    ):
+        raise ValueError(f"--chunk must be a safe relative file-unit key: {chunk_key!r}")
+    item_id = next(iter(item_ids))
+    item = next((candidate for candidate in config.items if candidate.id == item_id), None)
+    if item is None or not item.enabled or item.blocked_reason:
+        raise ValueError(f"--chunk item is not an enabled queue item: {item_id!r}")
+    if phase is not None and item.phase != phase:
+        raise ValueError(f"--chunk item {item_id!r} does not match phase {phase}")
+    if item.source_type != "tree" or item.chunk_depth <= 0:
+        raise ValueError("--chunk requires a chunked tree item")
+    matches = [unit for unit in chunk_units(item) if unit.key == chunk_key and unit.source.is_file()]
+    if len(matches) != 1:
+        raise ValueError(f"unknown or non-file chunk for {item_id}: {chunk_key!r}")
+    return item, matches[0]
+
+
 def update_item_completion(item: QueueItem, item_status: dict[str, Any], units: list[BackupUnit]) -> None:
     chunks = item_status.setdefault("chunks", {})
-    complete = all(chunks.get(unit_state_key(unit), {}).get("completed_at") for unit in units)
+    complete = True
+    for unit in units:
+        chunk_status = chunks.get(unit_state_key(unit), {})
+        file_unit = unit.source.is_file() or isinstance(chunk_status.get("source_metadata"), dict)
+        if (
+            not chunk_status.get("completed_at")
+            or chunk_status.get("status") in {"failed", "estimate_failed"}
+        ):
+            complete = False
+            break
+        if file_unit and (
+            chunk_status.get("status") != "complete"
+            or not isinstance(chunk_status.get("source_metadata"), dict)
+            or file_source_metadata(unit.source) != chunk_status.get("source_metadata")
+        ):
+            complete = False
+            break
     item_status["ever_completed"] = bool(item_status.get("ever_completed") or complete)
     if complete:
         item_status["last_completed_at"] = utc_now()
@@ -861,11 +1160,13 @@ def _run_backup_locked(
     limit_bytes: int | None = None,
     phase: int | None = None,
     item_ids: set[str] | None = None,
+    chunk_key: str | None = None,
     catalog_only: bool = False,
     stream: TextIO | None = None,
 ) -> dict[str, Any]:
     config.state_root.mkdir(parents=True, exist_ok=True)
     state = load_state(config)
+    selected_chunk = _validate_chunk_selection(config, item_ids, phase, chunk_key)
     run_started = utc_now()
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     logger = RunLogger(config.state_root / "logs" / f"{run_id}.log", stream=stream)
@@ -876,7 +1177,11 @@ def _run_backup_locked(
         publish_catalog(config, state, logger, dry_run=dry_run, required=catalog_only)
         if catalog_only:
             return {"run_id": run_id, "catalog_only": True, "dry_run": dry_run}
-        queue = selected_items(config, state, phase=phase, item_ids=item_ids)
+        queue = (
+            [selected_chunk[0]]
+            if selected_chunk is not None
+            else selected_items(config, state, phase=phase, item_ids=item_ids)
+        )
         selected_phase = phase if phase is not None else select_phase(config.items, state)
         logger.write(f"selected phase={selected_phase} items={len(queue)} limit={limit}")
         if not dry_run:
@@ -893,10 +1198,20 @@ def _run_backup_locked(
                 continue
             units = chunk_units(item)
             item_status = state.get("items", {}).get(item.id, {})
+            chunk_states = item_status.get("chunks", {})
+            file_unit_flags = {
+                unit.key: unit.source.is_file()
+                or isinstance(chunk_states.get(unit_state_key(unit), {}).get("source_metadata"), dict)
+                for unit in units
+            }
             due_units = [
                 unit
                 for unit in units
-                if unit_is_due(item, unit, item_status.get("chunks", {}).get(unit_state_key(unit), {}))
+                if (
+                    unit.key == selected_chunk[1].key
+                    if selected_chunk is not None
+                    else unit_is_due(item, unit, item_status.get("chunks", {}).get(unit_state_key(unit), {}))
+                )
             ]
             if dry_run:
                 for unit in due_units:
@@ -909,7 +1224,7 @@ def _run_backup_locked(
             deferred_count = 0
             item_failed = False
             save_state(config, state)
-            prepared_source = prepare_source(item, config.state_root)
+            prepared_source = prepare_source(item, config.state_root, config.sqlite_staging_root)
             for unit in due_units:
                 if remaining <= 0:
                     break
@@ -922,6 +1237,7 @@ def _run_backup_locked(
                     effective_unit,
                     prepared_source=prepared_source,
                     dry_run=True,
+                    file_unit=file_unit_flags[unit.key],
                 )
                 estimate_code, estimate_summary = run_restic_json(estimate_command, config, logger)
                 if estimate_code != 0:
@@ -932,6 +1248,15 @@ def _run_backup_locked(
                         "bytes": 0,
                     }
                     results.append(result)
+                    chunk_status = chunk_states.setdefault(unit_state_key(unit), {})
+                    chunk_status.update(
+                        {
+                            "key": unit.key,
+                            "label": unit.label,
+                            "status": "estimate_failed",
+                            "last_error": "restic dry-run failed",
+                        }
+                    )
                     item_status.update({"status": "failed", "last_error": "restic dry-run failed"})
                     item_failed = True
                     break
@@ -964,24 +1289,48 @@ def _run_backup_locked(
                     effective_unit,
                     prepared_source=prepared_source,
                     dry_run=False,
+                    file_unit=file_unit_flags[unit.key],
                 )
+                file_unit = file_unit_flags[unit.key]
+                source_metadata_before = file_source_metadata(unit.source) if file_unit else None
                 return_code, summary = run_restic_json(backup_command, config, logger)
+                source_metadata_after = file_source_metadata(unit.source) if file_unit else None
                 added = data_added(summary)
                 remaining = max(0, remaining - added)
                 snapshot_id = str(summary.get("snapshot_id") or "")
-                status_name = "complete" if return_code == 0 else "failed"
+                file_metadata_stable = (
+                    not file_unit
+                    or (
+                        source_metadata_before is not None
+                        and source_metadata_after is not None
+                        and source_metadata_before == source_metadata_after
+                    )
+                )
+                if return_code != 0:
+                    error = f"restic exit={return_code}"
+                elif not snapshot_id:
+                    error = "restic completed without snapshot_id"
+                elif not file_metadata_stable:
+                    error = "source file metadata changed or became unavailable during backup"
+                else:
+                    error = ""
+                status_name = "complete" if not error else "failed"
                 chunk_status = chunk_states.setdefault(unit_state_key(unit), {})
                 chunk_status.update(
                     {
                         "key": unit.key,
                         "label": unit.label,
                         "status": status_name,
-                        "completed_at": utc_now() if return_code == 0 else chunk_status.get("completed_at"),
-                        "snapshot_id": snapshot_id or chunk_status.get("snapshot_id", ""),
+                        "completed_at": utc_now() if status_name == "complete" else chunk_status.get("completed_at"),
+                        "snapshot_id": (
+                            snapshot_id if status_name == "complete" else chunk_status.get("snapshot_id", "")
+                        ),
                         "last_added_bytes": added,
-                        "last_error": "" if return_code == 0 else f"restic exit={return_code}",
+                        "last_error": error,
                     }
                 )
+                if status_name == "complete" and file_unit:
+                    chunk_status["source_metadata"] = source_metadata_after
                 results.append(
                     {
                         "id": item.id,
@@ -989,14 +1338,29 @@ def _run_backup_locked(
                         "status": status_name,
                         "bytes": added,
                         "snapshot_id": snapshot_id,
+                        "error": error,
                     }
                 )
                 save_state(config, state)
-                if return_code != 0:
-                    item_status.update({"status": "failed", "last_error": f"restic exit={return_code}"})
+                if status_name != "complete":
+                    item_status.update({"status": "failed", "last_error": error})
                     item_failed = True
                     break
             update_item_completion(item, item_status, units)
+            # 2026-09-01 (MACHINE-FILE-HYGIENE P3): sqlite 一致性快照只是上传暂存, 上传完成即删,
+            # 不再让 %LOCALAPPDATA%/OmniBackup/snapshots 长期攒 15 GB 的库副本(远端 restic 已有全部版本)。
+            if (
+                prepared_source is not None
+                and item.source_type == "sqlite"
+                and not item_failed
+                and not deferred_count
+                and item_status.get("status") == "complete"
+            ):
+                try:
+                    Path(prepared_source).unlink(missing_ok=True)
+                    logger.write(f"{item.id}: removed staging snapshot {prepared_source}")
+                except OSError as exc:  # 暂存删不掉不影响备份结果
+                    logger.write(f"{item.id}: staging snapshot cleanup skipped: {exc}")
             if deferred_count and not item_failed:
                 item_status.update(
                     {
@@ -1009,6 +1373,8 @@ def _run_backup_locked(
             elif not item_failed:
                 item_status.pop("deferred", None)
                 item_status.pop("deferred_count", None)
+                if item_status.get("status") == "running":
+                    item_status["status"] = "partial"
             save_state(config, state)
         result_statuses = {str(result.get("status", "")) for result in results}
         if dry_run:
@@ -1049,6 +1415,7 @@ def run_backup(
     limit_bytes: int | None = None,
     phase: int | None = None,
     item_ids: set[str] | None = None,
+    chunk_key: str | None = None,
     catalog_only: bool = False,
     stream: TextIO | None = None,
 ) -> dict[str, Any]:
@@ -1059,6 +1426,7 @@ def run_backup(
             limit_bytes=limit_bytes,
             phase=phase,
             item_ids=item_ids,
+            chunk_key=chunk_key,
             catalog_only=catalog_only,
             stream=stream,
         )
@@ -1071,13 +1439,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit-gib", type=float, default=None, help="Override this run's added-data cap")
     parser.add_argument("--phase", type=int, default=None, help="Run one explicit phase")
     parser.add_argument("--item", action="append", default=[], help="Run one queue item (repeatable)")
+    parser.add_argument("--chunk", default=None, help="Run one exact existing file chunk; requires one --item")
     parser.add_argument("--catalog-only", action="store_true", help="Publish descriptions without payload")
+    parser.add_argument(
+        "--local-session-limit-gib",
+        type=float,
+        default=None,
+        help="After a successful run, enforce verified local raw-session retention",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    config = load_config(args.config)
+    if args.chunk is not None and len(args.item) != 1:
+        raise ValueError("--chunk requires exactly one --item")
+    config_path = Path(args.config).resolve()
+    config = load_config(config_path)
     limit = None if args.limit_gib is None else int(args.limit_gib * GIB)
     result = run_backup(
         config,
@@ -1085,14 +1463,38 @@ def main(argv: list[str] | None = None) -> int:
         limit_bytes=limit,
         phase=args.phase,
         item_ids=set(args.item) or None,
+        chunk_key=args.chunk,
         catalog_only=args.catalog_only,
     )
-    print(json.dumps(result, ensure_ascii=False, indent=2))
     failed = any(
         entry.get("status") in {"failed", "source_missing", "estimate_failed"}
         for entry in result.get("results", [])
     )
-    return 1 if failed else 0
+    if args.local_session_limit_gib is not None and not args.catalog_only:
+        if args.local_session_limit_gib <= 0:
+            raise ValueError("--local-session-limit-gib must be positive")
+        if failed and not args.dry_run:
+            result["session_retention"] = {
+                "status": "skipped_backup_failed",
+                "dry_run": False,
+            }
+        else:
+            from .session_local_retention import (
+                GIB as RETENTION_GIB,
+                enforce_local_session_limit,
+                load_session_retention_policy,
+            )
+
+            policy = load_session_retention_policy(config_path)
+            result["session_retention"] = enforce_local_session_limit(
+                config,
+                policy,
+                limit_bytes=int(args.local_session_limit_gib * RETENTION_GIB),
+                dry_run=args.dry_run,
+            )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    retention_blocked = result.get("session_retention", {}).get("status") == "blocked"
+    return 1 if failed or retention_blocked else 0
 
 
 if __name__ == "__main__":

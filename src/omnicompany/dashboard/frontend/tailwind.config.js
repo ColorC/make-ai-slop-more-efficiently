@@ -61,10 +61,17 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      // 2026-08-06 蓝图收敛: 制图感 = 锐利。G 的圆角刻度只有 2/3/5(--fp-bp-r1/r2/r3)。
+      // --radius 已由 8px 降到 5px, lg/md/sm 自动落到 5/3/1;
+      // xl 及以上是 Tailwind 内置默认(12/16/24px), 不封顶就会有组件继续渲染大圆角 ——
+      // 这里一并压回刻度内, full 保留(色点/头像等真·圆形件仍需要)。
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "5px",
+        "2xl": "5px",
+        "3xl": "5px",
       },
       spacing: {
         'safe-area-inset-bottom': 'env(safe-area-inset-bottom)',

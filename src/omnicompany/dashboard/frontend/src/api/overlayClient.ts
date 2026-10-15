@@ -89,3 +89,35 @@ export async function inspectOverlayFile(
 export function overlayFileContentUrl(token: string): string {
   return `/lofa/overlay/file/${encodeURIComponent(token)}`
 }
+
+export interface WorkstationClipLatest {
+  id: string
+  ts_ms: number
+  kind: 'text' | 'image' | 'html' | string
+  /** 只有 kind === 'text' 才带内容；其余类型 v1 不同步。 */
+  text: string | null
+  truncated: boolean
+}
+
+/**
+ * 工作站剪贴板最新一条（远程剪切板同步用）。桥上刻意只有"最新一条"，
+ * 没有历史浏览/按 id 抓取——剪贴板历史里几乎必然有密码/token。
+ */
+export async function fetchLatestWorkstationClip(signal?: AbortSignal): Promise<WorkstationClipLatest | null> {
+  const response = await fetch('/lofa/overlay/invoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cmd: 'clip_latest', args: {} }),
+    signal,
+  })
+  const body = await response.json().catch(() => null) as OverlayBridgeResponse | null
+  if (!response.ok || !body || body.ok === false) {
+    throw new Error(body?.error || `工作站剪贴板读取失败 (${response.status})`)
+  }
+  if (body.result == null) return null
+  const clip = body.result as WorkstationClipLatest
+  if (typeof clip !== 'object' || typeof clip.id !== 'string') {
+    throw new Error('工作站剪贴板返回格式无效')
+  }
+  return clip
+}

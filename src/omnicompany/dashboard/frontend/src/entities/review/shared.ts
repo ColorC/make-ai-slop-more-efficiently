@@ -29,7 +29,7 @@ export const COLORS = {
   mandatory: 'var(--fp-err)',
   important: 'var(--fp-warn)',
   processual: 'var(--fp-text-3)',
-  ignored: '#5b6477',
+  ignored: 'var(--fp-idle)',   // 2026-08-06: 原 #5b6477 是旧灰蓝配方硬编码, 收敛到 G token
   // status 色
   pending: 'var(--fp-warn)',
   accepted: 'var(--fp-ok)',
@@ -153,7 +153,7 @@ export function batchButtonStyle(background: string): React.CSSProperties {
     background,
     color: '#fff',
     border: `1px solid ${COLORS.border}`,
-    borderRadius: 4,
+    borderRadius: 3,
     cursor: 'pointer',
     fontSize: 14,
   }

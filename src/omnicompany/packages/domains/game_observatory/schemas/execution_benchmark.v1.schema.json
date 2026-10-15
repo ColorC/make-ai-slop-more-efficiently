@@ -1,0 +1,977 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "ExecutionAttemptV1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "effective"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "business_change": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "business_state_changed": {
+                "const": true
+              },
+              "evidence_refs": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "business_state_changed",
+              "business_change",
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "rejected"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "business_state_changed": {
+                "const": false
+              },
+              "rejection_category": {
+                "type": "string"
+              },
+              "rejection_reason": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "rejection_category",
+              "rejection_reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "failure_reason": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "failure_reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "telemetry_event_ids": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "telemetry_event_ids"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "telemetry_event_ids"
+                }
+              }
+            },
+            "required": [
+              "canonical_source_gaps"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "telemetry_event_ids"
+                }
+              }
+            },
+            "required": [
+              "canonical_source_gaps"
+            ]
+          },
+          "then": {
+            "properties": {
+              "telemetry_event_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "execution_receipt_kind": {
+                "const": "route_execution"
+              },
+              "route_result_ids": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "execution_receipt_kind",
+              "route_result_ids"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "route_result_ids"
+                }
+              }
+            },
+            "required": [
+              "canonical_source_gaps"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "route_result_ids"
+                }
+              },
+              "execution_receipt_kind": {
+                "const": "route_execution"
+              }
+            },
+            "required": [
+              "execution_receipt_kind",
+              "canonical_source_gaps"
+            ]
+          },
+          "then": {
+            "properties": {
+              "route_result_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "execution_receipt_kind": {
+                "const": "single_action_execution"
+              }
+            },
+            "required": [
+              "execution_receipt_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canonical_source_gaps": {
+                "not": {
+                  "contains": {
+                    "const": "route_result_ids"
+                  }
+                }
+              },
+              "route_result_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "action_kind": {
+          "minLength": 1,
+          "title": "Action Kind",
+          "type": "string"
+        },
+        "business_change": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Business Change"
+        },
+        "business_state_changed": {
+          "title": "Business State Changed",
+          "type": "boolean"
+        },
+        "canonical_source_gaps": {
+          "items": {
+            "enum": [
+              "telemetry_event_ids",
+              "route_result_ids"
+            ],
+            "type": "string"
+          },
+          "title": "Canonical Source Gaps",
+          "type": "array"
+        },
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "execution_receipt_kind": {
+          "default": "route_execution",
+          "enum": [
+            "route_execution",
+            "single_action_execution"
+          ],
+          "title": "Execution Receipt Kind",
+          "type": "string"
+        },
+        "expectation_met": {
+          "title": "Expectation Met",
+          "type": "boolean"
+        },
+        "failure_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Reason"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "observed_detail": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Detail"
+        },
+        "outcome": {
+          "enum": [
+            "effective",
+            "no_change",
+            "rejected",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "planned_action_id": {
+          "minLength": 1,
+          "title": "Planned Action Id",
+          "type": "string"
+        },
+        "rejection_category": {
+          "anyOf": [
+            {
+              "enum": [
+                "source_guard",
+                "budget",
+                "lease",
+                "policy",
+                "state",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Category"
+        },
+        "rejection_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Reason"
+        },
+        "route_id": {
+          "minLength": 1,
+          "title": "Route Id",
+          "type": "string"
+        },
+        "route_result_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Route Result Ids",
+          "type": "array"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "telemetry_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Telemetry Event Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "sequence",
+        "environment_id",
+        "session_id",
+        "route_id",
+        "planned_action_id",
+        "action_kind",
+        "started_at",
+        "ended_at",
+        "outcome",
+        "expectation_met",
+        "business_state_changed",
+        "evidence_refs"
+      ],
+      "title": "ExecutionAttemptV1",
+      "type": "object"
+    },
+    "ExecutionBatchV1": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/ExecutionAttemptV1"
+          },
+          "minItems": 1,
+          "title": "Attempts",
+          "type": "array"
+        },
+        "branch_decisions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Branch Decisions",
+          "type": "array"
+        },
+        "canonical_attempt_count": {
+          "minimum": 1,
+          "title": "Canonical Attempt Count",
+          "type": "integer"
+        },
+        "canonical_source_gap_count": {
+          "minimum": 0,
+          "title": "Canonical Source Gap Count",
+          "type": "integer"
+        },
+        "chain_kind": {
+          "enum": [
+            "high_repetition",
+            "semi_fixed",
+            "unknown_exploration"
+          ],
+          "title": "Chain Kind",
+          "type": "string"
+        },
+        "effective_action_count": {
+          "minimum": 0,
+          "title": "Effective Action Count",
+          "type": "integer"
+        },
+        "effective_actions_per_minute": {
+          "minimum": 0,
+          "title": "Effective Actions Per Minute",
+          "type": "number"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "expected_effect_hit_count": {
+          "minimum": 0,
+          "title": "Expected Effect Hit Count",
+          "type": "integer"
+        },
+        "expected_effect_hit_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Expected Effect Hit Rate",
+          "type": "number"
+        },
+        "failed_count": {
+          "minimum": 0,
+          "title": "Failed Count",
+          "type": "integer"
+        },
+        "game_id": {
+          "minLength": 1,
+          "title": "Game Id",
+          "type": "string"
+        },
+        "gate_status": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_applicable"
+          ],
+          "title": "Gate Status",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "knowledge_outcomes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Knowledge Outcomes",
+          "type": "array"
+        },
+        "legal_business_terminal_reached": {
+          "default": false,
+          "title": "Legal Business Terminal Reached",
+          "type": "boolean"
+        },
+        "no_change_count": {
+          "minimum": 0,
+          "title": "No Change Count",
+          "type": "integer"
+        },
+        "no_change_rate": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "No Change Rate",
+          "type": "number"
+        },
+        "planned_action_count": {
+          "minimum": 1,
+          "title": "Planned Action Count",
+          "type": "integer"
+        },
+        "recovered_count": {
+          "minimum": 0,
+          "title": "Recovered Count",
+          "type": "integer"
+        },
+        "recovery_events": {
+          "items": {
+            "$ref": "#/$defs/RecoveryEventV1"
+          },
+          "title": "Recovery Events",
+          "type": "array"
+        },
+        "rejected_count": {
+          "minimum": 0,
+          "title": "Rejected Count",
+          "type": "integer"
+        },
+        "route_id": {
+          "minLength": 1,
+          "title": "Route Id",
+          "type": "string"
+        },
+        "safety": {
+          "$ref": "#/$defs/ExecutionSafetyReceiptV1"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "timing": {
+          "$ref": "#/$defs/FacilityTimingV1"
+        }
+      },
+      "required": [
+        "id",
+        "game_id",
+        "environment_id",
+        "session_id",
+        "chain_kind",
+        "route_id",
+        "planned_action_count",
+        "canonical_attempt_count",
+        "timing",
+        "attempts",
+        "safety",
+        "effective_action_count",
+        "no_change_count",
+        "rejected_count",
+        "failed_count",
+        "recovered_count",
+        "canonical_source_gap_count",
+        "expected_effect_hit_count",
+        "expected_effect_hit_rate",
+        "no_change_rate",
+        "effective_actions_per_minute",
+        "gate_status",
+        "evidence_refs"
+      ],
+      "title": "ExecutionBatchV1",
+      "type": "object"
+    },
+    "ExecutionSafetyReceiptV1": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_completed": {
+          "title": "Checkpoint Completed",
+          "type": "boolean"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "heartbeat_observed": {
+          "title": "Heartbeat Observed",
+          "type": "boolean"
+        },
+        "lease_id": {
+          "minLength": 1,
+          "title": "Lease Id",
+          "type": "string"
+        },
+        "lease_state_at_terminal": {
+          "enum": [
+            "held",
+            "released",
+            "expired",
+            "lost"
+          ],
+          "title": "Lease State At Terminal",
+          "type": "string"
+        },
+        "pending_action_count_at_terminal": {
+          "minimum": 0,
+          "title": "Pending Action Count At Terminal",
+          "type": "integer"
+        },
+        "remaining_action_budget_at_start": {
+          "minimum": 0,
+          "title": "Remaining Action Budget At Start",
+          "type": "integer"
+        },
+        "remaining_action_budget_at_terminal": {
+          "minimum": 0,
+          "title": "Remaining Action Budget At Terminal",
+          "type": "integer"
+        },
+        "safety_violations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Safety Violations",
+          "type": "array"
+        },
+        "source_guard_checked": {
+          "title": "Source Guard Checked",
+          "type": "boolean"
+        },
+        "source_guard_rejection_count": {
+          "minimum": 0,
+          "title": "Source Guard Rejection Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_guard_checked",
+        "source_guard_rejection_count",
+        "lease_id",
+        "lease_state_at_terminal",
+        "heartbeat_observed",
+        "remaining_action_budget_at_start",
+        "remaining_action_budget_at_terminal",
+        "checkpoint_completed",
+        "pending_action_count_at_terminal",
+        "evidence_refs"
+      ],
+      "title": "ExecutionSafetyReceiptV1",
+      "type": "object"
+    },
+    "FacilityTimingV1": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_completed_at": {
+          "format": "date-time",
+          "title": "Checkpoint Completed At",
+          "type": "string"
+        },
+        "device_action_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Action Seconds"
+        },
+        "evidence_processing_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Processing Seconds"
+        },
+        "request_received_at": {
+          "format": "date-time",
+          "title": "Request Received At",
+          "type": "string"
+        },
+        "terminal_receipt_completed_at": {
+          "format": "date-time",
+          "title": "Terminal Receipt Completed At",
+          "type": "string"
+        },
+        "wall_clock_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Wall Clock Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "request_received_at",
+        "checkpoint_completed_at",
+        "terminal_receipt_completed_at",
+        "wall_clock_seconds"
+      ],
+      "title": "FacilityTimingV1",
+      "type": "object"
+    },
+    "RecoveryEventV1": {
+      "additionalProperties": false,
+      "properties": {
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "recovered",
+            "failed",
+            "aborted"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "pending_action_cleared": {
+          "title": "Pending Action Cleared",
+          "type": "boolean"
+        },
+        "recovery_action": {
+          "minLength": 1,
+          "title": "Recovery Action",
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "trigger": {
+          "minLength": 1,
+          "title": "Trigger",
+          "type": "string"
+        },
+        "trigger_attempt_sequence": {
+          "minimum": 1,
+          "title": "Trigger Attempt Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "environment_id",
+        "session_id",
+        "trigger_attempt_sequence",
+        "trigger",
+        "recovery_action",
+        "started_at",
+        "ended_at",
+        "outcome",
+        "pending_action_cleared",
+        "evidence_refs"
+      ],
+      "title": "RecoveryEventV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "batches": {
+      "items": {
+        "$ref": "#/$defs/ExecutionBatchV1"
+      },
+      "minItems": 1,
+      "title": "Batches",
+      "type": "array"
+    },
+    "consecutive_passes_required": {
+      "default": 3,
+      "minimum": 3,
+      "title": "Consecutive Passes Required",
+      "type": "integer"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "gate_status": {
+      "enum": [
+        "passed",
+        "failed",
+        "in_progress",
+        "not_applicable"
+      ],
+      "title": "Gate Status",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Notes",
+      "type": "array"
+    },
+    "schema": {
+      "const": "game-observatory.execution-benchmark.v1",
+      "default": "game-observatory.execution-benchmark.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "target_effective_actions_per_minute": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Effective Actions Per Minute"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "workload_kind": {
+      "enum": [
+        "high_repetition",
+        "semi_fixed",
+        "unknown_exploration"
+      ],
+      "title": "Workload Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "game_id",
+    "environment_id",
+    "workload_kind",
+    "batches",
+    "gate_status",
+    "notes",
+    "updated_at"
+  ],
+  "title": "ExecutionBenchmarkV1",
+  "type": "object"
+}

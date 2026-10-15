@@ -18,6 +18,10 @@ export default function SessionProviderLogo({
     return <CursorLogo className={className} />;
   }
 
+  if (provider === 'codex_the_company') {
+    return <CodexLogo className={className} />;
+  }
+
   if (provider === 'codex') {
     return <CodexLogo className={className} />;
   }

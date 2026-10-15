@@ -19,7 +19,7 @@
   background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
 .mat-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
 /* 材料名 = 该行主焦点(衬线标题, G 排版) */
-.mat-name { font-family: var(--fp-bp-font-display); font-size: var(--fp-fs-2); font-weight: 700;
+.mat-name { font-family: var(--fp-bp-font-display); font-size: var(--fp-fs-2); font-weight: 500;
   color: var(--fp-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* type = 细线标注框(与 bp-newtag/尺寸标注同族) */
 .mat-tag { display: inline-grid; place-items: center; height: 19px; padding: 0 6px; flex: none;

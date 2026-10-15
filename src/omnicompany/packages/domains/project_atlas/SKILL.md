@@ -1,6 +1,6 @@
 ---
 name: project_atlas
-description: 项目及业务收集管线 —— 语义策展跨工作空间(omnicompany/quant-lab/webworks/AIWorkSpace/poof)的可复用能力,用带工具的 claude-code worker 实地核实真入口,按"操作对象/生产对象"切成 object-SKILL(lark-cli 粒度),并维护项目速览名录(扩 omni project)。产出先落 staging 待人审。触发词:资源收集/对象SKILL/项目名录/收集业务能力/project_atlas/收集一个空间。
+description: 项目及业务收集管线 —— 语义策展跨工作空间(omnicompany/quant-lab/webworks/AIWorkSpace)的可复用能力,用带工具的 claude-code worker 实地核实真入口,按"操作对象/生产对象"切成 object-SKILL(lark-cli 粒度),并维护项目速览名录(扩 omni project)。产出先落 staging 待人审。触发词:资源收集/对象SKILL/项目名录/收集业务能力/project_atlas/收集一个空间。
 ---
 
 # project_atlas — 项目及业务收集
@@ -22,7 +22,7 @@ omni run project_atlas.run -i space=omnicompany            # 收集一个空间(
 omni run project_atlas.run -i space=omnicompany -i dry_run=1  # 跳过 worker, 只验管线 plumbing
 ```
 
-可选 space:omnicompany / quant-lab / webworks / poof / aiworkspace(见 `spaces.py`)。
+可选 space:omnicompany / quant-lab / webworks / aiworkspace / walker(见 `spaces.py`)。
 
 ## 管线(4 节点)
 
@@ -34,6 +34,7 @@ omni run project_atlas.run -i space=omnicompany -i dry_run=1  # 跳过 worker, �
 
 - `data/domains/project_atlas/staging/<space>/<object>/SKILL.md` —— worker 起草, **待人审**。
 - `data/domains/project_atlas/atlas.jsonl` —— 项目速览名录草稿(待并入 `omni project`)。
-- 批准后 export 到 `~/.claude/skills` + `~/.codex/skills`(两 AI 都按 description 认领)。
+- 批准后 export 到 `~/.claude/skills`、`~/.codex/skills` 与 `~/.agents/skills`
+  (各客户端都按 `name + description` 认领)。
 
 > 权威设计:`docs/plans/[2026-06-22]OMNI-RESOURCE-CENTER/03-collection-team-design.md`。AI 产出不直进 canonical,护"人工 grep 唯一可信"。

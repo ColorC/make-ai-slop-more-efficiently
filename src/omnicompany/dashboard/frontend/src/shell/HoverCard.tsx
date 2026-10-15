@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { EntityType } from '../entities/types'
-import { colors, fonts } from './tokens'
+import { colors, fonts, blueprint } from './tokens'
 
 interface CardData { title: string; preview: string; meta?: string }
 
@@ -62,17 +62,21 @@ async function fetchPreview(type: EntityType, id: string): Promise<CardData> {
 }
 
 const S = {
+  // 2026-08-06 蓝图收敛: 原本是 #0d0d0d 近黑底 + #2a3a4a 边 + 柔光大投影, 与蓝图 G 无关。
+  // 悬浮物在 G 里一律是"描图纸"(tracing + blur + 虚线边 + 纸叠纸硬错位影)。
   card: {
     position: 'fixed' as const,
     zIndex: 9999,
-    background: '#0d0d0d',
-    border: `1px solid #2a3a4a`,
-    borderRadius: 6,
+    background: blueprint.tracingStrong,
+    backdropFilter: blueprint.tracingBlur,
+    WebkitBackdropFilter: blueprint.tracingBlur,
+    border: `1px dashed ${blueprint.lineStrong}`,
+    borderRadius: 3,
     padding: 12,
     width: 360,
     maxHeight: 320,
     overflow: 'auto' as const,
-    boxShadow: '0 6px 24px rgba(0,0,0,.6)',
+    boxShadow: blueprint.shadowPop,
     fontFamily: fonts.mono,
     fontSize: 14,
     color: colors.textMuted,
@@ -81,7 +85,7 @@ const S = {
   title: { color: colors.accent, fontSize: 14, marginBottom: 4, wordBreak: 'break-all' as const } as React.CSSProperties,
   meta: { color: colors.textFaint, fontSize: 14, marginBottom: 8, wordBreak: 'break-all' as const } as React.CSSProperties,
   preview: { color: colors.textMuted, fontSize: 14, whiteSpace: 'pre-wrap' as const, lineHeight: 1.5, fontFamily: fonts.ui } as React.CSSProperties,
-  err: { color: '#ef5350' } as React.CSSProperties,
+  err: { color: 'var(--fp-err)' } as React.CSSProperties,
   loading: { color: colors.textFaint, fontStyle: 'italic' as const } as React.CSSProperties,
 }
 

@@ -1,0 +1,36 @@
+{
+  "kind": "run.start",
+  "protocol_version": "0.1.0",
+  "request_id": "req-invalid-write",
+  "run_id": "run-invalid-write",
+  "session_id": "session-invalid-write",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "workspace_cwd": "C:/workspace/omnicompany",
+  "input": {
+    "text": "Write a file.",
+    "material_refs": [],
+    "artifact_refs": []
+  },
+  "context": {
+    "context_refs": [],
+    "material_refs": [],
+    "artifact_refs": [],
+    "inline_context": [],
+    "provenance": []
+  },
+  "capability_grant": {
+    "grant_id": "grant:invalid",
+    "policy_ref": "policy:readonly",
+    "permission_mode": "readonly",
+    "allowed_tools": ["read", "write"],
+    "allowed_read_roots": ["C:/workspace/omnicompany"],
+    "allowed_write_paths": [],
+    "allowed_write_roots": ["C:/workspace/omnicompany"],
+    "allowed_shell_roots": [],
+    "allowed_shell_command_prefixes": [],
+    "network_access": false
+  },
+  "budget": {}
+}
+

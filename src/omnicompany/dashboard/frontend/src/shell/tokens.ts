@@ -113,9 +113,63 @@ export const lineHeight = {
 } as const
 
 // ── 圆角 ───────────────────────────────────────────────────────────────
+// 2026-08-06 蓝图收敛: 原值 {tags:3, badges:4, default:6, xl:12} 是旧 Apple-glass 原型的遗留,
+// 与主题 G「制图感 = 锐利」直接冲突 —— token 层自己在发圆角, 消费方越守规矩圆角越多。
+// G 的圆角刻度只有三档(frostpane --fp-bp-r1/r2/r3 = 2/3/5), 这里一一对齐。
+// 真·圆形件(色点/头像/LED)继续写 '50%', 不走本表。
 export const radius = {
-  tags: 3,
-  badges: 4,
-  default: 6,   // 卡片 / 按钮 / 输入框
-  xl: 12,
+  tags: 2,      // r1 — chip / tag / 小徽章
+  badges: 2,    // r1 — 计数徽章(pill 形态另走 999)
+  default: 2,   // r1 — 卡片 / 按钮 / 输入框(G 主档)
+  xl: 5,        // r3 — 最大档, 仅弹层/大面板
+} as const
+
+// ── 蓝图材质语义(内联样式消费口) ─────────────────────────────────────────
+// 全站 3800+ 处内联 style 够不到样式表, 过去只能手写 hex/px, 于是蓝图材质(纸叠影/黄铜/朱红印章/
+// 剖面 hatch/玻璃面板)在内联层完全失传 —— 这是"设计了没用上"的机制性成因。
+// 这里把 G 的材质档位开成 TS 常量, 内联样式直接引, 值仍统一指向 frostpane.css 的 --fp-bp-*。
+export const blueprint = {
+  // 面板材质(蓝图玻璃: 网格透过面板模糊可见 = 连续感, 面板间隙网格清晰 = 露出感)
+  panel:       'var(--fp-bp-panel)',
+  panelHover:  'var(--fp-bp-panel-hover)',
+  panelText:   'var(--fp-bp-panel-text)',   // 文字重的行卡用这档(更不透)
+  panelBlur:   'var(--fp-bp-panel-blur)',
+  // 三层纸
+  scene:       'var(--fp-bp-scene)',        // 底图板
+  paper:       'var(--fp-bp-paper)',        // 图纸(文字面)
+  paper2:      'var(--fp-bp-paper-2)',      // 图纸 hover 档
+  solid:       'var(--fp-bp-solid)',        // 深图板(表格/终端/输入)
+  tracing:     'var(--fp-bp-tracing)',      // 描图纸(悬浮物)
+  tracingStrong: 'var(--fp-bp-tracing-strong)',
+  tracingBlur: 'var(--fp-bp-tracing-blur)',
+  vellum:      'var(--fp-bp-vellum)',       // 牛皮纸目录卡
+  vellumInk:   'var(--fp-bp-vellum-ink)',
+  doc:         'var(--fp-bp-doc)',          // 米色文档卡(长文阅读)
+  docInk:      'var(--fp-bp-doc-ink)',
+  // 绘图线(一切边界 = 线; 输入/筛选件用 dashed)
+  line:        'var(--fp-bp-line)',
+  lineStrong:  'var(--fp-bp-line-strong)',
+  lineSubtle:  'var(--fp-bp-line-subtle)',
+  frameW:      'var(--fp-bp-frame-w)',      // 厚框纸件 2px
+  // 点缀色: 朱红印章(在跑/primary/图钉) + 黄铜(组头/计数/focus 环)
+  seal:        'var(--fp-bp-seal)',
+  sealSoft:    'var(--fp-bp-seal-soft)',
+  stampIdle:   'var(--fp-bp-stamp-idle)',   // 驳回章的蓝灰退稿色
+  brass:       'var(--fp-bp-brass)',
+  brassHi:     'var(--fp-bp-brass-hi)',
+  brassSoft:   'var(--fp-bp-brass-soft)',
+  // 45° 剖面线: hatch = 选中态结构标记, hatchFill = 进度/新鲜度填充
+  hatch:       'var(--fp-bp-hatch)',
+  hatchFill:   'var(--fp-bp-hatch-fill)',
+  // 纸叠纸硬错位影(不是模糊阴影 —— G 没有柔光)
+  shadowSm:    'var(--fp-bp-shadow-sm)',
+  shadow:      'var(--fp-bp-shadow)',
+  shadowPop:   'var(--fp-bp-shadow-pop)',
+  // 字体栈
+  fontDisplay: 'var(--fp-bp-font-display)', // 衬线标题(LXGW WenKai)
+  fontScript:  'var(--fp-bp-font-script)',  // 手写批注
+  // 图标尺寸刻度
+  iconRail:    'var(--fp-bp-icon-rail)',
+  iconTile:    'var(--fp-bp-icon-tile)',
+  iconNav:     'var(--fp-bp-icon-nav)',
 } as const

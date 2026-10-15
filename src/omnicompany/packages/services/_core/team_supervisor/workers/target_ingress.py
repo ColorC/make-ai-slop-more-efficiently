@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 # 项目根 · target team 包目录在 src/omnicompany/packages/services/<id>/
 # __file__ = .../omnicompany/src/omnicompany/packages/services/team_supervisor/workers/target_ingress.py
-# parents[6] = .../omnicompany (项目根)
-_PROJECT_ROOT = Path(__file__).resolve().parents[6]
+# parents[7] = .../omnicompany (项目根; category folders add one level)
+_PROJECT_ROOT = Path(__file__).resolve().parents[7]
 _SERVICES_ROOT = _PROJECT_ROOT / "src" / "omnicompany" / "packages" / "services"
 
 
@@ -34,6 +34,26 @@ def _slug_to_pkg(target_team_id: str) -> str:
     注册 id 用 dash, 包目录用 underscore (omnicompany 惯例).
     """
     return target_team_id.replace("-", "_")
+
+
+def _resolve_team_code_dir(target_team_id: str) -> tuple[Path | None, str | None]:
+    """Resolve a Team package across the canonical service category folders."""
+    pkg_name = _slug_to_pkg(target_team_id)
+    package_names = {pkg_name, target_team_id}
+    candidates = sorted({
+        path.parent.resolve()
+        for name in package_names
+        for path in _SERVICES_ROOT.glob(f"**/{name}/team.py")
+        if not any(part.startswith(("_archive", "_legacy")) for part in path.parts)
+    })
+    if not candidates:
+        return None, (
+            f"target team 包目录不存在: services/**/{pkg_name}/team.py"
+        )
+    if len(candidates) > 1:
+        rendered = ", ".join(str(path) for path in candidates)
+        return None, f"target team 包目录不唯一: {rendered}"
+    return candidates[0], None
 
 
 def _build_team_for(target_team_id: str):
@@ -96,24 +116,12 @@ class TargetIngressWorker(Worker):
         if err is not None:
             return Verdict(kind=VerdictKind.FAIL, diagnosis=err)
 
-        # 推断 target 包目录 (注册 id 'csv-to-md' → 'csv_to_md')
+        # Team packages are category-organized (for example _core/_utility),
+        # so resolve the unique canonical package instead of assuming a flat root.
         pkg_name = _slug_to_pkg(target_team_id)
-        team_code_dir = _SERVICES_ROOT / pkg_name
-
-        if not team_code_dir.is_dir():
-            # 兼容包名直接 = team_id 的场景
-            alt = _SERVICES_ROOT / target_team_id
-            if alt.is_dir():
-                team_code_dir = alt
-                pkg_name = target_team_id
-            else:
-                return Verdict(
-                    kind=VerdictKind.FAIL,
-                    diagnosis=(
-                        f"target team 包目录不存在: 试过 {team_code_dir} 与 {alt}; "
-                        "supervisor 仅支持 services/<pkg>/ 布局的 team"
-                    ),
-                )
+        team_code_dir, location_error = _resolve_team_code_dir(target_team_id)
+        if location_error is not None or team_code_dir is None:
+            return Verdict(kind=VerdictKind.FAIL, diagnosis=location_error)
 
         team_design_md = team_code_dir / "DESIGN.md"
         team_py = team_code_dir / "team.py"
@@ -146,8 +154,16 @@ class TargetIngressWorker(Worker):
             )
 
         run_count = input_data.get("run_count", 1)
-        if not isinstance(run_count, int) or run_count < 1:
-            run_count = 1
+        if (
+            not isinstance(run_count, int)
+            or isinstance(run_count, bool)
+            or run_count < 1
+            or run_count > 10
+        ):
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                diagnosis="run_count 类型或范围非法 · 必须是 1..10 的整数",
+            )
 
         return Verdict(
             kind=VerdictKind.PASS,

@@ -91,6 +91,9 @@ def _check_async_router_run(ctx: FileContext) -> bool:
         return False
     if _is_external(ctx):
         return False
+    normalized_path = ctx.path.replace("\\", "/")
+    if normalized_path.startswith("tests/") or "/tests/" in normalized_path:
+        return False
     # 豁免框架层自身（runtime/ 里的 Router 基类定义合法有 async）
     if "src/omnicompany/runtime/" in ctx.path:
         return False

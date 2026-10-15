@@ -66,4 +66,30 @@ export function registerReviewBusinessRenderers(): void {
 
   // ── voxelcraft(资产同化管线重建, DEC-2026-07-06-081/024): 数据=资产库只读 API 投影
   //    (/voxelcraft-assets/api/*, dashboard 同源反代懒启动)。toolbar 并入审阅顶栏(件一)。 ──
+
+  // ── 游戏素材治理(walker 首个成员, 2026-08-02 治理体系化): 数据=walker-game 注册表投影 ──
+  // 聚合审阅报告: 引用徽章墙 + 常驻 asset-stage 内嵌壳(点徽章 postMessage 热切换, 不重载)。
+  // toolbar: 业务身份并入审阅顶栏(件一); 渲染器正文不画第二条顶栏。
+  registerSchemaRenderer('game.report.aggregate-v1', {
+    Component: lazy(() => import('./gameAssetsReport').then((mod) => ({ default: mod.GameAssetsReportView }))),
+    fullBleed: true,
+    toolbar: (m) => ({
+      icon: '🗂️',
+      title: '素材治理聚合报告',
+      sub: m.version != null ? `v${m.version}` : undefined,
+      chips: [
+        {
+          label: `${(((((m.extra ?? {}) as Record<string, unknown>).citations) as unknown[] | undefined) ?? []).length} 件引用`,
+          title: '报告引用的注册表素材 ID 数',
+        },
+      ],
+      actions: [
+        {
+          label: '展示壳',
+          title: '新页签打开 asset-stage（walker 素材标准展示终端）',
+          onClick: () => window.open('/walker-game/asset-stage.html', '_blank', 'noopener'),
+        },
+      ],
+    }),
+  })
 }

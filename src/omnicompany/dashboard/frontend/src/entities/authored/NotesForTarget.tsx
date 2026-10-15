@@ -25,7 +25,7 @@ function usesBadges(u: string[]): string {
   return (u || []).map((x) => map[x] || x).join(' · ')
 }
 
-export default function NotesForTarget({ kind, id, target, title, uses, heading = '草稿札记' }: Props) {
+export default function NotesForTarget({ kind, id, target, title, uses, heading = '画布草稿' }: Props) {
   const [items, setItems] = useState<AuthoredNote[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [composing, setComposing] = useState(false)
@@ -41,13 +41,13 @@ export default function NotesForTarget({ kind, id, target, title, uses, heading 
 
   const count = items?.length ?? 0
 
-  // 主操作「写草稿」= 显眼 primary; 「草稿箱 ↗」= 安静次级链接。
+  // 主操作「写草稿」= 显眼 primary; 「画布 ↗」= 安静次级链接。
   const primaryBtn: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 5,
     background: composing ? 'transparent' : 'var(--fp-accent)',
     color: composing ? 'var(--fp-text-2)' : 'var(--fp-accent-fg)',
     border: `1px solid ${composing ? 'var(--fp-border)' : 'var(--fp-accent)'}`,
-    borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 550, padding: '4px 12px',
+    borderRadius: 2, cursor: 'pointer', fontSize: 13, fontWeight: 500, padding: '4px 12px',
   }
   const ghostLink: React.CSSProperties = {
     background: 'transparent', border: 'none', color: 'var(--fp-text-3)',
@@ -57,13 +57,13 @@ export default function NotesForTarget({ kind, id, target, title, uses, heading 
   return (
     <div data-notes-for-target={`${kind}:${id}`} style={{ fontSize: 15, color: 'var(--fp-text)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ color: 'var(--fp-text-2)', fontWeight: 600, fontSize: 14 }}>{heading}{count ? ` · ${count}` : ''}</span>
+        <span style={{ color: 'var(--fp-text-2)', fontWeight: 500, fontSize: 14 }}>{heading}{count ? ` · ${count}` : ''}</span>
         <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button onClick={() => setComposing((v) => !v)} style={primaryBtn}>
             {composing ? '取消' : '＋ 写草稿'}
           </button>
-          <button onClick={() => openTab({ type: 'authored', id: 'main' }, '草稿箱')} title="在草稿箱集中管理" style={ghostLink}>
-            草稿箱 ↗
+          <button onClick={() => openTab({ type: 'authored', id: 'main' }, '画布')} title="在画布集中管理" style={ghostLink}>
+            画布 ↗
           </button>
         </span>
       </div>
@@ -90,7 +90,7 @@ export default function NotesForTarget({ kind, id, target, title, uses, heading 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(items || []).map((n) => (
           <div key={n.id} style={{
-            background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 11,
+            background: 'var(--fp-surface)', border: '1px solid var(--fp-border)', borderRadius: 3,
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)', padding: '10px 12px',
           }}>
             <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
@@ -100,7 +100,7 @@ export default function NotesForTarget({ kind, id, target, title, uses, heading 
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                 {n.captures!.map((c) => (
                   <img key={c} src={`/api/boss-sight/captures/file?path=${encodeURIComponent(c)}`} alt=""
-                    style={{ maxHeight: 84, borderRadius: 7, border: '1px solid var(--fp-border)' }} />
+                    style={{ maxHeight: 84, borderRadius: 2, border: '1px solid var(--fp-border)' }} />
                 ))}
               </div>
             )}

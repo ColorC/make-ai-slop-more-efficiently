@@ -1,0 +1,17 @@
+{
+  "id": "spec-demogame-skin-swap",
+  "title": "换皮配置工作流（示例，参照 demogame activity_battlepass 换皮流）",
+  "entry": "source",
+  "nodes": [
+    {"id": "source", "kind": "anchor", "title": "collab platform排期/换皮需求单", "params": {"source": "feishu:bitable/换皮排期"}},
+    {"id": "generate", "kind": "worker", "title": "生成配表改动", "worker_ref": "demogame.change", "params": {"workflow": "activity_battlepass", "table": "ActivityBattlePass"}},
+    {"id": "benchmark", "kind": "check", "title": "红绿回归 benchmark", "check_ref": "demogame.benchmark", "params": {"benchmark": "activity_battlepass"}},
+    {"id": "planner-gate", "kind": "gate", "title": "策划确认门"}
+  ],
+  "edges": [
+    {"from": "source", "to": "generate"},
+    {"from": "generate", "to": "benchmark"},
+    {"from": "benchmark", "to": "planner-gate"},
+    {"from": "benchmark", "to": "generate", "kind": "feedback", "condition": "FAIL", "max": 2}
+  ]
+}

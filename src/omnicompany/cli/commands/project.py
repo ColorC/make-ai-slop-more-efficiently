@@ -16,6 +16,7 @@ index 统一放 omnicompany/docs/projects/<id>/PROJECT_INDEX.md; root 仍指向�
       --root "C:/workspace/AIWorkSpace/" \\
       --index "C:/workspace/omnicompany/docs/projects/demogame-config/PROJECT_INDEX.md" \\
       --plan-cat demogame --desc "游戏数据自动配置(赛季手册/装饰抽奖/商店)"
+  omni project find "<称呼>" --json # 冷启动按人类称呼找项目(小输出)
   omni project list --json          # 总控读这个了解全部项目
   omni project show demogame-config    # 含 index 浮出的 quick_actions
   omni project index-check --all    # 校验所有 index 文件结构
@@ -38,6 +39,27 @@ updated: {today}          # 最后核对此 index 与现实一致的日期; 改�
 roots:
   - path: {root}
     note: 主目录
+directory_contract:
+  version: 1
+  status: draft             # 填完映射与 lifecycle 后设为 ready，再通过 --require-layout
+  canonical_root: {root}    # 必须是 roots 中一个已声明根；不猜测目录布局、不创建空目录
+  roles:
+    src: null
+    docs: null
+    tests: null
+    input: null
+    drafts: null
+    runtime: null
+    tmp: null
+    archive: null
+  placements:
+    worktrees: null
+    references: null
+    publish: null
+  lifecycle:
+    tmp: null
+    runtime: null
+    archive: null
 entry_points: []          # 主要子目录: [{{path, note}}]
 threads: []               # 工作线(项目状态的真源, 别在正文手写"活跃"): [{{name, status, updated, note}}]
                           #   status ∈ active|done|blocked|parked; updated=该线状态最后核对日(YYYY-MM-DD)
@@ -72,7 +94,7 @@ links: []                 # [{{label, url}}]
 
 @click.group("project")
 def cmd_project() -> None:
-    """项目注册表 (register/list/show/remove/index-check/index-init)。"""
+    """项目注册表 (find/register/list/show/remove/index-check/index-init)。"""
 
 
 @cmd_project.command("register")
@@ -85,18 +107,21 @@ def cmd_project() -> None:
 @click.option("--index", "index_path", default=None, help="index 文件(PROJECT_INDEX.md)绝对路径")
 @click.option("--bg", default=None, help="卡片背景图 url(如 /api/project-assets/xxx.png)或 CSS 渐变")
 @click.option("--icon", default=None, help="卡片小图标(lucide 图标名, kebab-case, 如 shield-check / book-open)")
+@click.option("--icon-url", default=None, help="卡片图标图片 URL（加载失败时回退 --icon）")
 @click.option("--plan-cat", "plan_categories", multiple=True, help="关联 docs/plans 下的类目(可多个)")
 @click.option("--team-id", "team_ids", multiple=True,
               help="关联的 TeamSpec.id（可多个；Project registry 单向持有）")
 @click.option("--primary-team-id", default=None,
               help="项目默认 TeamSpec.id（会自动加入 --team-id 列表）")
 @click.option("--pin", is_flag=True, default=None, help="置顶")
+@click.option("--no-assets", is_flag=True, help="不自动启动项目卡片资产生成")
 @external_or_controller
 def cmd_project_register(project_id: str, name: str | None, group: str | None, tags: tuple[str, ...],
                          desc: str | None, roots: tuple[str, ...], index_path: str | None,
-                         bg: str | None, icon: str | None, plan_categories: tuple[str, ...],
+                         bg: str | None, icon: str | None, icon_url: str | None,
+                         plan_categories: tuple[str, ...],
                          team_ids: tuple[str, ...], primary_team_id: str | None,
-                         pin: bool | None) -> None:
+                         pin: bool | None, no_assets: bool) -> None:
     """注册/更新一个项目(不传的字段保留原值)。"""
     from omnicompany.core.projects_registry import set_project
     from .._access import current_caller
@@ -110,6 +135,7 @@ def cmd_project_register(project_id: str, name: str | None, group: str | None, t
         "index_path": index_path,
         "bg": bg,
         "icon": icon,
+        "icon_url": icon_url,
         "plan_categories": list(plan_categories) or None,
         "team_ids": list(team_ids) or None,
         "primary_team_id": primary_team_id,
@@ -118,7 +144,15 @@ def cmd_project_register(project_id: str, name: str | None, group: str | None, t
     fields = {k: v for k, v in fields.items() if v is not None}
     by = "controller" if current_caller() == "controller" else "human"
     item = set_project(project_id, by=by, **fields)
-    click.echo(json.dumps({"ok": True, "project": item}, ensure_ascii=False, indent=2))
+    if no_assets:
+        assets = {"status": "skipped", "reason": "requested"}
+    elif getattr(item, "created", False):
+        from omnicompany.core.project_assets import autostart_project_assets
+
+        assets = autostart_project_assets(project_id)
+    else:
+        assets = {"status": "skipped", "reason": "existing_project"}
+    click.echo(json.dumps({"ok": True, "project": item, "assets": assets}, ensure_ascii=False, indent=2))
 
 
 @cmd_project.command("list")
@@ -154,6 +188,32 @@ def cmd_project_list(group: str | None, as_json: bool) -> None:
             click.echo(f"  {p['id']:<22} {p.get('name','')}  活跃:{la}  plans:{p.get('plan_count',0)}  动作:{qa}{tcol}  index:{idx}{stale}")
 
 
+@cmd_project.command("find")
+@click.argument("query")
+@click.option("--group", default=None, help="只在某分组里找")
+@click.option("--limit", type=click.IntRange(min=1, max=50), default=8, show_default=True)
+@click.option("--json", "as_json", is_flag=True, help="输出机器可读 JSON")
+@any_caller
+def cmd_project_find(query: str, group: str | None, limit: int, as_json: bool) -> None:
+    """按人类称呼快速找项目；只读注册表，不展开计划和项目文件。"""
+    from omnicompany.core.projects_registry import search_projects
+
+    matches = search_projects(query, limit=limit, group=group)
+    payload = {"query": query, "group": group, "matches": matches, "total": len(matches)}
+    if as_json:
+        click.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+    if not matches:
+        click.echo(f"(没有找到项目: {query})")
+        return
+    for item in matches:
+        root = (item.get("roots") or [""])[0]
+        suffix = f"  [{root}]" if root else ""
+        click.echo(f"{item['id']}  {item['name']}  ({item.get('group') or '-'}){suffix}")
+        if item.get("desc"):
+            click.echo(f"  {item['desc']}")
+
+
 @cmd_project.command("show")
 @click.argument("project_id")
 @click.option("--json", "as_json", is_flag=True)
@@ -181,8 +241,10 @@ def cmd_project_remove(project_id: str) -> None:
 @cmd_project.command("index-check")
 @click.argument("project_id", required=False)
 @click.option("--all", "check_all", is_flag=True, help="校验全部已注册项目的 index 文件")
+@click.option("--require-layout", is_flag=True,
+              help="要求 directory_contract 已填写且 status=ready（新项目首次业务写入前使用）")
 @any_caller
-def cmd_project_index_check(project_id: str | None, check_all: bool) -> None:
+def cmd_project_index_check(project_id: str | None, check_all: bool, require_layout: bool) -> None:
     """校验 index 文件: 结构(frontmatter 必填键 + threads)+ 状态可靠性(是否久未核对)。"""
     from omnicompany.core.projects_registry import enrich_projects, list_projects, parse_index_file
 
@@ -192,22 +254,28 @@ def cmd_project_index_check(project_id: str | None, check_all: bool) -> None:
         if not targets:
             click.echo(json.dumps({"ok": False, "error": f"未注册: {project_id}"}, ensure_ascii=False))
             raise SystemExit(1)
-    enriched = {x.get("id"): x for x in enrich_projects()["projects"]}
+    # A targeted check needs only the registered index and its canonical parser.
+    # Board enrichment scans workspace plans and unrelated project roots first.
+    enriched = ({x.get("id"): x for x in enrich_projects()["projects"]}
+                if check_all else {})
     results = []
     for p in targets:
         ip = p.get("index_path")
-        r = parse_index_file(ip) if ip else {"ok": False, "error": "未配置 index_path"}
-        e = enriched.get(p["id"], {})
+        r = parse_index_file(ip, require_layout=require_layout) if ip else {
+            "ok": False, "error": "未配置 index_path", "error_code": "INDEX_PATH_MISSING"}
+        e = enriched.get(p["id"], p)
         results.append({
             "id": p["id"], "index_path": ip, "ok": r.get("ok"), "error": r.get("error"),
-            "warnings": r.get("warnings") or [],
+            "warnings": r.get("warnings") or [], "warning_codes": r.get("warning_codes") or [],
+            "error_code": r.get("error_code"), "error_path": r.get("error_path"),
             "stale": bool(e.get("index_stale")),
             "stale_reason": e.get("stale_reason"),
         })
     bad = [r for r in results if not r["ok"]]
     stale = [r for r in results if r["stale"]]
     click.echo(json.dumps(
-        {"ok": not bad, "checked": len(results), "stale": len(stale), "results": results},
+        {"ok": not bad, "checked": len(results), "stale": len(stale),
+         "require_layout": require_layout, "results": results},
         ensure_ascii=False, indent=2))
     if bad:
         raise SystemExit(1)

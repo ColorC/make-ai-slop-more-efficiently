@@ -89,6 +89,29 @@ const tools: ToolDefinition[] = [
     inputSchema: sessionIdSchema,
   },
   {
+    name: 'xhs_open_private_messages',
+    description: 'Open Xiaohongshu private messages in the persistent real-Chrome agent-login profile and return the visible page snapshot.',
+    inputSchema: {
+      type: 'object',
+      properties: { sessionId: { type: 'string', description: 'Optional existing agent-login session.' } },
+    },
+  },
+  {
+    name: 'xhs_reply',
+    description: 'Fill a Xiaohongshu reply draft. It never sends unless send=true and confirmSend=true are both supplied.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sessionId: { type: 'string' },
+        selector: { type: 'string', description: 'Reply editor selector obtained from the current page snapshot.' },
+        text: { type: 'string' },
+        send: { type: 'boolean' },
+        confirmSend: { type: 'boolean' },
+      },
+      required: ['sessionId', 'selector', 'text'],
+    },
+  },
+  {
     name: 'browser_take_screenshot',
     description: 'Capture the latest screenshot for a Browser session.',
     inputSchema: sessionIdSchema,
@@ -251,6 +274,18 @@ async function callTool(name: string, args: Record<string, unknown>) {
       return jsonResponse(await callBrowserUseApi(name, {}));
     case 'browser_snapshot':
       return jsonResponse(await callBrowserUseApi(name, { sessionId: readString(args.sessionId, 'sessionId') }));
+    case 'xhs_open_private_messages':
+      return jsonResponse(await callBrowserUseApi(name, {
+        sessionId: readOptionalString(args.sessionId),
+      }));
+    case 'xhs_reply':
+      return jsonResponse(await callBrowserUseApi(name, {
+        sessionId: readString(args.sessionId, 'sessionId'),
+        selector: readString(args.selector, 'selector'),
+        text: readString(args.text, 'text'),
+        send: args.send === true,
+        confirmSend: args.confirmSend === true,
+      }));
     case 'browser_take_screenshot': {
       return jsonResponse(await callBrowserUseApi(name, { sessionId: readString(args.sessionId, 'sessionId') }));
     }

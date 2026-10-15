@@ -87,12 +87,23 @@ def _desired_hooks() -> dict[str, list[dict]]:
                 matcher="Bash|apply_patch|Edit|Write",
                 status="Checking Omnicompany write policy",
             ),
+            # plan 1.10 (demogame CONFIG-RECORDING-EFFICIENCY): the second independent write_stdin / sleep
+            # poll of a session gets one reminder of the sanctioned waits; never blocks.
+            _hook_block(
+                f"{base}.wait_pretooluse",
+                matcher="Bash|exec|exec_command|write_stdin|wait",
+                status="Omnicompany wait discipline",
+            ),
         ],
         "UserPromptSubmit": [
             _hook_block(f"{base}.user_prompt_submit"),
         ],
+        "SubagentStop": [
+            _hook_block(f"{base}.managed_agent_completion"),
+        ],
         "Stop": [
             _hook_block(f"{base}.trace"),
+            _hook_block(f"{base}.managed_agent_completion"),
         ],
     }
 

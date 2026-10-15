@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from omnicompany.core.config import omni_workspace_root
@@ -74,6 +74,42 @@ def _tokens() -> dict[str, str]:
         "ui": f"{_file_hash(_UI_INDEX)}:{epochs['ui']}",
         "ext": f"{_file_hash(_EXT_IMPL)}:{epochs['ext']}",
     }
+
+
+@dev_reload_router.post("/dev/shutdown")
+def dev_shutdown(request: Request) -> dict[str, Any]:
+    """优雅停机 —— 只服务 `omni dashboard restart` 的第一步。
+
+    为什么需要它: 重启此前一律是 `Stop-Process -Force` 硬杀。代价有三 ——
+    ① WebSocket 不发关闭帧, 前端要等 TCP 超时才知道断了;
+    ② 进程被砍在半路, 写状态文件的 os.replace 可能只完成一半;
+    ③ 冷启比优雅重启慢, 空窗更长, 反代那头 502 的时间也更长。
+    (客户端侧已能自愈, 见 desktop lib.rs 的看门狗; 这里是把空窗本身缩短。)
+
+    Windows 上没有 SIGTERM, 而 dashboard 是 DETACHED_PROCESS 起的、没有控制台,
+    GenerateConsoleCtrlEvent 送不进去。所以走进程内自发信号: uvicorn 装了 SIGINT
+    处理器, raise_signal(SIGINT) 会让它跑完正常的 shutdown 流程(关连接 → lifespan
+    shutdown → 退出), 与按 Ctrl+C 等价。
+
+    安全边界: 只认环回地址。这台机器的 dashboard 经 Caddy 对局域网可达,
+    没有这条判断的话, 同网段任何人都能一句话把控制面打下线。
+    """
+    client_host = request.client.host if request.client else ""
+    if client_host not in {"127.0.0.1", "::1", "localhost"}:
+        raise HTTPException(status_code=403, detail="shutdown is loopback-only")
+
+    import signal
+    import threading
+
+    def _raise_later() -> None:
+        # 先把 200 响应发出去再自杀, 否则调用方看到的是连接被重置, 分不清
+        # "优雅停机成功" 和 "进程本来就崩了", 只能盲目回退强杀。
+        import time as _time
+        _time.sleep(0.25)
+        signal.raise_signal(signal.SIGINT)
+
+    threading.Thread(target=_raise_later, name="omni-dashboard-shutdown", daemon=True).start()
+    return {"ok": True, "mode": "graceful"}
 
 
 @dev_reload_router.get("/dev/versions")

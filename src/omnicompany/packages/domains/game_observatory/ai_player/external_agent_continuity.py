@@ -445,6 +445,9 @@ def build_player_facility_contract() -> PlayerFacilityContractV1:
         _command("task.claim", "task claim", "任务", "认领任务，并可绑定到运行中的 Session。", "local_state"),
         _command("task.complete", "task complete", "任务", "以终态证据关闭任务。", "local_state"),
         _command("task.block", "task block", "任务", "记录已复现的真实阻断与恢复条件。", "local_state"),
+        _command("task.reactivate", "task reactivate", "任务", "以新的终态证据恢复 blocked 任务，并可绑定运行中的 Session。", "local_state"),
+        _command("model.summary", "model summary", "诊断", "只读汇总系统档案、内容关系、策略、基准和预测裁定。"),
+        _command("model.query", "model query", "诊断", "只读查询档案、图谱、事实、策略、基准与预测。"),
         _command("gameplay.list", "gameplay list", "玩法", "列出玩法候选、边界、规则线索、相邻关系和来源证据。"),
         _command("gameplay.show", "gameplay show", "玩法", "查看一个玩法候选的完整边界与证据。"),
         _command(
@@ -908,7 +911,7 @@ def export_external_agent_contracts(repository_root: Path) -> tuple[Path, ...]:
         ),
         repository_root
         / "docs/plans/game-observatory/"
-        / "[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/"
+        / "[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/samples/"
         / "omni-game-player-help.snapshot.txt": render_facility_help(contract).encode("utf-8"),
     }
     for path, content in outputs.items():
@@ -931,7 +934,7 @@ def check_external_agent_contracts(repository_root: Path) -> tuple[Path, ...]:
         ),
         repository_root
         / "docs/plans/game-observatory/"
-        / "[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/"
+        / "[2026-07-15]AI-PLAYER-LIFELONG-EXPLORATION-v1/samples/"
         / "omni-game-player-help.snapshot.txt": render_facility_help(contract).encode("utf-8"),
     }
     mismatches = [path for path, content in expected.items() if not path.is_file() or path.read_bytes() != content]

@@ -37,6 +37,41 @@ except ImportError:
     pass
 
 
+# ─── guardian dispatch-omission (SWARM-DISPATCH-PROACTIVITY P5, 只记录不阻断) ──
+
+@cmd_guardian.command("dispatch-omission")
+@click.option("--hours", default=24.0, show_default=True, help="回看窗口(小时)")
+@click.option("--min-calls", "min_mechanical", default=40, show_default=True,
+              help="机械工具调用总量阈值")
+@click.option("--min-streak", "min_consecutive", default=20, show_default=True,
+              help="最长连续机械串阈值")
+@click.option("--report", "write_report_flag", is_flag=True, help="落一份 JSON 报告")
+@click.option("--json", "as_json", is_flag=True)
+def cmd_guardian_dispatch_omission(hours: float, min_mechanical: int, min_consecutive: int,
+                                   write_report_flag: bool, as_json: bool):
+    """该派没派巡逻: 长机械串且零派发动作的会话(提示性, 不出罚单)。"""
+    from omnicompany.packages.services._core.guardian.dispatch_omission import (
+        scan_dispatch_omission, write_report,
+    )
+    from dataclasses import asdict
+
+    stats = scan_dispatch_omission(hours=hours, min_mechanical=min_mechanical,
+                                   min_consecutive=min_consecutive)
+    if write_report_flag:
+        p = write_report(stats)
+        click.echo(f"report -> {p}", err=True)
+    if as_json:
+        click.echo(json.dumps([asdict(s) for s in stats], ensure_ascii=False, indent=2))
+        return
+    flagged = [s for s in stats if s.flagged]
+    click.echo(f"窗口 {hours}h: {len(stats)} 个活跃 trace, 该派没派候选 {len(flagged)} 个"
+               f" (阈值: 机械≥{min_mechanical} 且连串≥{min_consecutive} 且零派发)")
+    for s in stats[:15]:
+        mark = "⚠该派没派" if s.flagged else ("✓有派发" if s.dispatch_markers else "·")
+        click.echo(f"  {mark:6s} {s.trace_id[:20]:20s} 机械={s.mechanical_calls:<4d} "
+                   f"最长连串={s.max_consecutive_mechanical:<4d} 派发动作={s.dispatch_markers}")
+
+
 # ─── guardian health（原有功能，保持兼容）─────────────────────
 
 @cmd_guardian.command("health")
@@ -1914,14 +1949,78 @@ def cmd_guardian_hygiene():
 @click.option("--root", type=str, default=_DEFAULT_ROOT)
 @click.option("--rule", "-r", type=str, default=None,
               help="只列指定 rule_id (OMNI-047/048a/048b/049/050/051a)")
-def cmd_hygiene_list(root: str, rule):
+@click.option("--profile-only", is_flag=True, help="只检查显式 closed_set_only profile，拒绝递归扫描")
+@click.option("--inventory-only", is_flag=True, help="只列 profile 闭集根第一层 lstat 元数据；须同时指定 --profile-only")
+@click.option("--json", "json_output", is_flag=True, help="输出单个机器可读 JSON")
+@click.option("--summary", is_flag=True, help="按 profile_root/rule_id 汇总，各组最多 5 个样本")
+def cmd_hygiene_list(root: str, rule, profile_only=False, inventory_only=False, json_output=False, summary=False):
     """列当前 hygiene scan 所有活跃告警 + 候选 + 白名单命中."""
     from omnicompany.packages.services._core.guardian.workers import HygieneScanWorker
+    from omnicompany.protocol.anchor import VerdictKind
 
-    v = HygieneScanWorker().run({"project_root": root})
-    out = v.output
+    if inventory_only and not profile_only:
+        raise click.UsageError("--inventory-only requires --profile-only")
+    request = {"project_root": root}
+    if profile_only:
+        request["profile_only"] = True
+    if inventory_only:
+        request["inventory_only"] = True
+        json_output = True
+    v = HygieneScanWorker().run(request)
+    out = v.output or {}
+    failed = v.kind == VerdictKind.FAIL
+    if json_output or summary:
+        report = dict(out)
+        report.update({"verdict": v.kind.value, "diagnosis": v.diagnosis, "rule_filter": rule})
+        for field, count_field in (("violations", "violation_count"), ("candidates_for_judge", "candidate_count"), ("whitelisted_hits", "whitelisted_count")):
+            items = report.get(field, [])
+            report[field] = items if rule is None else [item for item in items if item.get("rule_id") == rule]
+            report[count_field] = len(report[field])
+        report["by_rule"] = {}
+        report["by_rule_pending"] = {}
+        for field, counts in (("violations", "by_rule"), ("candidates_for_judge", "by_rule_pending")):
+            for item in report[field]:
+                rid = item["rule_id"]
+                report[counts][rid] = report[counts].get(rid, 0) + 1
+        if summary:
+            groups = {}
+            for field in ("violations", "candidates_for_judge", "whitelisted_hits"):
+                for item in report[field]:
+                    path = item.get("path", "")
+                    # Profile findings encode the configured root label before ':'.
+                    # Non-profile paths have no inferred project/ownership label.
+                    label = item.get("profile_root")
+                    if label is None and (profile_only or item.get("rule_id", "").startswith("PROJ-HYG-")):
+                        label = path.split(":", 1)[0]
+                    key = (label, item["rule_id"], field)
+                    group = groups.setdefault(key, {"profile_root": label, "rule_id": item["rule_id"], "kind": field, "count": 0, "samples": []})
+                    group["count"] += 1
+                    if len(group["samples"]) < 5:
+                        group["samples"].append(path)
+            report["summary"] = list(groups.values())
+            report["summary_scope"] = "Rule findings grouped by configured profile root; ownership/lifecycle classification has not been performed."
+            for field in ("violations", "candidates_for_judge", "whitelisted_hits", "aging_list", "volume_alerts", "data_root_layout_violations"):
+                report.pop(field, None)
+        if json_output:
+            click.echo(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            click.echo(v.diagnosis)
+            if report.get("coverage"):
+                click.echo(json.dumps(report["coverage"], ensure_ascii=False))
+            click.echo(report["summary_scope"])
+            for group in report["summary"]:
+                click.echo(f"  {group['profile_root'] or '(non-profile)'} / {group['rule_id']} / {group['kind']}: {group['count']}")
+                for sample in group["samples"]:
+                    click.echo(f"    {sample}")
+        if failed:
+            raise click.exceptions.Exit(1)
+        return
+    if failed:
+        raise click.ClickException(v.diagnosis)
     click.echo(click.style("> guardian hygiene list", fg="cyan", bold=True))
     click.echo(f"  root: {root}")
+    if profile_only:
+        click.echo(f"  coverage: {json.dumps(out['coverage'], ensure_ascii=False)}")
     click.echo(f"  汇总: {out['violation_count']} 告警 · {out['candidate_count']} 候选 · "
                f"{out['whitelisted_count']} 白名单豁免")
     click.echo()
@@ -1961,7 +2060,7 @@ def cmd_hygiene_list(root: str, rule):
             click.echo(f"    [{w['rule_id']}] {w['path']}  ← {w['matched_pattern']}  ({w['reason']})")
 
     if not violations and not candidates and not wl:
-        click.echo(click.style("  [OK] 运行空间干净", fg="green"))
+        click.echo(click.style("  [OK] 已检查 profile 闭集无告警（未检查递归内容、体积或归属）" if profile_only else "  [OK] 运行空间干净", fg="green"))
 
 
 @cmd_guardian_hygiene.command("whitelist")
@@ -2063,3 +2162,90 @@ def cmd_plan_bindings_scan(root: str, category: str | None, json_output: bool):
             click.echo(f"    ... +{len(violations) - 200} more")
     else:
         click.echo(click.style("  [OK] 绑定注册表巡检干净", fg="green"))
+
+
+# ─── guardian perf (PERF-OBSERVATORY P2, 2026-08-16 确定性性能巡检) ──────────
+
+@cmd_guardian.group("perf")
+def cmd_guardian_perf():
+    """性能巡检工具组: 读四源(slow-errors/frontend-telemetry/latency_monitor/resource_monitor),
+    按 config/perf/slo.yaml 判红黄绿或 no_data, 纯确定性不调 LLM。"""
+
+
+_LEVEL_COLORS = {"red": "red", "yellow": "yellow", "green": "green", "no_data": "white"}
+
+
+def _echo_perf_findings(findings: list) -> None:
+    for f in findings:
+        color = _LEVEL_COLORS.get(f["level"], "white")
+        click.echo(
+            click.style(f"  [{f['level']:>7}] ", fg=color) +
+            f"{f['slo_id']:<28} measured={f['measured']}  target={f['target']}"
+        )
+
+
+@cmd_guardian_perf.command("scan")
+@click.option("--root", type=str, default=_DEFAULT_ROOT, help="项目根目录")
+@click.option("--window-hours", type=float, default=24.0, show_default=True,
+              help="判定窗口(小时)")
+@click.option("--json-output", is_flag=True, help="以 JSON 输出完整 findings/offenders/meta")
+def cmd_guardian_perf_scan(root: str, window_hours: float, json_output: bool):
+    """跑一次确定性性能巡检(PerfScanWorker), 产 findings + offenders, 落盘 data/services/guardian/perf/。
+
+    \b
+    示例:
+      omni guardian perf scan
+      omni guardian perf scan --window-hours 1
+      omni guardian perf scan --json-output
+    """
+    from omnicompany.packages.services._core.guardian.perf_scan import PerfScanWorker
+
+    v = PerfScanWorker().run({"project_root": root, "window_hours": window_hours})
+    out = v.output
+
+    if json_output:
+        click.echo(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+
+    click.echo(click.style("> guardian perf scan", fg="cyan", bold=True))
+    click.echo(f"  root: {root}  window: {window_hours:g}h")
+    click.echo(f"  scan_duration_ms: {out['meta']['scan_duration_ms']}"
+               f"  truncated: {out['meta']['truncated']}")
+    click.echo()
+    _echo_perf_findings(out["findings"])
+    click.echo()
+    click.echo(f"  report: {out.get('report_path', '(未落盘)')}")
+
+
+@cmd_guardian_perf.command("latest")
+@click.option("--root", type=str, default=_DEFAULT_ROOT, help="项目根目录")
+@click.option("--json-output", is_flag=True, help="以 JSON 输出完整最近一次 scan 结果")
+def cmd_guardian_perf_latest(root: str, json_output: bool):
+    """读最近一次 perf scan 结果摘要(不重新扫描)。"""
+    latest_path = Path(root) / "data" / "services" / "guardian" / "perf" / "latest.json"
+    if not latest_path.exists():
+        click.echo("暂无 perf scan 记录(先运行 omni guardian perf scan)")
+        return
+    try:
+        out = json.loads(latest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        click.echo(click.style(f"[FAIL] 读取 {latest_path} 失败: {e}", fg="red"))
+        return
+
+    if json_output:
+        click.echo(json.dumps(out, ensure_ascii=False, indent=2))
+        return
+
+    click.echo(click.style("> guardian perf latest", fg="cyan", bold=True))
+    click.echo(f"  scan_ts: {out.get('scan_ts')}  scan_duration_ms: {out['meta']['scan_duration_ms']}")
+    click.echo()
+    _echo_perf_findings(out["findings"])
+
+
+# Explicit protected-asset read-only utilities; no scheduling or automatic actions.
+from omnicompany.cli.commands.guardian_asset_audit import cmd_guardian_assets
+cmd_guardian.add_command(cmd_guardian_assets)
+
+# Directory semantic archive (directory_semantic_archive.md): explain / list / check / drift, read-only.
+from omnicompany.cli.commands.guardian_dirs import cmd_guardian_dirs
+cmd_guardian.add_command(cmd_guardian_dirs)

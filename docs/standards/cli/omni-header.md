@@ -143,7 +143,7 @@ YAML 文件用 # 注释 (跟 Python 同):
 <!-- 替代文档: docs/standards/cli/omni-header.md -->
 ```
 
-**临时脚本** (只允许在 `data/*/scratch/`):
+**临时脚本**（位置按 [目录清洁度守则](../_global/directory_cleanliness.md)：项目已声明临时区优先，无声明时为项目 `.omni/tmp/<task-or-session>/`；下例只说明头部格式）：
 
 ```python
 # [OMNI] origin=human domain=demogame ts=2026-04-12T00:00:00Z type=scratch status=draft

@@ -2,6 +2,14 @@
 
 本文件记录发布版的用户可见变更。包名 `omnicompany`，命令行 `omni`。
 
+## 2026-10-15
+
+- Expanded CLI agent runtime support, account isolation, terminal handling and native session recovery.
+- Updated the dashboard terminal, Markdown reader, review views and material canvas; bundled their shared source dependencies for independent builds.
+- Added directory ownership archives, sparse worktree lifecycle and verified cleanup commands.
+- Packaged agent runtime protocol schemas and declared their JSON Schema validator dependency.
+- Kept machine configuration, private domain registrations and runtime data outside the public release.
+
 ## [0.2.0] - 2026-06-20
 
 首个公开平台版本。

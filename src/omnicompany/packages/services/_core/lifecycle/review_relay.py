@@ -21,17 +21,17 @@ from omnicompany.packages.services._core.lifecycle.dispatch_task import (
 
 
 def _material_source(material_id: str) -> dict[str, Any]:
-    """best-effort 从 reviewstage 拿 material 的 source_plan_id / source_subagent_id。"""
+    """best-effort 从审阅库 (review_store 读口) 拿 material 的 source_plan_id / source_subagent_id。"""
     try:
-        from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
-        m = get_store().get(material_id)
+        from omnicompany.packages.services._core import review_store
+        m = review_store.get_material(material_id)
         if m is None:
             return {}
         return {
-            "source_plan_id": getattr(m, "source_plan_id", None),
-            "source_subagent_id": getattr(m, "source_subagent_id", None),
-            "title": getattr(m, "title", None),
-            "status": str(getattr(getattr(m, "status", ""), "value", getattr(m, "status", "")) or ""),
+            "source_plan_id": m.get("source_plan_id"),
+            "source_subagent_id": m.get("source_subagent_id"),
+            "title": m.get("title"),
+            "status": str(m.get("status") or ""),
         }
     except Exception:
         return {}

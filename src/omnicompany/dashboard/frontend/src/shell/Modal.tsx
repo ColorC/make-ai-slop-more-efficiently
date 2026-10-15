@@ -7,15 +7,15 @@ const S: Record<string, any> = {
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 100,
   },
   panel: {
-    width: 520, maxWidth: '90vw', background: '#0d0d0d', border: '1px solid #2a3a4a',
-    borderRadius: 6, boxShadow: '0 6px 32px rgba(0,0,0,.6)', overflow: 'hidden',
+    width: 520, maxWidth: '90vw', background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border)',
+    borderRadius: 2, boxShadow: '0 6px 32px rgba(0,0,0,.6)', overflow: 'hidden',
     fontFamily: 'Consolas, Menlo, monospace',
   },
-  header: { padding: '10px 14px', color: '#90caf9', borderBottom: '1px solid #222', fontSize: 14 },
+  header: { padding: '10px 14px', color: 'var(--fp-link)', borderBottom: '1px solid var(--fp-border-subtle)', fontSize: 14 },
   body: { padding: 14 },
-  footer: { display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '10px 14px', borderTop: '1px solid #222' },
-  btn: { padding: '5px 14px', border: '1px solid #333', borderRadius: 4, color: '#ccc', background: 'transparent', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' },
-  btnPrimary: { padding: '5px 14px', border: '1px solid #2a3a4a', borderRadius: 4, color: '#90caf9', background: '#1a2a3a', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' },
+  footer: { display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '10px 14px', borderTop: '1px solid var(--fp-border-subtle)' },
+  btn: { padding: '5px 14px', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, color: 'var(--fp-text)', background: 'transparent', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' },
+  btnPrimary: { padding: '5px 14px', border: '1px solid var(--fp-border)', borderRadius: 3, color: 'var(--fp-link)', background: 'var(--fp-bp-paper-2)', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit' },
 }
 
 interface Props {

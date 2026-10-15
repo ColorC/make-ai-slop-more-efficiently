@@ -1,38 +1,85 @@
-// 项目 icon — 优先用开源 lucide 图标库里合适的; 找不到 → 纯色字母方块兜底(不用 AIGC/不存图)。
-// 用户 2026-06-14: "找个开源的icon库先, 里面找不到合适的再生成纯色icon"。icon 与背景图(bg)是两回事。
+// 项目 icon — 正式项目全部映射到开源 Lucide 矢量图标。
+// 未知 id 使用 FolderGit2 兜底，不再用字母方块伪装成项目图标。
 import React from 'react'
 import {
-  TrendingUp, BookOpen, Swords, Boxes, LayoutDashboard, ShieldCheck, Stethoscope,
-  Table2, Gamepad2, Puzzle, MonitorPlay, Radio, Globe, FolderGit2, type LucideIcon,
+  Blocks,
+  BookOpen,
+  BrainCircuit,
+  ChartCandlestick,
+  CodeXml,
+  DatabaseBackup,
+  Factory,
+  Feather,
+  FileCheck,
+  FishSymbol,
+  FolderGit2,
+  Gamepad2,
+  GitBranch,
+  Globe,
+  Image as ImageIcon,
+  Layers,
+  LayoutDashboard,
+  LayoutTemplate,
+  Music,
+  Package,
+  Palette,
+  PanelsTopLeft,
+  Presentation,
+  ScanSearch,
+  Send,
+  ShieldCheck,
+  Smartphone,
+  Stethoscope,
+  Swords,
+  Table2,
+  TestTube,
+  TvMinimalPlay,
+  type LucideIcon,
 } from 'lucide-react'
 
-// 按项目 id 挑 lucide 图标(开源库里找合适的)。没列到的 id → 纯色字母方块。
-const BY_ID: Record<string, LucideIcon> = {
-  'quant-lab': TrendingUp,
+export const PROJECT_ICON_IDS = [
+  'quant-lab', 'vilo', 'walker', 'voxelcraft', 'omnidashboard', 'omni-guard',
+  'omni-teambuilder-doctor', 'demogame-config', 'demogame-unity', 'demogame-prefab',
+  'demogame-demo', 'personal-site', 'aigc-image', 'aigc-music', 'publish-backup',
+  'decisions', 'omni-productization', 'omni-sw-engineering', 'narrative',
+  'omnidashboard-os', 'slidecast', 'frontend-design', 'demogame-design',
+  'demogame-publishing', 'game-observatory', 'ai-learning-observatory',
+  'agent-office', 'lofa', 'bside',
+  'spark-webtwin', 'bilibili-publish',
+] as const
+
+const BY_ID: Record<(typeof PROJECT_ICON_IDS)[number], LucideIcon> = {
+  'quant-lab': ChartCandlestick,
   vilo: BookOpen,
   walker: Swords,
-  voxelcraft: Boxes,
+  voxelcraft: Blocks,
   omnidashboard: LayoutDashboard,
   'omni-guard': ShieldCheck,
   'omni-teambuilder-doctor': Stethoscope,
   'demogame-config': Table2,
-  'demogame-unity': Gamepad2,
-  'demogame-prefab': Puzzle,
-  'demogame-demo': MonitorPlay,
-  'omni-remote': Radio,
+  'demogame-unity': TestTube,
+  'demogame-prefab': LayoutTemplate,
+  'demogame-demo': Gamepad2,
   'personal-site': Globe,
-}
-
-// id 关键词兜底(新项目没在 BY_ID 里时也能挑到大致合适的)
-function byKeyword(id: string): LucideIcon | null {
-  const s = id.toLowerCase()
-  if (s.includes('game') || s.includes('unity')) return Gamepad2
-  if (s.includes('guard') || s.includes('secur')) return ShieldCheck
-  if (s.includes('dash') || s.includes('board')) return LayoutDashboard
-  if (s.includes('site') || s.includes('web')) return Globe
-  if (s.includes('config') || s.includes('table')) return Table2
-  if (s.includes('quant') || s.includes('lab')) return TrendingUp
-  return null
+  'aigc-image': ImageIcon,
+  'aigc-music': Music,
+  'publish-backup': DatabaseBackup,
+  decisions: GitBranch,
+  'omni-productization': Package,
+  'omni-sw-engineering': CodeXml,
+  narrative: Feather,
+  'omnidashboard-os': PanelsTopLeft,
+  slidecast: Presentation,
+  'frontend-design': Palette,
+  'demogame-design': FileCheck,
+  'demogame-publishing': Send,
+  'game-observatory': ScanSearch,
+  'ai-learning-observatory': BrainCircuit,
+  'agent-office': Factory,
+  lofa: Smartphone,
+  bside: Layers,
+  'spark-webtwin': FishSymbol,
+  'bilibili-publish': TvMinimalPlay,
 }
 
 export function projectColor(id: string): string {
@@ -41,26 +88,22 @@ export function projectColor(id: string): string {
   return `hsl(${h % 360}, 52%, 54%)`
 }
 
-/** 项目 icon: lucide 库里有合适的就用(放进同色调圆角方块); 没有 → 纯色字母方块。 */
+/** 项目 icon: 注册项目用专属语义图标，未知 id 明确回落文件夹。 */
 export function ProjectIcon({ id, size = 18 }: { id: string; size?: number }) {
-  const Icon = BY_ID[id] || byKeyword(id) || FolderGit2
-  const explicit = !!(BY_ID[id] || byKeyword(id))
+  const Icon = BY_ID[id as keyof typeof BY_ID] || FolderGit2
   const color = projectColor(id)
   const box: React.CSSProperties = {
-    width: size, height: size, borderRadius: 4, flexShrink: 0,
+    width: size, height: size, borderRadius: 3, flexShrink: 0,
+    boxSizing: 'border-box',
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   }
-  if (explicit) {
-    return (
-      <span style={{ ...box, background: `${color}26`, border: `1px solid ${color}66`, color }}>
-        <Icon size={Math.round(size * 0.62)} />
-      </span>
-    )
-  }
-  // 库里找不到合适的 → 纯色字母方块
   return (
-    <span style={{ ...box, background: color, color: '#fff', fontSize: Math.round(size * 0.5), fontWeight: 700 }}>
-      {(id.replace(/[^a-z0-9]/gi, '')[0] || '?').toUpperCase()}
+    <span
+      data-project-icon={id}
+      data-registered={BY_ID[id as keyof typeof BY_ID] ? '1' : '0'}
+      style={{ ...box, background: `${color}26`, border: `1px solid ${color}66`, color }}
+    >
+      <Icon size={Math.round(size * 0.62)} />
     </span>
   )
 }

@@ -20,6 +20,7 @@ SPEC.loader.exec_module(recovery)
 
 def test_source_specs_cover_four_providers() -> None:
     assert set(recovery.SOURCE_SPECS) == {"codex", "claude", "kimi", "opencode"}
+    assert "%USERPROFILE%/.codex-2" in recovery.SOURCE_SPECS["codex"]["roots"]
     assert recovery.matches("sessions/example/wire.jsonl", ["sessions/**"])
     assert recovery.matches("credentials/token.json", ["credentials/**"])
 

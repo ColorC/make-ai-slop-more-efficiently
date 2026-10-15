@@ -31,6 +31,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import stat
+import time
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -75,6 +78,9 @@ class HygieneScanWorker(Worker):
         else:
             from omnicompany.core.config import _project_root
             project_root = _project_root()
+
+        if input_data.get("profile_only", False):
+            return self._run_profile_only(project_root, inventory_only=bool(input_data.get("inventory_only", False)))
 
         if not project_root.exists():
             return Verdict(
@@ -349,3 +355,200 @@ class HygieneScanWorker(Worker):
                 else "hygiene scan: 运行空间干净 · 0 告警 · 0 候选"
             ),
         )
+
+    def _run_profile_only(self, project_root: Path, *, inventory_only: bool = False) -> Verdict:
+        """Read-only, bounded profile checks; refuse profiles requiring recursion."""
+        from ..rules.project_profile_hygiene import PROFILE_REL, yaml
+
+        started = time.monotonic()
+        roots_checked: list[dict[str, Any]] = []
+        inventory: list[dict[str, Any]] = []
+        inventory_errors: list[dict[str, str]] = []
+        out: dict[str, Any] = {
+            "project_root": str(project_root),
+            "scan_ts": datetime.now(timezone.utc).isoformat(),
+            "scan_mode": "profile_only",
+            "scan_status": "error",
+            "violations": [], "violation_count": 0, "by_rule": {},
+            "candidates_for_judge": [], "candidate_count": 0, "by_rule_pending": {},
+            "whitelisted_hits": [], "whitelisted_count": 0,
+            "roots": roots_checked, "inventory": inventory, "root_count": 0,
+            "entry_count": 0, "link_count": 0, "errors": inventory_errors,
+            "coverage": {
+                "roots": roots_checked, "root_count": 0, "scanned_root_count": 0,
+                "recursive": False, "volume": False, "follows_junctions": False,
+                "scope": "Configured closed sets and required paths only; no ownership classification.",
+            },
+        }
+
+        def reject_links(path: Path) -> None:
+            # lstat every ancestor before any exists/is_dir/resolve call can
+            # traverse a Windows junction (including older pathlib versions).
+            absolute = path if path.is_absolute() else Path.cwd() / path
+            for part in [*reversed(absolute.parents), absolute]:
+                try:
+                    info = part.lstat()
+                except FileNotFoundError:
+                    break
+                if stat.S_ISLNK(info.st_mode) or (
+                    getattr(info, "st_file_attributes", 0)
+                    & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+                ):
+                    raise ValueError(f"Refusing to follow link/reparse point: {part}")
+
+        try:
+            profile_path = project_root / PROFILE_REL
+            reject_links(profile_path)
+            if yaml is None:
+                raise ValueError("PyYAML is unavailable; profile was not scanned")
+            profile = yaml.safe_load(profile_path.read_text(encoding="utf-8"))
+            if not isinstance(profile, dict):
+                raise ValueError("Hygiene profile must be a mapping")
+            roots = profile.get("roots")
+            if not isinstance(roots, dict) or not roots:
+                raise ValueError("Hygiene profile roots must be a non-empty mapping")
+            out["coverage"]["root_count"] = len(roots)
+            out["root_count"] = len(roots)
+            for name, spec in roots.items():
+                roots_checked.append({"name": str(name), "path": str(spec.get("path", ".")) if isinstance(spec, dict) else "", "status": "not_scanned"})
+            for root_info, (name, spec) in zip(roots_checked, roots.items()):
+                if not isinstance(spec, dict) or spec.get("closed_set_only") is not True:
+                    raise ValueError(f"Root {name!r} requires closed_set_only: true for --profile-only")
+                raw_path = spec.get("path", ".")
+                if not isinstance(raw_path, str):
+                    raise ValueError(f"Root {name!r} path must be a string")
+                root_path = Path(raw_path)
+                if not root_path.is_absolute():
+                    root_path = project_root / root_path
+                reject_links(root_path)
+                root_path = Path(os.path.abspath(root_path))
+                root_info["path"] = str(root_path)
+                for field in ("required_paths", "allowed_root_dirs", "allowed_root_files"):
+                    value = spec.get(field)
+                    if value is not None and not isinstance(value, str) and not (
+                        isinstance(value, list) and all(isinstance(item, str) for item in value)
+                    ):
+                        raise ValueError(f"Root {name!r} {field} must be a string or list of strings")
+                required = spec.get("required_paths") or []
+                if not (required or spec.get("allowed_root_dirs") or spec.get("allowed_root_files")):
+                    raise ValueError(f"Root {name!r} has no configured closed-set or required-path checks")
+                for required_path in ([required] if isinstance(required, str) else required):
+                    relative = Path(required_path)
+                    if relative.is_absolute() or relative.drive or relative.root or ".." in relative.parts:
+                        raise ValueError(f"Root {name!r} required_paths must remain relative within the root: {required_path}")
+                    if not inventory_only:
+                        reject_links(root_path / relative)
+                if inventory_only:
+                    root_info["entry_count"] = 0
+                    try:
+                        root_stat = root_path.lstat()
+                        if not stat.S_ISDIR(root_stat.st_mode):
+                            raise ValueError(f"Root {name!r} is not a directory: {root_path}")
+                        root_info["status"] = "checked"
+                        for entry in root_path.iterdir():
+                            try:
+                                info = entry.lstat()
+                            except OSError as exc:
+                                inventory_errors.append({"root": str(name), "path": str(entry), "error": str(exc)})
+                                root_info["status"] = "partial"
+                                continue
+                            attributes = getattr(info, "st_file_attributes", 0)
+                            is_link = stat.S_ISLNK(info.st_mode) or bool(
+                                attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+                            )
+                            kind = "link_or_reparse" if is_link else (
+                                "directory" if stat.S_ISDIR(info.st_mode) else
+                                "file" if stat.S_ISREG(info.st_mode) else "other"
+                            )
+                            inventory.append({
+                                "root": str(name), "name": entry.name, "path": str(entry),
+                                "kind": kind, "size": int(info.st_size),
+                            })
+                            root_info["entry_count"] += 1
+                            out["entry_count"] += 1
+                            if is_link:
+                                out["link_count"] += 1
+                    except (OSError, ValueError) as exc:
+                        inventory_errors.append({"root": str(name), "path": str(root_path), "error": str(exc)})
+                        root_info["status"] = "error"
+                    if root_info["status"] in {"checked", "partial"}:
+                        out["coverage"]["scanned_root_count"] += 1
+                    continue
+                if root_path.exists():
+                    if not root_path.is_dir():
+                        raise ValueError(f"Root {name!r} is not a directory: {root_path}")
+                    # The existing rule probes stray/.git to explain a finding.
+                    # Validate those probes too, without descending into entries.
+                    for entry in root_path.iterdir():
+                        reject_links(entry)
+                        if entry.is_dir():
+                            reject_links(entry / ".git")
+                else:
+                    root_info["status"] = "missing"
+            if inventory_only:
+                out["scan_status"] = "error" if inventory_errors else "completed"
+                out["coverage"].update({
+                    "inventory_only": True,
+                    "complete": not inventory_errors,
+                    "entry_count": out["entry_count"],
+                    "link_count": out["link_count"],
+                    "error_count": len(inventory_errors),
+                    "scope": "First-level lstat metadata for configured closed sets only; no target traversal, cleanliness or ownership classification.",
+                })
+                if inventory_errors:
+                    diagnosis = f"inventory-only incomplete: {len(inventory_errors)} errors across {out['coverage']['scanned_root_count']} scanned roots"
+                    kind = VerdictKind.FAIL
+                else:
+                    diagnosis = f"inventory-only: {out['coverage']['scanned_root_count']} roots, {out['entry_count']} entries, {out['link_count']} links; no cleanliness or ownership classification"
+                    kind = VerdictKind.PASS
+                out["coverage"]["elapsed_seconds"] = round(time.monotonic() - started, 6)
+                return Verdict(kind=kind, output=out, diagnosis=diagnosis)
+            items = scan_project_profile_violations(project_root)
+            whitelist = load_whitelist(project_root)
+            for item in items:
+                hit = is_whitelisted(item["rule_id"], item["path"], whitelist)
+                if hit is not None:
+                    out["whitelisted_hits"].append({
+                        "rule_id": item["rule_id"], "path": item["path"],
+                        "matched_pattern": hit.path_pattern, "reason": hit.reason,
+                    })
+                    continue
+                out["violations"].append(asdict(Violation(
+                    ticket_id=f"TICKET-{out['scan_ts'][:10]}-HYG-{len(out['violations']) + 1:03d}",
+                    rule_id=item["rule_id"], severity=item.get("severity", "MEDIUM"),
+                    path=item["path"], message=item["message"], disposition=["warn"],
+                    confidence=1.0, detected_at=out["scan_ts"],
+                )))
+                rid = item["rule_id"]
+                out["by_rule"][rid] = out["by_rule"].get(rid, 0) + 1
+            out["violation_count"] = len(out["violations"])
+            out["whitelisted_count"] = len(out["whitelisted_hits"])
+            out["scan_status"] = "completed"
+            for root_info in roots_checked:
+                if root_info["status"] != "missing":
+                    root_info["status"] = "checked"
+                    out["coverage"]["scanned_root_count"] += 1
+            diagnosis = f"profile-only: {len(roots_checked)} configured roots, {out['coverage']['scanned_root_count']} scanned; {len(out['violations'])} warnings; no recursive/volume scan or ownership classification"
+            kind = VerdictKind.PASS
+        except (OSError, ValueError, TypeError, AttributeError) as exc:
+            diagnosis = f"profile-only scan not completed: {exc}"
+            out["error"] = str(exc)
+            if inventory_only:
+                inventory_errors.append({"root": "profile", "path": str(project_root), "error": str(exc)})
+            kind = VerdictKind.FAIL
+        except Exception as exc:
+            # Includes YAML parser errors; malformed profiles must never look clean.
+            diagnosis = f"profile-only scan not completed: {exc}"
+            out["error"] = str(exc)
+            if inventory_only:
+                inventory_errors.append({"root": "profile", "path": str(project_root), "error": str(exc)})
+            kind = VerdictKind.FAIL
+        out["coverage"]["elapsed_seconds"] = round(time.monotonic() - started, 6)
+        if inventory_only:
+            out["coverage"].update({
+                "inventory_only": True, "complete": False,
+                "entry_count": out["entry_count"], "link_count": out["link_count"],
+                "error_count": len(inventory_errors),
+                "scope": "First-level lstat metadata for configured closed sets only; no target traversal, cleanliness or ownership classification.",
+            })
+        return Verdict(kind=kind, output=out, diagnosis=diagnosis)

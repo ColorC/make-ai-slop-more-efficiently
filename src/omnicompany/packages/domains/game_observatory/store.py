@@ -91,13 +91,22 @@ class ObservatoryStore:
         self.export_root.mkdir(parents=True, exist_ok=True)
         self.db_path = self.root / "observatory.sqlite3"
         self._lock = threading.RLock()
+        self._journal_mode_lock = threading.Lock()
+        self._journal_mode_initialized = False
         self._connection_local = threading.local()
         self.initialize()
 
     def _new_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=30)
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
+        if not self._journal_mode_initialized:
+            with self._journal_mode_lock:
+                if not self._journal_mode_initialized:
+                    mode = str(conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]).lower()
+                    if mode != "wal":
+                        conn.close()
+                        raise RuntimeError(f"Observatory SQLite journal mode is {mode}, expected wal")
+                    self._journal_mode_initialized = True
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
 
@@ -107,11 +116,36 @@ class ObservatoryStore:
         if current is not None:
             yield current
             return
+        reusable = getattr(self._connection_local, "reusable_connection", None)
+        if reusable is not None:
+            self._connection_local.connection = reusable
+            try:
+                with reusable:
+                    yield reusable
+            finally:
+                self._connection_local.connection = None
+            return
         connection = self._new_connection()
         try:
             with connection:
                 yield connection
         finally:
+            connection.close()
+
+    @contextmanager
+    def reusable_connection_session(self) -> Iterator[None]:
+        """Reuse one connection while each bounded store call still commits independently."""
+
+        current = getattr(self._connection_local, "reusable_connection", None)
+        if current is not None:
+            yield
+            return
+        connection = self._new_connection()
+        self._connection_local.reusable_connection = connection
+        try:
+            yield
+        finally:
+            self._connection_local.reusable_connection = None
             connection.close()
 
     @contextmanager

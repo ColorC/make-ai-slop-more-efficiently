@@ -57,7 +57,17 @@ class ProviderDefinition:
 BUILTIN_DEFINITIONS = (
     ProviderDefinition(
         name="codex",
-        roots=("%USERPROFILE%/.codex",),
+        roots=(
+            "%USERPROFILE%/.codex",
+            # The second local Codex identity is a distinct CODEX_HOME, not a
+            # mirror of ~/.codex. Omitting it silently drops live transcripts
+            # from machine-level disaster archives.
+            "%USERPROFILE%/.codex-2",
+            # LiTeWork can launch Codex with an isolated, managed home. Those
+            # sessions are first-class recovery evidence and must be archived
+            # before a wedged terminal daemon is replaced.
+            "%APPDATA%/liwork-dev/codex-runtime-home/home",
+        ),
         includes=(
             "sessions/**", "archived_sessions/**", "history.jsonl",
             "session_index.jsonl", "transcription-history.jsonl", "memories/**",
@@ -70,7 +80,8 @@ BUILTIN_DEFINITIONS = (
     ),
     ProviderDefinition(
         name="claude",
-        roots=("%USERPROFILE%/.claude",),
+        # 第二个官方账号(claude_2)整棵树在 ~/.claude-2 下, 与主号同构。
+        roots=("%USERPROFILE%/.claude", "%USERPROFILE%/.claude-2"),
         includes=(
             "projects/**", "file-history/**", "history.jsonl", "sessions/**",
             "backups/**", "jobs/**", "plans/**", "shell-snapshots/**", "tasks/**",

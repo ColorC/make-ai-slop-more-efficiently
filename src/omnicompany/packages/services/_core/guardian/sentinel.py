@@ -395,14 +395,14 @@ def _run_once(
     except Exception as e:
         logger.debug("[sentinel] 逾期升级异常 (非致命): %s", e)
 
-    # 工作区污染清理 (2026-05-04 加): 扫工作区根 + D 盘根顶层非白名单项, 备份后删除
-    # 兜底 bash 工具防御漏掉的产物 (旧 subprocess 调用 / 第三方工具 / 历史残留)
+    # 工作区污染候选 (2026-09-07 收紧): 只读扫描工作区根顶层非登记项。
+    # 未知不等于可删；实际回收须由带 manifest/hash/回退的已验收 mover 执行。
     try:
         from .workspace_pollution import run_workspace_pollution_scan
-        wsp = run_workspace_pollution_scan(omni_root=root)
+        wsp = run_workspace_pollution_scan(omni_root=root, dry_run=True)
         if wsp["total_tickets"] > 0:
             logger.warning(
-                "[sentinel] 工作区污染清理 %d 项: %s",
+                "[sentinel] 工作区污染候选 %d 项: %s",
                 wsp["total_tickets"], wsp["by_root"],
             )
     except Exception as e:

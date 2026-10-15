@@ -18,7 +18,7 @@
 "项目长什么样"全部以 index 文件为准, dashboard 与总控读到的是同一份。
 
 放置位置: 项目主根目录下（如 `src/omnicompany/dashboard/PROJECT_INDEX.md`）;
-立项期项目可临时放计划类目根（如 `docs/plans/remote-control/PROJECT_INDEX.md`）, 落地后迁主根。
+立项期项目可临时放计划类目根；落地后应迁到真实项目根，或对公开/外部仓库使用 `docs/projects/<id>/PROJECT_INDEX.md` 内部索引。
 
 ## 二 · frontmatter 契约
 

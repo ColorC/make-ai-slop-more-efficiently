@@ -140,6 +140,33 @@ def _codex_msg_text(content: Any) -> str:
     return ""
 
 
+def _kiro_msg_text(content: Any) -> str:
+    """Extract display text from Kiro's ``[{kind: text, data: ...}]`` blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("kind") == "text" and isinstance(block.get("data"), str):
+                    parts.append(block["data"])
+                elif isinstance(block.get("text"), str):
+                    parts.append(block["text"])
+            elif isinstance(block, str):
+                parts.append(block)
+        return "\n".join(part for part in parts if part.strip())
+    return ""
+
+
+def _transcript_format(provider: str) -> str:
+    """转录格式按家族定, 不按 provider id —— codex_2 也是 codex 格式, claude_2 也是 claude 格式。"""
+    from omnicompany.core.agent_environment import agent_environment
+
+    environment = agent_environment(str(provider or ""))
+    family = str(getattr(environment, "family", "") or "") if environment else ""
+    return family if family in {"codex", "kiro"} else "claude"
+
+
 def _extract_transcript(provider: str, path: Path, cap_chars: int = 60000, per_msg: int = 4000) -> tuple[list[dict], bool]:
     """从 transcript(.jsonl)抽出按时间排序的 [{role, text}], 跳过工具/思考/系统提醒。
 
@@ -168,6 +195,13 @@ def _extract_transcript(provider: str, path: Path, cap_chars: int = 60000, per_m
                     if role == "developer":  # codex 系统指令, 跳过
                         continue
                     text = _codex_msg_text(payload.get("content"))
+                elif provider == "kiro":
+                    kind = str(obj.get("kind") or "")
+                    if kind not in ("Prompt", "AssistantMessage"):
+                        continue
+                    data = obj.get("data") or {}
+                    role = "user" if kind == "Prompt" else "assistant"
+                    text = _kiro_msg_text(data.get("content"))
                 else:  # claude
                     if obj.get("type") not in ("user", "assistant"):
                         continue
@@ -179,7 +213,9 @@ def _extract_transcript(provider: str, path: Path, cap_chars: int = 60000, per_m
                     continue
                 if role not in ("user", "assistant"):
                     role = "user" if role != "assistant" else "assistant"
-                ts = _parse_iso(obj.get("timestamp"))
+                # Kiro AssistantMessage rows may omit timestamps. Keeping all
+                # Kiro rows untimed preserves their authoritative JSONL order.
+                ts = None if provider == "kiro" else _parse_iso(obj.get("timestamp"))
                 rows.append({"role": role, "text": text, "_ts": ts})
     except OSError as e:
         raise HTTPException(400, f"读取 transcript 失败: {e}") from e
@@ -203,7 +239,7 @@ def _extract_transcript(provider: str, path: Path, cap_chars: int = 60000, per_m
 
 
 def _format_preamble(provider: str, session_id: str, title: str, cwd: str, messages: list[dict], truncated: bool) -> str:
-    label = "Codex" if provider == "codex" else "Claude Code"
+    label = {"codex": "Codex", "kiro": "Kiro CLI"}.get(provider, "Claude Code")
     lines = [
         "[from: BOSS-SIGHT bus event, not_user: true]",
         "event_type: load_prior_conversation",
@@ -231,10 +267,51 @@ def _format_preamble(provider: str, session_id: str, title: str, cwd: str, messa
     return "\n".join(lines)
 
 
-def _scan_claude() -> list[dict]:
-    root = Path.home() / ".claude" / "projects"
+def _account_scan_roots(family: str, leaf: tuple[str, ...]) -> list[tuple[str, Path]]:
+    """一个家族的每个账号一个扫描根 —— 账号就是 home 目录(claude_2 / codex_2 是另一个账号)。
+
+    2026-09-19 前这里写死 ``~/.claude`` / ``~/.codex``, 于是 claude_2 / codex_2 的对话在
+    /active 和 /importable 里根本不存在, 摘要管线也就永远看不到它们。归属解析只认
+    ``claude_home_for`` / ``codex_home_for`` 这个契约面, 不自己拼路径。
+    """
+    from omnicompany.core.agent_environment import agent_environments
+
+    from .provider_identity import claude_home_for, codex_home_for
+
+    home_for = {"claude": claude_home_for, "codex": codex_home_for}[family]
+    members = [e for e in agent_environments()
+               if getattr(e, "family", "") == family and getattr(e, "account_home", None)]
+    # 专属账号先登记: 主账号会跟随环境里的 CLAUDE_CONFIG_DIR/CODEX_HOME, 万一它正好被指到
+    # 副账号目录, 这一步保证那份转录仍然挂在副账号名下, 而不是被认成主账号的。
+    members.sort(key=lambda e: getattr(e.account_home, "role", "") != "secondary")
+    roots: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for environment in members:
+        candidates = [home_for(environment.id)]
+        # 同时登记默认目录名: 主账号被环境变量搬走时, 默认 home 下的历史转录不能凭空消失。
+        dir_name = str(getattr(environment.account_home, "dir_name", "") or "")
+        if dir_name:
+            candidates.append(Path.home() / dir_name)
+        for candidate in candidates:
+            root = candidate.joinpath(*leaf)
+            key = str(root).casefold()
+            if key in seen:  # 共用同一个 home 的 provider(codex_the_company/codex_glm)只扫一次
+                continue
+            seen.add(key)
+            roots.append((environment.id, root))
+    return roots
+
+
+def _scan_claude(*, cap: int | None = None) -> list[dict]:
     out: list[dict] = []
-    for mtime, f in _recent_files(root):
+    for provider_id, root in _account_scan_roots("claude", ("projects",)):
+        out.extend(_scan_claude_root(provider_id, root, cap=cap))
+    return out
+
+
+def _scan_claude_root(provider_id: str, root: Path, *, cap: int | None = None) -> list[dict]:
+    out: list[dict] = []
+    for mtime, f in _recent_files(root, cap):
         cwd = ""
         preview = ""
         try:
@@ -263,7 +340,60 @@ def _scan_claude() -> list[dict]:
         except OSError:
             continue
         out.append({
-            "provider": "claude_code",
+            "provider": provider_id,
+            "session_id": f.stem,
+            "cwd": cwd,
+            "mtime": mtime,
+            "preview": _clip(preview),
+            "file": str(f),
+        })
+    return out
+
+
+def _scan_qoder(*, cap: int | None = None) -> list[dict]:
+    root = Path.home() / ".qoder" / "projects"
+    out: list[dict] = []
+    for mtime, f in _recent_files(root, cap):
+        cwd = ""
+        preview = ""
+        try:
+            with f.open("r", encoding="utf-8", errors="replace") as fh:
+                for i, line in enumerate(fh):
+                    if i > _HEAD_LINES:
+                        break
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except Exception:  # noqa: BLE001
+                        continue
+                    if not cwd and obj.get("type") == "workspace-directories":
+                        dirs = obj.get("directories")
+                        if isinstance(dirs, list) and dirs:
+                            cwd = str(dirs[0])
+                        elif isinstance(dirs, str):
+                            try:
+                                import ast
+
+                                parsed = ast.literal_eval(dirs)
+                                if isinstance(parsed, list) and parsed:
+                                    cwd = str(parsed[0])
+                            except Exception:  # noqa: BLE001
+                                cwd = dirs
+                    if not preview:
+                        msg = obj.get("message") or {}
+                        is_user = msg.get("role") == "user" or obj.get("type") == "user"
+                        if is_user:
+                            txt = _first_text(msg.get("content"))
+                            if txt and not _looks_internal(txt):
+                                preview = txt
+                    if cwd and preview:
+                        break
+        except OSError:
+            continue
+        out.append({
+            "provider": "qoder",
             "session_id": f.stem,
             "cwd": cwd,
             "mtime": mtime,
@@ -302,12 +432,18 @@ def _is_codex_subagent_meta(meta: dict[str, Any]) -> bool:
     return isinstance(source, dict) and "subagent" in source
 
 
-def _scan_codex() -> list[dict]:
-    root = Path.home() / ".codex" / "sessions"
+def _scan_codex(*, cap: int | None = None) -> list[dict]:
     out: list[dict] = []
-    # Inspect the complete 90-day inventory.  Pagination belongs at the API
-    # boundary; truncating here made older user sessions impossible to search.
-    for mtime, f in _recent_files(root):
+    for provider_id, root in _account_scan_roots("codex", ("sessions",)):
+        out.extend(_scan_codex_root(provider_id, root, cap=cap))
+    return out
+
+
+def _scan_codex_root(provider_id: str, root: Path, *, cap: int | None = None) -> list[dict]:
+    out: list[dict] = []
+    # Search/import callers keep the complete 90-day inventory by leaving cap
+    # unset. Live residents may request only the newest bounded slice.
+    for mtime, f in _recent_files(root, cap):
         sid = ""
         cwd = ""
         preview = ""
@@ -347,12 +483,60 @@ def _scan_codex() -> list[dict]:
             m = _UUID_RE.search(f.name)
             sid = m.group(0) if m else f.stem
         out.append({
-            "provider": "codex",
+            "provider": provider_id,
             "session_id": sid,
             "cwd": cwd,
             "mtime": mtime,
             "preview": _clip(preview),
             "file": str(f),
+        })
+    return out
+
+
+def _scan_kiro(*, cap: int | None = None) -> list[dict]:
+    """Scan native Kiro CLI sessions that contain at least one real prompt."""
+    root = Path.home() / ".kiro" / "sessions" / "cli"
+    out: list[dict] = []
+    for mtime, transcript in _recent_files(root, cap):
+        preview = ""
+        try:
+            with transcript.open("r", encoding="utf-8", errors="replace") as fh:
+                for i, line in enumerate(fh):
+                    if i > _HEAD_LINES:
+                        break
+                    try:
+                        obj = json.loads(line)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    if obj.get("kind") != "Prompt":
+                        continue
+                    preview = _kiro_msg_text((obj.get("data") or {}).get("content")).strip()
+                    if preview and not _looks_internal(preview):
+                        break
+                    preview = ""
+        except OSError:
+            continue
+        # Kiro creates metadata/transcript files before the first prompt. Empty
+        # starts are not useful resume or context-import targets.
+        if not preview:
+            continue
+
+        meta: dict[str, Any] = {}
+        meta_path = transcript.with_suffix(".json")
+        try:
+            loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                meta = loaded
+            mtime = max(mtime, meta_path.stat().st_mtime)
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+        out.append({
+            "provider": "kiro",
+            "session_id": str(meta.get("session_id") or transcript.stem),
+            "cwd": str(meta.get("cwd") or ""),
+            "mtime": mtime,
+            "preview": _clip(meta.get("title") or preview),
+            "file": str(transcript),
         })
     return out
 
@@ -364,37 +548,60 @@ def _scan_codex() -> list[dict]:
 # 写缓存整体替换(新 list 对象), 不原地改旧列表。
 _SCAN_CACHE_TTL_SEC = 20.0
 _SCAN_CACHE: dict[str, Any] = {"ts": 0.0, "items": [], "refreshing": False}
+_SCAN_CACHE_LOCK = threading.Lock()
 
 
 def _scan_all_now() -> list[dict]:
     try:
-        return _scan_claude() + _scan_codex()
+        return _scan_claude() + _scan_codex() + _scan_kiro() + _scan_qoder()
     except Exception:  # noqa: BLE001
         return []
 
 
 def _scan_refresh_bg() -> None:
-    scanned = _scan_all_now()
-    _SCAN_CACHE["items"] = scanned
-    _SCAN_CACHE["ts"] = time.time()
-    _SCAN_CACHE["refreshing"] = False
+    scanned: list[dict] | None = None
+    try:
+        scanned = _scan_all_now()
+    finally:
+        with _SCAN_CACHE_LOCK:
+            if scanned is not None:
+                _SCAN_CACHE["items"] = scanned
+                _SCAN_CACHE["ts"] = time.time()
+            _SCAN_CACHE["refreshing"] = False
 
 
 def _scan_all_cached() -> list[dict]:
     now = time.time()
-    items = _SCAN_CACHE["items"]
-    if now - float(_SCAN_CACHE["ts"]) < _SCAN_CACHE_TTL_SEC:
-        return items
-    if items:
-        if not _SCAN_CACHE["refreshing"]:
-            _SCAN_CACHE["refreshing"] = True
-            threading.Thread(target=_scan_refresh_bg, daemon=True, name="active-scan-refresh").start()
-        return items  # 旧扫描先用着, 刷新在后台跑
+    with _SCAN_CACHE_LOCK:
+        items = _SCAN_CACHE["items"]
+        if now - float(_SCAN_CACHE["ts"]) < _SCAN_CACHE_TTL_SEC:
+            return items
+        if items:
+            if not _SCAN_CACHE["refreshing"]:
+                _SCAN_CACHE["refreshing"] = True
+                threading.Thread(
+                    target=_scan_refresh_bg,
+                    daemon=True,
+                    name="active-scan-refresh",
+                ).start()
+            return items  # 旧扫描先用着, 刷新在后台跑
+        # 冷启动时只允许一个线程做首轮全量扫描。其它并发请求先拿
+        # 空快照，避免多个 /active 同时各扫一遍几千个 transcript。
+        if _SCAN_CACHE["refreshing"]:
+            return items
+        _SCAN_CACHE["refreshing"] = True
+
     # 进程内第一问(没有任何旧扫描可回): 本线程同步扫(调用方已在线程池, 不堵事件循环)
-    scanned = _scan_all_now()
-    _SCAN_CACHE["items"] = scanned
-    _SCAN_CACHE["ts"] = time.time()
-    return scanned
+    scanned: list[dict] | None = None
+    try:
+        scanned = _scan_all_now()
+    finally:
+        with _SCAN_CACHE_LOCK:
+            if scanned is not None:
+                _SCAN_CACHE["items"] = scanned
+                _SCAN_CACHE["ts"] = time.time()
+            _SCAN_CACHE["refreshing"] = False
+    return scanned or []
 
 
 # ── 完成感知: 读 transcript 尾部判"运行中/已完成/等待" + 抽"完成了什么" ──────────
@@ -516,11 +723,51 @@ def _codex_tail_status(lines: list[str]) -> dict[str, Any]:
     }
 
 
+def _kiro_tail_status(lines: list[str]) -> dict[str, Any]:
+    last_role = ""
+    last_assistant = ""
+    last_user = ""
+    recent_reversed: list[dict[str, str]] = []
+    for line in reversed(lines):
+        try:
+            obj = json.loads(line)
+        except Exception:  # noqa: BLE001
+            continue
+        kind = str(obj.get("kind") or "")
+        if kind not in ("Prompt", "AssistantMessage"):
+            continue
+        role = "user" if kind == "Prompt" else "assistant"
+        text = _kiro_msg_text((obj.get("data") or {}).get("content")).strip()
+        if not text or (role == "user" and _looks_internal(text)):
+            continue
+        if not last_role:
+            last_role = role
+        if role == "assistant" and not last_assistant:
+            last_assistant = text
+        if role == "user" and not last_user:
+            last_user = text
+        if len(recent_reversed) < 4:
+            recent_reversed.append({"role": role, "text": _clip(text, 1600)})
+        if last_role and last_assistant and last_user and len(recent_reversed) >= 4:
+            break
+    return {
+        "last_role": last_role,
+        "last_assistant": _clip(last_assistant, 200),
+        "last_user": _clip(last_user, 200),
+        "recent_messages": list(reversed(recent_reversed)),
+    }
+
+
 def _tail_status(provider: str, path: Path) -> dict[str, Any]:
     lines = _tail_lines(path)
     if not lines:
         return {"last_role": "", "last_assistant": "", "last_user": "", "recent_messages": []}
-    return _codex_tail_status(lines) if provider == "codex" else _claude_tail_status(lines)
+    fmt = _transcript_format(provider)
+    if fmt == "codex":
+        return _codex_tail_status(lines)
+    if fmt == "kiro":
+        return _kiro_tail_status(lines)
+    return _claude_tail_status(lines)
 
 
 # ── _tail_status 缓存: 按 (路径, mtime) 键, 文件没再写(mtime 不变)就不用重读尾部 128KB ──
@@ -586,19 +833,21 @@ def _list_active_sync(window_sec: int, limit: int) -> dict[str, Any]:
     # 附性价比模型维护的对话摘要(项目/计划/在做什么/最近一步)+ 懒触发一次刷新。
     # 摘要只在后台线程里由便宜模型算(单飞+节流), 不堵本响应; 没摘要的行前端回退到原始 preview。
     try:
-        from omnicompany.dashboard.boss_sight.services import agent_digest
+        from omnicompany.packages.services.boss_sight.services import agent_digest
         store = agent_digest.load_digests()
         for it in items:
             d = store.get(f"{it.get('provider')}:{it.get('session_id')}")
             if d:
                 it["digest"] = {k: d.get(k, "") for k in ("project", "plan", "title", "last_step")}
-        agent_digest.schedule_tick(items)
+        # companion 只覆盖它自己拉起的会话; 这里发现的外部 claude/codex/kiro 对话永远不发
+        # 生命周期事件, 没人补摘要就只剩首条 prompt。补盲只写摘要, 不写身份绑定。
+        agent_digest.schedule_scan_backfill(items)
     except Exception:  # noqa: BLE001
-        _log.debug("agent_digest attach/schedule skipped", exc_info=True)
+        _log.debug("agent_digest compatibility projection attach skipped", exc_info=True)
     # 被动收集机器级 agent 注册表(身份/位置/在做啥): 检测到对话在跑就懒触发一次后台 rebuild
     # (确定性, 不调模型, 节流), 让总控派发路由器的候选清单始终新鲜。
     try:
-        from omnicompany.dashboard.boss_sight.services import agent_registry
+        from omnicompany.packages.services.boss_sight.services import agent_registry
         agent_registry.schedule_rebuild()
     except Exception:  # noqa: BLE001
         _log.debug("agent_registry schedule skipped", exc_info=True)
@@ -635,7 +884,7 @@ async def list_importable_sessions(
     offset: int = 0,
     q: str = "",
 ) -> dict[str, Any]:
-    """列出可载入续接的本机历史会话(Claude Code + Codex), 按最近修改排序。"""
+    """列出可载入续接的本机历史会话(Claude Code + Codex + Kiro), 按最近修改排序。"""
     limit = max(1, min(int(limit), 120))
     offset = max(0, int(offset))
     items = [
@@ -681,8 +930,13 @@ def _validate_transcript_path(raw: str) -> Path:
     except OSError as e:
         raise HTTPException(400, f"无效路径: {e}") from e
     home = Path.home()
-    if not (_is_under(rp, home / ".claude") or _is_under(rp, home / ".codex")):
-        raise HTTPException(400, "transcript 路径必须在 ~/.claude 或 ~/.codex 下")
+    # 每个账号一个 home: claude_2 / codex_2 的转录不在主 home 下, 写死主 home 会把它们
+    # 全判成非法路径("载入"直接 400)。
+    allowed = [root for _provider, root in _account_scan_roots("claude", ())]
+    allowed += [root for _provider, root in _account_scan_roots("codex", ())]
+    allowed.append(home / ".kiro" / "sessions" / "cli")
+    if not any(_is_under(rp, base) for base in allowed):
+        raise HTTPException(400, "transcript 路径必须在已登记的 Claude/Codex 账号目录或 ~/.kiro/sessions/cli 下")
     if not rp.is_file():
         raise HTTPException(404, f"transcript 文件不存在: {raw}")
     return rp
@@ -708,14 +962,14 @@ _load_ctx_tasks: set = set()
 
 @import_sessions_router.post("/load_context")
 async def load_context(body: LoadContextBody) -> dict[str, Any]:
-    """#3 / A1: 把选中的已有对话(claude/codex)真实内容载入为【总控对话的前文】。
+    """#3 / A1: 把选中的已有对话(claude/codex/kiro)真实内容载入为【总控对话的前文】。
 
     读 transcript → 抽真实 (role,text) → 作为一条带标注的消息注入唯一活跃总控, 让总控模型
     真正"看见"这段历史(并显示在总控对话里)。注入会触发一次总控 turn, 丢后台、立即返回;
     总控对话经 WS 流式显示。
     """
     path = _validate_transcript_path(body.file)
-    provider = "codex" if body.provider == "codex" else "claude_code"
+    provider = _transcript_format(body.provider)
     messages, truncated = _extract_transcript(provider, path, cap_chars=body.cap_chars)
     if not messages:
         raise HTTPException(422, "没从这段对话里抽到可读消息(可能全是工具/系统记录)")

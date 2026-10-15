@@ -1,6 +1,6 @@
 # [OMNI] origin=claude-code domain=cli/commands ts=2026-04-23T00:00:00Z type=cli
 # [OMNI] material_id="material:cli.commands.human_approval.inbox_manager.py"
-"""omni human — HumanBus inbox / resolve 人类审批入口.
+"""omni human — HumanBus 运行时人工复核 / resolve 入口（非持续学习设施）。
 
 用法:
   omni human inbox                        # 列 pending 问题
@@ -34,7 +34,7 @@ def _truncate(text: str, limit: int = 80) -> str:
 
 @click.group("human")
 def cmd_human():
-    """HumanBus — 人类审批 inbox / resolve."""
+    """HumanBus — 通用运行时人工审批；不是持续学习或知识沉淀入口。"""
 
 
 @cmd_human.command("inbox")

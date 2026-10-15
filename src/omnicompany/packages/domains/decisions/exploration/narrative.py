@@ -29,7 +29,7 @@ REGISTRY_TO_DECISIONS = {
     "demogame-config": "demogame", "demogame-unity": "demogame", "demogame-prefab": "demogame", "demogame-demo": "demogame",
     "omnidashboard": "omnicompany", "omni-guard": "omnicompany", "omni-productization": "omnicompany",
     "omni-sw-engineering": "omnicompany", "omni-learning": "omnicompany",
-    "omni-teambuilder-doctor": "omnicompany", "omni-remote": "omnicompany", "decisions": "omnicompany",
+    "omni-teambuilder-doctor": "omnicompany", "lofa": "omnicompany", "decisions": "omnicompany",
     "personal-site": "web-company", "publish-backup": "web-company",
 }
 

@@ -5,12 +5,12 @@
 设计原则：
 - 与网页端同源：都通过 assistant_db + IDEAgentLoop，不复制业务逻辑
 - 三类操作：
-    1. chat   — 发任务给 assistant（一次性或持续）
+    1. chat   — 已封存；新任务走 omni agent start
     2. CRUD   — 管理 goals/plans/workspaces/rules/cron（修订上下文）
     3. watch  — 监督进度（读 history / events.db）
 
 外部 agent 通过这个 CLI 可以：
-- 发布任务    → omni assistant chat "帮我..."
+- 发布任务    → omni agent start "帮我..."
 - 查看状态    → omni assistant status
 - 修订目标    → omni assistant goal update <id> --tick "condition"
 - 看做了啥    → omni assistant history / omni assistant tail
@@ -42,7 +42,7 @@ _LEGACY_REMOVED_MSG = (
     "替代 (进度/目标/plan 现在的真源):\n"
     "  - 目标 / 计划 / 进度: whatnow 目标系统 (:8230) —— `whatnow board` / `whatnow add/patch/progress`\n"
     "  - 新计划自动纳管 + 进度刷新: `omni governance plans-sync` (每日 cron gov-progress-sync 已挂)\n"
-    "  - 定时任务: `omni cron`;chat 仍工作: `omni assistant chat` (走 native_agent, 跟 assistant_db 无关)"
+    "  - 定时任务: `omni cron`;Agent 工作: `omni agent start`"
 )
 
 
@@ -92,11 +92,51 @@ def cmd_assistant():
     """Assistant context management + task dispatch (claude -p style)."""
 
 
+@cmd_assistant.command("switch-provider")
+@click.argument("session_id")
+@click.option("--to-provider", default=None, help="Explicit CLI provider; omit to use the assistant ladder.")
+@click.option("--model", default=None, help="Model for an explicit provider.")
+def cmd_switch_provider(session_id: str, to_provider: str | None, model: str | None) -> None:
+    """Move one live assistant PTY to the next provider rung."""
+    import urllib.error
+    import urllib.request
+
+    from omnicompany.cli.commands.cc import _pty_daemon_base
+
+    payload: dict[str, str] = {"session_id": session_id}
+    if to_provider:
+        payload["to_provider"] = to_provider
+    if model:
+        payload["model"] = model
+    request = urllib.request.Request(
+        f"{_pty_daemon_base()}/cc/agent-workers/switch-provider",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Referer": "http://127.0.0.1:8210/",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 - local daemon
+            result = json.loads(response.read() or b"{}")
+    except urllib.error.HTTPError as exc:
+        detail = exc.reason
+        try:
+            detail = json.loads(exc.read() or b"{}").get("detail") or detail
+        except Exception:  # noqa: BLE001 - error reporting only
+            pass
+        raise click.ClickException(str(detail)) from exc
+    except OSError as exc:
+        raise click.ClickException(f"ccdaemon request failed: {exc}") from exc
+    _json_out(result)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # chat — 对齐 claude -p: 一次性任务发布
 # ═══════════════════════════════════════════════════════════════════
 
-@cmd_assistant.command("chat")
+@cmd_assistant.command("chat", hidden=True, deprecated=True)
 @click.argument("instruction", required=False)
 @click.option("--stdin", "from_stdin", is_flag=True, help="Read instruction from stdin")
 @click.option("--cwd", default=None, help="Working directory for the agent")
@@ -113,6 +153,10 @@ def cmd_chat(instruction: str | None, from_stdin: bool, cwd: str | None,
       omni assistant chat "do X" --cwd /path/to/project --max-turns 50
       omni assistant chat "test" --policy robust_test
     """
+    raise click.ClickException(
+        "`omni assistant chat` is archived. Use `omni agent start \"<task>\"` "
+        "to run the task in a real CLI Agent Worker."
+    )
     if from_stdin:
         instruction = sys.stdin.read().strip()
     if not instruction:

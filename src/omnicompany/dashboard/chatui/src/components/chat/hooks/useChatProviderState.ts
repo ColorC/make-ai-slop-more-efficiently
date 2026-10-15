@@ -15,7 +15,7 @@ const FALLBACK_DEFAULT_MODEL: Record<LLMProvider, string> = {
   codex: 'gpt-5.4',
   gemini: 'gemini-3.1-pro-preview',
   kimi: 'kimi-code/k3',
-  opencode: 'anthropic/claude-sonnet-4-5',
+  opencode: 'opencode-go/deepseek-v4-flash',
   omni_agent: 'qwen3.6-plus',
   controller: 'opus',
 };

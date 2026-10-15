@@ -1,0 +1,180 @@
+# [OMNI] origin=codex domain=services/_core/material_wiki ts=2026-08-02T00:00:00+08:00 type=data status=active
+# [OMNI] summary="材料 Wiki profile、本体写入、投影、HTTP 与 StudioReader Wiki 交互的功能点测试台账"
+# [OMNI] material_id="material:core.material_wiki.testmap.yaml"
+app: omnicompany-material-wiki
+doc: ../../../../../../docs/plans/format-material/[2026-08-02]MATERIAL-WIKI-FULL-FACILITY/plan.md
+gates:
+  - id: unit
+    cmd: python -m pytest tests/services/material_wiki tests/cli/test_material_wiki_command.py tests/dashboard/test_material_wiki_routes.py -q
+    cwd: ../../../../../..
+
+features:
+  - id: material_wiki.profile_contract
+    what: 通用合同与项目 profile 分离，Vilo 四层十一类直接读取故事 Wiki 权威页。
+    should:
+      - 平台 profile 名录只存权威指针，不复制项目 taxonomy
+      - Vilo 固定层和一级类型不能由平台或 Agent 扩展
+      - 允许项目声明的动态子级；Vilo 动态分支不限制深度，但不能新增固定层或一级类型
+    tests:
+      - file: ../../../../../../tests/services/material_wiki/test_schema.py
+        cases:
+          - test_vilo_profile_is_four_layers_and_eleven_primary_types
+          - test_vilo_wiki_table_and_machine_profile_match
+          - test_locked_vilo_layers_and_primary_types_reject_unknown_values
+          - test_vilo_allows_arbitrarily_deep_tree_below_opted_in_primary
+          - test_three_project_profiles_resolve_without_vilo_taxonomy_leaking
+    status: covered
+
+  - id: material_wiki.canonical_markdown_mutations
+    what: create/revise/derive/supersede/reject/restore/link 全部先修改一个 canonical Markdown 条目。
+    should:
+      - 一个 material_id 只有一个稳定本体文件，历史版本保留在同一条目
+      - 每个版本和操作都保存来源、作者会话、状态与关系
+      - reject 回退上一有效版本，restore 可恢复且均保留操作记录
+    tests:
+      - file: ../../../../../../tests/services/material_wiki/test_service.py
+        cases:
+          - test_create_writes_one_canonical_markdown_and_replays_idempotently
+          - test_revise_preserves_history_and_reject_restore_are_traceable
+          - test_derive_supersede_and_link_preserve_explicit_relations
+          - test_status_and_link_mutations_require_sources
+    status: covered
+
+  - id: material_wiki.atomic_idempotent_concurrent_write
+    what: 本体写入原子、幂等并带 expected_version 并发保护。
+    should:
+      - dry-run 不创建目录或文件
+      - 原子替换失败时旧本体保持完整且不残留临时文件
+      - stale expected_version 明确冲突，不静默覆盖
+      - 同一幂等键重放返回原回执，不产生第二版本
+    tests:
+      - file: ../../../../../../tests/services/material_wiki/test_service.py
+        cases:
+          - test_dry_run_does_not_create_files
+          - test_atomic_replace_failure_leaves_previous_body_intact
+          - test_stale_expected_version_cannot_silently_overwrite
+          - test_idempotent_retry_wins_over_stale_expected_version
+    status: covered
+
+  - id: material_wiki.cli_contract
+    what: 人和 Agent 共用 omni material wiki 命令面，不直接改投影数据库。
+    should:
+      - CLI 暴露 create/revise/derive/supersede/reject/restore/link/get
+      - mutation 强制 source 与 idempotency_key
+      - 成功返回 material_id、version、status 与 canonical_ref
+    tests:
+      - file: ../../../../../../tests/cli/test_material_wiki_command.py
+        cases:
+          - test_material_wiki_cli_create_and_get
+          - test_material_wiki_cli_requires_source
+    status: covered
+
+  - id: material_wiki.replayable_projections
+    what: 本体 mutation 通过持久 outbox 派生 ID 索引、FactoryEvent 与语义检索，失败可重放。
+    should:
+      - 本体成功后才建立投影；投影失败在回执中显式 pending
+      - 同一幂等键重放只补失败投影，已成功投影不重复执行
+      - 默认写入和重建不生成 ReviewStage 文件；只有明确提交审阅时才建立审阅记录
+      - 显式 ReviewStage 集成只保存 canonical 文件指针和版本元数据，不复制正文
+      - 语义检索在 embedding 服务不可用时仍可使用确定性 lexical 投影
+      - 可从空派生目录按 canonical 版本重建三个默认投影，既有成功 outbox 不阻止显式 rebuild
+    tests:
+      - file: ../../../../../../tests/services/material_wiki/test_projections_and_reports.py
+        cases:
+          - test_projection_outbox_retries_only_pending_projectors
+          - test_rebuild_forces_successful_projectors_from_canonical_versions
+          - test_empty_derived_facility_rebuilds_all_default_views_from_canonical_body
+          - test_reviewstage_projection_points_to_canonical_file_without_body_copy
+          - test_semantic_projection_is_searchable_without_embedding_service
+      - file: ../../../../../../tests/cli/test_material_wiki_command.py
+        cases:
+          - test_material_wiki_cli_create_and_get
+    status: covered
+
+  - id: material_wiki.report_refs_are_views
+    what: 报告只持有 latest 或 fixed material_ref，渲染时读取本体，说明文字明确标为非材料。
+    should:
+      - latest 引用随当前有效版本更新
+      - fixed 引用始终渲染指定历史版本
+      - 报告数据不保存独立正文副本
+      - 报告段落可先经统一入口归位并得到 replacement material_ref
+    tests:
+      - file: ../../../../../../tests/services/material_wiki/test_projections_and_reports.py
+        cases:
+          - test_report_latest_updates_while_fixed_reference_stays_on_original
+      - file: ../../../../../../tests/dashboard/test_material_wiki_routes.py
+        cases:
+          - test_report_materialize_render_and_projection_rebuild
+    status: covered
+
+  - id: material_wiki.http_canonical_surface
+    what: HTTP 的 profile、列表、正文、历史、关系与 mutation 全部委托 MaterialWikiRuntime 和唯一 Service。
+    should:
+      - 三个项目 profile 均可从各自权威源加载
+      - 列表支持状态、未审批、终态和正文查询筛选
+      - stale expected_version 返回 409，不静默覆盖
+      - 单条和批量归档均有回执，且可恢复
+      - 报告归位/渲染与全项目投影重建仍委托同一 runtime
+    tests:
+      - file: ../../../../../../tests/dashboard/test_material_wiki_routes.py
+        cases:
+          - test_profile_create_list_history_relation_and_conflict
+          - test_recoverable_archive_restore_and_batch_receipts
+          - test_report_materialize_render_and_projection_rebuild
+    status: covered
+
+  - id: material_wiki.studio_reader_surface
+    what: StudioReader 默认呈现 canonical Wiki，并保留 ReviewStage 作为明确的审阅投影视图。
+    should:
+      - 按 profile 位置浏览任意深度树，每层可收起，文档可拥有子文档
+      - 默认页面不展示报告说明、来源堆叠和技术标识；技术信息从更多菜单按需查看
+      - 左栏可调整宽度，筛选使用下拉多选，目录变化由服务端自动推送
+      - 新建和修订只通过 canonical HTTP API
+      - 只看未审批和批量可恢复归档使用真实回执
+      - 批量归档先预览数量与标题并二次确认，报告引用可直接复制
+    tests:
+      - file: ../../../../../../src/omnicompany/dashboard/frontend/src/entities/studio_reader/MaterialWikiPanel.test.tsx
+        cases:
+          - 先显示真实加载态，不把未返回的数据误报为空
+          - 显示任意深度目录和正文，报告说明与技术追溯不进入默认页面
+          - 长材料提供粘性文内目录，不必从头滚动查找章节
+          - 目录每一层都可以独立收起
+          - 可切换历史比较，并把未审批筛选交给 canonical API
+          - 分页继续读取，而不是一次传输所有版本正文
+          - 新建材料保留专有名词并接受任意深度下级路径
+          - 批量归档先预览影响，再调用可恢复归档接口
+      - file: ../../../../../../src/omnicompany/dashboard/frontend/src/utils/clipboard.test.ts
+        cases:
+          - 在浏览器支持读回时只把完全一致的内容算作成功
+          - 在安全剪贴板接口不可用时验证传统复制返回值
+    status: covered
+
+  - id: material_wiki.multi_project_end_to_end
+    what: Vilo、Walker 与 Bilibili Publish 共用一套身份/版本/来源/引用合同，但各自读取独立 profile 并完整走到报告渲染。
+    should:
+      - 三项目均能以真实 profile 创建、修订并渲染 latest/fixed 报告引用
+      - Walker 与 Bilibili 的 placement 不得出现 Vilo 固定层名
+      - 项目名录决定 canonical prefix，不由调用方复制路径规则
+    tests:
+      - file: ../../../../../../tests/services/material_wiki/test_three_project_e2e.py
+        cases:
+          - test_real_project_profiles_share_one_contract_through_report_embedding
+    status: covered
+
+  - id: material_wiki.inventory_and_migration
+    what: 存量逐文件盘点；结构化集合可逐记录保留认可状态，迁移支持 dry-run、幂等重跑与可恢复回滚。
+    should:
+      - 范围内每个源文件都有明确处置，不能用 unclassified 隐藏遗漏
+      - JSON 集合逐记录建立稳定身份，rejected 不会因容器中还有暂行内容而复活
+      - migrate 必须声明位置、状态和状态证据
+      - 保存后的逐文件清单必须在真实写入前重新验算源字节与规则，发生漂移立即停止
+      - dry-run 不写本体，同批重跑新增数为零，receipt 可回滚本批新建条目
+      - 长批次逐条 fsync 追加 journal；中途终止后可恢复完整回滚范围
+    tests:
+      - file: ../../../../../../tests/services/material_wiki/test_migration.py
+        cases:
+          - test_inventory_assigns_every_scoped_file_one_disposition
+          - test_dry_run_idempotent_apply_and_recoverable_rollback
+          - test_json_records_keep_per_record_status_and_identity
+          - test_saved_inventory_fences_source_drift_before_apply
+    status: covered

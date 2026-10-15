@@ -38,6 +38,15 @@ _TARGET_GLOBS: dict[str, tuple[str, ...]] = {
 _SKIP_DIR_PARTS = ("_archive", "_graveyard", "__pycache__")
 
 
+def _is_retired_project_index(path: Path) -> bool:
+    """退役墓碑保留寻址，但不进入活跃文档发现与自动补漏。"""
+    try:
+        head = path.read_text(encoding="utf-8", errors="replace")[:4096]
+    except OSError:
+        return False
+    return bool(re.search(r"(?m)^status:\s*['\"]?retired['\"]?\s*$", head))
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -60,6 +69,8 @@ def discover_targets(kinds: tuple[str, ...] | None = None, root: Path | None = N
                 if not p.is_file():
                     continue
                 if any(part in _SKIP_DIR_PARTS for part in p.parts):
+                    continue
+                if kind == "project_index" and _is_retired_project_index(p):
                     continue
                 if p in seen:
                     continue

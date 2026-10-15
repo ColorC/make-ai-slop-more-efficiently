@@ -1,10 +1,19 @@
+/* ============================================================
+   overlay_file(Agent 暂存区文件页)· 蓝图 G 形态(2026-08-06)。
+   此前颜色走 token 但形态仍是通用文件浏览器: 柔光玻璃页头 / 素行 / 实底筛选框 /
+   11px 破字阶地板 / PDF 底写死 #202124。这轮统一到既有语汇:
+   chrome 透网格、文件名衬线、筛选=虚线测量件+黄铜焦点环、行=厚框纸件、
+   PDF 与 CLI 共用黑玻璃观察窗底。
+   ============================================================ */
+
 .ov-file-page {
   height: 100%;
   min-width: 0;
   display: flex;
   flex-direction: column;
   color: var(--fp-text);
-  background: var(--fp-bg);
+  /* 页面根容器按 G.7 透出 #bp-grid 全局格纸, 不自铺也不上纯底色 */
+  background: transparent;
 }
 
 .ov-file-header {
@@ -13,8 +22,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--fp-border);
-  background: var(--fp-glass-1);
+  border-bottom: 1px solid var(--fp-border-subtle);
+  /* chrome 区透出 #bp-grid 统一网格(G.7 波四: 全 app 只有那一张格纸) */
+  background: transparent;
   box-sizing: border-box;
 }
 
@@ -41,15 +51,19 @@
   white-space: nowrap;
 }
 
+/* 文件名走衬线 display 栈, 与项目板卡名/multiagent 行标题同一档 */
 .ov-file-identity strong {
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--fp-fs-2);
+  font-weight: 500;
+  font-family: var(--fp-bp-font-display);
 }
 
+/* 11px 破了 G 的 12px 功能文字地板(只有 chrome 区 aria-hidden 的刻度类可豁免) */
 .ov-file-identity span {
   color: var(--fp-text-3);
   font-family: var(--fp-font-mono);
-  font-size: 11px;
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
 }
 
 .ov-file-meta {
@@ -57,7 +71,8 @@
   min-width: 0;
   color: var(--fp-text-3);
   font-family: var(--fp-font-mono);
-  font-size: 11px;
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -71,7 +86,7 @@
   min-height: 29px;
   padding: 5px 9px;
   border: 1px solid var(--fp-border);
-  border-radius: 4px;
+  border-radius: 3px;
   background: transparent;
   color: var(--fp-text-2);
   font-size: 12px;
@@ -112,7 +127,7 @@
   gap: 12px;
   border-bottom: 1px solid var(--fp-border);
   color: var(--fp-text-3);
-  font-size: 11px;
+  font-size: var(--fp-fs-4);
 }
 
 .ov-file-filter {
@@ -121,14 +136,18 @@
   align-items: center;
   gap: 7px;
   padding: 5px 8px;
-  border: 1px solid var(--fp-border);
-  border-radius: 4px;
+  /* 输入/筛选件 = 虚线测量件(G 口径), 聚焦转实线 + 黄铜环 —— 与 .v2-search / .bps-btn 同手感 */
+  border: 1px dashed var(--fp-border);
+  border-radius: var(--fp-bp-r1);
   color: var(--fp-text-3);
-  background: var(--fp-bg-2);
+  background: transparent;
+  transition: border-color var(--fp-t-fast), box-shadow var(--fp-t-fast);
 }
 
 .ov-file-filter:focus-within {
-  border-color: var(--fp-border-strong);
+  border-style: solid;
+  border-color: var(--fp-bp-brass);
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft);
   color: var(--fp-text-2);
 }
 
@@ -259,7 +278,12 @@
   min-height: 0;
   flex: 1;
   border: 0;
-  background: #202124;
+  /* 2026-08-06: 原本写死 #202124(既不是蓝图也不是黑玻璃)。PDF 与 CLI 同属"嵌在图板上的
+     深色观察窗", 统一走终端那套黑玻璃底; iframe 里是外部内容, 只给窗框不干预内容。 */
+  background: var(--fp-term-bg-solid);
+  box-shadow:
+    inset 0 0 0 1px var(--fp-term-edge),
+    inset 0 0 28px var(--fp-term-glow);
 }
 
 .ov-file-unpreviewable {

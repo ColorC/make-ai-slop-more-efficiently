@@ -275,6 +275,7 @@ class ModelRegistry:
     #   gemini-embedding-2    0.20 / 0.00    embedding
     #   gemini-embedding-001  0.15 / 0.00    embedding
     #   deepseek-v4-flash     0.14 / 0.29    ultra-cheap
+    #   deepseek-v4.1-flash   0.14 / 0.29?   ultra-cheap, 推理型; 价格待官方表确认
     #   text-embedding-3-large 0.13 / 0.00   embedding
     #   qwen-flash            0.02 / 0.21    ultra-cheap
     _MODELS: dict[str, dict[str, str]] = {
@@ -292,13 +293,21 @@ class ModelRegistry:
         "gpt-5.5":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gpt-5.5-expensive":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gpt-5.6-terra":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.6-sol":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-6.1-sol":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-6-sol":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-6-luna":           {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "claude-sonnet-5-5":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # standard tier (glm / kimi / qwen-max)
         "glm-5":                {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "glm-5.1":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "glm-5.2":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "glm-5.3":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "glm-5.3-flash":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "kimi-k2.5":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "kimi-k2.6":            {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "kimi-k2.7-code":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "kimi-k3":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # Kimi Code direct endpoint. Keep these IDs separate from the the_company
         # aliases above so a caller can explicitly choose its credential path.
         "k3":                    {"base_url": _KIMI_URL, "key_env": "KIMI_API_KEY"},
@@ -310,20 +319,30 @@ class ModelRegistry:
         "qwen3.6-max-preview":  {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "qwen3.6-plus":         {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # cheap / fast tier (deepseek / qwen-flash)
+        "deepseek-flash":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "deepseek-v3-2-251201": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "deepseek-v4-flash":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "deepseek-v4.1-flash":  {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "deepseek-v4-pro":      {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gpt-5.6-luna":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "qwen3.5-flash":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "qwen-flash":           {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "qwen3.8-max":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # vision tier
         "qwen3-vl-flash":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.1":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-4-argon":               {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3-flash-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.5-flash":             {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.1-flash-lite":        {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.7-flash":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.8-flash":              {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.1-flash-lite-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.1-pro-preview":       {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         # image / embedding（非对话, 计价用; role 一般不选）
         "gpt-image-2":                   {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3-pro-image":             {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
+        "gemini-3.1-flash-image":         {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3-pro-image-preview":    {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-3.1-flash-image-preview": {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
         "gemini-embedding-001":          {"base_url": _THE_COMPANY_URL, "key_env": "THE_COMPANY_API_KEY"},
@@ -646,6 +665,53 @@ class _UnifiedUsage:
     cache_creation_input_tokens: int = 0
 
 
+def _usage_int(container: Any, name: str) -> int:
+    """Read one integer usage field from SDK objects or raw dictionaries."""
+    if container is None:
+        return 0
+    value = container.get(name, 0) if isinstance(container, dict) else getattr(container, name, 0)
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _openai_usage_to_unified(usage: Any) -> _UnifiedUsage:
+    """Normalize OpenAI-compatible cache counters without double billing.
+
+    OpenAI reports cached prompt tokens inside ``prompt_tokens`` and exposes the
+    green cache counter as ``prompt_tokens_details.cached_tokens``. DeepSeek-
+    compatible providers commonly use ``prompt_cache_hit_tokens`` /
+    ``prompt_cache_miss_tokens`` instead. the_company can proxy either shape, so the
+    unified meter accepts both and keeps ``input_tokens`` as the non-cached
+    remainder, matching the existing Anthropic cache accounting contract.
+    """
+    prompt_total = _usage_int(usage, "prompt_tokens") or _usage_int(usage, "input_tokens")
+    output_tokens = _usage_int(usage, "completion_tokens") or _usage_int(usage, "output_tokens")
+    details = (
+        usage.get("prompt_tokens_details")
+        if isinstance(usage, dict)
+        else getattr(usage, "prompt_tokens_details", None)
+    )
+    cache_read = (
+        _usage_int(usage, "cache_read_input_tokens")
+        or _usage_int(usage, "prompt_cache_hit_tokens")
+        or _usage_int(details, "cached_tokens")
+    )
+    cache_creation = (
+        _usage_int(usage, "cache_creation_input_tokens")
+        or _usage_int(usage, "prompt_cache_creation_tokens")
+    )
+    cache_miss = _usage_int(usage, "prompt_cache_miss_tokens")
+    normal_input = cache_miss if cache_miss else max(0, prompt_total - cache_read - cache_creation)
+    return _UnifiedUsage(
+        input_tokens=normal_input,
+        output_tokens=output_tokens,
+        cache_read_input_tokens=cache_read,
+        cache_creation_input_tokens=cache_creation,
+    )
+
+
 @dataclass
 class _UnifiedResponse:
     """Mimics anthropic.types.Message so downstream code works unchanged."""
@@ -658,10 +724,14 @@ class _UnifiedResponse:
 
 # ── LLM 计量设施 ──
 
-# 每百万 token 价格（美元），来源: the_company 聚合 API 定价 (2026-04-07)
+# 每百万 token 价格（美元），来源: the_company 聚合 API 当前价目表。
+# Keep model IDs unprefixed here; callers may pass ``the_company/<model>`` and are
+# normalized by ``_estimate_cost`` below.
 _MODEL_PRICING: dict[str, tuple[float, float]] = {
     # (input_per_M, output_per_M)
     # ── ★2026-06-23 用户同步最新价目表（权威）──
+    "claude-haiku-4-5@20251001": (1.00, 5.00),
+    "claude-haiku-4-5-20251001": (1.00, 5.00),
     "gpt-5.5-expensive":         (5.00,  30.00),
     "gpt-image-2":               (5.00,  10.00),
     "gemini-3-pro-image-preview": (2.00, 12.00),
@@ -670,13 +740,22 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "qwen3.7-max":               (1.71,  5.14),
     "gemini-3.5-flash":          (1.50,  9.00),
     "glm-5.2":                   (1.14,  4.00),
-    "claude-haiku-4-5-20251001": (1.00,  5.00),
-    "claude-haiku-4-5@20251001": (1.00,  5.00),
+    "gpt-5.6-sol":               (0.50,  3.00),
+    "gpt-6.1-sol":               (2.00, 10.00),
+    "claude-sonnet-5-5":         (2.00, 10.00),
+    "gpt-5.6-terra":             (0.20,  1.20),
+    "gpt-5.6-luna":              (0.02,  0.12),
     "kimi-k2.6":                 (0.93,  3.86),
     "kimi-k2.7-code":            (0.93,  3.86),
+    "kimi-k3":                   (2.86, 14.29),
     "glm-5.1":                   (0.86,  3.43),
     "gemini-3-flash-preview":    (0.50,  3.00),
+    "gemini-3.1-flash-lite":     (0.25,  1.50),
+    "gemini-3.1-flash-lite-preview": (0.25, 1.50),
+    "gemini-3.7-flash":          (0.75,  3.75),
+    "gemini-3-pro-image":        (2.00, 12.00),
     "gemini-3.1-flash-image-preview": (0.50, 3.00),
+    "gemini-3.1-flash-image":    (0.50,  3.00),
     "gpt-5.5":                   (0.50,  3.00),   # ★本轮自建 agent 主力
     "deepseek-v4-pro":           (0.43,  0.86),
     "qwen3-max":                 (0.36,  1.43),
@@ -685,8 +764,13 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "gemini-embedding-2":        (0.20,  0.00),
     "gemini-embedding-001":      (0.15,  0.00),
     "deepseek-v4-flash":         (0.14,  0.29),
+    # 2026-09-19 用户指定为会话摘要/伴随会话默认模型。the_company /v1/models 列出该型号且
+    # 实测可调用, 但代理未暴露价格字段, 官方价目表也还没同步这一行, 故先按同族
+    # deepseek-v4-flash 记价; 拿到正式价目后请覆盖, 别当成已核实数字用。
+    "deepseek-v4.1-flash":       (0.14,  0.29),  # 待官方价目表确认
     "text-embedding-3-large":    (0.13,  0.00),
     "qwen-flash":                (0.02,  0.21),
+    "qwen3.8-max":               (1.71,  5.14),
     # ── 旧型号（不在最新表内, 留旧价供历史/fallback 调用估算）──
     "claude-opus-4-6":           (5.00,  25.00),
     "claude-sonnet-4-6":         (3.00,  15.00),
@@ -950,7 +1034,14 @@ def _estimate_cost(
       - cache_read_input_tokens: ~10% normal input price (Anthropic 标准)
       - cache_creation_input_tokens: ~125% normal input price (一次性写入溢价)
     """
-    pricing = _MODEL_PRICING.get(model)
+    # Meter records can carry an OpenAI-compatible provider prefix while the
+    # catalog stores the billing model ID (for example ``the_company/gpt-5.6-sol``).
+    # Normalize only the prefix; model names themselves remain case-sensitive
+    # in the catalog and unknown IDs still use the explicit fallback below.
+    model_id = str(model or "").strip()
+    if "/" in model_id:
+        model_id = model_id.rsplit("/", 1)[-1]
+    pricing = _MODEL_PRICING.get(model_id)
     if not pricing:
         # 未知模型按中等价格估算
         return (
@@ -1811,10 +1902,7 @@ class LLMClient:
 
                     # 提取 usage（流式在最后一个 chunk 返回，需 stream_options.include_usage）
                     if hasattr(chunk, "usage") and chunk.usage:
-                        stream_usage = _UnifiedUsage(
-                            input_tokens=getattr(chunk.usage, "prompt_tokens", 0) or 0,
-                            output_tokens=getattr(chunk.usage, "completion_tokens", 0) or 0,
-                        )
+                        stream_usage = _openai_usage_to_unified(chunk.usage)
 
                     # 文本内容
                     if delta and delta.content:

@@ -1,29 +1,68 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
-import { ccChatApi, type CcChatSessionMeta } from '../../api/ccChatClient'
-import NativeChatPanel from '../cc_session/NativeChatPanel'
+import React, { useCallback, useState } from 'react'
+import { Play } from 'lucide-react'
+import {
+  ccApi,
+  ASSISTANT_TOPIC,
+  rememberAssistantSession,
+  rememberedAssistantSession,
+  type CcSessionMeta,
+} from '../../api/ccClient'
+import Editor from '../cc_session/Editor'
+import type { CcSessionEntity } from '../cc_session'
+
+function toEntity(meta: CcSessionMeta): CcSessionEntity {
+  return {
+    type: 'cc_session',
+    kind: 'pty',
+    id: meta.id,
+    title: `assistant · ${meta.id.slice(0, 8)}`,
+    cwd: meta.cwd,
+    alive: meta.alive,
+    status: meta.status || 'alive',
+    cmd: meta.cmd,
+    startedAt: meta.started_at,
+    claudeSessionId: meta.claude_session_id || null,
+    providerSessionId: meta.provider_session_id || null,
+    providerTitle: meta.provider_title || null,
+    activePlan: meta.active_plan || null,
+    provider: meta.provider || 'codex',
+    topic: meta.topic || ASSISTANT_TOPIC,
+    tags: ['assistant', 'agent-worker', 'cli'],
+  }
+}
 
 /**
- * 总控固定入口：复用最近一个仍存活的 controller session；没有时原地创建。
- * 这保证“打开总控”永远落到真实会话，而不是落点卡或另一个站点。
+ * 总控实体内的对话视图 —— 与「会话」页的 assistant 按钮同源: 都是 assistant
+ * 会话(机主的会话与材料管家, 模型由后端 assistant 阶梯选择)。
+ * 已有活着的 assistant 会话就直接接上, 没有才新建。
  */
 export default function ControllerChat() {
-  const [session, setSession] = useState<CcChatSessionMeta | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [session, setSession] = useState<CcSessionMeta | null>(null)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const ensureSession = useCallback(async (forceNew = false) => {
+  const startSession = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      let found: CcChatSessionMeta | undefined
-      if (!forceNew) {
-        const sessions = await ccChatApi.list({ limit: 100, includeArchived: false })
-        found = sessions
-          .filter((item) => item.provider === 'controller' && item.alive)
-          .sort((a, b) => b.started_at - a.started_at)[0]
+      const remembered = rememberedAssistantSession()
+      const sessions = await ccApi.list({ includeRecoverable: false })
+      const live = sessions.find((item) => (
+        item.alive && remembered !== null && item.id === remembered
+      )) ?? sessions.find((item) => item.alive && item.topic === ASSISTANT_TOPIC)
+      let next = live
+      if (!next) {
+        const assistant = (await ccApi.agentWorkerCatalog()).assistant
+        next = await ccApi.createAgentWorker({
+          provider: assistant.provider,
+          model: assistant.model || undefined,
+          effort: assistant.effort || undefined,
+          topic: ASSISTANT_TOPIC,
+          visibility: 'hidden',
+        })
       }
-      setSession(found || await ccChatApi.create({ provider: 'controller' }))
+      rememberAssistantSession(next.id)
+      setSession(next)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -31,29 +70,23 @@ export default function ControllerChat() {
     }
   }, [])
 
-  useEffect(() => { void ensureSession(false) }, [ensureSession])
+  if (session) return <Editor entity={toEntity(session)} />
 
-  if (session) {
-    return (
-      <NativeChatPanel
-        key={session.id}
-        sessionId={session.id}
-        initialMeta={session}
-        title="总控对话"
-        onNewSession={() => ensureSession(true)}
-      />
-    )
-  }
   return (
-    <div className="cs-handoff" data-testid="controller-chat-loading">
+    <div className="cs-handoff" data-testid="controller-cli-idle">
       <div className="cs-handoff-card">
-        <div className="cs-handoff-title">{loading ? '正在连接总控…' : '总控会话暂不可用'}</div>
+        <div className="cs-handoff-title">{loading ? '正在启动 assistant…' : 'assistant 未启动'}</div>
+        {!loading && !error && <div className="cs-handoff-desc">会话与材料管家：搜索、整理、管理所有会话与札记。需要时手动启动。</div>}
         {error && <div className="cs-handoff-desc">{error}</div>}
-        {!loading && (
-          <button type="button" className="cs-openbtn" onClick={() => { void ensureSession(false) }}>
-            <RefreshCw size={14} />重试
-          </button>
-        )}
+        <button
+          type="button"
+          className="cs-openbtn"
+          data-testid="controller-cli-start"
+          disabled={loading}
+          onClick={() => { void startSession() }}
+        >
+          <Play size={14} />{error ? '重试启动' : '启动 assistant'}
+        </button>
       </div>
     </div>
   )

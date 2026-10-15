@@ -1,0 +1,586 @@
+{
+  "$defs": {
+    "EvidenceReferenceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Ids",
+          "type": "array"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Run Ids",
+          "type": "array"
+        },
+        "evidence_step_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Step Ids",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        },
+        "schema": {
+          "const": "game-observatory.ai-player.evidence-reference.v1",
+          "default": "game-observatory.ai-player.evidence-reference.v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "trace_run_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Run Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment_id"
+      ],
+      "title": "EvidenceReferenceV1",
+      "type": "object"
+    },
+    "ExecutionAttemptV1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "effective"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "business_change": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "business_state_changed": {
+                "const": true
+              },
+              "evidence_refs": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "business_state_changed",
+              "business_change",
+              "evidence_refs"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "rejected"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "business_state_changed": {
+                "const": false
+              },
+              "rejection_category": {
+                "type": "string"
+              },
+              "rejection_reason": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "rejection_category",
+              "rejection_reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "failure_reason": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "failure_reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "telemetry_event_ids": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "telemetry_event_ids"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "telemetry_event_ids"
+                }
+              }
+            },
+            "required": [
+              "canonical_source_gaps"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "telemetry_event_ids"
+                }
+              }
+            },
+            "required": [
+              "canonical_source_gaps"
+            ]
+          },
+          "then": {
+            "properties": {
+              "telemetry_event_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "execution_receipt_kind": {
+                "const": "route_execution"
+              },
+              "route_result_ids": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "execution_receipt_kind",
+              "route_result_ids"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "route_result_ids"
+                }
+              }
+            },
+            "required": [
+              "canonical_source_gaps"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "canonical_source_gaps": {
+                "contains": {
+                  "const": "route_result_ids"
+                }
+              },
+              "execution_receipt_kind": {
+                "const": "route_execution"
+              }
+            },
+            "required": [
+              "execution_receipt_kind",
+              "canonical_source_gaps"
+            ]
+          },
+          "then": {
+            "properties": {
+              "route_result_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "execution_receipt_kind": {
+                "const": "single_action_execution"
+              }
+            },
+            "required": [
+              "execution_receipt_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "canonical_source_gaps": {
+                "not": {
+                  "contains": {
+                    "const": "route_result_ids"
+                  }
+                }
+              },
+              "route_result_ids": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "action_kind": {
+          "minLength": 1,
+          "title": "Action Kind",
+          "type": "string"
+        },
+        "business_change": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Business Change"
+        },
+        "business_state_changed": {
+          "title": "Business State Changed",
+          "type": "boolean"
+        },
+        "canonical_source_gaps": {
+          "items": {
+            "enum": [
+              "telemetry_event_ids",
+              "route_result_ids"
+            ],
+            "type": "string"
+          },
+          "title": "Canonical Source Gaps",
+          "type": "array"
+        },
+        "ended_at": {
+          "format": "date-time",
+          "title": "Ended At",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/EvidenceReferenceV1"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "execution_receipt_kind": {
+          "default": "route_execution",
+          "enum": [
+            "route_execution",
+            "single_action_execution"
+          ],
+          "title": "Execution Receipt Kind",
+          "type": "string"
+        },
+        "expectation_met": {
+          "title": "Expectation Met",
+          "type": "boolean"
+        },
+        "failure_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Reason"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "observed_detail": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed Detail"
+        },
+        "outcome": {
+          "enum": [
+            "effective",
+            "no_change",
+            "rejected",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "planned_action_id": {
+          "minLength": 1,
+          "title": "Planned Action Id",
+          "type": "string"
+        },
+        "rejection_category": {
+          "anyOf": [
+            {
+              "enum": [
+                "source_guard",
+                "budget",
+                "lease",
+                "policy",
+                "state",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Category"
+        },
+        "rejection_reason": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Reason"
+        },
+        "route_id": {
+          "minLength": 1,
+          "title": "Route Id",
+          "type": "string"
+        },
+        "route_result_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Route Result Ids",
+          "type": "array"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "telemetry_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Telemetry Event Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "sequence",
+        "environment_id",
+        "session_id",
+        "route_id",
+        "planned_action_id",
+        "action_kind",
+        "started_at",
+        "ended_at",
+        "outcome",
+        "expectation_met",
+        "business_state_changed",
+        "evidence_refs"
+      ],
+      "title": "ExecutionAttemptV1",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "items": {
+        "$ref": "#/$defs/ExecutionAttemptV1"
+      },
+      "minItems": 1,
+      "title": "Attempts",
+      "type": "array"
+    },
+    "benchmark_eligible": {
+      "title": "Benchmark Eligible",
+      "type": "boolean"
+    },
+    "benchmark_exclusion_reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Benchmark Exclusion Reason"
+    },
+    "conflicting_assessment_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Conflicting Assessment Ids",
+      "type": "array"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "game_id": {
+      "minLength": 1,
+      "title": "Game Id",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "prediction_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Prediction Ids",
+      "type": "array"
+    },
+    "purpose": {
+      "minLength": 1,
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema": {
+      "const": "game-observatory.execution-attempt-log.v1",
+      "default": "game-observatory.execution-attempt-log.v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "game_id",
+    "environment_id",
+    "session_id",
+    "purpose",
+    "benchmark_eligible",
+    "attempts",
+    "updated_at"
+  ],
+  "title": "ExecutionAttemptLogV1",
+  "type": "object"
+}

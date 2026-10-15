@@ -3,7 +3,7 @@
 """Guardian 规则 — 自定义 LLM 调用反模式 (OMNI-094, 2026-06-21 用户立).
 
 立档背景 (2026-06-21):
-  写 poof 总控派发路由器时, 我 (Claude Code) 直接 `subprocess.run(["claude","-p",...])` 调本机
+  写历史总控派发路由器时, 我 (Claude Code) 直接 `subprocess.run(["claude","-p",...])` 调本机
   claude code 做归类 —— 这是"自定义 LLM 调用", 绕过了 Omnicompany 的标准 worker 抽象。
   用户裁决: "请使用标准实现, 不要在 Omnicompany 里面出现自定义 LLM 调用, 自动解析对话内容的
   程序也必须是 team 或者 worker。这一点也要加入 guardian 守则。"

@@ -1,0 +1,632 @@
+{
+  "schema_version": 1,
+  "revision": "2026-09-23",
+  "digest": "f054d6be755d638d32754924aa2efffe9d9f04e9909c8e1a77389d6d196eda2c",
+  "providers": [
+    {
+      "id": "codex",
+      "family": "codex",
+      "status": "active",
+      "label": "Codex",
+      "catalog_label": "Codex CLI（official 1）",
+      "aliases": [
+        "codex_cli",
+        "codex_official",
+        "codex_official_1"
+      ],
+      "executables": [
+        "codex"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": {
+        "env_var": "CODEX_HOME",
+        "role": "primary",
+        "profile_id": null,
+        "override_env": "CODEX_HOME",
+        "dir_name": ".codex"
+      },
+      "agent": "codex",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal",
+        "native-chat"
+      ],
+      "native_chat": "experimental",
+      "resume_strategy": "provider-session",
+      "native_trace": true,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "codex_2",
+      "family": "codex",
+      "status": "retired",
+      "label": "Codex 2",
+      "catalog_label": "Codex CLI（official 2）",
+      "aliases": [
+        "codex_official_2",
+        "codex2"
+      ],
+      "executables": [
+        "codex"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": {
+        "env_var": "CODEX_HOME",
+        "role": "secondary",
+        "profile_id": "omnicompany-secondary",
+        "override_env": "OMNI_CODEX_2_HOME",
+        "dir_name": ".codex-2"
+      },
+      "agent": "codex",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal",
+        "native-chat"
+      ],
+      "native_chat": "experimental",
+      "resume_strategy": "provider-session",
+      "native_trace": true,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "codex_the_company",
+      "family": "codex",
+      "status": "active",
+      "label": "Codex the_company",
+      "catalog_label": "Codex CLI（the_company API）",
+      "aliases": [],
+      "executables": [
+        "codex"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": "deepseek-v4.1-flash",
+      "default_effort": null,
+      "pins_model_on_argv": true,
+      "cli_overrides": [
+        [
+          "-c",
+          "model_provider=\"the_company\""
+        ],
+        [
+          "-c",
+          "model_providers.the_company.name=\"the_company proxy\""
+        ],
+        [
+          "-c",
+          "model_providers.the_company.base_url=\"https://internal-llm-proxy.example.com/v1\""
+        ],
+        [
+          "-c",
+          "model_providers.the_company.env_key=\"THE_COMPANY_API_KEY\""
+        ],
+        [
+          "-c",
+          "model_providers.the_company.wire_api=\"responses\""
+        ],
+        [
+          "-c",
+          "model_providers.the_company.supports_websockets=false"
+        ]
+      ],
+      "api_key_env": "THE_COMPANY_API_KEY",
+      "account_home": {
+        "env_var": "CODEX_HOME",
+        "role": "primary",
+        "profile_id": null,
+        "override_env": "CODEX_HOME",
+        "dir_name": ".codex"
+      },
+      "agent": "codex",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal",
+        "native-chat"
+      ],
+      "native_chat": "experimental",
+      "resume_strategy": "provider-session",
+      "native_trace": true,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "codex_glm",
+      "family": "codex",
+      "status": "active",
+      "label": "Codex GLM",
+      "catalog_label": "Codex CLI（GLM Coding Plan）",
+      "aliases": [
+        "codex_zai",
+        "glm_coding_plan"
+      ],
+      "executables": [
+        "codex"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": "glm-5.3",
+      "default_effort": null,
+      "pins_model_on_argv": true,
+      "cli_overrides": [
+        [
+          "-c",
+          "model_provider=\"zai\""
+        ],
+        [
+          "-c",
+          "model_providers.zai.name=\"GLM Coding Plan\""
+        ],
+        [
+          "-c",
+          "model_providers.zai.base_url=\"https://api.z.ai/api/v1\""
+        ],
+        [
+          "-c",
+          "model_providers.zai.env_key=\"ZAI_API_KEY\""
+        ],
+        [
+          "-c",
+          "model_providers.zai.wire_api=\"responses\""
+        ],
+        [
+          "-c",
+          "model_providers.zai.supports_websockets=false"
+        ]
+      ],
+      "api_key_env": "ZAI_API_KEY",
+      "account_home": {
+        "env_var": "CODEX_HOME",
+        "role": "primary",
+        "profile_id": null,
+        "override_env": "CODEX_HOME",
+        "dir_name": ".codex"
+      },
+      "agent": "codex",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal",
+        "native-chat"
+      ],
+      "native_chat": "experimental",
+      "resume_strategy": "provider-session",
+      "native_trace": true,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "claude_code",
+      "family": "claude",
+      "status": "active",
+      "label": "Claude Code",
+      "catalog_label": "Claude CLI（official 1）",
+      "aliases": [
+        "claude",
+        "claude_code_cli",
+        "claude_official",
+        "claude_official_1"
+      ],
+      "executables": [
+        "claude"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": "claude-opus-5-5",
+      "default_effort": "high",
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": {
+        "env_var": "CLAUDE_CONFIG_DIR",
+        "role": "primary",
+        "profile_id": null,
+        "override_env": "CLAUDE_CONFIG_DIR",
+        "dir_name": ".claude"
+      },
+      "agent": "claude",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal",
+        "native-chat"
+      ],
+      "native_chat": "experimental",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "claude_2",
+      "family": "claude",
+      "status": "active",
+      "label": "Claude Code 2",
+      "catalog_label": "Claude CLI（official 2）",
+      "aliases": [
+        "claude_official_2",
+        "claude_code_2",
+        "claude2"
+      ],
+      "executables": [
+        "claude"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": "claude-opus-5-5",
+      "default_effort": "high",
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": {
+        "env_var": "CLAUDE_CONFIG_DIR",
+        "role": "secondary",
+        "profile_id": "omnicompany-secondary",
+        "override_env": "OMNI_CLAUDE_2_HOME",
+        "dir_name": ".claude-2"
+      },
+      "agent": "claude",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal",
+        "native-chat"
+      ],
+      "native_chat": "experimental",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "antigravity",
+      "family": "antigravity",
+      "status": "active",
+      "label": "Antigravity",
+      "catalog_label": "Antigravity CLI",
+      "aliases": [
+        "agy",
+        "antigravity_cli"
+      ],
+      "executables": [
+        "agy",
+        "agy.exe"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "antigravity",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "codebuddy",
+      "family": "codebuddy",
+      "status": "active",
+      "label": "CodeBuddy",
+      "catalog_label": "CodeBuddy CLI",
+      "aliases": [],
+      "executables": [
+        "codebuddy",
+        "cbc"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "codebuddy",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "kimi",
+      "family": "kimi",
+      "status": "active",
+      "label": "Kimi",
+      "catalog_label": "Kimi CLI",
+      "aliases": [
+        "kimi_code"
+      ],
+      "executables": [
+        "kimi"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "kimi",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "opencode",
+      "family": "opencode",
+      "status": "active",
+      "label": "OpenCode",
+      "catalog_label": "OpenCode Go",
+      "aliases": [
+        "open_code"
+      ],
+      "executables": [
+        "opencode"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "opencode",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "kiro",
+      "family": "kiro",
+      "status": "active",
+      "label": "Kiro",
+      "catalog_label": "Kiro CLI",
+      "aliases": [
+        "kiro_cli"
+      ],
+      "executables": [
+        "kiro-cli"
+      ],
+      "process_args": [
+        "chat"
+      ],
+      "model_flag": null,
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "kiro",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "qoder",
+      "family": "qoder",
+      "status": "active",
+      "label": "Qoder",
+      "catalog_label": "Qoder CLI",
+      "aliases": [
+        "qodercli",
+        "qoderclicn"
+      ],
+      "executables": [
+        "qodercli",
+        "qoderclicn"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "qoder",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "dsh",
+      "family": "dsh",
+      "status": "active",
+      "label": "DeepSeek Harness",
+      "catalog_label": "DeepSeek Harness CLI",
+      "aliases": [],
+      "executables": [
+        "python",
+        "python3"
+      ],
+      "process_args": [],
+      "model_flag": null,
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": null,
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "host-checkpoint",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "dsh_web",
+      "family": "dsh",
+      "status": "active",
+      "label": "DeepSeek Harness Web",
+      "catalog_label": "DeepSeek Harness Web",
+      "aliases": [],
+      "executables": [],
+      "process_args": [],
+      "model_flag": null,
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": null,
+      "default_surface": "web",
+      "surfaces": [
+        "web"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "hosted-session",
+      "native_trace": false,
+      "pty": false,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "grok",
+      "family": "grok",
+      "status": "active",
+      "label": "Grok",
+      "catalog_label": "Grok Build CLI",
+      "aliases": [
+        "grok_build"
+      ],
+      "executables": [
+        "grok",
+        "grok.exe"
+      ],
+      "process_args": [],
+      "model_flag": null,
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "grok",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal",
+        "native-chat"
+      ],
+      "native_chat": "experimental",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "gemini",
+      "family": "gemini",
+      "status": "retired",
+      "label": "Gemini",
+      "catalog_label": "Gemini CLI",
+      "aliases": [
+        "gemini_cli"
+      ],
+      "executables": [
+        "gemini",
+        "gemini.cmd"
+      ],
+      "process_args": [],
+      "model_flag": "--model",
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": "gemini",
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    },
+    {
+      "id": "zcode",
+      "family": "zcode",
+      "status": "retired",
+      "label": "ZCode",
+      "catalog_label": "ZCode CLI",
+      "aliases": [],
+      "executables": [],
+      "process_args": [],
+      "model_flag": null,
+      "default_model": null,
+      "default_effort": null,
+      "pins_model_on_argv": false,
+      "cli_overrides": [],
+      "api_key_env": null,
+      "account_home": null,
+      "agent": null,
+      "default_surface": "terminal",
+      "surfaces": [
+        "terminal"
+      ],
+      "native_chat": "deferred",
+      "resume_strategy": "provider-session",
+      "native_trace": false,
+      "pty": true,
+      "session_host": "omni-ccdaemon"
+    }
+  ]
+}

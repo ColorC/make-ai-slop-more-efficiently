@@ -1,9 +1,10 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CockpitShell from './CockpitShell'
-import { CONTROLLER_TAB_ID, usePanels, withDefaultTabs } from '../stores/panelsStore'
+import { CONTROLLER_TAB_ID, saveTabSnapshot, usePanels, withDefaultTabs } from '../stores/panelsStore'
 import { reviewstageApi } from '../api/reviewstageClient'
+import { clearConsoleLogRing } from './consoleLogRing'
 
 vi.mock('./EditorArea', () => ({
   default: () => <div data-testid="mock-editor-area">Dockview work surface</div>,
@@ -20,6 +21,15 @@ vi.mock('./BottomPanel', () => ({
 vi.mock('./useBossSightObservability', () => ({
   useBossSightObservability: vi.fn(),
 }))
+
+// P1.2: 剪贴板统一走 mock(快照 URL 化/日志复制全部的断言入口)。
+const copyTextMock = vi.hoisted(() => vi.fn(async () => true))
+vi.mock('../lib/copyText', () => ({
+  copyText: (text: string) => copyTextMock(text),
+}))
+
+// P1.2: 记录 POST /api/boss-sight/captures 的请求体, 断言 logs/url/圈选联动快照。
+const captureRequests: Array<Record<string, any>> = []
 
 const briefing = {
   generated_at: '2026-06-03T00:00:00Z',
@@ -207,8 +217,13 @@ function mockBossSightFetch() {
       const method = String(init?.method || 'GET').toUpperCase()
       if (method === 'POST') {
         const body = JSON.parse(String(init?.body || '{}'))
+        captureRequests.push(body)
         return Promise.resolve(new Response(JSON.stringify({
           saved_path: `E:/ws/data/boss_sight/captures/pending/x_${body.capture_kind}.md`,
+          url: `http://127.0.0.1:8210/api/boss-sight/captures/file?path=pending/x_${body.capture_kind}.md`,
+          share_id: `${body.capture_kind === 'page_snapshot' ? 'pg' : 'ui'}-capture-test01`,
+          canonical_url: `http://192.0.2.10:8210/s/${body.capture_kind === 'page_snapshot' ? 'pg' : 'ui'}-capture-test01`,
+          share_status: 'ready',
           pending_count: 1,
         }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
       }
@@ -227,22 +242,56 @@ describe('CockpitShell', () => {
   beforeEach(() => {
     usePanels.setState({ tabs: withDefaultTabs([]), activeId: CONTROLLER_TAB_ID })
     window.localStorage.clear()
+    window.sessionStorage.clear()
+    window.history.replaceState(null, '', '/')
+    delete window.__OMNICOMPANY_HOST__
     delete (window as any).__OMNI_CODEX_DEBUG_HANDOFF__
     // R4: 壳挂载即订阅审阅 WS 流(urgent 角标 + 推送 toast); 单测里不真连。
     vi.spyOn(reviewstageApi, 'openStream').mockReturnValue(() => {})
     mockBossSightFetch()
+    // P1.2: 每个测试从干净的日志环形缓冲/捕获请求记录/剪贴板 mock 开始。
+    clearConsoleLogRing()
+    captureRequests.length = 0
+    copyTextMock.mockClear()
   })
 
   afterEach(() => {
+    delete window.__OMNICOMPANY_HOST__
     vi.restoreAllMocks()
   })
 
-  it('renders the zero-topbar cockpit shell with everything tucked into the rail', async () => {
+
+  it('starts a detached deep link with only the requested tab', async () => {
+    const inherited = { id: 'note:from-opener', ref: { type: 'note' as const, id: 'from-opener' }, title: 'Inherited opener tab' }
+    saveTabSnapshot(withDefaultTabs([inherited]), inherited.id)
+    window.history.replaceState(
+      null,
+      '',
+      '/?open_type=cc_session&open_id=pty-detached&open_title=Detached+CLI&omni_detached=1',
+    )
+
+    render(<CockpitShell />)
+
+    await waitFor(() => {
+      expect(usePanels.getState().tabs).toHaveLength(1)
+      expect(usePanels.getState().tabs[0]).toMatchObject({
+        id: 'cc_session:pty-detached',
+        ref: { type: 'cc_session', id: 'pty-detached' },
+        title: 'Detached CLI',
+      })
+      expect(usePanels.getState().tabs[0].returnTo).toBeUndefined()
+      expect(usePanels.getState().activeId).toBe('cc_session:pty-detached')
+    })
+    expect(usePanels.getState().tabs.some((tab) => tab.id === inherited.id)).toBe(false)
+  })
+
+  it('renders the cockpit shell without a legacy top bar (快照/圈选入口在 ⋯ 菜单)', async () => {
     render(<CockpitShell />)
 
     expect(screen.getByTestId('cockpit-shell')).toBeTruthy()
-    // 零顶栏(2026-07-19 用户指令): 薄顶栏整体删除,全件收编进左 rail 槽位。
+    // 2026-08-16 用户裁决: dashboard 不加薄顶栏, 圈选/整页快照的既有位置(⋯ 菜单)不动。
     expect(screen.queryByTestId('cockpit-topbar')).toBeNull()
+    expect(screen.queryByTestId('cockpit-thintop')).toBeNull()
     const rail = screen.getByTestId('cockpit-rail')
     expect(screen.getByTestId('mock-editor-area')).toBeTruthy()
     // rail 槽位: ⌘K 命令面板(顶槽) / 通知 bell / ⋯ 菜单(底槽) 都在 rail 内。
@@ -252,7 +301,6 @@ describe('CockpitShell', () => {
     expect(rail.textContent).not.toContain('最近')
     expect(rail.querySelector('[data-testid^="cockpit-rail-recent-"]')).toBeNull()
 
-    // blocked 状态细点在 rail 底部(同 testid, 文案=状态标签)。
     await waitFor(() => {
       expect(screen.getByTestId('cockpit-status').textContent).toContain('blocked')
     })
@@ -268,8 +316,9 @@ describe('CockpitShell', () => {
     })
 
     fireEvent.click(screen.getByTestId('cockpit-more'))
+    expect(screen.getByTestId('cockpit-more-close-other-tabs')).toBeTruthy()
     expect(screen.getByTestId('cockpit-more-page-snapshot')).toBeTruthy()
-    expect(screen.queryByTestId('cockpit-capture-moved-to-poof')).toBeNull()
+    expect(screen.queryByTestId('cockpit-capture-moved-to-canvas')).toBeNull()
     const elementComment = screen.getByTestId('cockpit-element-comment')
     expect(elementComment).toBeTruthy()
     fireEvent.click(elementComment)
@@ -283,6 +332,105 @@ describe('CockpitShell', () => {
     // 点击后进入评论态仍保留被选元素的硬描边，不再随 hover/captureMode 一起消失。
     expect(screen.getByTestId('cockpit-capture-selected-outline')).toBeTruthy()
     expect(screen.getByTestId('cockpit-capture-comment').classList.contains('omni-capture-textarea')).toBe(true)
+  })
+
+  // ── P1.2 薄顶栏 + 快照/圈选统一 ────────────────────────────────────────────
+
+  it('sends logs with page snapshot and surfaces the returned URL in toast + clipboard', async () => {
+    render(<CockpitShell />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cockpit-status').textContent).toContain('blocked')
+    })
+    act(() => { window.dispatchEvent(new ErrorEvent('error', { message: 'snap-err-marker' })) })
+
+    fireEvent.click(screen.getByTestId('cockpit-more'))
+    fireEvent.click(screen.getByTestId('cockpit-more-page-snapshot'))
+    fireEvent.change(screen.getByTestId('cockpit-capture-comment'), { target: { value: '备份这一版' } })
+    fireEvent.click(screen.getByTestId('cockpit-capture-submit'))
+
+    await waitFor(() => expect(captureRequests.length).toBe(1))
+    const body = captureRequests[0]
+    expect(body.capture_kind).toBe('page_snapshot')
+    expect(Array.isArray(body.logs)).toBe(true)
+    expect(body.logs.some((entry: any) => String(entry.text).includes('snap-err-marker'))).toBe(true)
+
+    // URL 化: 提示条与剪贴板给中心确认过的 canonical URL, 不再是本地路径或 loopback。
+    const url = 'http://192.0.2.10:8210/s/pg-capture-test01'
+    await waitFor(() => {
+      expect(screen.getByTestId('cockpit-capture-toast').textContent).toContain(url)
+    })
+    await waitFor(() => expect(copyTextMock).toHaveBeenCalledWith(url))
+    expect(copyTextMock.mock.calls.some((call) => String(call[0]).startsWith('E:/ws/'))).toBe(false)
+  })
+
+  it('copies the snapshot URL instead of a local path from the copy action', async () => {
+    render(<CockpitShell />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cockpit-status').textContent).toContain('blocked')
+    })
+
+    fireEvent.click(screen.getByTestId('cockpit-more'))
+    fireEvent.click(screen.getByTestId('cockpit-more-page-snapshot'))
+    fireEvent.click(screen.getByTestId('cockpit-capture-copy'))
+
+    await waitFor(() => expect(copyTextMock).toHaveBeenCalled())
+    expect(String(copyTextMock.mock.calls[0][0])).toBe('http://192.0.2.10:8210/s/pg-capture-test01')
+    await waitFor(() => {
+      expect(screen.getByTestId('cockpit-capture-toast').textContent).toContain('已复制分享链接')
+    })
+  })
+
+  it('silently attaches a page snapshot after submitting an element comment, linked by URL', async () => {
+    render(<CockpitShell />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cockpit-status').textContent).toContain('blocked')
+    })
+
+    fireEvent.click(screen.getByTestId('cockpit-more'))
+    fireEvent.click(screen.getByTestId('cockpit-element-comment'))
+    const target = screen.getByTestId('mock-editor-area')
+    fireEvent.mouseMove(target)
+    fireEvent.click(target)
+    fireEvent.change(screen.getByTestId('cockpit-capture-comment'), { target: { value: '这个按钮太挤' } })
+    fireEvent.click(screen.getByTestId('cockpit-capture-submit'))
+
+    await waitFor(() => expect(captureRequests.length).toBe(2))
+    const [comment, snap] = captureRequests
+    expect(comment.capture_kind).toBe('element_comment')
+    expect(snap.capture_kind).toBe('page_snapshot')
+    expect(snap.title).toBe('页面快照(圈选联动)')
+    expect(snap.enqueue).toBe(false)
+    // 两者以中心 canonical URL 互相关联，不再传 loopback 临时文件 URL。
+    expect(snap.comment).toContain('http://192.0.2.10:8210/s/ui-capture-test01')
+    expect(snap.comment).toContain('自动附带 · 关联圈选评论')
+    // 快照同样附带日志环形缓冲。
+    expect(Array.isArray(snap.logs)).toBe(true)
+    // 静默: 不弹第二个对话框, 提示条追加自动快照的 URL。
+    expect(screen.queryByTestId('cockpit-capture-modal')).toBeNull()
+    await waitFor(() => {
+      expect(screen.getByTestId('cockpit-capture-toast').textContent).toContain('已自动附带快照')
+      expect(screen.getByTestId('cockpit-capture-toast').textContent).toContain('http://192.0.2.10:8210/s/pg-capture-test01')
+    })
+  })
+
+  it('closes every other tab from the more menu and keeps the active one', async () => {
+    const keep = { id: 'cc_session:keep', ref: { type: 'cc_session' as const, id: 'keep' }, title: 'keep' }
+    const extra = { id: 'review_material:extra', ref: { type: 'review_material' as const, id: 'extra' }, title: 'extra' }
+    usePanels.setState({ tabs: [keep, extra], activeId: keep.id })
+    render(<CockpitShell />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cockpit-status').textContent).toContain('blocked')
+    })
+
+    fireEvent.click(screen.getByTestId('cockpit-more'))
+    fireEvent.click(screen.getByTestId('cockpit-more-close-other-tabs'))
+
+    expect(usePanels.getState().tabs.map((tab) => tab.id)).toEqual([keep.id])
+    expect(usePanels.getState().activeId).toBe(keep.id)
   })
 
   it('does not mount a cockpit-global comments rail above the active tab content', async () => {
@@ -354,5 +502,36 @@ describe('CockpitShell', () => {
     fireEvent.click(screen.getByTestId('cockpit-notification-item-0'))
     expect(usePanels.getState().activeId).toBe('material:attention-mat')
     // (右侧检视面板的 cockpit-attention-item 已随面板删除; attention 仍可经通知铃进入。)
+  })
+
+  it('adds non-overlay window fullscreen controls only in desktop host mode', async () => {
+    const windowState = vi.fn().mockResolvedValue({
+      fullscreen: false,
+      maximized: false,
+      titlebarHeight: 38,
+      fullscreenGuardHotEdge: 8,
+    })
+    const toggleFullscreen = vi.fn().mockResolvedValue(true)
+    window.__OMNICOMPANY_HOST__ = {
+      runtime: 'desktop',
+      openSystemUrl: vi.fn(),
+      windowState,
+      toggleFullscreen,
+    }
+
+    render(<CockpitShell />)
+
+    const control = await screen.findByTestId('cockpit-desktop-fullscreen')
+    await waitFor(() => expect(windowState).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId('cockpit-rail').contains(control)).toBe(true)
+    expect(control.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('cockpit-shell').getAttribute('data-omnicompany-host')).toBe('desktop')
+
+    fireEvent.click(control)
+    await waitFor(() => expect(toggleFullscreen).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(control.getAttribute('aria-pressed')).toBe('true'))
+
+    fireEvent.click(screen.getByTestId('cockpit-more'))
+    expect(screen.getByTestId('cockpit-more-desktop-fullscreen').textContent).toContain('退出窗口全屏')
   })
 })

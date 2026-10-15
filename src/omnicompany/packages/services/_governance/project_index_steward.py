@@ -16,7 +16,7 @@
         5. 新鲜度戳   全绿(无 finding)且 --apply 时写 last_verified: <今日>
 
   omni governance project-index-review [PROJECT] [--json]
-      语义补漏(gpt-5.5 性价比模型): 对每个项目找"新资产未进 index"/"权威已迁移"两类候选,
+      语义补漏(外置只读 AgentRuntime): 对每个项目找"新资产未进 index"/"权威已迁移"两类候选,
       写进 index 正文固定候选区(去重追加, 绝不碰 frontmatter/其余正文)。
 """
 from __future__ import annotations
@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from omnicompany.core.config import omni_workspace_root
+from omnicompany.runtime.agent_runtime import run_readonly_structured_agent
 
 # ── 复用既有件, 不重写 ──────────────────────────────────────────────
 from omnicompany.packages.services._governance.doc_steward.steward import (
@@ -116,9 +117,51 @@ def check_contract(root: Path | None = None) -> list[IndexFinding]:
             continue
         missing = [k for k in INDEX_REQUIRED_KEYS if k not in (parsed.get("data") or {})]
         detail = parsed.get("error") or "frontmatter 不合法"
+        extra: dict[str, Any] = {}
+        if missing:
+            extra["missing_keys"] = missing
+        if parsed.get("error_code"):
+            extra["error_code"] = parsed["error_code"]
+        if parsed.get("error_path"):
+            extra["error_path"] = parsed["error_path"]
         out.append(IndexFinding(project=d.name, kind="contract_violation",
                                 detail=detail, index_path=rel,
-                                extra={"missing_keys": missing} if missing else {}))
+                                extra=extra))
+    return out
+
+
+def check_layout_warnings(root: Path | None = None) -> list[IndexFinding]:
+    """Expose compatible legacy/draft directory-contract notices in the existing report.
+
+    These are deliberately not findings: a historical PROJECT_INDEX may be readable
+    while it is being migrated.  Invalid *present* contracts remain contract failures
+    through ``check_contract``.
+    """
+    from omnicompany.core.projects_registry import parse_index_file
+
+    base = root or omni_workspace_root()
+    out: list[IndexFinding] = []
+    pdir = projects_dir(base)
+    if not pdir.is_dir():
+        return out
+    for d in sorted(pdir.iterdir()):
+        idx = d / "PROJECT_INDEX.md"
+        if not d.is_dir() or not idx.is_file():
+            continue
+        parsed = parse_index_file(idx)
+        if not parsed.get("ok"):
+            continue
+        # Only directory-contract notices belong in this section.  General
+        # parse warnings (for example invalid thread status) have their own
+        # codes and must not be positionally paired with layout warnings.
+        messages = parsed.get("layout_warnings") or []
+        codes = parsed.get("layout_warning_codes") or []
+        for i, detail in enumerate(messages):
+            out.append(IndexFinding(
+                project=d.name, kind="contract_warning", detail=str(detail),
+                index_path=str(idx.relative_to(base)).replace("\\", "/"),
+                extra={"warning_code": codes[i] if i < len(codes) else "INDEX_WARNING"},
+            ))
     return out
 
 
@@ -367,6 +410,7 @@ def run_check(*, apply: bool = False, root: Path | None = None, write: bool = Tr
 
     missing = check_missing(base)
     contract = check_contract(base)
+    layout_warnings = check_layout_warnings(base)
 
     # ③a markdown 正文死链(project_index kind 已挂 doc_steward._TARGET_GLOBS)
     ref_audit = run_reference_audit(kinds=("project_index",), root=base, write=False)
@@ -436,8 +480,10 @@ def run_check(*, apply: bool = False, root: Path | None = None, write: bool = Tr
             "broken_ref": len(ref_findings),
             "broken_field": len(yaml_findings),
             "quick_action": len(quick_action_findings),
+            "layout_warning": len(layout_warnings),
         },
         "findings": [f.to_dict() for f in all_findings],
+        "warnings": [f.to_dict() for f in layout_warnings],
         "repair_plan": {"ref": ref_repair_plan, "yaml_field": _jsonsafe_yaml_plan(yaml_repair_plan, base)},
         "stamped_fresh": stamped,
     }
@@ -641,12 +687,11 @@ def _upsert_candidate_block(text: str, new_lines: list[str]) -> tuple[str, list[
     return text.rstrip("\n") + block, added
 
 
-def run_review(project_id: str | None = None, *, model: str = "gpt-5.5",
+def run_review(project_id: str | None = None, *, model: str = "deepseek-v4-flash",
                root: Path | None = None, write: bool = True) -> dict[str, Any]:
-    """语义补漏: 对每个(或指定)项目跑一次 run_json_agent, 候选写进 index 固定候选区。"""
+    """语义补漏：外置只读推理，候选是否写入仍由 Omni 决定。"""
     import asyncio
     from omnicompany.core.projects_registry import list_projects
-    from omnicompany.packages.services._core.agent.launch import run_json_agent
 
     base = root or omni_workspace_root()
     projects = [p for p in list_projects() if p.get("index_path")]
@@ -669,14 +714,14 @@ def run_review(project_id: str | None = None, *, model: str = "gpt-5.5",
         task = (f"项目 index 绝对路径: {idx_path}\n\n"
                 f"index 当前内容:\n{text[:6000]}\n\n"
                 f"该项目 roots 目录近 30 天 git log 摘要(可能为空):\n{log_summary or '(无 git 记录或不可达)'}")
-        agent_result = asyncio.run(run_json_agent(
-            task=task, node_prompt=REVIEW_NODE_PROMPT, model=model,
-            result_schema=REVIEW_RESULT_SCHEMA, project_root=str(base),
+        agent_result = asyncio.run(run_readonly_structured_agent(
+            task=task, instructions=REVIEW_NODE_PROMPT, model=model,
+            result_schema=REVIEW_RESULT_SCHEMA, workspace_cwd=base,
             caller="projidx.review",
         ))
         if not agent_result["ok"]:
             results.append({"project": p["id"], "ok": False,
-                            "error": agent_result.get("error") or "run_json_agent 失败"})
+                            "error": agent_result.get("error") or "AgentRuntime 失败"})
             continue
         candidates = (agent_result["final"] or {}).get("candidates", [])
         new_lines = [
@@ -696,6 +741,6 @@ def run_review(project_id: str | None = None, *, model: str = "gpt-5.5",
 __all__ = [
     "IndexFinding",
     "report_dir", "projects_dir",
-    "check_missing", "check_contract", "check_yaml_field_paths", "check_quick_actions",
+    "check_missing", "check_contract", "check_layout_warnings", "check_yaml_field_paths", "check_quick_actions",
     "compute_actions_check", "run_check", "run_review",
 ]

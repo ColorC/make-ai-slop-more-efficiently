@@ -36,7 +36,7 @@ export function VSplitter({ onResize, side = 'right' }: VProps) {
       onMouseDown={onMouseDown}
       style={{
         width: 4, flexShrink: 0, cursor: 'ew-resize',
-        background: '#1a1a1a', alignSelf: 'stretch',
+        background: 'var(--fp-bp-solid)', alignSelf: 'stretch',
       }}
       title="拖拽调整宽度"
     />
@@ -78,7 +78,7 @@ export function HSplitter({ onResize, side = 'top' }: HProps) {
       onMouseDown={onMouseDown}
       style={{
         height: 4, flexShrink: 0, cursor: 'ns-resize',
-        background: '#1a1a1a',
+        background: 'var(--fp-bp-solid)',
       }}
       title="拖拽调整高度"
     />

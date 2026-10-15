@@ -37,6 +37,22 @@
      display LXGW 恒为第一。LXGW WenKai 本地打包 frontend/public/fonts/,@font-face 本地引用禁 CDN) */
   --fp-font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', 'DengXian', system-ui, sans-serif;
   --fp-font-mono: 'Berkeley Mono', ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, 'LXGW WenKai', 'Noto Serif SC', 'Microsoft YaHei', monospace;
+  /* 终端专用栈(2026-08-06, 用户: 「cli 默认都是宋体? 可以改一个字体吗」)。
+     此前终端在 Editor.tsx 里硬编码 'Consolas, Cascadia Code, Menlo, monospace' ——
+     一个 CJK 字体都没有, 中文只能掉到系统默认的 SimSun(宋体)。切成 DOM 渲染器后
+     每个字符各自回落, 宋体就更扎眼了。
+     选型(以本机实装为准, 没装的写了也是空转 —— 比如 Berkeley Mono 本机就没有):
+       Latin  = Cascadia Mono(比 Cascadia Code 少连字, 终端里更规整)→ Consolas 兜底;
+       CJK    = Microsoft YaHei 打头而不是等线 —— 深底白字下等线笔画偏细会发虚,
+                雅黑更稳; 想要等线把两者对调即可, 就这一处。
+       末位   = MS Gothic, 唯一的等宽 CJK, 前面都缺字时至少不破坏列对齐。
+     2026-08-06 补: 首位换成 Sarasa Term SC(更纱黑体·终端版), 已随产物打包
+     (assets/fonts/sarasa.css, 97 段 unicode-range 分片, 浏览器按需取)。
+     选它是因为 CJK 精确占 2 个 Latin 字符宽 —— 终端列对齐与 box-drawing 才严丝合缝;
+     而且打包意味着桌面端/网页端/局域网/手机拿到的是同一套字, 不依赖任何本机安装。
+     后面那串保留作降级链: 字体没加载出来时不至于直接掉回宋体。
+     xterm 已开 rescaleOverlappingGlyphs, 非等宽 CJK 会按单元格重缩放, 不会半格错位。 */
+  --fp-font-term: 'Sarasa Term SC', 'Cascadia Mono', Consolas, 'Microsoft YaHei', 'DengXian', 'MS Gothic', monospace;
   --fp-font-display: 'LXGW WenKai', 'Noto Serif SC', 'Source Han Serif SC', 'STSong', 'SimSun', serif;
   --fp-font-script: 'LXGW WenKai', 'Segoe Script', 'Kaiti SC', 'STKaiti', 'KaiTi', '楷体', 'Noto Serif SC', cursive;
 
@@ -132,6 +148,24 @@
   --fp-bp-shadow-pop: 3px 3px 0 rgba(6,16,38,.5), 8px 8px 0 rgba(6,16,38,.25);
   /* 圆角刻度(制图感=锐利) */
   --fp-bp-r1: 2px; --fp-bp-r2: 3px; --fp-bp-r3: 5px;
+
+  /* ---------- 终端「黑玻璃」(2026-08-06 用户裁决:「cli 使用黑色玻璃感, 更深更黑更特别」) ----------
+     终端在图板上要读作"另一种材质":不是又一张蓝图纸,而是嵌在图板上的一块深色观察窗。
+     配方 = 近黑底(带一点蓝相,不是纯灰黑,免得和蓝图割裂) + 轻微半透让格纸隐约透上来 + 玻璃边框。
+     α 定在 .93:再低会让格线穿透正文影响 CLI 可读性(终端是高频阅读面, 可读性优先于观感);
+     xterm 需要 allowTransparency 才认这个 α, 该开关在 Editor.tsx 一并打开。 */
+  /* 2026-08-06 二轮(用户:「CLI 底板也不能做的有玻璃感吗」): 一轮只做了半透(α.93)、
+     没做模糊 —— 那读起来是"有点发灰的黑", 不是玻璃。玻璃感的来源是**模糊**:
+     背后的格纸被糊成一片柔光, 而不是几根切过正文的硬线。有了模糊才敢把 α 压下来。
+     分两层叠: 窗体层(--fp-term-pane, 带 backdrop blur, 静态不重绘)负责糊格纸,
+     画布层(--fp-term-bg, xterm 自己画)负责给字垫底。
+     叠加后压暗率 = 1-(1-.58)*(1-.55) ≈ .81, 正文对比度绰绰有余。 */
+  --fp-term-pane: rgba(4, 8, 18, 0.58);        /* 窗体玻璃层 */
+  --fp-term-pane-blur: blur(16px) saturate(150%);
+  --fp-term-bg: rgba(4, 8, 18, 0.55);          /* xterm 画布底 */
+  --fp-term-bg-solid: #040812;          /* 不透明兜底(截图/打印/降级路径) */
+  --fp-term-edge: rgba(150, 185, 235, .22);   /* 观察窗内缘冷高光 */
+  --fp-term-glow: rgba(8, 16, 34, .85);       /* 窗外压边, 让它"陷"进图板 */
   /* 字体栈别名(= 上方 --fp-font-display/script,供蓝图组件直引) */
   --fp-bp-font-display: 'LXGW WenKai', 'Noto Serif SC', 'Source Han Serif SC', 'STSong', 'SimSun', serif;
   --fp-bp-font-script: 'LXGW WenKai', 'Segoe Script', 'Kaiti SC', 'STKaiti', 'KaiTi', '楷体', 'Noto Serif SC', cursive;
@@ -219,6 +253,23 @@ body {
 
 /* ambient 候选 B: 纯实底(无格纸纹理), 供 M1 成对截图评审对比; 评审拍板后二选一收敛。 */
 html.no-ambient #bp-grid { display: none; }
+/* 低端机/省电/无障碍走同一个开关: 终端玻璃回落实底, backdrop-filter 一并关掉。
+   (设计语言 §5「降低透明度开关」的既有口径, 这里把终端也纳进来。) */
+/* 玻璃档(设置 → 界面 → 终端底 = 玻璃)专属压暗量。
+   高性能档下画布不透明, 这两个值只作用于窗框, 压得深一点更"黑玻璃";
+   玻璃档下它们决定格纸能透出多少 —— 压 81% 时反差只剩 ~3/255 等于没有,
+   降到 ~50% 才看得见格线, 而正文对比度仍有 ~15:1, 不牺牲可读性。 */
+:root[data-omni-terminal-renderer="glass"] {
+  --fp-term-pane: rgba(4, 8, 18, 0.50);
+  --fp-term-bg: rgba(4, 8, 18, 0.28);
+  --fp-term-pane-blur: blur(12px) saturate(150%) brightness(1.75);
+}
+
+html.no-ambient {
+  --fp-term-pane: var(--fp-term-bg-solid);
+  --fp-term-pane-blur: none;
+  --fp-term-bg: #040812;
+}
 
 /* markdown 正文内嵌图片可点击放大提示(MarkdownMaterialView 事件代理开 lightbox,
    图片经 dangerouslySetInnerHTML 注入无法直接写内联 style, 靠此规则给 hover 反馈) */

@@ -58,10 +58,16 @@ def main() -> int:
         plan_meta=plan_meta,
     )
 
+    # SWARM-DISPATCH-PROACTIVITY P3: 集群快照只在 SessionStart 追加一次, 默认关闭,
+    # 有独立小预算, 不占 build_minimal_context 的 520 字符上限。
+    snapshot = sh.swarm_snapshot_line()
+    if snapshot:
+        text = f"{text}\n{snapshot}" if text else snapshot
+
     # Audit so we can see what we injected (for debugging via tail data/cc_hooks_audit.jsonl)
     sh.append_audit("session_start", {
         "session_id": session_id, "provider": provider, "cwd": cwd, "plan_id": plan_id,
-        "context_chars": len(text),
+        "context_chars": len(text), "swarm_snapshot": bool(snapshot),
     })
 
     # Mirror to event bus so the session appears as a trace immediately.
@@ -84,6 +90,13 @@ def main() -> int:
     # provider's durable conversation id back into cc_sessions.json so the
     # dashboard can correlate + offer resume after a backend restart.
     pty_id = os.environ.get("OMNI_CC_PTY_ID")
+    from ..provider_identity import CODEX_FAMILY_PROVIDER_IDS
+    if pty_id and provider in CODEX_FAMILY_PROVIDER_IDS:
+        from ..codex_runtime_identity import hook_owns_pty
+        # exec resume/forks inherit the parent's PTY variable. Only the actual
+        # displayed main thread may bind it; all others retain their own trace.
+        if not session_id or not hook_owns_pty(pty_id, session_id):
+            pty_id = None
     if pty_id and session_id:
         try:
             from omnicompany.dashboard.ccdaemon.pty import update_meta_field
@@ -109,7 +122,8 @@ def main() -> int:
                 claude_session_id=session_id if provider == "claude_code" else None,
                 pty_id=pty_id,
                 active_plan=plan_id,
-                # project 取 plan frontmatter(权威); 没绑 plan 时留空, 让 agent_registry 去推测.
+                # project 取 plan frontmatter(权威); 没绑 plan 时留空, 交给
+                # session_companion 按会话内容提出候选, 不从 cwd 推项目.
                 project=(plan_meta.get("project") if plan_meta else None),
                 provider=provider,
                 cwd=cwd,
@@ -124,6 +138,17 @@ def main() -> int:
                 )
         except Exception as e:
             print(f"[ccdaemon] record_active_session failed: {e}", file=sys.stderr)
+
+    # Codex reports a completed compact as a fresh SessionStart(source=compact).
+    # This complements Claude's PreCompact event with the actual post-compact
+    # summary when the provider includes it in the payload.
+    try:
+        from .session_companion import enqueue_from_payload, is_post_compact_start
+
+        if is_post_compact_start(payload):
+            enqueue_from_payload(payload, trigger="post_compact")
+    except Exception:
+        pass
 
     # Both native runtimes accept this event-scoped additionalContext envelope;
     # Kimi Code CLI gets plain stdout text instead (see _shared.emit_context).

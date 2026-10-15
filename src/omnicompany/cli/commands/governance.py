@@ -10,7 +10,7 @@
   omni governance docs-refs       # 文档引用完整性(断链/失效行锚, 确定性, 不调模型)
   omni governance docs-timeliness # 规范/计划/报告时效性(过期/被取代/冲突, 性价比模型为主)
   omni governance docs-report     # 打印最近一次文档治理摘要
-  omni governance commit-run      # 性价比模型严格分批 git 提交(默认 dry-run, --apply 真提交)
+  omni governance commit-run      # 可选: 提交后审阅本地 HEAD 说明, --apply 安全 amend
   omni governance decisions-run   # 标记 llm_input 的札记 → 结构化决策(进总控 ctx)
   omni governance catalog         # 列出所有治理管线 + 档期 + 上次跑(唯一发现面)
 """
@@ -370,9 +370,9 @@ def cmd_progress_scan(include_docs: bool, include_code: bool, include_projects: 
 @click.option("--limit", type=int, default=None, help="只精判前 N 个文档(冒烟用)")
 @click.option("--model", default=None, help="覆盖模型(默认性价比模型)")
 @click.option("--only-ref", is_flag=True, help="只判死链(确定性, 不调模型)")
-@click.option("--no-inbox", is_flag=True, help="不推 human-inbox, 只出报告")
+@click.option("--no-inbox", is_flag=True, help="不推 HumanBus 运行时人工复核队列, 只出报告")
 def cmd_progress_review(limit: int | None, model: str | None, only_ref: bool, no_inbox: bool) -> None:
-    """轨一·里程碑二: 对探针候选三态精判(进度漂移/决策设计/误报), 可处置项进 human-inbox。"""
+    """轨一·里程碑二: 对探针候选三态精判；可处置项进运行时人工复核队列。"""
     from omnicompany.packages.services._governance.progress_steward.review import run_progress_review
     payload = run_progress_review(limit=limit, model=model, only_ref=only_ref,
                                   push_inbox=not no_inbox, echo=click.echo)
@@ -418,7 +418,7 @@ def cmd_progress_strip(plan_id: str, lines: str, annotate: bool) -> None:
 @click.option("--code", "include_code", is_flag=True, help="也扫 src/**/*.py 注释")
 @click.option("--limit", type=int, default=None, help="只扫前 N 个文件(冒烟用)")
 @click.option("--model", default=None, help="覆盖模型(默认性价比模型)")
-@click.option("--inbox", is_flag=True, help="把'建议改中文'推 human-inbox")
+@click.option("--inbox", is_flag=True, help="把'建议改中文'推 HumanBus 运行时人工复核队列")
 def cmd_prose_lang(include_code: bool, limit: int | None, model: str | None, inbox: bool) -> None:
     """轨二·里程碑四: 非中文泄漏(中文段里的非白名单英文)→ LLM 判该保留/改中文。只报不改。"""
     from omnicompany.packages.services._governance.prose_steward.lang import run_lang_scan
@@ -589,7 +589,7 @@ def cmd_project_index_check(do_apply: bool, json_output: bool) -> None:
 @cmd_governance.command("project-index-review")
 @external_or_controller
 @click.argument("project", required=False)
-@click.option("--model", default="gpt-5.5", show_default=True)
+@click.option("--model", default="deepseek-v4.1-flash", show_default=True)
 @click.option("--json-output", is_flag=True)
 def cmd_project_index_review(project: str | None, model: str, json_output: bool) -> None:
     """项目索引语义补漏: 找新资产未进 index / 权威已迁移, 写进 index 正文固定候选区(去重追加)。"""
@@ -687,33 +687,36 @@ def cmd_docs_report() -> None:
 @cmd_governance.command("commit-run")
 @external_or_controller
 @click.option("--model", default=None, help="覆盖默认性价比模型")
-@click.option("--apply", "apply_", is_flag=True, help="真提交(默认 dry-run 只出批次计划)")
-@click.option("--workers", type=int, default=4)
-def cmd_commit_run(model: str | None, apply_: bool, workers: int) -> None:
-    """性价比模型严格分批 git 提交: 低重复明文必读、禁盲目全量、逐批显式 add+commit。
-
-    默认 dry-run 只出批次计划供抽查; 加 --apply 才真提交(pre-commit 卫士逐批兜底)。
-    """
+@click.option(
+    "--apply",
+    "apply_",
+    is_flag=True,
+    help="把建议 amend 到本地未发布 HEAD；默认只审阅，不改历史",
+)
+def cmd_commit_run(model: str | None, apply_: bool) -> None:
+    """可选的提交后审阅：读完整 HEAD diff，必要时建议或安全 amend 说明。"""
     from omnicompany.packages.services._governance.commit_steward import run_commit
-    res = run_commit(model=model, dry_run=not apply_, workers=workers, echo=click.echo)
-    if res.get("changes") == 0:
-        click.echo(res.get("message", "工作区干净"))
-        return
-    click.echo(f"改动 {res['changes']} 文件 → {res['batches']} 批"
-               f"(map 失败 {res['map_failed']}); {'真提交' if apply_ else 'DRY-RUN 计划'}")
-    for b in res["plan"]:
-        click.echo(f"\n■ {b['subject']}  ({len(b['files'])} 文件)")
-        if b.get("body"):
-            click.echo("  " + b["body"].replace("\n", "\n  "))
-    if res.get("uncommitted_left"):
-        click.echo(f"\n留工作区未提交(读不到/判不准) {len(res['uncommitted_left'])} 个:")
-        for f in res["uncommitted_left"][:20]:
-            click.echo(f"  - {f}")
-    if apply_:
-        ok = sum(1 for a in res["applied"] if a.get("committed"))
-        click.echo(f"\n已提交 {ok}/{len(res['applied'])} 批; 计划见 {res.get('_written')}")
-    else:
-        click.echo(f"\n计划落盘: {res.get('_written')}  (确认无误后加 --apply 真提交)")
+    res = run_commit(model=model, apply=apply_)
+    commit = res["commit"]
+    review = res["review"]
+    click.echo(
+        f"提交后审阅 {commit['sha'][:12]} · {len(commit['files'])} 文件 · "
+        f"完整 diff {commit['diff_chars']} 字符"
+    )
+    click.echo(f"当前: {commit['message'].splitlines()[0]}")
+    click.echo(f"结论: {review['verdict']} — {review['reason']}")
+    if review["verdict"] == "amend":
+        click.echo(f"建议: {review['subject']}")
+        if review.get("body"):
+            click.echo(review["body"])
+    applied = res["applied"]
+    if apply_ and applied.get("blocked"):
+        raise click.ClickException(str(applied.get("reason") or "amend 被安全边界阻止"))
+    if applied.get("amended"):
+        click.echo(f"已 amend: {applied['old_sha'][:12]} → {applied['new_sha'][:12]}")
+    elif apply_:
+        click.echo("无需 amend，保留现有提交说明。")
+    click.echo(f"审阅记录: {res.get('_written')}")
 
 
 @cmd_governance.command("decisions-run")
@@ -739,11 +742,11 @@ def cmd_decisions_run(model: str | None, reextract: bool, no_collect: bool,
     产物经 cockpit_workflow 的 ctx_summary.decisions 段进总控首轮上下文。
     """
     from omnicompany.core.config import omni_workspace_root
-    from omnicompany.dashboard.boss_sight.authored.extract import extract_decisions
+    from omnicompany.packages.services.boss_sight.authored.extract import extract_decisions
 
     collect_res = None
     if not no_collect:
-        from omnicompany.dashboard.boss_sight.authored.collect import collect_long_prompts
+        from omnicompany.packages.services.boss_sight.authored.collect import collect_long_prompts
         waitlist_path = omni_workspace_root() / "data" / "governance" / "decisions" / "collect_waitlist.jsonl"
         collect_res = collect_long_prompts(
             window_days=collect_window_days, daily_cap=collect_daily_cap,
@@ -851,14 +854,14 @@ _GOVERNANCE_CATALOG = [
     {"verb": "plans-run", "what": "计划→项目归属 + 中文标题 + 格式检查", "cadence": "每日(--only-missing)", "kind": "语义"},
     {"verb": "plans-sync", "what": "计划→whatnow 同步: 新计划自动建 task + 进度过时则重评估刷新", "cadence": "每日", "kind": "语义"},
     {"verb": "progress-scan", "what": "轨一: 确定性圈出 plan.md/注释里的进度型自述候选(进度归 whatnow)", "cadence": "每日", "kind": "确定性"},
-    {"verb": "progress-review", "what": "轨一: 进度型候选三态精判(漂移/决策/误报)→ human-inbox", "cadence": "每周", "kind": "语义"},
+    {"verb": "progress-review", "what": "轨一: 进度型候选三态精判(漂移/决策/误报)→ 运行时人工复核队列", "cadence": "每周", "kind": "语义"},
     {"verb": "prose-lang", "what": "轨二: 非中文泄漏(中文段里非白名单英文)→ LLM 判保留/改中文", "cadence": "每周", "kind": "语义"},
     {"verb": "prose-term", "what": "轨二: 术语不一致/代称/易过时 + 从单一真源生成 Vale/CSpell", "cadence": "每周", "kind": "确定性"},
     {"verb": "prose-compress", "what": "轨二: 惜字如金(缩写展开 + 可疑段 LLM 建议)", "cadence": "每周", "kind": "语义"},
     {"verb": "history-run", "what": "对话里重复需求/指正提取", "cadence": "每周", "kind": "语义"},
     {"verb": "docs-refs", "what": "文档引用完整性(断链/失效行锚)", "cadence": "每日", "kind": "确定性"},
     {"verb": "docs-timeliness", "what": "规范/计划/报告时效性(过期/被取代/冲突)", "cadence": "每周", "kind": "语义"},
-    {"verb": "commit-run", "what": "性价比模型严格分批 git 提交", "cadence": "定时/大改后", "kind": "语义+确定性"},
+    {"verb": "commit-run", "what": "可选的本地 HEAD 提交后说明审阅/amend", "cadence": "按需/提交后", "kind": "语义+确定性"},
     {"verb": "decisions-run", "what": "标记 llm_input 的札记 → 结构化决策(进总控 ctx)", "cadence": "每日", "kind": "语义"},
     {"verb": "actions-check", "what": "PROJECT_INDEX quick_actions 的 skill 存在性体检", "cadence": "按需", "kind": "确定性"},
     {"verb": "project-index-check", "what": "项目索引五项体检(缺失/契约/死链/quick_actions/新鲜度戳)", "cadence": "每日(--apply)", "kind": "确定性"},

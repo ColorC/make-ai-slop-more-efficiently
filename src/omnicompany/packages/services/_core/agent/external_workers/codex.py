@@ -23,6 +23,7 @@ from omnicompany.packages.services._core.agent.external_workers.base import (
     ExternalAgentRunSpec,
     ExternalAgentStatus,
     ExternalAgentWorker,
+    _headless_process_kwargs,
 )
 from omnicompany.packages.services._core.agent.external_workers.trace import (
     _summarize_args,
@@ -36,6 +37,22 @@ _CODEX_SANDBOX_BY_PERMISSION: dict[ExternalAgentPermissionMode, str] = {
     ExternalAgentPermissionMode.TRUSTED_BYPASS: "danger-full-access",
 }
 
+_THE_COMPANY_CODEX_CONFIG: dict[str, str] = {
+    "model_provider": json.dumps("the_company"),
+    "model_providers.the_company.name": json.dumps("the_company proxy"),
+    "model_providers.the_company.base_url": json.dumps(
+        "https://internal-llm-proxy.example.com/v1"
+    ),
+    "model_providers.the_company.env_key": json.dumps("THE_COMPANY_API_KEY"),
+    "model_providers.the_company.wire_api": json.dumps("responses"),
+    "model_providers.the_company.supports_websockets": "false",
+}
+
+_STREAM_READ_CHUNK_SIZE = 64 * 1024
+_POST_EXIT_STREAM_DRAIN_TIMEOUT_S = 1.0
+_STREAM_CLEANUP_TIMEOUT_S = 1.0
+_PROCESS_WAIT_TIMEOUT_S = 5.0
+
 
 class CodexExecWorker(ExternalAgentWorker):
     """Run Codex through `codex exec --json`.
@@ -46,9 +63,24 @@ class CodexExecWorker(ExternalAgentWorker):
     provider_name = "codex"
     handles_timeout = True
 
-    def __init__(self, *, bus: Any | None = None, codex_executable: str = "codex"):
+    def __init__(
+        self,
+        *,
+        bus: Any | None = None,
+        codex_executable: str = "codex",
+        provider_name: str | None = None,
+        codex_home: str | None = None,
+    ):
         super().__init__(bus=bus)
         self.codex_executable = codex_executable
+        if provider_name:
+            self.provider_name = provider_name
+        # Codex has no account switch of its own: "another account" IS another
+        # CODEX_HOME (authority: dashboard/ccdaemon/provider_identity.codex_home_for,
+        # not importable from this layer). codex-2 runs the same CLI against the
+        # second official account's home so its quota, rollouts and auth stay
+        # separate from the primary account.
+        self.codex_home = codex_home
 
     def build_command(
         self,
@@ -102,11 +134,12 @@ class CodexExecWorker(ExternalAgentWorker):
         schema_path = output_schema_path or spec.output_schema_path
         if schema_path:
             cmd.extend(["--output-schema", str(Path(schema_path).expanduser().resolve())])
-        # 调用方可经 metadata["codex_config"] 传 `-c key=value` 配置覆盖(如 research 开 tools.web_search)。
-        codex_config = (spec.metadata or {}).get("codex_config")
-        if isinstance(codex_config, dict):
-            for key, value in codex_config.items():
-                cmd.extend(["-c", f"{key}={value}"])
+        # model_provider 是统一 ExternalAgentRunSpec 的公开字段；the_company 通过
+        # 进程局部 Codex 配置接入，不能要求 CLI 调用者另造嵌套 metadata。
+        # 显式 codex_config 仍可追加/覆盖(如 research 开 tools.web_search)。
+        codex_config = _codex_config_overrides(spec)
+        for key, value in codex_config.items():
+            cmd.extend(["-c", f"{key}={value}"])
         # ``codex exec`` is non-interactive. With the current CLI, an omitted
         # approval policy defaults workspace-write tool calls to approval-
         # required and then silently rejects them because no approver exists.
@@ -168,6 +201,8 @@ class CodexExecWorker(ExternalAgentWorker):
                 )
             ]
             env = _build_env(spec.env)
+            if self.codex_home:
+                env["CODEX_HOME"] = self.codex_home
 
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -177,6 +212,7 @@ class CodexExecWorker(ExternalAgentWorker):
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
+                    **_headless_process_kwargs(),
                 )
             except FileNotFoundError:
                 return ExternalAgentResult(
@@ -314,32 +350,103 @@ class CodexExecWorker(ExternalAgentWorker):
 
         assert proc.stdin is not None
         proc.stdin.write(spec.full_prompt().encode("utf-8"))
-        await proc.stdin.drain()
+        startup_timeout = _optional_positive_float(
+            (spec.metadata or {}).get("startup_timeout_s")
+        ) or 30.0
+        try:
+            await asyncio.wait_for(proc.stdin.drain(), timeout=startup_timeout)
+        except asyncio.TimeoutError:
+            proc.stdin.close()
+            await _terminate_process_tree(proc)
+            return (
+                "",
+                "",
+                True,
+                f"Agent stdin startup stalled for {startup_timeout:g}s",
+                False,
+            )
         proc.stdin.close()
 
-        queue: asyncio.Queue[tuple[str, bytes | None]] = asyncio.Queue()
+        queue: asyncio.Queue[tuple[str, str, object | None]] = asyncio.Queue()
 
         async def pump(name: str, stream: asyncio.StreamReader | None) -> None:
-            if stream is None:
-                await queue.put((name, None))
-                return
-            while True:
-                line = await stream.readline()
-                if not line:
-                    await queue.put((name, None))
+            buffer = bytearray()
+            try:
+                if stream is None:
                     return
-                await queue.put((name, line))
+                while True:
+                    # readline() enforces StreamReader's 64 KiB transport
+                    # limit. Chunk reads let valid JSONL records be larger.
+                    chunk = await stream.read(_STREAM_READ_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    buffer.extend(chunk)
+                    while True:
+                        newline = buffer.find(b"\n")
+                        if newline < 0:
+                            break
+                        line = bytes(buffer[: newline + 1])
+                        del buffer[: newline + 1]
+                        queue.put_nowait(("line", name, line))
+                if buffer:
+                    # A final JSONL record may omit its newline.
+                    queue.put_nowait(("line", name, bytes(buffer)))
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                if buffer:
+                    # Preserve a valid trailing record even when the next
+                    # transport read fails before EOF.
+                    queue.put_nowait(("line", name, bytes(buffer)))
+                # Keep reader failures in-band; otherwise a dead pump looks
+                # like a process timeout to the coordinator.
+                queue.put_nowait(("error", name, exc))
+            finally:
+                # Exactly one EOF notification per pump, including failures.
+                queue.put_nowait(("eof", name, None))
+
+        async def watch_process() -> None:
+            try:
+                returncode = await proc.wait()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                queue.put_nowait(("process_error", "process", exc))
+            else:
+                queue.put_nowait(("process_exit", "process", returncode))
 
         pumps = [
             asyncio.create_task(pump("stdout", proc.stdout)),
             asyncio.create_task(pump("stderr", proc.stderr)),
         ]
-        active_streams = 2
+        process_waiter = asyncio.create_task(watch_process())
+        stream_names = {"stdout", "stderr"}
+        eof_streams: set[str] = set()
+        process_exited = proc.returncode is not None
+        post_exit_deadline = (
+            time.monotonic()
+            + (
+                _optional_positive_float(
+                    (spec.metadata or {}).get("post_exit_drain_timeout_s")
+                )
+                or _POST_EXIT_STREAM_DRAIN_TIMEOUT_S
+            )
+            if process_exited
+            else None
+        )
+        post_exit_drain_timeout = (
+            _optional_positive_float(
+                (spec.metadata or {}).get("post_exit_drain_timeout_s")
+            )
+            or _POST_EXIT_STREAM_DRAIN_TIMEOUT_S
+        )
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
         tool_parent_by_id: dict[str, str] = {}
         idle_timeout = _optional_positive_float((spec.metadata or {}).get("idle_timeout_s"))
         total_deadline = started + spec.timeout_s if spec.timeout_s is not None else None
+        last_meaningful_progress = started
+        diagnostic_counts: dict[str, int] = {}
         timed_out = False
         timeout_reason = ""
         saw_error = False
@@ -352,59 +459,203 @@ class CodexExecWorker(ExternalAgentWorker):
         def persist_event(event: ExternalAgentEvent) -> None:
             if event_log is None:
                 return
+            message = event.message
+            payload = event.payload
+            if _metadata_flag(spec.metadata, "event_log_redact_tool_output"):
+                message, payload = _redacted_event_log_content(event)
             event_log.write(json.dumps({
                 "ts": event.ts,
                 "type": event.type,
-                "message": event.message,
-                "payload": event.payload,
+                "message": message,
+                "payload": payload,
             }, ensure_ascii=False, default=str) + "\n")
             event_log.flush()
 
-        try:
-            while active_streams:
-                remaining_total = (
-                    total_deadline - time.monotonic()
-                    if total_deadline is not None
-                    else None
-                )
-                if remaining_total is not None and remaining_total <= 0:
-                    timed_out = True
-                    timeout_reason = f"total deadline reached after {spec.timeout_s:g}s"
-                    await _terminate_process_tree(proc)
-                    break
-                candidates = [v for v in (idle_timeout, remaining_total) if v is not None]
+        def record_runtime_error(source: str, exc: object) -> None:
+            nonlocal saw_error
+            saw_error = True
+            message = f"{source} error: {type(exc).__name__}: {exc}"
+            stderr_lines.append(message)
+            event = ExternalAgentEvent(
+                type="stream.error",
+                message=message,
+                payload={"source": source, "error_type": type(exc).__name__},
+            )
+            events.append(event)
+            persist_event(event)
+
+        async def cancel_tasks_bounded(tasks: list[asyncio.Task[object]]) -> None:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            done, pending = await asyncio.wait(
+                tasks,
+                timeout=_STREAM_CLEANUP_TIMEOUT_S,
+            )
+            for task in done:
+                if task.cancelled():
+                    continue
                 try:
-                    if candidates:
-                        stream_name, raw_line = await asyncio.wait_for(
-                            queue.get(), timeout=min(candidates)
+                    task.result()
+                except Exception as exc:
+                    record_runtime_error("stream task", exc)
+            # Do not wait indefinitely for an uncooperative reader after the
+            # bounded cleanup window has elapsed.
+            for task in pending:
+                task.cancel()
+
+        try:
+            while eof_streams != stream_names:
+                if not process_exited and proc.returncode is not None:
+                    process_exited = True
+                    post_exit_deadline = (
+                        time.monotonic() + post_exit_drain_timeout
+                    )
+                if process_exited and post_exit_deadline is None:
+                    post_exit_deadline = (
+                        time.monotonic() + post_exit_drain_timeout
+                    )
+
+                if process_exited:
+                    remaining = post_exit_deadline - time.monotonic()
+                    if remaining <= 0:
+                        record_runtime_error(
+                            "process exit stream drain",
+                            TimeoutError(
+                                "stdout/stderr did not reach EOF after process exit"
+                            ),
+                        )
+                        break
+                    candidates = [remaining]
+                else:
+                    remaining_total = (
+                        total_deadline - time.monotonic()
+                        if total_deadline is not None
+                        else None
+                    )
+                    if remaining_total is not None and remaining_total <= 0:
+                        timed_out = True
+                        timeout_reason = f"total deadline reached after {spec.timeout_s:g}s"
+                        await _terminate_process_tree(proc)
+                        break
+                    remaining_idle = (
+                        idle_timeout - (time.monotonic() - last_meaningful_progress)
+                        if idle_timeout is not None
+                        else None
+                    )
+                    if remaining_idle is not None and remaining_idle <= 0:
+                        timed_out = True
+                        timeout_reason = f"no meaningful Agent output for {idle_timeout:g}s"
+                        await _terminate_process_tree(proc)
+                        break
+                    candidates = [
+                        value
+                        for value in (remaining_idle, remaining_total)
+                        if value is not None
+                    ]
+                try:
+                    stream_kind, stream_name, raw_value = await asyncio.wait_for(
+                        queue.get(), timeout=min(candidates) if candidates else None
+                    )
+                except asyncio.TimeoutError:
+                    if not process_exited and proc.returncode is not None:
+                        # The process may have exited after the pre-wait
+                        # check, while its waiter notification is still
+                        # pending.  Reclassify this boundary as transport
+                        # draining, not a model deadline.
+                        process_exited = True
+                        post_exit_deadline = (
+                            time.monotonic() + post_exit_drain_timeout
+                        )
+                        continue
+                    if process_exited:
+                        record_runtime_error(
+                            "process exit stream drain",
+                            TimeoutError(
+                                "stdout/stderr did not reach EOF after process exit"
+                            ),
                         )
                     else:
-                        stream_name, raw_line = await queue.get()
-                except asyncio.TimeoutError:
-                    timed_out = True
-                    if total_deadline is not None and time.monotonic() >= total_deadline:
-                        timeout_reason = f"total deadline reached after {spec.timeout_s:g}s"
-                    else:
-                        timeout_reason = f"no observable output for {idle_timeout:g}s"
-                    await _terminate_process_tree(proc)
+                        timed_out = True
+                        now = time.monotonic()
+                        if total_deadline is not None and (
+                            idle_timeout is None or now >= total_deadline
+                        ):
+                            timeout_reason = f"total deadline reached after {spec.timeout_s:g}s"
+                        elif idle_timeout is not None:
+                            timeout_reason = (
+                                f"no meaningful Agent output for {idle_timeout:g}s"
+                            )
+                        else:
+                            timeout_reason = "stream wait deadline reached"
+                        await _terminate_process_tree(proc)
                     break
-                if raw_line is None:
-                    active_streams -= 1
+
+                if stream_kind == "eof":
+                    if stream_name in stream_names:
+                        eof_streams.add(stream_name)
                     continue
-                line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                if stream_kind == "process_exit":
+                    process_exited = True
+                    post_exit_deadline = (
+                        time.monotonic() + post_exit_drain_timeout
+                    )
+                    continue
+                if stream_kind == "process_error":
+                    record_runtime_error("process wait", raw_value)
+                    process_exited = True
+                    post_exit_deadline = (
+                        time.monotonic() + post_exit_drain_timeout
+                    )
+                    continue
+                if stream_kind == "error":
+                    record_runtime_error(f"{stream_name} reader", raw_value)
+                    continue
+                if stream_kind != "line":
+                    record_runtime_error(
+                        "stream coordinator",
+                        RuntimeError(f"unknown stream message kind: {stream_kind}"),
+                    )
+                    continue
+                if not isinstance(raw_value, bytes):
+                    record_runtime_error(
+                        f"{stream_name} reader",
+                        TypeError("stream pump returned non-bytes data"),
+                    )
+                    continue
+                line = raw_value.decode("utf-8", errors="replace").rstrip("\r\n")
                 if stream_name == "stderr":
-                    stderr_lines.append(line)
                     if line.strip():
-                        diagnostic_event = ExternalAgentEvent(type="stderr", message=line[-4000:])
+                        diagnostic_key = _diagnostic_key(line)
+                        repeat_count = diagnostic_counts.get(diagnostic_key, 0) + 1
+                        diagnostic_counts[diagnostic_key] = repeat_count
+                        # Codex can emit thousands of timestamped copies of the
+                        # same queue warning while otherwise making no progress.
+                        # Keep a logarithmic audit trail without letting those
+                        # diagnostics defeat the idle timeout or flood memory.
+                        if repeat_count not in {1, 10, 100, 1000, 10_000}:
+                            continue
+                        diagnostic_line = line[-4000:]
+                        if repeat_count > 1:
+                            diagnostic_line += f" (同类诊断累计 {repeat_count} 次)"
+                        stderr_lines.append(diagnostic_line)
+                        diagnostic_event = ExternalAgentEvent(
+                            type="stderr", message=diagnostic_line
+                        )
                         events.append(diagnostic_event)
                         persist_event(diagnostic_event)
                         await self._emit_material(
                             spec,
                             "agent.diagnostic",
-                            {"material_kind": "diagnostic", "stream": "stderr", "text": line[-4000:]},
+                            {
+                                "material_kind": "diagnostic",
+                                "stream": "stderr",
+                                "text": diagnostic_line,
+                            },
                         )
                     continue
 
+                last_meaningful_progress = time.monotonic()
                 stdout_lines.append(line)
                 parsed = _parse_json_lines(line)
                 event = parsed[0] if parsed else ExternalAgentEvent(type="stdout", message=line)
@@ -420,12 +671,15 @@ class CodexExecWorker(ExternalAgentWorker):
             await _terminate_process_tree(proc)
             raise
         finally:
-            await asyncio.gather(*pumps, return_exceptions=True)
+            await cancel_tasks_bounded([*pumps, process_waiter])
             if event_log is not None:
                 event_log.close()
 
         if proc.returncode is None:
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=_PROCESS_WAIT_TIMEOUT_S)
+            except asyncio.TimeoutError:
+                await _terminate_process_tree(proc)
         return (
             "\n".join(stdout_lines),
             "\n".join(stderr_lines),
@@ -668,7 +922,6 @@ def _codex_runtime_cwd(cwd: Path) -> Iterator[Path]:
     alias_parent = _codex_alias_parent(resolved)
     alias = alias_parent / f".omni-codex-cwd-{os.getpid()}-{time.time_ns()}"
     comspec = os.environ.get("COMSPEC") or r"C:\Windows\System32\cmd.exe"
-    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     linked = subprocess.run(
         [comspec, "/d", "/c", "mklink", "/J", str(alias), str(resolved)],
         check=False,
@@ -676,7 +929,7 @@ def _codex_runtime_cwd(cwd: Path) -> Iterator[Path]:
         text=True,
         encoding="utf-8",
         errors="replace",
-        creationflags=creation_flags,
+        **_headless_process_kwargs(),
     )
     if linked.returncode != 0 or not alias.exists():
         if alias.exists():
@@ -745,30 +998,68 @@ def _resolve_event_log_path(spec: ExternalAgentRunSpec) -> Path | None:
     return path
 
 
+def _diagnostic_key(line: str) -> str:
+    """Collapse timestamped copies of the same Codex diagnostic."""
+
+    if (
+        "dropping in-process server notification (queue full)" in line
+        or "dropping in-process app-server event because consumer queue is full"
+        in line
+    ):
+        return "codex_app_server_queue_full"
+    return line
+
+
+def _codex_config_overrides(spec: ExternalAgentRunSpec) -> dict[str, str]:
+    """Resolve process-local Codex config from the provider-neutral run spec."""
+
+    overrides: dict[str, str] = {}
+    if (spec.model_provider or "").strip().lower() == "the_company":
+        overrides.update(_THE_COMPANY_CODEX_CONFIG)
+    catalog_path = (spec.metadata or {}).get("model_catalog_path")
+    if catalog_path:
+        catalog = Path(str(catalog_path)).expanduser().resolve().as_posix()
+        overrides["model_catalog_json"] = json.dumps(catalog, ensure_ascii=False)
+    explicit = (spec.metadata or {}).get("codex_config")
+    if isinstance(explicit, dict):
+        overrides.update({str(key): str(value) for key, value in explicit.items()})
+    return overrides
+
+
 async def _terminate_process_tree(proc: asyncio.subprocess.Process) -> None:
     """Terminate the whole external Agent tree and wait for process reaping."""
 
     if proc.returncode is not None:
         return
     if os.name == "nt":
-        killer = await asyncio.create_subprocess_exec(
-            "taskkill.exe",
-            "/PID",
-            str(proc.pid),
-            "/T",
-            "/F",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        await killer.wait()
+        killer = None
+        try:
+            killer = await asyncio.create_subprocess_exec(
+                "taskkill.exe",
+                "/PID",
+                str(proc.pid),
+                "/T",
+                "/F",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                **_headless_process_kwargs(),
+            )
+            await asyncio.wait_for(killer.wait(), timeout=_PROCESS_WAIT_TIMEOUT_S)
+        except (OSError, asyncio.TimeoutError):
+            if killer is not None and killer.returncode is None:
+                killer.kill()
     else:
         proc.kill()
     try:
-        await asyncio.wait_for(proc.wait(), timeout=5.0)
+        await asyncio.wait_for(proc.wait(), timeout=_PROCESS_WAIT_TIMEOUT_S)
     except asyncio.TimeoutError:
         proc.kill()
-        await proc.wait()
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=_STREAM_CLEANUP_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            # The caller must still be able to return a bounded result when a
+            # broken child/pipe refuses to finish reaping.
+            pass
 
 
 def _build_env(extra: dict[str, str]) -> dict[str, str]:
@@ -843,6 +1134,30 @@ def _parse_json_lines(stdout: str) -> list[ExternalAgentEvent]:
     return events
 
 
+def _redacted_event_log_content(
+    event: ExternalAgentEvent,
+) -> tuple[str, dict[str, Any]]:
+    """Keep live Agent observability without copying retrieved source bodies."""
+
+    message = event.message
+    payload = dict(event.payload)
+    if event.type == "stdout" and message:
+        message = _redacted_text_marker(message)
+    item = payload.get("item")
+    if isinstance(item, dict) and item.get("type") == "command_execution":
+        item = dict(item)
+        output = item.get("aggregated_output")
+        if isinstance(output, str) and output:
+            item["aggregated_output"] = _redacted_text_marker(output)
+        payload["item"] = item
+    return message, payload
+
+
+def _redacted_text_marker(value: str) -> str:
+    digest = hashlib.sha256(value.encode("utf-8", errors="replace")).hexdigest()
+    return f"<redacted chars={len(value)} sha256={digest}>"
+
+
 def _last_text_from_events(events: list[ExternalAgentEvent]) -> str:
     for event in reversed(events):
         if event.message:
@@ -855,15 +1170,29 @@ def _last_text_from_events(events: list[ExternalAgentEvent]) -> str:
 
 
 def _git_diff_stat(cwd: Path) -> str:
+    # The pathspec is load-bearing, not cosmetic.  A worker cwd is not always a
+    # repository root: session_companion hands each lane an empty scratch dir
+    # under data/_runtime/session_companion/workspaces/, and a bare `git diff`
+    # there walks *up* until it finds the enclosing omnicompany repo, then
+    # diffs that entire work tree.  Measured on this machine: 9-13GB RSS per
+    # call, re-spawned every few seconds, driving system RAM from 73% to 93%
+    # in a sawtooth -- while reporting changes the worker never made, because
+    # the diff described a repository it had never touched.
+    #
+    # Restricting to `-- .` keeps the intended meaning ("what did this worker
+    # change here") in every case: at a repository root it still covers the
+    # whole repo, in a subdirectory it scopes to that subdirectory, and in a
+    # non-repository scratch dir it correctly reports nothing (6MB / 0.1s).
     try:
         proc = subprocess.run(
-            ["git", "-C", str(cwd), "diff", "--stat"],
+            ["git", "-C", str(cwd), "diff", "--stat", "--", "."],
             check=False,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
             timeout=10,
+            **_headless_process_kwargs(),
         )
     except Exception:
         return ""
@@ -927,15 +1256,24 @@ def _append_rollback_summary(diff_summary: str, rollback: dict[str, list[str]]) 
 
 
 def _git_changed_files(cwd: Path) -> list[str]:
+    # Same trap as _git_diff_stat: a session_companion scratch dir is not a repository, so
+    # an unscoped `git status --untracked-files=all` walks up and scans the whole omnicompany
+    # work tree.  That scan can outlive the 10s timeout, and a git killed mid-refresh leaves a
+    # 0-byte .git/index.lock (2026-10-12: three such locks in 45 minutes with only this command
+    # running against the repo, every session's commits blocked); it also counts other
+    # sessions' edits as this worker's changes.
+    # `-- .` scopes the answer to the worker's own directory; --no-optional-locks keeps a
+    # read-only query from taking the index lock at all.
     try:
         proc = subprocess.run(
-            ["git", "-C", str(cwd), "status", "--porcelain=v1", "--untracked-files=all"],
+            ["git", "--no-optional-locks", "-C", str(cwd), "status", "--porcelain=v1", "--untracked-files=all", "--", "."],
             check=False,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
             timeout=10,
+            **_headless_process_kwargs(),
         )
     except Exception:
         return []
@@ -1119,6 +1457,7 @@ def _git_path_is_tracked(cwd: Path, rel_path: str) -> bool:
             encoding="utf-8",
             errors="replace",
             timeout=10,
+            **_headless_process_kwargs(),
         )
     except Exception:
         return False

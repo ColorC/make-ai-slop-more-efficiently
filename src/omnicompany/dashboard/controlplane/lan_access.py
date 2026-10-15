@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from pydantic import BaseModel, Field
 
 from omnicompany.core.config import omni_workspace_root
+from omnicompany.dashboard.controlplane.lan_access_lofa_identity import _bind_pending_lofa_device_id
 
 lan_access_router = APIRouter(prefix="/api/lan-access", tags=["lan-access"])
 
@@ -62,12 +63,20 @@ _CAPTURE_HEADERS = (
 )
 _PUBLIC_PATHS = {
     "/device-access",
+    "/api/healthz",
+    "/api/clients/catalog",
     "/api/lan-access/authorize",
     "/api/lan-access/request",
     "/api/lan-access/status",
     "/api/lan-access/me",
 }
+_PUBLIC_PREFIXES = (
+    "/api/clients/desktop/",
+    "/api/clients/litework-desktop/",
+    "/s/",
+)
 _NATIVE_DEVICE_PATHS = {
+    "/api/android/register",
     "/api/android/automation/pair",
     "/api/android/automation/register",
     "/api/android/automation/poll",
@@ -882,8 +891,16 @@ def evaluate_request(
 
 
 def _claim_id(ip: str, fingerprint: dict[str, Any]) -> str:
+    identity = {
+        "ip": ip,
+        "ua": fingerprint.get("user_agent"),
+        "model": fingerprint.get("model"),
+    }
+    native_device_id = str(fingerprint.get("native_device_id") or "").strip()
+    if native_device_id:
+        identity["native_device_id"] = native_device_id
     material = json.dumps(
-        {"ip": ip, "ua": fingerprint.get("user_agent"), "model": fingerprint.get("model")},
+        identity,
         ensure_ascii=False,
         sort_keys=True,
     )
@@ -1084,6 +1101,8 @@ def _public_game_observatory_read_path(path: str) -> bool:
 
 def _public_path(path: str, method: str = "GET") -> bool:
     if path in _PUBLIC_PATHS:
+        return True
+    if method.upper() in _PUBLIC_READ_METHODS and path.startswith(_PUBLIC_PREFIXES):
         return True
     if path.startswith("/api/lan-access/status/"):
         return True
@@ -1633,6 +1652,7 @@ async def decide_device_access(req: Request, body: DeviceDecisionBody) -> Respon
                     "decision_notes": body.notes[:1000],
                 }
             )
+            _bind_pending_lofa_device_id(device, pending)
             _audit(
                 data,
                 "device_access_recovered",
@@ -1679,6 +1699,7 @@ async def decide_device_access(req: Request, body: DeviceDecisionBody) -> Respon
             "approved_by": approver["device_id"],
             "notes": body.notes[:1000],
         }
+        _bind_pending_lofa_device_id(device, pending)
         data.setdefault("devices", []).append(device)
         pending.update(
             {

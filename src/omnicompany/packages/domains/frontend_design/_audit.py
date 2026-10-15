@@ -82,13 +82,28 @@ def _real_ux_audit(src_root: str) -> dict:
         enum_nav,
     )
 
+    # 三个枚举器默认只看 entities/ 与 shell/ —— 那是驾驶舱自己的目录约定。
+    # 换个前端(BSide 用 components/)就一个文件都扫不到, 而 report 照样空, 于是
+    # gate 报 audited + 0 条发现 = 假绿(2026-08-07 实锤)。
+    # 修法不是给每个前端配一份 include_dirs, 是让默认值**认得出扫不到**并退到整个 src:
+    # 门禁的职责是审这个前端, 不是审某种目录命名法。
+    dirs = [d for d in ("entities", "shell") if (Path(src_root) / d).is_dir()] or ["."]
+    interactions = enum_interactions(src_root, include_dirs=dirs)
+    info = enum_info(src_root, include_dirs=dirs)
+    nav = enum_nav(src_root, include_dirs=dirs)
     accum = {
         "src_root": src_root,
-        "interactions": enum_interactions(src_root),
-        "info": enum_info(src_root),
-        "nav": enum_nav(src_root),
+        "interactions": interactions,
+        "info": info,
+        "nav": nav,
     }
-    return consolidate(accum)
+    report = consolidate(accum)
+    # 扫到几个文件必须带出来 —— 三个枚举器默认只看 entities/shell(驾驶舱自己的目录约定),
+    # 换个前端(如 BSide 用 components/)就一个文件都扫不到, 而 report 照样空。
+    # 空 report 与"扫了没发现"长得一模一样, gate 于是报 audited + 0 条发现 = 假绿。
+    # (2026-08-07 实锤: BSide 首次接入, gate 报 audited, 实际 scanned=0。)
+    report["scanned_files"] = len({*interactions, *info, *nav})
+    return report
 
 
 def run_ux_audit(src_root: str, audit_fn: Callable[[str], dict] | None = None) -> dict:

@@ -68,6 +68,7 @@ class ScrcpyControlTransport:
         serial: str,
         width: int,
         height: int,
+        display_id: int | None = None,
         server_path: str | Path | None = None,
         server_version: str | None = None,
     ) -> None:
@@ -77,6 +78,9 @@ class ScrcpyControlTransport:
         self.serial = serial
         self.width = width
         self.height = height
+        if display_id is not None and display_id < 0:
+            raise ScrcpyControlError("scrcpy display id must be non-negative")
+        self.display_id = display_id
         self.server_path = resolve_scrcpy_server(server_path)
         self.server_version = server_version or self._infer_server_version(self.server_path)
         self._socket: socket.socket | None = None
@@ -194,7 +198,9 @@ class ScrcpyControlTransport:
             f"CLASSPATH={self.REMOTE_SERVER} app_process / "
             f"com.genymobile.scrcpy.Server {self.server_version} "
             f"scid={scid:x} log_level=debug video=false audio=false control=true "
-            f"{tunnel_option}cleanup=false power_on=false raw_stream=true"
+            f"{tunnel_option}"
+            f"{f'display_id={self.display_id} ' if self.display_id is not None else ''}"
+            "cleanup=false power_on=false raw_stream=true"
         )
         self._process = subprocess.Popen(
             [str(self.adb_path), "-s", self.serial, "shell", command],
@@ -319,6 +325,7 @@ class ScrcpyControlTransport:
         trace = " | ".join(self._touch_trace[-4:]) or "none"
         parts = [
             f"scrcpy_server_exit={self.server_exit_code}",
+            f"display_id={self.display_id if self.display_id is not None else 'default'}",
             f"adb_tunnel_mode={self.tunnel_mode}",
             f"adb_tunnel_detached={str(self.tunnel_detached).lower()}",
             f"touch_messages_sent={self._touch_messages_sent}",
@@ -327,6 +334,26 @@ class ScrcpyControlTransport:
         if self.server_output:
             parts.append(f"scrcpy_server_output={self.server_output}")
         return "; ".join(parts)
+
+    def tap(self, x: int, y: int, *, hold_seconds: float = 0.05) -> None:
+        """Inject one complete, bounded pointer lifecycle on the bound display."""
+
+        primary_error: BaseException | None = None
+        down = False
+        try:
+            self._send_touch(self.ACTION_DOWN, 0, x, y, 1.0)
+            down = True
+            time.sleep(max(0.0, hold_seconds))
+        except BaseException as exc:
+            primary_error = exc
+            raise
+        finally:
+            if down:
+                try:
+                    self._send_touch(self.ACTION_UP, 0, x, y, 0.0)
+                except BaseException:
+                    if primary_error is None:
+                        raise
 
     @staticmethod
     def _point_between(start: tuple[float, float], end: tuple[float, float], t: float) -> tuple[int, int]:

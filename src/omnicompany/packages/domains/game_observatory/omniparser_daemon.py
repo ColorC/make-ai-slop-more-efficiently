@@ -128,6 +128,19 @@ class _DaemonServer(socketserver.ThreadingTCPServer):
     engine: Any
     inference_lock: threading.Lock
     started_at: str
+    idle_timeout_seconds: float
+    last_activity_monotonic: float
+
+
+def _stop_server_after_idle(server: _DaemonServer) -> None:
+    """Release the heavyweight model after a bounded idle window."""
+    while server.idle_timeout_seconds > 0:
+        idle_seconds = time.monotonic() - server.last_activity_monotonic
+        remaining = server.idle_timeout_seconds - idle_seconds
+        if remaining <= 0 and not server.inference_lock.locked():
+            server.shutdown()
+            return
+        time.sleep(min(5.0, max(0.05, remaining)))
 
 
 class _RequestHandler(socketserver.StreamRequestHandler):
@@ -152,6 +165,7 @@ class _RequestHandler(socketserver.StreamRequestHandler):
         if request.get("secret") != server.secret:
             self._reply({"ok": False, "error": "unauthorized"})
             return
+        server.last_activity_monotonic = time.monotonic()
         operation = request.get("operation")
         if operation == "health":
             self._reply(
@@ -225,6 +239,7 @@ class _RequestHandler(socketserver.StreamRequestHandler):
             )
         finally:
             server.inference_lock.release()
+            server.last_activity_monotonic = time.monotonic()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -237,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config-hash", required=True)
     parser.add_argument("--weights-hash", required=True)
     parser.add_argument("--box-threshold", type=float, default=0.05)
+    parser.add_argument("--idle-timeout-seconds", type=float, default=900.0)
     parser.add_argument("--fake-engine", action="store_true")
     args = parser.parse_args(argv)
 
@@ -269,6 +285,8 @@ def main(argv: list[str] | None = None) -> int:
             server.runtime_root = runtime_root
             server.inference_lock = threading.Lock()
             server.started_at = started_at
+            server.idle_timeout_seconds = max(0.0, args.idle_timeout_seconds)
+            server.last_activity_monotonic = time.monotonic()
             if args.fake_engine:
                 server.engine = _FakeEngine()
             else:
@@ -284,7 +302,15 @@ def main(argv: list[str] | None = None) -> int:
             identity["engine_startup_seconds"] = round(
                 float(server.engine.startup_seconds), 6
             )
+            identity["idle_timeout_seconds"] = server.idle_timeout_seconds
             _atomic_json(identity_path, identity)
+            if server.idle_timeout_seconds > 0:
+                threading.Thread(
+                    target=_stop_server_after_idle,
+                    args=(server,),
+                    name="omniparser-idle-shutdown",
+                    daemon=True,
+                ).start()
             server.serve_forever(poll_interval=0.2)
     except Exception as exc:  # noqa: BLE001 - durable startup diagnosis
         identity["status"] = "failed"

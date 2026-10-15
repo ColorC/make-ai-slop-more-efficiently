@@ -14,6 +14,7 @@ import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
 import { usePanels } from '../../stores/panelsStore'
 import { useReviewQueueFocus } from '../../stores/reviewQueueFocusStore'
+import { ReviewBoard } from './ReviewBoard'
 // 直连具体文件, 不走 ../review 的 export * barrel(2026-07 首屏拆包: 见 CockpitShell 同注)。
 import { MaterialDetail } from '../review/MaterialDetail'
 import { MaterialSidebar } from '../review/MaterialSidebar'
@@ -32,7 +33,7 @@ export interface ReviewQueueEntity extends Entity {
 const SINGLE: ReviewQueueEntity = {
   type: 'review_queue',
   id: 'main',
-  title: 'Review Queue',
+  title: '审阅台',
   tags: ['boss-sight', 'review'],
 }
 
@@ -427,6 +428,16 @@ function ReviewQueuePanel({
 }
 
 const Editor: React.FC<{ entity: ReviewQueueEntity; facet?: string }> = ({ facet }) => {
+  // 2026-08-14 复位: 审阅台界面回原位, 数据读写全走 material 契约(review-queue + canvas mutate),
+  // 列表/裁决件与札记画布审阅面同源(@overlay-notes/regions/reviewShared)。
+  // 旧 reviewstage 驱动实现保留在下方 LegacyReviewQueueEditor。
+  // 聚焦哪条材料走 store(单例 tab, 不靠 facet 拼 tab id)。facet 作首开兜底。
+  const focusedId = useReviewQueueFocus((s) => s.focusedId)
+  return <ReviewBoard focusCardId={focusedId ?? facet} />
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const LegacyReviewQueueEditor: React.FC<{ entity: ReviewQueueEntity; facet?: string }> = ({ facet }) => {
   // 聚焦哪条材料走 store(单例 tab, 不靠 facet 拼 tab id)。facet 作首开兜底。
   const focusedId = useReviewQueueFocus((s) => s.focusedId)
   const nonce = useReviewQueueFocus((s) => s.nonce)
@@ -460,6 +471,6 @@ const Editor: React.FC<{ entity: ReviewQueueEntity; facet?: string }> = ({ facet
 export const reviewQueueRegistration: EntityRegistration<ReviewQueueEntity> = {
   resolver,
   renderer: { type: 'review_queue', Editor },
-  label: 'Review Queue',
+  label: '审阅台',
   icon: 'R',
 }

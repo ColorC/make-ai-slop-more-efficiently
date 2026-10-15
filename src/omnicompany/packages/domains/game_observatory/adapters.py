@@ -43,6 +43,7 @@ class AdbVideoCaptureHandle:
     remote_pid: int
     process: Any
     started_at: str
+    display_id: str | None = None
 
 
 class GameAdapter(abc.ABC):
@@ -99,12 +100,18 @@ def _run(args: list[str], *, binary: bool = False, timeout: float = 20.0) -> str
         **headless_process_kwargs(),
     )
     if proc.returncode != 0:
-        detail = proc.stderr.decode("utf-8", "replace") if binary else proc.stderr.decode("utf-8", "replace")
+        detail = (
+            proc.stderr.decode("utf-8", "replace")
+            if binary
+            else proc.stderr.decode("utf-8", "replace")
+        )
         raise AdapterError(detail.strip() or f"command failed: {args[0]}")
     return proc.stdout if binary else proc.stdout.decode("utf-8", "replace")
 
 
 class AdbAdapter(GameAdapter):
+    _suppress_transport_error_depth: int = 0
+
     def __init__(
         self,
         store: ObservatoryStore,
@@ -226,9 +233,84 @@ class AdbAdapter(GameAdapter):
             raise AdapterError("connect a target before observe")
         raw = self._adb("exec-out", "screencap", "-p", binary=True, timeout=30)
         assert isinstance(raw, bytes)
+        if (
+            not raw.startswith(b"\x89PNG")
+            and b"Multiple displays were found" in raw[:1024]
+        ):
+            raw = self._capture_focused_display_png()
         if not raw.startswith(b"\x89PNG"):
             raise AdapterError("adb screencap did not return PNG")
         return raw
+
+    @staticmethod
+    def _png_dimensions(raw: bytes) -> tuple[int, int] | None:
+        if not raw.startswith(b"\x89PNG\r\n\x1a\n") or len(raw) < 24:
+            return None
+        return (
+            int.from_bytes(raw[16:20], "big"),
+            int.from_bytes(raw[20:24], "big"),
+        )
+
+    def _capture_focused_display_png(self) -> bytes:
+        window_dump = str(
+            self._adb(
+                "shell",
+                "dumpsys",
+                "window",
+                "displays",
+                timeout=10,
+            )
+        )
+        focused_display_id: str | None = None
+        focused_size: tuple[int, int] | None = None
+        for block in re.split(r"(?=^\s*Display: mDisplayId=)", window_dump, flags=re.MULTILINE):
+            if not re.search(r"^\s*mCurrentFocus=Window\{", block, flags=re.MULTILINE):
+                continue
+            display_match = re.search(r"^\s*Display: mDisplayId=(\d+)", block)
+            size_match = re.search(r"\bcur=(\d+)x(\d+)\b", block)
+            if display_match is not None and size_match is not None:
+                focused_display_id = display_match.group(1)
+                focused_size = (int(size_match.group(1)), int(size_match.group(2)))
+                break
+        if focused_display_id is None or focused_size is None:
+            raise AdapterError(
+                "adb screencap found multiple displays but no focused display size"
+            )
+
+        display_dump = str(
+            self._adb(
+                "shell",
+                "dumpsys",
+                "display",
+                timeout=10,
+            )
+        )
+        physical_match = re.search(
+            rf"displayId={re.escape(focused_display_id)},\s+uniqueId='local:(\d+)'",
+            display_dump,
+        )
+        if physical_match is None:
+            raise AdapterError(
+                "adb screencap could not map focused logical display "
+                f"{focused_display_id} to a physical display"
+            )
+        candidate = self._adb(
+            "exec-out",
+            "screencap",
+            "-p",
+            "-d",
+            physical_match.group(1),
+            binary=True,
+            timeout=30,
+        )
+        assert isinstance(candidate, bytes)
+        if self._png_dimensions(candidate) != focused_size:
+            raise AdapterError(
+                "adb screencap focused display size mismatch: "
+                f"expected {focused_size[0]}x{focused_size[1]}, "
+                f"got {self._png_dimensions(candidate)}"
+            )
+        return candidate
 
     def _capture_observation(self, *, include_ui: bool) -> ObservationBundle:
         raw = self._capture_png()
@@ -362,12 +444,7 @@ class AdbAdapter(GameAdapter):
         width, height, pixel_format = int(width), int(height), int(pixel_format)
         pixel_bytes = width * height * 4
         offset = len(raw) - pixel_bytes
-        if (
-            width <= 0
-            or height <= 0
-            or offset not in {12, 16}
-            or pixel_format not in {1, 2}
-        ):
+        if width <= 0 or height <= 0 or offset not in {12, 16} or pixel_format not in {1, 2}:
             raise AdapterError("unsupported adb raw screencap layout")
         rgba = np.frombuffer(raw, dtype=np.uint8, offset=offset).reshape((height, width, 4))
         bgr = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
@@ -380,10 +457,20 @@ class AdbAdapter(GameAdapter):
             raise AdapterError("host JPEG encoding failed")
         return jpeg.tobytes()
 
-    def begin_video_capture(self, *, max_seconds: int = 180) -> AdbVideoCaptureHandle:
+    def begin_video_capture(
+        self,
+        *,
+        max_seconds: int = 180,
+        display_id: str | int | None = None,
+    ) -> AdbVideoCaptureHandle:
         if not self.serial:
             raise AdapterError("connect a target before video capture")
         duration = max(10, min(int(max_seconds), 180))
+        normalized_display_id: str | None = None
+        if display_id is not None:
+            normalized_display_id = str(display_id).strip()
+            if not normalized_display_id.isdecimal():
+                raise AdapterError("screenrecord display_id must be a non-negative integer")
         remote_path = f"/sdcard/omni-evidence-{uuid.uuid4().hex}.mp4"
         try:
             active = str(
@@ -404,12 +491,18 @@ class AdbAdapter(GameAdapter):
             self.serial,
             "shell",
             "screenrecord",
-            "--bit-rate",
-            "8000000",
-            "--time-limit",
-            str(duration),
-            remote_path,
         ]
+        if normalized_display_id is not None:
+            command.extend(["--display-id", normalized_display_id])
+        command.extend(
+            [
+                "--bit-rate",
+                "8000000",
+                "--time-limit",
+                str(duration),
+                remote_path,
+            ]
+        )
         process = subprocess.Popen(
             command,
             stdout=subprocess.DEVNULL,
@@ -446,6 +539,7 @@ class AdbAdapter(GameAdapter):
             remote_pid=remote_pid,
             process=process,
             started_at=utc_now(),
+            display_id=normalized_display_id,
         )
 
     def finish_video_capture(
@@ -455,10 +549,51 @@ class AdbAdapter(GameAdapter):
         evidence_run_id: str,
         evidence_step_id: str,
     ) -> Any:
-        if not self.serial:
-            raise AdapterError("connect a target before finishing video capture")
         artifact_id = f"art.video.{int(time.time() * 1000)}.{uuid.uuid4().hex[:8]}"
         path = self.store.artifact_root / f"{artifact_id}.mp4"
+        self.finish_video_capture_to_path(handle, path)
+        body = path.read_bytes()
+        from .models import ArtifactRef
+
+        artifact = ArtifactRef(
+            id=artifact_id,
+            kind="video",
+            path=str(path),
+            sha256=hashlib.sha256(body).hexdigest(),
+            captured_at=handle.started_at,
+            run_id=evidence_run_id,
+            media_type="video/mp4",
+            metadata={
+                "serial": self.serial,
+                "evidence_run_id": evidence_run_id,
+                "evidence_step_id": evidence_step_id,
+                "screenrecord_pid": handle.remote_pid,
+                "display_id": handle.display_id,
+                "capture_started_at": handle.started_at,
+            },
+        )
+        self.store.save_artifact(artifact)
+        return artifact
+
+    def finish_video_capture_to_path(
+        self,
+        handle: AdbVideoCaptureHandle,
+        output_path: str | Path,
+    ) -> Path:
+        """Stop one ADB recording segment and pull it to an explicit local path.
+
+        Unlike :meth:`finish_video_capture`, this lightweight primitive does not
+        register or duplicate the file in the Observatory artifact store.
+        """
+
+        if not self.serial:
+            raise AdapterError("connect a target before finishing video capture")
+        path = Path(output_path).expanduser().resolve()
+        if path.suffix.lower() != ".mp4":
+            raise AdapterError("video output path must use the .mp4 extension")
+        if path.exists():
+            raise AdapterError(f"refusing to overwrite video output: {path}")
+        path.parent.mkdir(parents=True, exist_ok=True)
         try:
             try:
                 self._adb_optional(
@@ -493,26 +628,7 @@ class AdbAdapter(GameAdapter):
         body = path.read_bytes()
         if len(body) < 16 or body[4:8] != b"ftyp":
             raise AdapterError("screenrecord produced an invalid MP4 container")
-        from .models import ArtifactRef
-
-        artifact = ArtifactRef(
-            id=artifact_id,
-            kind="video",
-            path=str(path),
-            sha256=hashlib.sha256(body).hexdigest(),
-            captured_at=handle.started_at,
-            run_id=evidence_run_id,
-            media_type="video/mp4",
-            metadata={
-                "serial": self.serial,
-                "evidence_run_id": evidence_run_id,
-                "evidence_step_id": evidence_step_id,
-                "screenrecord_pid": handle.remote_pid,
-                "capture_started_at": handle.started_at,
-            },
-        )
-        self.store.save_artifact(artifact)
-        return artifact
+        return path
 
     @staticmethod
     def _safe_package(package: str) -> str:
@@ -622,7 +738,9 @@ class AdbAdapter(GameAdapter):
 
     def reset(self, snapshot: str | None = None) -> dict[str, Any]:
         if snapshot:
-            raise AdapterError("generic ADB targets cannot restore emulator snapshots; use a provider adapter")
+            raise AdapterError(
+                "generic ADB targets cannot restore emulator snapshots; use a provider adapter"
+            )
         if not self.serial:
             raise AdapterError("connect a target before reset")
         self._adb("shell", "input", "keyevent", "3")
@@ -756,8 +874,14 @@ class AdbAdapter(GameAdapter):
                 if None in (action.x, action.y, action.x2, action.y2):
                     raise AdapterError("swipe requires x/y/x2/y2")
                 args = [
-                    "shell", "input", "swipe", str(action.x), str(action.y),
-                    str(action.x2), str(action.y2), str(action.duration_ms),
+                    "shell",
+                    "input",
+                    "swipe",
+                    str(action.x),
+                    str(action.y),
+                    str(action.x2),
+                    str(action.y2),
+                    str(action.duration_ms),
                 ]
             elif action.type == "pinch":
                 method = self._perform_pinch(action)
@@ -788,8 +912,13 @@ class AdbAdapter(GameAdapter):
             elif action.type == "launch":
                 package = self._safe_package(action.package or "")
                 args = [
-                    "shell", "monkey", "-p", package,
-                    "-c", "android.intent.category.LAUNCHER", "1",
+                    "shell",
+                    "monkey",
+                    "-p",
+                    package,
+                    "-c",
+                    "android.intent.category.LAUNCHER",
+                    "1",
                 ]
             elif action.type == "force_stop":
                 package = self._safe_package(action.package or "")
@@ -891,7 +1020,9 @@ class SourceFixtureAdapter(GameAdapter):
         checks: list[ObjectiveCheck] = []
         for item in task.checks:
             actual = facts.get(item.id)
-            checks.append(item.model_copy(update={"actual": actual, "passed": actual == item.expected}))
+            checks.append(
+                item.model_copy(update={"actual": actual, "passed": actual == item.expected})
+            )
         passed = all(item.passed for item in checks)
         identity = json.dumps(
             {

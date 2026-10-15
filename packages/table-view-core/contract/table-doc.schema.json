@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "omni.table-doc/v1",
+  "title": "TableDoc",
+  "description": "来源无关的统一表格模型。Cell 四值：v=投影/导出值, sv=源侧原始值, f=公式原文, fv=公式缓存值。公式必须忠实携带，禁丢弃。",
+  "type": "object",
+  "required": ["schema", "source", "table"],
+  "properties": {
+    "schema": { "const": "omni.table-doc/v1" },
+    "source": {
+      "type": "object",
+      "required": ["adapter", "locator"],
+      "properties": {
+        "adapter": { "type": "string", "description": "reader 插件 id，如 xlsm-openpyxl / csv-core / json-core / lua-core" },
+        "locator": { "type": "string", "description": "插件能理解的定位子，如 path#sheet" },
+        "fingerprint": {
+          "type": "object",
+          "properties": {
+            "sha256": { "type": "string", "description": "源文件字节 sha256" },
+            "revision": { "type": "string", "description": "版本标识（VCS 插件给），中性字符串" }
+          }
+        },
+        "capabilities": { "type": "array", "items": { "type": "string" }, "description": "如 formulas / styles / round-trip" }
+      }
+    },
+    "table": {
+      "type": "object",
+      "required": ["name", "columns", "key_fields", "rows"],
+      "properties": {
+        "name": { "type": "string" },
+        "header_layout": {
+          "type": "object",
+          "description": "由 adapter 声明的表头形状（如 demogame: 2 行表头数据从 3 起；Spark: 3 行表头数据从 4 起）",
+          "properties": {
+            "rows": { "type": "integer", "minimum": 0 },
+            "roles": { "type": "array", "items": { "type": "string" } },
+            "data_start": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "label": { "type": "string", "description": "人读表头（中文说明）" },
+              "type": { "type": "string", "description": "业务类型签名，透传给 type-system 插件" },
+              "key": { "type": "boolean", "description": "主键显式声明，不靠类型前缀推断" }
+            }
+          }
+        },
+        "key_fields": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["cells"],
+            "properties": {
+              "cells": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "v": { "description": "投影/导出值（渲染与导出一致性的锚点）" },
+                    "sv": { "description": "源侧原始值（当源表示 ≠ 投影值）" },
+                    "f": { "type": ["string", "null"], "description": "公式原文" },
+                    "fv": { "description": "公式缓存值" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

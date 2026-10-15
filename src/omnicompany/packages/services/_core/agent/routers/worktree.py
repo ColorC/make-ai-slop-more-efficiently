@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import ClassVar
 
+from omnicompany.core.git_worktree import GitWorktreeSetupError, create_sparse_worktree
 from omnicompany.packages.services._core.agent.routers.single_tool import (
     SingleToolRouter,
     ToolContext,
@@ -63,11 +64,26 @@ def _clear_session(ctx: ToolContext) -> None:
         p.unlink()
 
 
-def _git_run(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+def _git_run(
+    args: list[str],
+    cwd: Path,
+    *,
+    timeout: int = 60,
+    input_text: str | None = None,
+) -> subprocess.CompletedProcess:
+    kwargs = {
+        "cwd": str(cwd),
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+        "errors": "replace",
+        "timeout": timeout,
+    }
+    if input_text is not None:
+        kwargs["input"] = input_text
     return subprocess.run(
-        ["git"] + args, cwd=str(cwd),
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=60,
+        ["git"] + args,
+        **kwargs,
     )
 
 
@@ -132,15 +148,19 @@ class EnterWorktreeRouter(SingleToolRouter):
         if worktree_path.exists():
             raise ToolExecutionError(f"worktree path already exists: {worktree_path}")
 
-        worktree_path.parent.mkdir(parents=True, exist_ok=True)
-        result = _git_run(
-            ["worktree", "add", "-b", name, str(worktree_path), base],
-            cwd=repo_root,
-        )
-        if result.returncode != 0:
-            raise ToolExecutionError(
-                f"git worktree add failed (rc={result.returncode}): {result.stderr.strip()[:500]}"
+        try:
+            create_sparse_worktree(
+                repo_root,
+                worktree_path,
+                name,
+                base,
+                run_git=_git_run,
+                timeout=60,
             )
+        except GitWorktreeSetupError as exc:
+            raise ToolExecutionError(
+                str(exc)
+            ) from exc
 
         _write_session(ctx, {
             "active": True,

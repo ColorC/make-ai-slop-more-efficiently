@@ -338,9 +338,9 @@ def _submit_review_material(payload: dict[str, Any], review_store=None) -> dict[
     if payload.get("violation_count", 0) <= 0:
         return {"submitted": False, "reason": "clean"}
     if review_store is None:
-        from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+        from omnicompany.packages.services.boss_sight.reviewstage.routes import get_store
         review_store = get_store()
-    from omnicompany.dashboard.boss_sight.reviewstage.report_submission import submit_markdown_report
+    from omnicompany.packages.services.boss_sight.reviewstage.report_submission import submit_markdown_report
 
     reason = "后台发现计划文档含可变进度副本或 WhatNow 内部状态语义矛盾; 请只读核对证据。"
     return submit_markdown_report(

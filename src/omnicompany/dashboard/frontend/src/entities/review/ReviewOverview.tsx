@@ -12,6 +12,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { reviewstageApi, type Material } from '../../api/reviewstageClient'
+import { useBackgroundPoll } from '../../shell/panelRuntime'
 import { COLORS } from './shared'
 import { MaterialOverviewCard } from './MaterialOverviewCard'
 import KebabMenu, { type KebabItem } from '../../shared/view/ui/KebabMenu'
@@ -34,7 +35,7 @@ const S: Record<string, React.CSSProperties> = {
   actions: {
     position: 'sticky', top: 8, zIndex: 3, float: 'right', display: 'inline-flex',
     alignItems: 'center', gap: 6, margin: '8px 12px -44px 8px', padding: 4,
-    border: `1px solid ${COLORS.border}`, borderRadius: 8,
+    border: `1px solid ${COLORS.border}`, borderRadius: 2,
     background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
   },
@@ -49,7 +50,7 @@ const S: Record<string, React.CSSProperties> = {
     marginBottom: 12, borderBottom: `1px solid ${COLORS.border}`,
   },
   sectionDot: { width: 8, height: 8, borderRadius: 999, flex: 'none' },
-  sectionName: { fontSize: 13, fontWeight: 600, color: COLORS.text, letterSpacing: '-0.005em' },
+  sectionName: { fontSize: 13, fontWeight: 500, color: COLORS.text, letterSpacing: '-0.005em' },
   sectionCount: { fontSize: 12, color: COLORS.textDim },
   // CSS columns 瀑布流: 列间留 12 缝呼吸 (hero 卡内 column-span:all 横跨成头条带)。
   waterfall: { columns: '300px', columnGap: 12 } as React.CSSProperties,
@@ -123,14 +124,13 @@ export default function ReviewOverview({
     }
   }, [fetcher])
 
+  // pollMs = 0 表示"只加载一次, 不轮询"(默认值), 那一次在这里做。
   useEffect(() => {
-    void load()
-    if (pollMs > 0) {
-      const t = setInterval(() => void load(), pollMs)
-      return () => clearInterval(t)
-    }
-    return undefined
+    if (pollMs <= 0) void load()
   }, [load, pollMs])
+  // 后台节流(2026-08-07 页签常驻): 轮询只在这个页签可见且窗口在前台时跑, 切回来立刻补一次
+  // —— 常驻不等于常轮询。
+  useBackgroundPoll(load, pollMs)
 
   // items 引用不变(等价轮询)就不重算 → 衍生数组引用稳定 → 子树不被无谓重渲染。
   const ordered = useMemo(() => byTimeDesc(items), [items])

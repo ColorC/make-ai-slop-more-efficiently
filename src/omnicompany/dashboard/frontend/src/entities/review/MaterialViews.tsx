@@ -24,12 +24,14 @@ import { FileTreeDiffView } from './FileTreeDiffView'
 import { WebgameSpecView } from './WebgameSpecView'
 import { MaterialEmbed } from './MaterialEmbed'
 import KebabMenu, { type KebabItem } from '../../shared/view/ui/KebabMenu'
-import { ExternalLink, Copy, GitBranch, ArrowRight, TriangleAlert, MessageSquare } from 'lucide-react'
+import { ExternalLink, Copy, GitBranch, ArrowRight, TriangleAlert, MessageSquare, RotateCw } from 'lucide-react'
 import { registerKindRenderer, registerSchemaRenderer, resolveMaterialRenderer, schemaIdOf } from './rendererRegistry'
 import Lightbox from 'yet-another-react-lightbox'
 import Zoom from 'yet-another-react-lightbox/plugins/zoom'
 import 'yet-another-react-lightbox/styles.css'
 import './reviewFlow.css'
+import WebPagePanel from '../web_review/WebPagePanel'
+import { isSameOriginWebUrl } from '../../lib/webTabHost'
 
 // ── frostpane 玻璃外壳/字阶配方(冷色 token 复用 COLORS, 这里只补"卡片解剖"的共用片段)──
 // 信息层级靠字号: 标题 15-18 / 次级 13-14 / 最弱 12px 等宽弱灰; 4px 栅格呼吸。
@@ -38,7 +40,7 @@ const GLASS = {
   backdropFilter: 'var(--fp-blur)',
   WebkitBackdropFilter: 'var(--fp-blur)',
   border: `1px solid ${COLORS.border}`,
-  borderRadius: 11,
+  borderRadius: 3,
   boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
 } as const
 const MONO = "'Berkeley Mono','Consolas','Menlo',monospace"
@@ -121,10 +123,10 @@ function branchStorylineBody(data: any): React.ReactElement {
     <div style={{ padding: 24, color: COLORS.text }}>
       {/* 区标题 18px 主焦点 + 一行弱灰统计(字号建层级, 不堆说明文字) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <span style={{ width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', flex: 'none', color: COLORS.borderActive, background: ACCENT_SOFT }}>
+        <span style={{ width: 28, height: 28, borderRadius: 2, display: 'grid', placeItems: 'center', flex: 'none', color: COLORS.borderActive, background: ACCENT_SOFT }}>
           <GitBranch size={16} />
         </span>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 650, letterSpacing: '-0.01em' }}>{data.title || '分支剧情线'}</h2>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 500, letterSpacing: '-0.01em' }}>{data.title || '分支剧情线'}</h2>
       </div>
       <div style={{ color: 'var(--fp-text-3)', fontSize: 12, marginBottom: 20, fontFamily: MONO }}>
         节点 {(data.nodes || []).length} · 分支 {(data.branches || []).length}
@@ -136,7 +138,7 @@ function branchStorylineBody(data: any): React.ReactElement {
             {/* 卡顶: id 弱灰等宽 chip + 标题 15px 醒目 flex1 */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
               <span style={{ fontSize: 12, fontFamily: MONO, color: 'var(--fp-text-3)', flex: 'none' }}>{n.id || `节点${i + 1}`}</span>
-              <span style={{ fontSize: 15, fontWeight: 650, letterSpacing: '-0.01em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</span>
+              <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: '-0.01em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</span>
             </div>
             {n.body && <div style={{ fontSize: 13, lineHeight: 1.5, marginTop: 8, color: COLORS.textDim }}>{n.body}</div>}
             {n.choices && n.choices.length > 0 && (
@@ -173,7 +175,7 @@ export function ImageMaterialView({ m }: { m: Material }) {
         src={src}
         alt={m.title}
         onClick={() => setZoomOpen(true)}
-        style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 11, boxShadow: 'var(--fp-shadow)', cursor: 'zoom-in' }}
+        style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: 3, boxShadow: 'var(--fp-shadow)', cursor: 'zoom-in' }}
         data-testid="material-image"
       />
       <div ref={portalRef.setNode} style={{ display: 'contents' }} />
@@ -266,11 +268,31 @@ export function MarkdownMaterialView({ m }: { m: Material }) {
 const wikiMarkdown = createRenderer()
 
 
+/** 给地址挂一个一次性参数, 强制浏览器重新取(不改地址就只会吃缓存)。 */
+function withReloadNonce(url: string, nonce: number): string {
+  if (nonce === 0) return url
+  return `${url}${url.includes('?') ? '&' : '?'}_rf=${nonce}`
+}
+
 export function HtmlMaterialView({ m }: { m: Material }) {
-  // 实时网页材料(如 walker-game): extra.live_url 经 dashboard 代理同源; 优先于落盘文件。
-  const liveUrl = (m.extra as Record<string, unknown> | undefined)?.live_url as string | undefined
-  const src = liveUrl ?? (m.file_relpath ? reviewstageApi.fileUrl(m.id) : undefined)
+  // 实时网页材料(如 walker-game / bside): extra.live_url 经 dashboard 代理同源。
+  const extra = (m.extra as Record<string, unknown> | undefined) ?? {}
+  const liveUrl = extra.live_url as string | undefined
+  // 快照有两种来法: 上传进 review store 的那份, 或同样走路由的一个冻结地址
+  // (extra.snapshot_url)。后者让"留一份提交那刻的样子"也不必往 store 里堆文件。
+  const snapshotUrl = (extra.snapshot_url as string | undefined)
+    ?? (m.file_relpath ? reviewstageApi.fileUrl(m.id) : undefined)
+  // 两种模式可以并存: live_url 是"现在的样子", 落盘文件是"提交那刻的样子"。
+  // 以前只挑一个(live 优先), 于是路由型材料看不到快照、快照型材料没法看现况。
+  // 用户 2026-08-07: "应当多种模式都支持"。
+  const [mode, setMode] = useState<'live' | 'snapshot'>(liveUrl ? 'live' : 'snapshot')
+  // 刷新: 活页面的内容会变(产物重生成), 但 iframe 不会自己重取 —— 必须给一个按钮。
+  const [nonce, setNonce] = useState(0)
+  const chosen = mode === 'live' ? liveUrl : snapshotUrl
+  const src = chosen ? withReloadNonce(chosen, nonce) : (liveUrl ?? snapshotUrl)
   const useSrcdoc = !src && !!m.inline_content
+  const useSharedExternalSurface = mode === 'live' && !!src && !isSameOriginWebUrl(src)
+  const showBar = Boolean(liveUrl || snapshotUrl)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [slides, setSlides] = useState<{ src: string; alt?: string }[]>([])
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -320,18 +342,63 @@ export function HtmlMaterialView({ m }: { m: Material }) {
   // 全屏看网页本体走顶栏"在页签打开", 这里不再放重复按钮。整块就是网页本体, 让它占满。
   return (
     <>
-      <iframe
-        ref={iframeRef}
-        data-testid="material-html"
-        src={src}
-        srcDoc={useSrcdoc ? (m.inline_content || undefined) : undefined}
-        onLoad={wireImages}
-        // allow-popups: 材料内 target=_blank 体验链接(playground/游戏/本地demo)要能弹新页(2026-07-06 用户"点不开");
-        // popups-to-escape-sandbox: 弹出的新页不继承沙箱, 否则目标站脚本被禁照样白屏
-        sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
-        style={{ flex: 1, border: 'none', background: '#fff', width: '100%', minHeight: 0 }}
-        title={m.title}
-      />
+      {showBar && (
+        <div className="rf-webbar" data-testid="material-web-modes">
+          {liveUrl && snapshotUrl && (
+            <span className="rf-webmodes" role="radiogroup" aria-label="呈现模式">
+              <button
+                type="button" role="radio" aria-checked={mode === 'live'}
+                data-testid="material-mode-live"
+                title={`活页面: 每次打开都取当前的 ${liveUrl}`}
+                onClick={() => { setMode('live'); setNonce((n) => n + 1) }}
+              >活页面</button>
+              <button
+                type="button" role="radio" aria-checked={mode === 'snapshot'}
+                data-testid="material-mode-snapshot"
+                title="快照: 提交那一刻落盘的副本, 不随后续改动变"
+                onClick={() => { setMode('snapshot'); setNonce((n) => n + 1) }}
+              >快照</button>
+            </span>
+          )}
+          <span className="rf-websrc" title={chosen || ''}>
+            {liveUrl && mode === 'live' ? liveUrl : '提交时的快照'}
+          </span>
+          <button
+            type="button" className="rf-webreload"
+            data-testid="material-web-reload"
+            title="重新取一次(活页面的内容会随重生成而变, iframe 自己不会重取)"
+            onClick={() => setNonce((n) => n + 1)}
+          ><RotateCw size={12} aria-hidden />刷新</button>
+          {chosen && (
+            <a className="rf-webopen" href={chosen} target="_blank" rel="noreferrer"
+              data-testid="material-web-open" title="在新页签打开">
+              <ExternalLink size={12} aria-hidden />新页签
+            </a>
+          )}
+        </div>
+      )}
+      {useSharedExternalSurface ? (
+        <WebPagePanel
+          key={`${mode}-${nonce}`}
+          target={{ title: m.title, url: src! }}
+          instanceId={`review-material:${m.id}`}
+          showToolbar={false}
+        />
+      ) : (
+        <iframe
+          ref={iframeRef}
+          key={`${mode}-${nonce}`}
+          data-testid="material-html"
+          src={src}
+          srcDoc={useSrcdoc ? (m.inline_content || undefined) : undefined}
+          onLoad={wireImages}
+          // allow-popups: 材料内 target=_blank 体验链接(playground/游戏/本地demo)要能弹新页(2026-07-06 用户"点不开");
+          // popups-to-escape-sandbox: 弹出的新页不继承沙箱, 否则目标站脚本被禁照样白屏
+          sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          style={{ flex: 1, border: 'none', background: '#fff', width: '100%', minHeight: 0 }}
+          title={m.title}
+        />
+      )}
       <div ref={portalRef.setNode} style={{ display: 'contents' }} />
       <Lightbox
         open={lightboxIndex !== null}
@@ -370,11 +437,11 @@ export function AigcImageView({ m }: { m: Material }) {
       {/* 工具条不再一排等权链接: 标题占主, 主操作做显眼按钮, 低频(复制链接)收进 ⋯ */}
       <div style={TOOLBAR}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: domainColor.cyan, flex: 'none' }} />
-        <span style={{ fontSize: 14, color: COLORS.text, fontWeight: 600, letterSpacing: '-0.01em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>AIGC 图片</span>
+        <span style={{ fontSize: 14, color: COLORS.text, fontWeight: 500, letterSpacing: '-0.01em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>AIGC 图片</span>
         <a
           href={labUrl} target="_blank" rel="noreferrer"
           data-testid="material-aigc-open"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, background: COLORS.borderActive, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none', boxShadow: '0 2px 10px rgba(0,0,0,.30)' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 2, background: COLORS.borderActive, color: '#fff', fontSize: 13, fontWeight: 500, textDecoration: 'none', boxShadow: '0 2px 10px rgba(0,0,0,.30)' }}
         >
           <ExternalLink size={14} /> 在 aigc-lab 打开
         </a>
@@ -408,12 +475,12 @@ export function CustomTemplateMaterialView({ m }: { m: Material }) {
     <div data-testid="material-custom-template" style={{ height: '100%', overflow: 'auto', background: 'transparent' }}>
       {/* 工具条: 标题 + schema 做等宽 chip + 未注册做警告徽章(状态叠图标+文案, 不只靠色) */}
       <div style={{ ...TOOLBAR, position: 'sticky', top: 0, zIndex: 1, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, color: COLORS.text, fontWeight: 600, letterSpacing: '-0.01em' }}>自定义网页模板</span>
+        <span style={{ fontSize: 14, color: COLORS.text, fontWeight: 500, letterSpacing: '-0.01em' }}>自定义网页模板</span>
         <span style={{ fontSize: 12, fontFamily: MONO, color: COLORS.textDim, padding: '2px 9px', borderRadius: 999, background: 'rgba(255,255,255,.05)', border: `1px solid ${COLORS.border}` }}>
           schema={schemaId || '(none)'}
         </span>
         {schemaId && (
-          <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, padding: '2px 9px', borderRadius: 999, color: COLORS.important, background: WARN_SOFT, border: `1px solid ${WARN_RIM}` }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 500, padding: '2px 9px', borderRadius: 999, color: COLORS.important, background: WARN_SOFT, border: `1px solid ${WARN_RIM}` }}>
             <TriangleAlert size={11} aria-hidden style={{ verticalAlign: -1 }} /> 未注册 schema · 回退 raw JSON
           </span>
         )}
@@ -444,8 +511,8 @@ export function KeyQuestionMaterialView({ m }: { m: Material }) {
     <div data-testid="material-key-question" style={{ padding: 24, color: COLORS.text, height: '100%', overflow: 'auto', maxWidth: 880, margin: '0 auto', background: 'transparent' }}>
       {/* 问题做单一主焦点: 玻璃卡内嵌弱灰标签 chip + 18px 题干, 字号建层级 */}
       <div style={{ ...GLASS, borderLeft: `3px solid ${COLORS.important}`, padding: 20, marginBottom: 20 }}>
-        <span style={{ display: 'inline-block', fontSize: 12, fontWeight: 600, letterSpacing: '.04em', color: COLORS.important, padding: '2px 9px', borderRadius: 999, background: WARN_SOFT, marginBottom: 12 }}>关键问题</span>
-        <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>{question}</div>
+        <span style={{ display: 'inline-block', fontSize: 12, fontWeight: 500, letterSpacing: '.04em', color: COLORS.important, padding: '2px 9px', borderRadius: 999, background: WARN_SOFT, marginBottom: 12 }}>关键问题</span>
+        <div style={{ fontSize: 18, fontWeight: 500, lineHeight: 1.5, letterSpacing: '-0.01em' }}>{question}</div>
       </div>
       {options && options.length > 0 && (
         // 选项从单列 → 自适应卡片网格, 字母做醒目圆 chip(signifier: 看起来可点)
@@ -460,7 +527,7 @@ export function KeyQuestionMaterialView({ m }: { m: Material }) {
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = COLORS.borderActive; e.currentTarget.style.background = 'var(--fp-glass-2)' }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = COLORS.border; e.currentTarget.style.background = 'var(--fp-glass)' }}
             >
-              <span style={{ flex: 'none', width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: MONO, color: COLORS.textDim, background: 'rgba(255,255,255,.06)', border: `1px solid ${COLORS.border}` }}>{String.fromCharCode(65 + i)}</span>
+              <span style={{ flex: 'none', width: 22, height: 22, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 500, fontFamily: MONO, color: COLORS.textDim, background: 'rgba(255,255,255,.06)', border: `1px solid ${COLORS.border}` }}>{String.fromCharCode(65 + i)}</span>
               <span style={{ flex: 1, minWidth: 0 }}>{opt}</span>
             </div>
           ))}
@@ -469,7 +536,7 @@ export function KeyQuestionMaterialView({ m }: { m: Material }) {
       {explanation && (
         // 说明降级为渐进披露(默认收起), 与选项区拉开间距
         <details style={{ ...GLASS, marginTop: 20, color: COLORS.textDim, fontSize: 13, padding: '12px 16px' }}>
-          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 550, color: COLORS.textDim, listStyle: 'none' }}>说明 ›</summary>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: COLORS.textDim, listStyle: 'none' }}>说明 ›</summary>
           <div style={{ padding: '12px 0 0', lineHeight: 1.5 }}>{explanation}</div>
         </details>
       )}
@@ -526,7 +593,7 @@ export function VideoMaterialView({ m }: { m: Material }) {
         src={yt}
         sandbox="allow-same-origin allow-scripts allow-presentation"
         allow="encrypted-media; picture-in-picture; fullscreen"
-        style={{ flex: 1, border: 'none', background: '#000', width: '100%', minHeight: 0 }}
+        style={{ flex: 1, border: 'none', background: 'var(--fp-bp-solid)', width: '100%', minHeight: 0 }}
         title={m.title}
       />
     )
@@ -556,13 +623,13 @@ export function VideoMaterialView({ m }: { m: Material }) {
           data-testid="material-video-error"
           style={{ ...GLASS, width: '100%', aspectRatio: '16 / 9', maxHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: WARN_SOFT, borderColor: WARN_RIM }}
         >
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fp-text-1)' }}>此环境播放失败（{playError}）</div>
-          <div style={{ fontSize: 12.5, color: 'var(--fp-text-3)', maxWidth: 520, textAlign: 'center', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fp-text-1)' }}>此环境播放失败（{playError}）</div>
+          <div style={{ fontSize: 13, color: 'var(--fp-text-3)', maxWidth: 520, textAlign: 'center', lineHeight: 1.6 }}>
             审阅不必卡在播放器：下方帧带是服务端抽好的关键帧；也可用"在浏览器打开"用系统浏览器满血播放。
           </div>
         </div>
       ) : (
-        <div style={{ width: '100%', aspectRatio: '16 / 9', maxHeight: '72vh', background: '#000', borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+        <div style={{ width: '100%', aspectRatio: '16 / 9', maxHeight: '72vh', background: 'var(--fp-bp-solid)', borderRadius: 3, overflow: 'hidden', flexShrink: 0 }}>
           <video
             ref={videoRef}
             data-testid="material-video"
@@ -587,21 +654,21 @@ export function VideoMaterialView({ m }: { m: Material }) {
           href={absSrc}
           target="_blank"
           rel="noreferrer"
-          style={{ ...GLASS, padding: '6px 14px', fontSize: 12.5, color: 'var(--fp-accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          style={{ ...GLASS, padding: '6px 14px', fontSize: 13, color: 'var(--fp-accent)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
         >
           <ExternalLink size={13} /> 在浏览器打开
         </a>
         <a
           href={absSrc}
           download={`${m.id}.${ext || 'webm'}`}
-          style={{ ...GLASS, padding: '6px 14px', fontSize: 12.5, color: 'var(--fp-text-2)', textDecoration: 'none' }}
+          style={{ ...GLASS, padding: '6px 14px', fontSize: 13, color: 'var(--fp-text-2)', textDecoration: 'none' }}
         >
           下载
         </a>
         <button
           type="button"
           onClick={copyLink}
-          style={{ ...GLASS, padding: '6px 14px', fontSize: 12.5, color: 'var(--fp-text-2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          style={{ ...GLASS, padding: '6px 14px', fontSize: 13, color: 'var(--fp-text-2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
         >
           <Copy size={13} /> {copied ? '已复制' : '复制链接'}
         </button>
@@ -621,7 +688,7 @@ export function VideoMaterialView({ m }: { m: Material }) {
                 if (!playError) { e.preventDefault(); seekTo(f.position) }
               }}
               title={`${Math.round(f.position * 100)}% 处 · 点击${playError ? '看大图' : '跳播'}`}
-              style={{ flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}`, lineHeight: 0 }}
+              style={{ flexShrink: 0, borderRadius: 2, overflow: 'hidden', border: `1px solid ${COLORS.border}`, lineHeight: 0 }}
             >
               <img src={f.url} alt={`frame ${f.index}`} style={{ height: 86, display: 'block' }} />
             </a>

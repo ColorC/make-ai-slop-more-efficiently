@@ -2,7 +2,7 @@
 # [OMNI] material_id="material:services.learning.hypothesis.package.exports.py"
 """hypothesis — 假设-学习服务。
 
-循环：Experimenter (AgentNodeLoop) → Reflector (AgentNodeLoop) → (loop)
+循环：外置只读 Experimenter → 外置零工具 Reflector → (loop)
 真实多轮由 run_session 外部驱动；TeamSpec 仅声明单轮拓扑。
 
 公开接口：

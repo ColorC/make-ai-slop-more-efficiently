@@ -520,6 +520,7 @@ class LofaOutboundProvider(TargetProvider):
 
 class DeviceGateway:
     _PRE_RESERVED_ACTION_KEY = "ai_player_pre_reserved_action"
+    _SOURCE_STATE_GUARD_UNSET = object()
 
     @staticmethod
     def _expanded_source_region(
@@ -546,6 +547,7 @@ class DeviceGateway:
         providers: list[TargetProvider] | None = None,
         *,
         clock: Callable[[], datetime] = _now,
+        ai_player_store: Any | None = None,
     ) -> None:
         self.store = store
         self.providers = providers or [
@@ -555,8 +557,29 @@ class DeviceGateway:
             LofaOutboundProvider(),
         ]
         self.clock = clock
+        self._ai_player_store = ai_player_store
         self._adb_adapter_lock = threading.RLock()
         self._adb_adapters: dict[tuple[str, str], AdbAdapter] = {}
+
+    def _bound_ai_player_store(self) -> Any:
+        """Reuse the route's initialized player store across high-frequency actions."""
+
+        if self._ai_player_store is None:
+            from .ai_player.store import AIPlayerStore
+
+            self._ai_player_store = AIPlayerStore(self.store)
+        return self._ai_player_store
+
+    def bind_ai_player_store(self, player_store: Any) -> None:
+        """Bind an already initialized canonical player store to this gateway runtime."""
+
+        player_observatory = getattr(player_store, "observatory_store", None)
+        player_db_path = getattr(player_observatory, "db_path", None)
+        if player_db_path is None or Path(player_db_path).resolve() != Path(
+            self.store.db_path
+        ).resolve():
+            raise ValueError("AI player store belongs to another Observatory store")
+        self._ai_player_store = player_store
 
     def control(self, target_id: str) -> GatewayControl:
         return self.store.get_gateway_control(target_id) or GatewayControl(target_id=target_id)
@@ -830,11 +853,9 @@ class DeviceGateway:
             AIPlayerSessionControl,
             AIPlayerSessionError,
         )
-        from .ai_player.store import AIPlayerStore
-
         try:
             session = AIPlayerSessionControl(
-                AIPlayerStore(self.store)
+                self._bound_ai_player_store()
             ).assert_session_can_act(environment_id, session_id)
         except AIPlayerSessionError as exc:
             raise GatewayError(f"{exc.code}: {exc.message}") from exc
@@ -861,9 +882,7 @@ class DeviceGateway:
             AIPlayerSessionControl,
             AIPlayerSessionError,
         )
-        from .ai_player.store import AIPlayerStore
-
-        player_store = AIPlayerStore(self.store)
+        player_store = self._bound_ai_player_store()
         try:
             session = AIPlayerSessionControl(player_store).assert_session_lease_active(
                 environment_id,
@@ -920,15 +939,14 @@ class DeviceGateway:
             AIPlayerSessionControl,
             AIPlayerSessionError,
         )
-        from .ai_player.store import AIPlayerStore
-
         try:
-            session = AIPlayerSessionControl(AIPlayerStore(self.store)).reserve_action(
+            session = AIPlayerSessionControl(self._bound_ai_player_store()).reserve_action(
                 environment_id,
                 session_id,
                 command_id=f"gateway-action-reserve.{step.id}",
                 actor="Game Observatory Gateway",
                 reason=f"为 EvidenceStep {step.id} 预留一次设备动作预算。",
+                evidence_step_ids=(step.id,),
             )
         except AIPlayerSessionError as exc:
             raise GatewayError(f"{exc.code}: {exc.message}") from exc
@@ -1147,11 +1165,14 @@ class DeviceGateway:
         sample_interval_seconds: float = 0.25,
         terminal_condition: EvidenceTerminalCondition | None = None,
         dynamic_scene_profile: EvidenceDynamicSceneProfile | None = None,
-        capture_profile: Literal["full", "compact_static"] = "full",
+        capture_profile: Literal[
+            "full", "compact_static", "guarded_batch_checkpoint"
+        ] = "full",
         action_task_id: str | None = None,
         reused_before_artifact_id: str | None = None,
         trusted_terminal_reference_artifact_id: str | None = None,
         trusted_terminal_max_visual_distance: float = 0.012,
+        source_state_guard: dict[str, Any] | None | object = _SOURCE_STATE_GUARD_UNSET,
     ) -> EvidenceStep:
         run = self.store.get_evidence_run(evidence_run_id)
         if not run:
@@ -1160,7 +1181,11 @@ class DeviceGateway:
         recorder = EvidenceRecorder(self.store, adapter)
 
         def authorize(step: EvidenceStep) -> None:
-            guard = run.environment.get("source_state_guard")
+            guard = (
+                run.environment.get("source_state_guard")
+                if source_state_guard is self._SOURCE_STATE_GUARD_UNSET
+                else source_state_guard
+            )
             if guard is not None:
                 if not isinstance(guard, dict):
                     raise GatewayError("invalid source-state guard")
@@ -1173,7 +1198,11 @@ class DeviceGateway:
                 maximum = float(guard.get("max_visual_distance") or 0)
                 if not 0 < maximum <= 1:
                     raise GatewayError("source-state guard threshold is invalid")
-                distance = perceptual_frame_distance(source.path, before.path)
+                distance = (
+                    0.0
+                    if source.id == before.id and source.sha256 == before.sha256
+                    else perceptual_frame_distance(source.path, before.path)
+                )
                 dynamic = guard.get("dynamic_target_guard")
                 if isinstance(dynamic, dict):
                     if step.target_bounds is None:
@@ -1214,16 +1243,20 @@ class DeviceGateway:
                         viewport_width=step.viewport_width,
                         viewport_height=step.viewport_height,
                     )
-                    target_distance = regional_perceptual_frame_distance(
-                        source.path,
-                        before.path,
-                        step.target_bounds,
-                    )
-                    context_distance = regional_structural_frame_distance(
-                        source.path,
-                        before.path,
-                        context_bounds,
-                    )
+                    if source.id == before.id and source.sha256 == before.sha256:
+                        target_distance = 0.0
+                        context_distance = 0.0
+                    else:
+                        target_distance = regional_perceptual_frame_distance(
+                            source.path,
+                            before.path,
+                            step.target_bounds,
+                        )
+                        context_distance = regional_structural_frame_distance(
+                            source.path,
+                            before.path,
+                            context_bounds,
+                        )
                     if (
                         distance > global_maximum
                         or target_distance > target_maximum

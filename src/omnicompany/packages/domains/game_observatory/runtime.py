@@ -798,8 +798,8 @@ class GameObservatory:
             self.compile_public()
         return report
 
-    def device_gateway(self) -> DeviceGateway:
-        return DeviceGateway(self.store)
+    def device_gateway(self, *, ai_player_store: Any | None = None) -> DeviceGateway:
+        return DeviceGateway(self.store, ai_player_store=ai_player_store)
 
     def discover_targets(self, *, refresh: bool = False) -> list[dict[str, Any]]:
         gateway = self.device_gateway()

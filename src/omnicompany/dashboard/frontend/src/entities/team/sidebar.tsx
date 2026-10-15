@@ -54,18 +54,18 @@ const S: Record<string, any> = {
   tree: { fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' },
   dir: (depth: number): React.CSSProperties => ({
     padding: '2px 0', paddingLeft: 4 + depth * 12, cursor: 'pointer',
-    color: '#a8a8a8', userSelect: 'none' as const,
+    color: 'var(--fp-text)', userSelect: 'none' as const,
     fontWeight: depth === 0 ? 'bold' as const : 'normal' as const,
   }),
-  arr: { color: '#666', display: 'inline-block', width: 12 },
-  count: { color: '#777', marginLeft: 6, fontSize: 14 },
+  arr: { color: 'var(--fp-text-2)', display: 'inline-block', width: 12 },
+  count: { color: 'var(--fp-text-2)', marginLeft: 6, fontSize: 14 },
   item: (depth: number, active: boolean): React.CSSProperties => ({
     padding: '2px 0', paddingLeft: 4 + depth * 12 + 12, cursor: 'pointer',
-    color: active ? '#90caf9' : '#d0d0d0',
-    background: active ? '#1a2a3a' : 'transparent',
+    color: active ? 'var(--fp-link)' : 'var(--fp-text)',
+    background: active ? 'var(--fp-bp-paper-2)' : 'transparent',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   }),
-  empty: { padding: 8, color: '#888', fontSize: 14 },
+  empty: { padding: 8, color: 'var(--fp-text-2)', fontSize: 14 },
 }
 
 interface NodeRowProps {

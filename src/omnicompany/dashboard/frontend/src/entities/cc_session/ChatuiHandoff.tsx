@@ -8,8 +8,8 @@ export const ChatuiHandoff: React.FC<{ provider?: string }> = ({ provider }) => 
   const isController = provider === 'controller'
   return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, color: 'var(--fp-text)', background: 'transparent' }} data-testid="cc-chat-chatui-handoff">
-      <div style={{ maxWidth: 420, textAlign: 'center', border: '1px solid var(--fp-border)', borderRadius: 8, padding: 24, background: 'var(--fp-solid)' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
+      <div style={{ maxWidth: 420, textAlign: 'center', border: '1px solid var(--fp-border)', borderRadius: 2, padding: 24, background: 'var(--fp-solid)' }}>
+        <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>
           {isController ? '总控对话已迁到 chatui' : '聊天已迁到 chatui'}
         </div>
         <div style={{ color: 'var(--fp-text-3)', fontSize: 14, lineHeight: 1.6, marginBottom: 16 }}>
@@ -19,7 +19,7 @@ export const ChatuiHandoff: React.FC<{ provider?: string }> = ({ provider }) => 
         </div>
         <button
           type="button"
-          style={{ border: '1px solid var(--fp-accent)', background: 'var(--fp-accent)', color: '#fff', borderRadius: 5, padding: '7px 16px', cursor: 'pointer', fontSize: 14 }}
+          style={{ border: '1px solid rgba(255,240,235,.55)', background: 'var(--fp-bp-seal)', color: '#fff', borderRadius: 2, padding: '7px 16px', cursor: 'pointer', fontSize: 14 }}
           onClick={() => openChatui(isController ? 'controller' : undefined)}
           data-testid="cc-chat-open-chatui"
         >

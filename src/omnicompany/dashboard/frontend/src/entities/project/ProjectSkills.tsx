@@ -79,7 +79,7 @@ export default function ProjectSkills({ projectRoots }: { projectRoots: string[]
           data-testid="project-skills-filter"
           style={{
             flex: '0 1 340px', minWidth: 200, boxSizing: 'border-box', padding: '7px 11px',
-            border: '1px solid var(--fp-border)', borderRadius: 7, background: 'var(--fp-surface)',
+            border: '1px solid var(--fp-border)', borderRadius: 2, background: 'var(--fp-surface)',
             color: 'var(--fp-text)', fontSize: 13, outline: 'none',
           }}
         />

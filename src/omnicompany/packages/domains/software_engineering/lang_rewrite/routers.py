@@ -2130,7 +2130,7 @@ class SignatureComparatorRouter(Router):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class BehavioralTesterRouter(Router):
-    """确定性行为测试：用固定模板验证 TS 模块能被导入、接口能被实例化。
+    """确定性行为测试：执行 TS 导入检查或 Rust crate 测试/golden vectors。
 
     不依赖 LLM 生成测试脚本（这是 EquivalenceVerifier 旧设计的致命缺陷）。
     只验证"能导入 + 接口存在 + 基础类型正确"三件事，确定性执行。
@@ -2139,10 +2139,11 @@ class BehavioralTesterRouter(Router):
     """
     FORMAT_IN = "rewrite.interface-spec"
     FORMAT_OUT = "rewrite.behavioral-tested"
-    DESCRIPTION = "L3b: 确定性 import 测试 + 接口存在性验证（不依赖 LLM 生成脚本）"
+    DESCRIPTION = "L3b: 确定性 TS import 或 Rust crate/golden-vector 行为测试"
 
-    def __init__(self, *, ts_dir: str | None = None):
+    def __init__(self, *, ts_dir: str | None = None, rs_dir: str | None = None):
         self._ts_dir = Path(ts_dir) if ts_dir else None
+        self._rs_dir = Path(rs_dir) if rs_dir else None
 
     def run(self, input_data: dict) -> Verdict:
         generated_code: str = input_data.get("generated_code", "")
@@ -2151,10 +2152,19 @@ class BehavioralTesterRouter(Router):
         interface_spec: dict = input_data.get("interface_spec", {})
         ts_ifaces = interface_spec.get("typescript", [])
 
+        if target_lang == "rust":
+            return self._run_rust(input_data)
+
         if target_lang != "typescript":
             return Verdict(
                 kind=VerdictKind.PASS,
-                output={**input_data, "behavioral_test_result": {"skipped": True}},
+                output={
+                    **input_data,
+                    "behavioral_test_result": {
+                        "skipped": True,
+                        "backend": target_lang,
+                    },
+                },
                 diagnosis=f"BehavioralTester: {target_lang} 暂不支持，跳过",
                 confidence=1.0,
             )
@@ -2258,6 +2268,334 @@ class BehavioralTesterRouter(Router):
         lines.append("")
         lines.append("export {};  // ensure module mode")
         return "\n".join(lines)
+
+    def _run_rust(self, input_data: dict) -> Verdict:
+        """把生成模块放进 crate，执行已签入测试和可选 golden vectors。
+
+        ``behavioral_test_spec``（或 ``behavioral_test_spec_path`` 指向的 JSON）可含：
+        ``command``（argv 数组）和 ``vectors``。每个 vector 可用 ``stdin_json`` /
+        ``expected_json`` 做结构比较，或用 ``stdin`` / ``expected_stdout`` 做逐 byte
+        比较；首差分别报告 JSON Pointer 或 byte offset。
+        """
+        generated_code = str(input_data.get("generated_code", ""))
+        source_path = str(input_data.get("source_path", "module"))
+        rs_dir = self._rs_dir or Path(
+            input_data.get("rs_dir")
+            or input_data.get("work_dir")
+            or "data/rewrite/rs_phase1"
+        )
+        module_name = re.sub(r"\W", "_", Path(source_path).stem)
+        src_dir = rs_dir / "src"
+        cargo_toml = rs_dir / "Cargo.toml"
+        if not cargo_toml.exists():
+            return self._rust_failure(
+                input_data,
+                "missing_cargo_toml",
+                f"Rust 行为测试需要 crate，但未找到 {cargo_toml}",
+            )
+
+        src_dir.mkdir(parents=True, exist_ok=True)
+        target_file = src_dir / f"{module_name}.rs"
+        lib_file = src_dir / "lib.rs"
+        target_backup = target_file.read_bytes() if target_file.exists() else None
+        lib_backup = lib_file.read_bytes() if lib_file.exists() else None
+        target_file.write_text(generated_code, encoding="utf-8")
+        mod_decl = f"pub mod {module_name};"
+        lib_text = lib_file.read_text(encoding="utf-8") if lib_file.exists() else ""
+        if not re.search(rf"(?m)^\s*(?:pub\s+)?mod\s+{re.escape(module_name)}\s*;", lib_text):
+            lib_file.write_text(
+                f"{lib_text.rstrip()}\n{mod_decl}\n" if lib_text else f"{mod_decl}\n",
+                encoding="utf-8",
+            )
+
+        try:
+            listed = subprocess.run(
+                ["cargo", "test", "--quiet", "--", "--list"],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                cwd=str(rs_dir),
+                encoding="utf-8",
+                errors="replace",
+                env=_rust_env(),
+            )
+            if listed.returncode != 0:
+                errors = (listed.stderr or listed.stdout).strip()
+                return self._rust_failure(
+                    input_data,
+                    "cargo_test_list_failed",
+                    errors[:1000],
+                )
+            discovered = sum(
+                1 for line in listed.stdout.splitlines() if re.search(r":\s+test\s*$", line)
+            )
+
+            tested = subprocess.run(
+                ["cargo", "test", "--quiet"],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=str(rs_dir),
+                encoding="utf-8",
+                errors="replace",
+                env=_rust_env(),
+            )
+            if tested.returncode != 0:
+                errors = (tested.stderr or tested.stdout).strip()
+                return self._rust_failure(
+                    input_data,
+                    "cargo_test_failed",
+                    errors[:1000],
+                    cargo_tests_discovered=discovered,
+                )
+
+            try:
+                spec = self._load_rust_behavioral_spec(input_data, rs_dir)
+            except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                return self._rust_failure(
+                    input_data,
+                    "invalid_behavioral_test_spec",
+                    str(exc),
+                    cargo_tests_discovered=discovered,
+                )
+            vector_result = self._run_rust_vectors(spec, rs_dir)
+            vector_count = int(vector_result.get("vectors_executed", 0))
+            if vector_result.get("passed") is False:
+                return self._rust_failure(
+                    input_data,
+                    "golden_vector_mismatch",
+                    str(vector_result.get("error") or vector_result.get("first_difference")),
+                    cargo_tests_discovered=discovered,
+                    vector_result=vector_result,
+                )
+            if discovered == 0 and vector_count == 0:
+                return self._rust_failure(
+                    input_data,
+                    "no_behavioral_cases",
+                    "Rust crate 没有已签入测试，且未提供 behavioral_test_spec vectors",
+                    cargo_tests_discovered=0,
+                )
+
+            btest = {
+                "passed": True,
+                "skipped": False,
+                "backend": "rust",
+                "cargo_tests_discovered": discovered,
+                "golden_vectors_executed": vector_count,
+                "first_difference": None,
+            }
+            return Verdict(
+                kind=VerdictKind.PASS,
+                output={**input_data, "behavioral_test_result": btest},
+                diagnosis=(
+                    "BehavioralTester PASS: Rust cargo tests "
+                    f"{discovered}，golden vectors {vector_count}"
+                ),
+                confidence=1.0,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return self._rust_failure(input_data, "rust_test_execution_failed", str(exc))
+        finally:
+            if target_backup is None:
+                target_file.unlink(missing_ok=True)
+            else:
+                target_file.write_bytes(target_backup)
+            if lib_backup is None:
+                lib_file.unlink(missing_ok=True)
+            else:
+                lib_file.write_bytes(lib_backup)
+
+    @staticmethod
+    def _load_rust_behavioral_spec(input_data: dict, rs_dir: Path) -> dict | None:
+        spec = input_data.get("behavioral_test_spec")
+        spec_path = input_data.get("behavioral_test_spec_path")
+        if spec is not None and spec_path is not None:
+            raise ValueError("只能提供 behavioral_test_spec 或 behavioral_test_spec_path 之一")
+        if spec_path is not None:
+            path = Path(str(spec_path))
+            if not path.is_absolute():
+                path = rs_dir / path
+            spec = json.loads(path.read_text(encoding="utf-8"))
+        if spec is not None and not isinstance(spec, dict):
+            raise TypeError("behavioral_test_spec 必须是 JSON object")
+        return spec
+
+    @classmethod
+    def _run_rust_vectors(cls, spec: dict | None, rs_dir: Path) -> dict:
+        if spec is None:
+            return {"passed": True, "vectors_executed": 0, "first_difference": None}
+        command = spec.get("command")
+        vectors = spec.get("vectors", [])
+        if not isinstance(command, list) or not command or not all(
+            isinstance(item, str) and item for item in command
+        ):
+            raise ValueError("behavioral_test_spec.command 必须是非空 argv 字符串数组")
+        if not isinstance(vectors, list):
+            raise TypeError("behavioral_test_spec.vectors 必须是数组")
+        timeout = int(spec.get("timeout_seconds", 120))
+        for index, vector in enumerate(vectors):
+            if not isinstance(vector, dict):
+                raise TypeError(f"vector {index} 必须是 object")
+            argv = [*command, *[str(item) for item in vector.get("args", [])]]
+            if "stdin_json" in vector:
+                stdin = json.dumps(
+                    vector["stdin_json"],
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            else:
+                stdin = str(vector.get("stdin", ""))
+            completed = subprocess.run(
+                argv,
+                input=stdin,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=str(rs_dir),
+                encoding="utf-8",
+                errors="replace",
+                env=_rust_env(),
+            )
+            name = str(vector.get("name", index))
+            if completed.returncode != 0:
+                return {
+                    "passed": False,
+                    "vectors_executed": index + 1,
+                    "failed_vector": name,
+                    "error": (completed.stderr or completed.stdout)[:1000],
+                    "first_difference": {"kind": "process_exit", "returncode": completed.returncode},
+                }
+            if "expected_json" in vector:
+                try:
+                    actual = json.loads(completed.stdout)
+                except json.JSONDecodeError as exc:
+                    return {
+                        "passed": False,
+                        "vectors_executed": index + 1,
+                        "failed_vector": name,
+                        "error": f"stdout 不是合法 JSON: {exc}",
+                        "first_difference": {"kind": "json_parse", "offset": exc.pos},
+                    }
+                difference = cls._first_json_difference(vector["expected_json"], actual)
+            else:
+                expected = str(vector.get("expected_stdout", "")).encode("utf-8")
+                actual_bytes = completed.stdout.encode("utf-8")
+                difference = cls._first_byte_difference(expected, actual_bytes)
+            if difference is not None:
+                return {
+                    "passed": False,
+                    "vectors_executed": index + 1,
+                    "failed_vector": name,
+                    "first_difference": difference,
+                }
+        return {
+            "passed": True,
+            "vectors_executed": len(vectors),
+            "first_difference": None,
+        }
+
+    @classmethod
+    def _first_json_difference(cls, expected: Any, actual: Any, path: str = "") -> dict | None:
+        if type(expected) is not type(actual):
+            return {
+                "kind": "json_pointer",
+                "path": path or "",
+                "expected": expected,
+                "actual": actual,
+            }
+        if isinstance(expected, dict):
+            for key in sorted(set(expected) | set(actual)):
+                child = f"{path}/{str(key).replace('~', '~0').replace('/', '~1')}"
+                if key not in expected or key not in actual:
+                    return {
+                        "kind": "json_pointer",
+                        "path": child,
+                        "expected": expected.get(key, "<missing>"),
+                        "actual": actual.get(key, "<missing>"),
+                    }
+                difference = cls._first_json_difference(expected[key], actual[key], child)
+                if difference is not None:
+                    return difference
+            return None
+        if isinstance(expected, list):
+            if len(expected) != len(actual):
+                return {
+                    "kind": "json_pointer",
+                    "path": path or "",
+                    "expected_length": len(expected),
+                    "actual_length": len(actual),
+                }
+            for index, (left, right) in enumerate(zip(expected, actual, strict=True)):
+                difference = cls._first_json_difference(left, right, f"{path}/{index}")
+                if difference is not None:
+                    return difference
+            return None
+        if expected != actual:
+            return {
+                "kind": "json_pointer",
+                "path": path or "",
+                "expected": expected,
+                "actual": actual,
+            }
+        return None
+
+    @staticmethod
+    def _first_byte_difference(expected: bytes, actual: bytes) -> dict | None:
+        limit = min(len(expected), len(actual))
+        for offset in range(limit):
+            if expected[offset] != actual[offset]:
+                return {
+                    "kind": "byte_offset",
+                    "offset": offset,
+                    "expected": expected[offset],
+                    "actual": actual[offset],
+                }
+        if len(expected) != len(actual):
+            return {
+                "kind": "byte_offset",
+                "offset": limit,
+                "expected_length": len(expected),
+                "actual_length": len(actual),
+            }
+        return None
+
+    @staticmethod
+    def _rust_failure(
+        input_data: dict,
+        reason: str,
+        error: str,
+        *,
+        cargo_tests_discovered: int | None = None,
+        vector_result: dict | None = None,
+    ) -> Verdict:
+        btest: dict[str, Any] = {
+            "passed": False,
+            "skipped": False,
+            "backend": "rust",
+            "reason": reason,
+            "errors": error[:1000],
+        }
+        if cargo_tests_discovered is not None:
+            btest["cargo_tests_discovered"] = cargo_tests_discovered
+        if vector_result is not None:
+            btest.update(
+                {
+                    "golden_vectors_executed": vector_result.get("vectors_executed", 0),
+                    "first_difference": vector_result.get("first_difference"),
+                    "failed_vector": vector_result.get("failed_vector"),
+                }
+            )
+        return Verdict(
+            kind=VerdictKind.FAIL,
+            output={
+                **input_data,
+                "behavioral_test_result": btest,
+                "_feedback": f"Rust BehavioralTest 失败 [{reason}]: {error[:500]}",
+            },
+            diagnosis=f"BehavioralTester FAIL (Rust): {reason}",
+            confidence=1.0,
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -29,6 +29,14 @@
 - `server/claude-sdk.js` — 加可选 `systemPromptAppend`(不传时 claude 行为不变,供 controller 注入总控提示)。
 - 硬编码 `IS_PLATFORM=true`(`src/constants/config.ts` + `server/constants/config.js`)免登录,不依赖 .env。
 - `ProtectedRoute.tsx` 去 OSS 登录/setup 分支。
+- `server/modules/providers/services/sessions-watcher.service.ts` — 会话监视器改原生事件式:
+  上游写死 `usePolling: true, interval: 6_000`,会给每个文件挂一个 `fs.watchFile` StatWatcher
+  并定期全量 re-stat 五棵根目录(本机约 6.7k 文件,大头是 `~/.local/share/opencode` 的 4.4k),
+  **零客户端连接时也持续烧 5.3% 单核**(2026-09-06 实测 14.9 小时累计 2856 CPU 秒)。
+  改为 `usePolling: WATCH_USE_POLLING`,默认 false 走原生递归监视(Windows ReadDirectoryChangesW /
+  macOS FSEvents / Linux inotify);`OMNI_CHATUI_WATCH_POLLING=1` 可退回轮询,留给根目录落在
+  网络盘或某些容器 bind mount 上、原生事件不触发的情况。
+  改后实测:空闲 CPU 5.3% → 0.12% 单核,监视器仍能捕到真实 change 事件并触发同步。
 
 **删除(剪 cruft / 不需要的)**
 - 项目元数据:.github / docker / docs / 8 个译版 README / redirect-package / release 工具 / plugins.starter 子模块 / .gitmodules。

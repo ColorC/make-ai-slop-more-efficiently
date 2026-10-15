@@ -1,0 +1,20 @@
+{
+  "artifact": "omni-proc-mem-locator",
+  "compile": {
+    "flags": [
+      "-static",
+      "-O2",
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-s"
+    ],
+    "toolchain": "wsl-gcc",
+    "toolchain_target": "x86_64-linux-gnu"
+  },
+  "schema_version": 1,
+  "source": "proc_mem_locator.c",
+  "source_sha256": "861f78718b4e038debfdb252ee29e2e10f758454b2e63315e990573c49e51a8e",
+  "target": "android-x86_64"
+}

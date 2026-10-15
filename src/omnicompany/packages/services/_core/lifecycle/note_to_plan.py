@@ -1,11 +1,11 @@
 # [OMNI] origin=claude-code domain=services/_core/lifecycle ts=2026-06-25T00:00:00Z type=infra status=active
-# [OMNI] summary="note→plan 调研澄清: 读 poof note→统一 run_json_agent 调研+结构化→渲染符合模板的 plan.md 草稿+brief, 歧义标 NEEDS CLARIFICATION 并入 human inbox"
-# [OMNI] why="WORK-LIFECYCLE-AND-DISPATCH N-research: note(poof真源) 经调研澄清成可执行 plan"
+# [OMNI] summary="note→plan 调研澄清: 读 Material 札记→外置只读 AgentRuntime 调研+结构化→渲染 plan.md 草稿+brief"
+# [OMNI] why="WORK-LIFECYCLE-AND-DISPATCH N-research: Material 札记经调研澄清成可执行 plan"
 # [OMNI] tags=lifecycle,note,plan,promote,clarify,unified-agent
 # [OMNI] material_id="material:services._core.lifecycle.note_to_plan.py"
-"""note→plan 调研澄清回路 (走统一 AgentNodeLoop, 不 fork)。
+"""note→plan 调研澄清回路（走语言无关 AgentRuntime）。
 
-读 poof note 正文 → run_json_agent 在仓里调研 + 结构化成 plan 骨架 →
+读 Material 札记正文 → 外置只读 runtime 在仓里调研 + 结构化成 plan 骨架 →
 渲染成符合 plan 模板的 plan.md + brief.md 草稿 → 歧义用 [NEEDS CLARIFICATION: ...]
 标记并(best-effort)入 omni human inbox。产出的草稿要过 omni plan gate 才能投递。
 """
@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from omnicompany.core.plans_catalogue import _plans_root
-from omnicompany.packages.services._core.agent.launch import run_json_agent
 from omnicompany.packages.services._core.lifecycle.note_source import read_note_source
+from omnicompany.runtime.agent_runtime import run_readonly_structured_agent
 
 _PLAN_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -96,18 +96,18 @@ def _render_plan_md(spec: dict[str, Any], *, plan_id: str, date: str, short: str
     lines.append("  packages: []")
     lines.append("  targets: []")
     lines.append("applicable_standards: []")
-    lines.append(f"source_note: 'note:poof-note://{note_id}'")
+    lines.append(f"source_note: 'omni://note/{note_id}'")
     lines.append("---")
     lines.append("")
     lines.append(f"<!-- [OMNI] origin=note-promote domain=plans ts={date}T00:00:00Z type=plan authority=whatnow -->")
     lines.append(f"<!-- [OMNI] summary=\"{spec.get('purpose','')[:120]}\" -->")
-    lines.append(f"<!-- [OMNI] why=\"由 poof note {note_id} 经 omni notes promote 调研澄清生成\" -->")
+    lines.append(f"<!-- [OMNI] why=\"由 Material 札记 {note_id} 经 omni notes promote 调研澄清生成\" -->")
     lines.append("<!-- [OMNI] tags=plan,promoted,note -->")
     lines.append(f"<!-- [OMNI] material_id=\"material:plans.{_slug(short).lower()}.plan.md\" -->")
     lines.append("")
     lines.append(f"# {title} 计划书 (草稿, 由 note 提升)")
     lines.append("")
-    lines.append(f"> **来源 note**: poof-note://{note_id}")
+    lines.append(f"> **来源 note**: omni://note/{note_id}")
     lines.append(f"> **立计划日**: {date}")
     lines.append(f"> **范围**: {spec.get('scope','(待补)')}")
     lines.append(f"> **不在范围**: {spec.get('out_of_scope','(待补)')}")
@@ -204,15 +204,15 @@ async def _run_research(note_title: str, note_body: str, model: str | None,
     )
     kwargs: dict[str, Any] = {
         "task": task,
-        "node_prompt": _NODE_PROMPT_SIMPLE if simple else _NODE_PROMPT,
+        "instructions": _NODE_PROMPT_SIMPLE if simple else _NODE_PROMPT,
         "result_schema": _PLAN_SCHEMA,
-        "project_root": str(_plans_root().parent.parent),
-        "max_turns": 6 if simple else 12,
+        "workspace_cwd": _plans_root().parent.parent,
+        "max_steps": 6 if simple else 12,
         "caller": "note_promote",
     }
     if model:
         kwargs["model"] = model
-    return await run_json_agent(**kwargs)
+    return await run_readonly_structured_agent(**kwargs)
 
 
 def _skeleton_spec(note_title: str, note_body: str) -> dict[str, Any]:
@@ -244,16 +244,16 @@ def _skeleton_spec(note_title: str, note_body: str) -> dict[str, Any]:
 
 def promote_note_to_plan(note_id: str, *, category: str = "inbox",
                          model: str | None = None, dry: bool = False) -> dict[str, Any]:
-    """读 poof note → 调研澄清 → 写 plan.md 草稿。返回 {ok, plan_id, path, clarifications, error}。"""
+    """读 Material 札记 → 调研澄清 → 写 plan.md 草稿。"""
     src = read_note_source()
     note = src.get_note(note_id)
     if not note:
         return {"ok": False, "error": f"overlay-note-store 里找不到 note: {note_id} "
-                f"(omni notes ls 看有哪些; 或 OVERLAY_NOTE_STORE_DIR/旧 POOF_NOTES_DIR 未配)"}
+                f"(用 omni notes ls 查看；或确认 OVERLAY_NOTE_STORE_DIR 已配置)"}
     body = note.body()
     if not body:
         return {"ok": False, "error": f"note {note_id} 没有正文 .md 导出 "
-                f"(在 poof 里打开该笔记一次, 或 omni notes refresh 触发导出)"}
+                f"(在 Canvas 打开该札记一次，或用 omni notes refresh 触发导出)"}
 
     # 三层鲁棒: 调研(读文件,12轮) → 简化(不读文件,6轮) → 确定性骨架(永不失败)
     source = "research"

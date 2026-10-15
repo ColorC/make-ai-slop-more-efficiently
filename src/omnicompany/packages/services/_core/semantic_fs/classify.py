@@ -1,12 +1,12 @@
 # [OMNI] origin=claude-code domain=services/_core/semantic_fs ts=2026-06-27T00:00:00Z type=router
-# [OMNI] summary="产出即 material(语义文件系统里程碑二)。分类器走统一 call_json(喂受控 type+tag 词表), 输出对齐受控集合的 semantic_tags+summary;materialize 落盘钩子=分类→omni register(复用 register_dispatcher 形状 subprocess)→set_semantic 写回, 把打标从人工负担变产出副产物。置信不足进 human-inbox。"
+# [OMNI] summary="产出即 material(语义文件系统里程碑二)。分类器走统一 call_json(喂受控 type+tag 词表), 输出对齐受控集合的 semantic_tags+summary;materialize 落盘钩子=分类→omni register(复用 register_dispatcher 形状 subprocess)→set_semantic 写回, 把打标从人工负担变产出副产物。置信不足进 HumanBus 运行时人工复核队列。"
 # [OMNI] why="Notion/Roam 死于人手打标。解法=产出即打标、AI 填值、受控词表兜边界、不达标进人审, 绝不自由发挥出孤儿标签。"
 # [OMNI] tags=semantic-os,material,auto-classify,auto-register
 # [OMNI] material_id="material:core.semantic_fs.classify.py"
 """产出分类 + 自动入册(里程碑二)。
 
 materialize(path): 落盘钩子 —— 分类(LLM 对齐受控词表)→ omni register(subprocess 复用现成)
-→ set_semantic 写回 attrs。置信不足/标签越界 → human-inbox, 不静默乱写。
+→ set_semantic 写回 attrs。置信不足/标签越界 → HumanBus 运行时人工复核队列, 不静默乱写。
 """
 from __future__ import annotations
 
@@ -116,7 +116,7 @@ def materialize(path: str | Path, *, model: str | None = None, root: Path | None
                 push_inbox: bool = True, force: bool = False) -> dict[str, Any]:
     """落盘钩子: 分类 → 进程内注册 → set_semantic 写回。
 
-    置信不足 / 有越界标签 → 仍登记但进 human-inbox 待人核;不静默写脏标签。
+    置信不足 / 有越界标签 → 仍登记但进 HumanBus 运行时人工复核队列;不静默写脏标签。
     """
     base = root or omni_workspace_root()
     p = Path(path).resolve()

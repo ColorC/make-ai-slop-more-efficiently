@@ -87,8 +87,8 @@ async def _run_event_pipeline(
     返回: {"sinks": [sink material payload...], "sink_types": [...], "entry_material": str, "events": [...]}。
     sink = 被某 worker 以 FORMAT_OUT 产出、却无任何 worker 以 FORMAT_IN 消费的 material。
 
-    E2(决策本体阶段二): 事件流持久化到 SQLiteBus(与 teamrunner 同一 events.db 体系),
-    运行原语的唯一真源=事件流,event 引擎不再用易失内存总线。
+    Material 正文与激活顺序由 MaterialDispatcher 的 run-scoped ledger 掌权；
+    SQLiteBus 只接收 bodyless `material.published` 审计投影，不能被查询为 stock。
     """
     from omnicompany.bus.sqlite import SQLiteBus
     from omnicompany.core.config import resolve_db_path
@@ -130,7 +130,7 @@ async def _run_event_pipeline(
         entry.name, entry_material, sink_types, len(workers),
     )
 
-    # E2: 事件流持久化 —— event 引擎与 teamrunner 共用 SQLiteBus/events.db 体系。
+    # EventBus is an optional audit projection sink, never the Material stock.
     resolved_db = resolve_db_path(entry.domain)
     resolved_db.parent.mkdir(parents=True, exist_ok=True)
     bus = SQLiteBus(resolved_db)
@@ -143,6 +143,8 @@ async def _run_event_pipeline(
         "sink_types": sink_types,
         "entry_material": entry_material,
         "events": events,
+        "material_authority": "run-scoped-ledger",
+        "eventbus_role": "bodyless-audit-projection",
     }
 
 

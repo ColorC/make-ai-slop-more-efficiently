@@ -10,9 +10,10 @@ describe('devReload PTY protection', () => {
     })
   })
 
-  it('defers automatic UI reload while a connected live PTY surface is mounted', () => {
+  it('still detects a connected live PTY surface', () => {
     document.body.innerHTML = '<div data-cc-session-id="pty-1" data-cc-session-alive="true" data-cc-session-connected="true"></div>'
     expect(hasLivePtySurface()).toBe(true)
+    expect(shouldDeferUiReload()).toBe(false)
   })
 
   it('does not block reload for reconnecting, ended, or absent PTY surfaces', () => {
@@ -24,12 +25,12 @@ describe('devReload PTY protection', () => {
     expect(hasLivePtySurface()).toBe(false)
   })
 
-  it('allows a hidden browser tab to update and release its PTY', () => {
+  it('defers a hidden browser tab instead of reloading every view together', () => {
     document.body.innerHTML = '<div data-cc-session-id="pty-1" data-cc-session-alive="true" data-cc-session-connected="true"></div>'
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'hidden',
     })
-    expect(shouldDeferUiReload()).toBe(false)
+    expect(shouldDeferUiReload()).toBe(true)
   })
 })

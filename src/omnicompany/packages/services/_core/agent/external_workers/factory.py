@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 from omnicompany.packages.services._core.agent.external_workers.base import (
@@ -38,6 +40,18 @@ def build_default_external_agent_worker_registry(
 
     registry = ExternalAgentWorkerRegistry()
     registry.register("codex", lambda **kw: CodexExecWorker(bus=bus, **kw))
+    # 第二个官方 Codex 账号：同一 CLI、独立 CODEX_HOME（额度/凭据/rollout 全独立）。
+    # 主账号额度耗尽时的指定逃生口（2026-08-18：派 worker 用错账号浪费一轮的教训）。
+    registry.register(
+        "codex-2",
+        lambda **kw: CodexExecWorker(
+            bus=bus,
+            provider_name="codex-2",
+            codex_home=os.environ.get("OMNI_CODEX_2_HOME", "").strip()
+            or str(Path.home() / ".codex-2"),
+            **kw,
+        ),
+    )
     registry.register("claude-code", lambda **kw: ClaudeCodeSdkWorker(bus=bus, **kw))
     registry.register("opencode", lambda **kw: OpenCodeRunWorker(bus=bus, **kw))
     registry.register("kimi", lambda **kw: KimiExecWorker(bus=bus, **kw))

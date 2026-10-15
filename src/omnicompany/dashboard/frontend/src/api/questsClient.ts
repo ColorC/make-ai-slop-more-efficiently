@@ -1,8 +1,16 @@
-// 任务窗口 API 客户端 — 接本地目标管理系统 whatnow（Rust 服务，:8230，仿 Leantime）。
+// 任务窗口 API 客户端 — 数据真源 = plan-groups 文件模型（M3b 切换，M4 已停 :8230 归档）。
 // 模型：cluster(域) → goal(主线北极星/支线主题) → task(计划) → subtask(子计划) + progress(进度历史) + focus(当前专注)。
-// 数据真源是 whatnow（统一数据模型 + 统一身份：meego/multica 同一单子只一条 task）；项目工作板(tab1)管资产盘点，本视图管进度与历史。
+// M4（2026-08-14）：whatnow(:8230) 已停服归档。旧代理回退链撤掉——再 fallback 到
+// /api/local/progress-service 会把已停的服务重新打活。读写出错=直接报错，不再回退。
 
-const WHATNOW = '/api/local/progress-service'
+const PG = '/api/plan-groups'
+
+/** 单链：plan-groups 端点（M4 起唯一链；旧 whatnow 代理回退已随停服撤除）。 */
+async function dual<T>(path: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(`${PG}${path}`, init)
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+  return (await r.json()) as T
+}
 
 export interface ProgressEntry { ts: number; text: string; source?: string }
 export interface TaskNode {
@@ -69,22 +77,18 @@ export interface Board {
   updated_at: number
 }
 
-async function j<T>(r: Response): Promise<T> {
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
-  return r.json() as Promise<T>
-}
-
 export const questsApi = {
   board: (includeArchived = false): Promise<Board> =>
-    fetch(`${WHATNOW}/api/board${includeArchived ? '?archived=1' : ''}`).then((r) => j<Board>(r)),
-  /** 拉取外部渠道单子（meego = 经办人/负责人 maintainer；multica = demogame-5224 议题），统一身份去重后入库 */
-  syncMeego: (): Promise<any> => fetch(`${WHATNOW}/api/sync/meego`, { method: 'POST' }).then((r) => r.json()),
-  syncMultica: (): Promise<any> => fetch(`${WHATNOW}/api/sync/multica`, { method: 'POST' }).then((r) => r.json()),
+    dual<Board>(`/api/board${includeArchived ? '?archived=1' : ''}`),
+  /** 外部渠道 sync（meego/multica）随 whatnow 停服一并退役（M4）：不再请求任何后端，
+   *  直接返回 retired 标记，避免把已停服务打活。外部接入重写到 plan-groups 是独立工作项。 */
+  syncMeego: (): Promise<any> => Promise.resolve({ ok: false, retired: true, synced: 0, reason: 'whatnow 已停服归档（M4），外部渠道同步退役' }),
+  syncMultica: (): Promise<any> => Promise.resolve({ ok: false, retired: true, synced: 0, reason: 'whatnow 已停服归档（M4），外部渠道同步退役' }),
   /** 置顶 / 取消置顶（任务线 goal 或具体任务 task）。pinned=false 即取消。 */
   pin: (subject_kind: 'goal' | 'task', subject_id: string, pinned = true, note = ''): Promise<any> =>
-    fetch(`${WHATNOW}/api/pin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject_kind, subject_id, pinned, note }) }).then((r) => r.json()),
+    dual('/api/pin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject_kind, subject_id, pinned, note }) }),
   archive: (id: string, archived = true): Promise<any> =>
-    fetch(`${WHATNOW}/api/task/archive`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, archived }) }).then((r) => r.json()),
+    dual('/api/task/archive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, archived }) }),
   addProgress: (subject_id: string, text: string, subject_kind = 'task'): Promise<any> =>
-    fetch(`${WHATNOW}/api/progress`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject_kind, subject_id, text, source: 'dashboard' }) }).then((r) => r.json()),
+    dual('/api/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject_kind, subject_id, text, source: 'dashboard' }) }),
 }

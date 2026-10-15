@@ -8,7 +8,7 @@
  * 单端口,注入 localStorage lofa.baseUrl;Chromium 关 LocalNetworkAccessChecks。
  *
  * 用法(在 frontend/ 目录下跑):
- *   node tests/e2e/visual/v2-blueprint-wave4-lofa-shots.mjs [--out <目录>] [--lofa-api https://10.3.43.246:12443]
+ *   node tests/e2e/visual/v2-blueprint-wave4-lofa-shots.mjs [--out <目录>] [--lofa-api https://192.0.2.10:12443]
  *
  * 视口:手机 390×844(会话 + 审阅详情)/ 平板竖 834×1194(会话 + 审阅双栏)/ 平板横 1194×834(会话 + 审阅双栏)。
  */
@@ -19,7 +19,7 @@ import { extname, join, normalize } from 'path';
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const OUT = arg('out', join(process.cwd(), 'tests/e2e/visual/_shots/v2-blueprint-wave4-lofa'));
-const LOFA_API = arg('lofa-api', 'https://10.3.43.246:12443');
+const LOFA_API = arg('lofa-api', 'https://192.0.2.10:12443');
 const WWW = arg('lofa-www', 'C:/workspace/lofa/app/www');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
 

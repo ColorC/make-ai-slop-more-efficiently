@@ -41,6 +41,7 @@ import { TraceMenu } from './TraceMenu'
 import { MaterialContextSpineView } from './MaterialContextSpine'
 import { canonicalMaterialRef, CANONICAL_REVIEW_KIND } from './materialReference'
 import './reviewFlow.css'
+import VerdictStamp from './VerdictStamp'
 
 
 // 需理由的裁决(驳回)走二段式: 先点亮 → 顶出理由条 → 确认。通过直发无理由。
@@ -158,9 +159,24 @@ export function MaterialDetail({
     notice('已开始下载文件', 'ok')
   }, [material.file_relpath, material.id, material.kind, material.title])
 
-  // 除通过/驳回/调级外一切操作收进「更多」(DEC-2026-07-05-003): 复制路径 + 消费方动作 + 返回源。
-  // (调级已按 V2 合同提到栏面 tier chip, 不再藏二级菜单。)
+  // 伴随会话会从主对话里的明确反馈自动落实 verdict；人工通过/驳回仍保留，
+  // 但退到「更多」作为低频兜底。调级仍在栏面 tier chip。
   const kebabItems: KebabItem[] = [
+    {
+      label: accepted ? '已通过' : '通过材料',
+      icon: <Check size={15} />,
+      testid: 'verdict-accept',
+      disabled: accepted,
+      onClick: () => { void onVerdict('accepted', '') },
+    },
+    {
+      label: material.status === 'rejected' ? '已驳回' : '驳回材料…',
+      icon: <X size={15} />,
+      testid: 'verdict-reject',
+      danger: true,
+      disabled: material.status === 'rejected',
+      onClick: () => { setPendingVerdict('rejected'); setReason('') },
+    },
     {
       label: '下载文件',
       icon: <Download size={15} />,
@@ -254,35 +270,6 @@ export function MaterialDetail({
     </TraceMenu>
   )
 
-  // 审阅动作集中在单一顶栏，正文上下不再各占一条操作栏。
-  const verdictActions = (
-    <div className="v2-verdict" role="radiogroup" aria-label="审阅裁决">
-      <div className="vd-group">
-        <button
-          type="button"
-          className="vd-i"
-          role="radio"
-          data-v="accepted"
-          aria-checked={accepted}
-          disabled={accepted}
-          data-testid="verdict-accept"
-          title={accepted ? '已通过' : '通过'}
-          onClick={() => onVerdict('accepted', '')}
-        ><i className="led" aria-hidden />通过</button>
-      </div>
-      {/* 搁置按 DEC-2026-07-05-003 不下达(根本没有用); 评论 = C 区右抽屉, 不在此组。 */}
-      <button
-        type="button"
-        className="vd-reject"
-        role="radio"
-        data-v="rejected"
-        aria-checked={material.status === 'rejected'}
-        data-testid="verdict-reject"
-        title="驳回(填可选理由)"
-        onClick={() => { setPendingVerdict('rejected'); setReason('') }}
-      ><X size={13} aria-hidden />驳回…</button>
-    </div>
-  )
   const commentAction = (
     <button type="button" className="rf-comment-toggle" data-testid="material-open-comments" onClick={openComments}>
       <MessageSquare size={13} aria-hidden />评论
@@ -385,10 +372,14 @@ export function MaterialDetail({
   // minHeight:0 必须有：flex 子项默认 min-height:auto 会被长 markdown 撑开，
   // 外层面板 overflow:hidden 直接裁掉 → 整个审阅台滚不动（2026-06-12 用户上报）
   return (
-    <div ref={rootRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'transparent', color: COLORS.text, minWidth: 0, minHeight: 0 }} data-testid="material-detail"
+    <div ref={rootRef} key={material.id} className="mo-draw-in"
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'transparent', color: COLORS.text, minWidth: 0, minHeight: 0, position: 'relative' }} data-testid="material-detail"
       data-omni-uri={canonicalMaterialRef(material.id)}
       data-omni-kind={CANONICAL_REVIEW_KIND}
       data-omni-title={material.title}>
+      {/* 切材料 = 从图筒里抽出一张新图(key 变化重放 mo-draw-in), 不再是整块内容瞬间替换。
+          裁决印章是一次性仪式件, 播完自摘, 不压正文。 */}
+      <VerdictStamp status={material.status} />
       {/* 单一顶栏：标题、级别/状态、目录、评论、裁决与更多。 */}
       {bizToolbar ? (
         <div className="rf-bar" data-testid="material-detail-merged-toolbar" title={barTitle}>
@@ -410,7 +401,6 @@ export function MaterialDetail({
           {reviewContextChip}
           {tocBtn}
           {commentAction}
-          {verdictActions}
           {moreActions}
         </div>
       ) : (
@@ -424,13 +414,12 @@ export function MaterialDetail({
           {reviewContextChip}
           {tocBtn}
           {commentAction}
-          {verdictActions}
           {moreActions}
         </div>
       )}
 
       {pendingVerdict && (
-        <div className="rf-reasonbar">
+        <div className="rf-reasonbar mo-drop">
           <span className="rl">{REJECT_META[pendingVerdict].label} 原因:</span>
           <input
             value={reason}

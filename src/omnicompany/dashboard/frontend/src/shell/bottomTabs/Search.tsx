@@ -6,17 +6,17 @@ import { usePanels } from '../../stores/panelsStore'
 import { openProps } from '../../utils/middleClick'
 
 const S: Record<string, any> = {
-  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--fp-bg)', color: '#bbb', fontFamily: 'Consolas, Menlo, monospace', fontSize: 14 },
-  bar: { display: 'flex', gap: 6, padding: '4px 8px', borderBottom: '1px solid #222', alignItems: 'center' },
-  input: { flex: 1, background: '#111', border: '1px solid #333', borderRadius: 4, color: '#e0e0e0', padding: '3px 8px', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' },
-  meta: { color: '#666', fontSize: 14 },
+  root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--fp-bg)', color: 'var(--fp-text)', fontFamily: 'Consolas, Menlo, monospace', fontSize: 14 },
+  bar: { display: 'flex', gap: 6, padding: '4px 8px', borderBottom: '1px solid var(--fp-border-subtle)', alignItems: 'center' },
+  input: { flex: 1, background: 'var(--fp-bp-solid)', border: '1px solid var(--fp-border-subtle)', borderRadius: 3, color: 'var(--fp-text)', padding: '3px 8px', fontSize: 14, fontFamily: 'Consolas, Menlo, monospace' },
+  meta: { color: 'var(--fp-text-2)', fontSize: 14 },
   list: { flex: 1, overflow: 'auto' },
-  hit: { padding: '6px 12px', cursor: 'pointer', borderBottom: '1px solid #161616' },
-  title: { color: '#90caf9', fontSize: 14, marginBottom: 2, display: 'flex', gap: 8, alignItems: 'baseline' },
+  hit: { padding: '6px 12px', cursor: 'pointer', borderBottom: '1px solid var(--fp-border-subtle)' },
+  title: { color: 'var(--fp-link)', fontSize: 14, marginBottom: 2, display: 'flex', gap: 8, alignItems: 'baseline' },
   kind: { color: 'var(--fp-warn)', fontSize: 14, minWidth: 86 },
-  uri: { color: '#666', fontSize: 14 },
-  snippet: { color: '#999', fontSize: 14 },
-  empty: { padding: 16, color: '#666', fontStyle: 'italic' as const },
+  uri: { color: 'var(--fp-text-2)', fontSize: 14 },
+  snippet: { color: 'var(--fp-text-2)', fontSize: 14 },
+  empty: { padding: 16, color: 'var(--fp-text-2)', fontStyle: 'italic' as const },
 }
 
 function highlight(snippet: string, q: string): React.ReactNode {
@@ -28,7 +28,7 @@ function highlight(snippet: string, q: string): React.ReactNode {
   return (
     <>
       {snippet.slice(0, idx)}
-      <mark style={{ background: '#3a4a5a', color: '#fff' }}>{snippet.slice(idx, idx + q.length)}</mark>
+      <mark style={{ background: 'var(--fp-bp-paper-2)', color: '#fff' }}>{snippet.slice(idx, idx + q.length)}</mark>
       {snippet.slice(idx + q.length)}
     </>
   )
@@ -80,7 +80,7 @@ export default function SearchTab() {
         <span style={S.meta}>{loading ? '搜索中...' : `${hits.length} 命中`}</span>
       </div>
       <div style={S.list}>
-        {error && <div style={{ ...S.empty, color: '#ef5350' }}>{error}</div>}
+        {error && <div style={{ ...S.empty, color: 'var(--fp-err)' }}>{error}</div>}
         {!loading && !error && q.trim() && hits.length === 0 && <div style={S.empty}>无匹配</div>}
         {!q.trim() && <div style={S.empty}>输入关键字开始搜索</div>}
         {hits.map((h) => (

@@ -10,6 +10,47 @@ roots:
     note: 锁防护(主动防御, omni lock)
   - path: C:/workspace/omnicompany/.omni
     note: 运行态数据(sentinel 状态/巡逻报告/fix-queue/锁策略)
+directory_contract:
+  version: 1
+  status: ready
+  canonical_root: C:/workspace/omnicompany/src/omnicompany/packages/services/_core/guardian
+  # 包目录整体是 omnicompany 源码（Git 跟踪），src 不写 "."。omnicompany/.omni 是全仓共用的运行区，不整体归本项目，只登记守护专属的子目录。
+  roles:
+    src: null
+    docs: null
+    tests: null
+    input: null
+    drafts: null
+    runtime: null
+    tmp: null
+    archive: _archive
+  placements:
+    worktrees: null
+    references: null
+    publish: null
+  lifecycle:
+    tmp: 未单独声明；需要临时区时用工作区默认 .omni/tmp/<任务>/，任务结束核验后清理。
+    runtime: 不在本根：sentinel 状态、巡逻报告、锁策略等写在 C:/workspace/omnicompany/.omni（另一个已声明根，根目录文件未细分），守护专属的子目录见 areas。
+    archive: _archive/ 是旧巡逻实现的代码留档（README 2026-05-03），入 Git，不再写入。
+  areas:
+    - path: C:/workspace/omnicompany/.omni/guardian
+      role: data
+      producer: guardian/_patrol_shim.py（守护状态与 hygiene-whitelist.json）
+      consumers: [guardian 巡逻与目录卫生检查]
+      lifecycle: 守护状态与卫生白名单，正式状态，不按时间删
+      status: active
+    - path: C:/workspace/omnicompany/.omni/fix-queue
+      role: drafts
+      producer: guardian/auto_comment.py 的 write_fix_queue_entry（内部管线违规的 patch 草稿，按日期分目录）
+      consumers: [人工处置罚单]
+      lifecycle: patch 草稿；采纳或否决后由处置方收尾；草稿区不整棵删
+      status: active
+    - path: C:/workspace/omnicompany/.omni/quarantine
+      role: archive
+      producer: guardian/auto_comment.py 与 workspace_pollution.py 等（违规文件原件备份，按日期或来源分目录）
+      consumers: [从 quarantine 恢复原件]
+      lifecycle: 恢复依据，不按时间删；对应罚单结案后由业主决定是否清理
+      status: active
 entry_points:
   - path: C:/workspace/omnicompany/src/omnicompany/packages/services/_core/guardian/rules
     note: 20 条架构规则(OMNI-001 至 020), 纯计算无副作用
@@ -101,4 +142,7 @@ omnicompany 的守护设施, 防止仓库被各路 AI 写漂: 20 条架构规则
 - [ ] (2026-07-04) 补充目录卫生/项目 hygiene profile 作为重要守护资产，列出 `rules/project_profile_hygiene.py`、`workers/hygiene_scan_worker.py` 以及 `.omni/hygiene-profile.yaml` 的关系。 — 证据: 近 30 天提交 `2026-06-26 feat(guardian): 新增目录清洁守卫、规则与测试`、`2026-06-19 feat(guardian): 新增项目卫生规则扫描与配置模块`；当前存在 `C:/workspace/omnicompany/src/omnicompany/packages/services/_core/guardian/rules/project_profile_hygiene.py`（读取 `.omni/hygiene-profile.yaml`）与 `C:/workspace/omnicompany/src/omnicompany/packages/services/_core/guardian/workers/hygiene_scan_worker.py`，但 index 只笼统提 `.omni` 和“周边工具”，未列项目卫生配置/目录清洁守卫这一新增守护面。
 - [ ] (2026-07-04) 补入计划硬闸与项目索引体检/巡检模块的入口或权威目录，说明其在 guardian/governance 巡检链路中的职责。 — 证据: 近 30 天提交 `2026-07-04 feat(governance): 实现计划硬闸、项目索引体检与巡检模块`；index 当前 entry_points、主要目录、能做什么均未提“计划硬闸”或“项目索引体检/巡检模块”。
 - [ ] (2026-07-07) 在规则能力或周边工具中补入 Python 字节码清理规则，说明其属于近期新增的目录/运行产物卫生守护能力。 — 证据: 近 30 天提交 `2026-07-01 feat(guardian): 新增 Python 字节码清理规则`；index 当前只概括“周边工具: 僵尸进程扫描、架构地图校验、Format/Router 描述质量报告”，未提 Python 字节码清理规则。
+- [ ] (2026-08-06) 将 `C:/workspace/omnicompany/docs/archmap.yaml` 补入 entry_points 或权威链接，说明它是 Guardian 合法 drawer/archmap 规则（如 OMNI-014/015/021）的唯一权威，近期已登记 `src/omnicompany/desktop` drawer。 — 证据: 近 30 天提交摘要含 `2026-08-03 chore(governance): register desktop drawer`；权威文件 `C:/workspace/omnicompany/docs/archmap.yaml` 写明 `OmniGuardian 的唯一权威 drawer 定义来源`，并在 v13 注释中记录 `Register src/omnicompany/desktop as the Windows Tauri host for Dashboard Web Core`。当前 index 只在正文笼统提到“架构地图校验”，entry_points/权威规范未列 `docs/archmap.yaml`。
+- [ ] (2026-08-12) 在 Omni Guard index 的主要目录或周边工具/quick_actions 中补入 `guardian/dispatch_omission.py` 与 `omni guardian dispatch-omission`，说明其扫描 ide_events.db 中长机械工具调用且无派发动作的 trace，并输出提示性报告、不出罚单不阻断。 — 证据: 近 30 天提交摘要包含 `2026-08-10 SWARM-DISPATCH-PROACTIVITY P5: guardian dispatch-omission 该派没派巡逻(只记录不阻断)`；当前代码已有新守护资产 `C:/workspace/omnicompany/src/omnicompany/packages/services/_core/guardian/dispatch_omission.py`（文件头/模块说明为“该派没派巡逻 (SWARM-DISPATCH-PROACTIVITY P5) — 仅记录, 不阻断”），并在 `C:/workspace/omnicompany/src/omnicompany/cli/commands/guardian.py` 注册 `omni guardian dispatch-omission` 子命令。index 当前 entry_points/主要目录/能做什么/quick_actions 均未提该巡逻能力。
+- [ ] (2026-08-21) 在主要目录与能做什么(及 entry_points 的 guardian.py 条目说明)补入 guardian/perf_scan.py: 确定性性能巡检 PERF-OBSERVATORY(四源+latency 快照, 按 config/perf/slo.yaml 判红黄绿/no_data, 产 offenders by_session/by_path/by_instance/by_owner 榜, 落 data/services/guardian/perf/), CLI 为 omni guardian perf scan / perf latest。 — 证据: 近30天git log 2026-08-16 feat(guardian): perf scan 确定性性能巡检+犯罪榜 (PERF-OBSERVATORY P2) 与 2026-08-17 feat(guardian): perf scan 接入资源治理三 SLO + by_owner 溯源榜 (PERF-OBSERVATORY); 代码资产 C:/workspace/omnicompany/src/omnicompany/packages/services/_core/guardian/perf_scan.py(PerfScanWorker, 约60KB, 纯确定性零LLM, 判据真源 docs/plans/dashboard/[2026-08-16]PERF-OBSERVATORY/P2-P3-口径合同.md, 阈值真源 config/perf/slo.yaml + config/perf/resource-policy.yaml), 已接 CLI: src/omnicompany/cli/commands/guardian.py:2103 起 omni guardian perf scan / perf latest; index 的 entry_points/主要目录/能做什么均未提性能巡检。
 <!-- projidx-candidates:end -->

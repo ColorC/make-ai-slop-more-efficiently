@@ -29,6 +29,7 @@ import { createPortal } from 'react-dom'
 import { RefreshCw, Check, Circle, ChevronDown, ChevronRight, ChevronUp, Ban, Info, Code2, Search, ExternalLink } from 'lucide-react'
 import { ccApi, type ResolvedContextItem, type SessionContext as CcContext } from '../../api/ccClient'
 import { ideApi, type SessionContext as IdeContext } from '../../api/ideClient'
+import { useBackgroundPoll } from '../../shell/panelRuntime'
 import { usePanels } from '../../stores/panelsStore'
 import KebabMenu, { type KebabItem } from '../../shared/view/ui/KebabMenu'
 import NotesForTarget from '../authored/NotesForTarget'
@@ -76,8 +77,12 @@ function postToOmniHost(message: Record<string, unknown>): boolean {
 function providerLabel(provider: string | null | undefined, kind: 'cc' | 'native'): string {
   if (kind === 'native') return 'Native Agent'
   if (provider === 'codex') return 'Codex'
+  if (provider === 'codex_the_company') return 'the_company API'
   if (provider === 'omni_agent') return 'OmniAgent'
   if (provider === 'claude_code') return 'Claude Code'
+  if (provider === 'kiro') return 'Kiro'
+  if (provider === 'qoder') return 'Qoder'
+  if (provider === 'dsh') return 'DeepSeek Harness'
   if (provider === 'chat') return 'OmniChat'
   return 'OmniChat'
 }
@@ -291,7 +296,7 @@ const PlanPicker: React.FC<PlanPickerProps> = ({ sessionId, currentPlanId, alive
             return sortedCats.map((cat) => (
               <div key={cat} style={{ marginBottom: 4 }}>
                 <div style={{
-                  padding: '4px 8px', fontSize: 'var(--fp-fs-4)', color: 'var(--fp-text-3)', fontWeight: 600,
+                  padding: '4px 8px', fontSize: 'var(--fp-fs-4)', color: 'var(--fp-text-3)', fontWeight: 500,
                   fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase' as const, letterSpacing: '.1em',
                   borderBottom: '1px solid var(--fp-border)', marginBottom: 2,
                   position: 'sticky' as const, top: 0, background: 'var(--fp-solid)', zIndex: 1,
@@ -365,12 +370,9 @@ export default function SessionContextPanel({ sessionId, alive, kind = 'cc' }: P
     reload()
   }, [sessionId, reload])
 
-  // Poll while alive (5s); pause when session dead
-  useEffect(() => {
-    if (!alive) return
-    const id = window.setInterval(reload, 5000)
-    return () => window.clearInterval(id)
-  }, [alive, reload])
+  // Poll while alive (5s); pause when the session is dead, the tab is hidden
+  // or the window is in the background (2026-08-07 页签常驻: 后台不轮询)。
+  useBackgroundPoll(reload, 5000, { enabled: alive, leading: false })
 
   if (error) return <div className="cs-root" style={{ padding: 16, color: 'var(--fp-err)' }}>{error}</div>
   if (!ctx) return <div className="cs-root" style={{ padding: 16, color: 'var(--fp-text-3)' }}>loading…</div>

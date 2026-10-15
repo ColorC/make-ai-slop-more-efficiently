@@ -42,8 +42,9 @@ from .challenge_diagnostic import ChallengeDiagnosticAgent, CHALLENGE_DIAGNOSTIC
 def build_diagnostic_workers(*, bus) -> list:
     """返 doctor 当前已立 agent list (可入 MaterialDispatcher).
 
-    每个 agent 是 ConfigurableAgent 子类 (Router 子类) 继承 AgentNodeLoop, 必须传 bus.
-    FORMAT_IN/OUT 自动派生自 SPEC.trigger_materials / primary_output.
+    四个对象诊断位点、Challenge、Meta 与 HypothesisDeriver 均是外置
+    AgentRuntime Worker。bus 参数供 Omni 侧 finding/假设发布审计和 dispatcher
+    使用；模型侧没有权威写工具。
 
     含 4 对象级诊断 agent + 1 派生 agent + 1 元诊断 agent (看 team 整体).
     """

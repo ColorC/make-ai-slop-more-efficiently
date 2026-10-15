@@ -14,11 +14,11 @@ const TABS = [
 
 const S: Record<string, any> = {
   root: { display: 'flex', flexDirection: 'column', height: '100%', background: 'transparent' },
-  bar: { display: 'flex', alignItems: 'center', borderTop: '1px solid #222', borderBottom: '1px solid #222', padding: 0 },
+  bar: { display: 'flex', alignItems: 'center', borderTop: '1px solid var(--fp-border-subtle)', borderBottom: '1px solid var(--fp-border-subtle)', padding: 0 },
   btn: (active: boolean): React.CSSProperties => ({
     padding: '4px 14px',
-    background: active ? '#1a2a3a' : 'transparent',
-    color: active ? '#90caf9' : '#666',
+    background: active ? 'var(--fp-bp-paper-2)' : 'transparent',
+    color: active ? 'var(--fp-link)' : 'var(--fp-text-2)',
     border: 'none',
     borderBottom: active ? '2px solid #90caf9' : '2px solid transparent',
     cursor: 'pointer',
@@ -31,7 +31,7 @@ const S: Record<string, any> = {
     marginRight: 4,
     border: 'none',
     background: 'transparent',
-    color: '#777',
+    color: 'var(--fp-text-2)',
     cursor: 'pointer',
     display: 'inline-flex',
     alignItems: 'center',

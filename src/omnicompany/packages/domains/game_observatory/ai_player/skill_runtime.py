@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
 from typing import Any, Literal, Protocol
 
@@ -14,6 +15,8 @@ from .contracts import (
     SkillVersionV1,
 )
 from .skills import SkillLifecycle, SkillLifecycleError, skill_is_applicable
+from .skill_attestation import SkillValidationSigner
+from .skill_provenance import SkillRunEvidenceWriter
 from .store import AIPlayerStore
 
 
@@ -35,6 +38,8 @@ class SkillStepExecutionResultV1(BaseModel):
     claimed_success: bool
     objective_success: bool
     evidence_refs: list[EvidenceReferenceV1] = Field(min_length=1)
+    observed_state_id: str | None = Field(default=None, min_length=1)
+    verified_state_guard: bool = False
     branch_value: bool | None = None
     retry_allowed_after_observation: bool = False
     action_count: int = Field(default=0, ge=0)
@@ -51,6 +56,7 @@ class SkillExecutionRequestV1(BaseModel):
     skill_version_id: str | None = Field(default=None, min_length=1)
     validation_mode: bool = False
     run_id: str = Field(min_length=1)
+    validator_id: str = Field(min_length=1)
     attempt_index: int = Field(ge=1)
     independent_reset_id: str = Field(min_length=1)
     visual_variant_id: str = Field(min_length=1)
@@ -164,16 +170,29 @@ def _action_evidence_matches_skill_step(
 class SkillRuntime:
     """Execute preferred skills in production and explicit candidates in validation mode."""
 
-    def __init__(self, store: AIPlayerStore, adapter: SkillStepAdapter) -> None:
+    def __init__(
+        self,
+        store: AIPlayerStore,
+        adapter: SkillStepAdapter,
+        *,
+        run_signer: SkillValidationSigner | None = None,
+        timing_sink: dict[str, float] | None = None,
+        defer_lifecycle_reconcile: bool = False,
+    ) -> None:
         self.store = store
         self.adapter = adapter
         self.lifecycle = SkillLifecycle(store)
+        self.run_signer = run_signer
+        self.timing_sink = timing_sink
+        self.defer_lifecycle_reconcile = defer_lifecycle_reconcile
 
     def execute(self, request: SkillExecutionRequestV1) -> SkillExecutionResultV1:
         skill = self._resolve_skill(request)
         environment = self.store.get_environment(request.environment_id)
         if environment is None:
             raise SkillLifecycleError(f"unknown environment: {request.environment_id}")
+        self._require_structured_skill(skill)
+        self._require_trusted_independent_signer(request, skill)
         if not skill_is_applicable(
             skill,
             environment,
@@ -298,6 +317,42 @@ class SkillRuntime:
         )
         return SkillExecutionResultV1(skill=skill, run=run, step_results=results)
 
+    @staticmethod
+    def _require_structured_skill(skill: SkillVersionV1) -> None:
+        if any(
+            step.kind == "assert" and step.expected_state_id is None
+            for step in skill.steps
+        ):
+            raise SkillLifecycleError(
+                "skill execution requires structured expected_state_id terminals"
+            )
+
+    def _require_trusted_independent_signer(
+        self,
+        request: SkillExecutionRequestV1,
+        skill: SkillVersionV1,
+    ) -> None:
+        signer = self.run_signer
+        if signer is None:
+            raise SkillLifecycleError(
+                "skill execution requires an independent validation signer"
+            )
+        if signer.validator_id != request.validator_id:
+            raise SkillLifecycleError(
+                "skill execution validator does not match the runtime signer"
+            )
+        if signer.validator_id == skill.creator_id:
+            raise SkillLifecycleError(
+                "skill creator cannot execute its own independent validation"
+            )
+        try:
+            self.store.skill_validator_trust_store.assert_active(
+                signer.validator_id,
+                signer.key_id,
+            )
+        except ValueError as error:
+            raise SkillLifecycleError(str(error)) from error
+
     def _resolve_skill(self, request: SkillExecutionRequestV1) -> SkillVersionV1:
         if request.skill_version_id is not None:
             skill = self.store.get_skill_version_by_id(
@@ -377,11 +432,51 @@ class SkillRuntime:
         model_input_tokens: int = 0,
         decision_latency_ms: float = 0,
     ) -> SkillRunV1:
-        run = SkillRunV1(
+        signer = self.run_signer
+        if signer is None:  # The execution gate rejects this before any device work.
+            raise SkillLifecycleError(
+                "skill execution requires an independent validation signer"
+            )
+        provenance_started = time.perf_counter()
+        (
+            evidence_refs,
+            provenance_evidence_run_id,
+            provenance_evidence_step_ids,
+        ) = SkillRunEvidenceWriter(self.store).write(
+            skill=skill,
+            validator_id=request.validator_id,
+            run_id=request.run_id,
+            independent_reset_id=request.independent_reset_id,
+            visual_variant_id=request.visual_variant_id,
+            outcome=outcome,
+            precondition_satisfied=precondition_satisfied,
+            objective_success=objective_success,
+            validation_passed=validation_passed,
+            false_success=false_success,
+            safety_violation_count=0,
+            recovery_attempted=recovery_attempted,
+            recovery_succeeded=recovery_succeeded,
+            action_count=action_count,
+            model_input_tokens=model_input_tokens,
+            baseline_model_input_tokens=request.baseline_model_input_tokens,
+            decision_latency_ms=decision_latency_ms,
+            baseline_decision_latency_ms=request.baseline_decision_latency_ms,
+            source_evidence_refs=evidence_refs,
+        )
+        if self.timing_sink is not None:
+            self.timing_sink["run_provenance"] = round(
+                (time.perf_counter() - provenance_started) * 1000,
+                3,
+            )
+        unsigned = SkillRunV1(
             id=request.run_id,
             environment_id=request.environment_id,
             evidence_refs=evidence_refs,
             skill_version_id=skill.id,
+            validator_id=request.validator_id,
+            provenance_evidence_run_id=provenance_evidence_run_id,
+            provenance_evidence_step_ids=provenance_evidence_step_ids,
+            provenance_sha256=self.store.skill_run_provenance_sha256(evidence_refs),
             attempt_index=request.attempt_index,
             independent_reset_id=request.independent_reset_id,
             visual_variant_id=request.visual_variant_id,
@@ -399,4 +494,19 @@ class SkillRuntime:
             decision_latency_ms=decision_latency_ms,
             baseline_decision_latency_ms=request.baseline_decision_latency_ms,
         )
-        return self.lifecycle.record_run(run)
+        persist_started = time.perf_counter()
+        run = self.lifecycle.record_run(signer.sign(unsigned))
+        if self.timing_sink is not None:
+            self.timing_sink["run_sign_and_persist"] = round(
+                (time.perf_counter() - persist_started) * 1000,
+                3,
+            )
+        if not self.defer_lifecycle_reconcile:
+            reconcile_started = time.perf_counter()
+            self.lifecycle.reconcile_after_run(run)
+            if self.timing_sink is not None:
+                self.timing_sink["lifecycle_reconcile"] = round(
+                    (time.perf_counter() - reconcile_started) * 1000,
+                    3,
+                )
+        return run

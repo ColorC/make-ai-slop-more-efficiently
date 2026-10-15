@@ -1,0 +1,28 @@
+{
+  "contract_version": "material-plugin-fixtures/0.1",
+  "cases": [
+    {
+      "id": "valid-note-plugin",
+      "ok": true,
+      "manifest": {
+        "contract_version": "0.1.0",
+        "id": "example.note",
+        "version": "1",
+        "capabilities": ["note", "write"],
+        "requires": ["example.wiki"],
+        "transport": { "kind": "http", "ref": "/api/notes" }
+      }
+    },
+    {
+      "id": "missing-capability",
+      "ok": false,
+      "issue_paths": ["capabilities"],
+      "manifest": {
+        "contract_version": "0.1.0",
+        "id": "example.empty",
+        "version": "1",
+        "capabilities": []
+      }
+    }
+  ]
+}

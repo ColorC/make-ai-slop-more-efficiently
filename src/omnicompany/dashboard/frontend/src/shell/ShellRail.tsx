@@ -11,8 +11,9 @@ import {
   ClipboardList,
   Command,
   FolderKanban,
+  LayoutDashboard,
   Maximize2,
-  MessageSquare,
+  Minimize2,
   MoreHorizontal,
   NotebookPen,
   Settings,
@@ -24,17 +25,19 @@ import './shellA.css'
 export type SpineKey = 'home' | 'authored' | 'review' | 'multiagent' | 'controller' | 'settings'
 
 // 左侧 rail 的目的地:每个点下去 = 切到一个主区视图(统一语义,与 V1 顶栏导航一致)。
+// 2026-08-15 用户裁定: 原「总控」改名「中枢」并换 icon —— 「总控」身份已由「会话」页
+// 里的 assistant 按钮接替, 中枢只留视图集合(项目板/CLI Hub/最近访问/定时任务)。
 export const SPINE: Array<{ key: SpineKey; label: string; Icon: LucideIcon }> = [
   { key: 'home', label: '项目', Icon: FolderKanban },
-  { key: 'authored', label: '草稿箱', Icon: NotebookPen },
+  { key: 'authored', label: '画布', Icon: NotebookPen },
   { key: 'review', label: '审阅', Icon: ClipboardList },
-  { key: 'multiagent', label: 'Multiagent', Icon: Activity },
-  { key: 'controller', label: '总控', Icon: MessageSquare },
+  { key: 'multiagent', label: '会话', Icon: Activity },
+  { key: 'controller', label: '中枢', Icon: LayoutDashboard },
   { key: 'settings', label: '设置', Icon: Settings },
 ]
 
 export const SPINE_LABEL: Record<SpineKey, string> = {
-  home: '项目', authored: '草稿箱', review: '审阅', multiagent: 'Multiagent', controller: '总控', settings: '设置',
+  home: '项目', authored: '画布', review: '审阅', multiagent: '会话', controller: '中枢', settings: '设置',
 }
 
 export interface RailSlots {
@@ -47,6 +50,10 @@ export interface RailSlots {
   /** 全屏审阅:仅当前页签是 web_review 时出现(条件槽位;退出态由壳层浮动钮承载)。 */
   enterMaximizeVisible: boolean
   onEnterMaximize: () => void
+  /** Native desktop window fullscreen; absent in the browser build. */
+  desktopFullscreenVisible: boolean
+  desktopFullscreen: boolean
+  onToggleDesktopFullscreen: () => void
   /** ⋯ 菜单(rail 底槽,状态细点之上)。 */
   moreOpen: boolean
   onToggleMore: () => void
@@ -121,6 +128,21 @@ export const ShellRail = React.memo(function ShellRail({ activeKey, reviewPendin
         >
           <span className="ico-s" aria-hidden="true"><Maximize2 size={18} /></span>
           <span className="lb">全屏</span>
+        </button>
+      )}
+      {slots.desktopFullscreenVisible && (
+        <button
+          type="button"
+          className={`sha-ri${slots.desktopFullscreen ? ' on' : ''}`}
+          onClick={slots.onToggleDesktopFullscreen}
+          data-testid="cockpit-desktop-fullscreen"
+          aria-label={slots.desktopFullscreen ? '退出窗口全屏 (F11)' : '窗口全屏 (F11)'}
+          aria-pressed={slots.desktopFullscreen}
+        >
+          <span className="ico-s" aria-hidden="true">
+            {slots.desktopFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </span>
+          <span className="lb">{slots.desktopFullscreen ? '退出全屏' : '全屏'}</span>
         </button>
       )}
       {/* 底槽: ⋯ 菜单(整页快照/刷新/停靠/底部事件/管线) */}

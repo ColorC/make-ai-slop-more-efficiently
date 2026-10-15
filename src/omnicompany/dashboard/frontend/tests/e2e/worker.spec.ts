@@ -45,7 +45,7 @@ test('D5.1 设计 facet 用 .markdown-body 容器 (统一 renderer)', async ({ p
   await expandTo(page, WD)
   await page.locator(`[data-tree="worker"] div[title="${WD}"]`).click()
   await page.waitForTimeout(800)
-  await expect(page.locator('.markdown-body').first()).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('.wiki-prose').first()).toBeVisible({ timeout: 10000 })
 })
 
 test('D5.2 设计 facet 渲染表格 (复用统一 renderer)', async ({ page }) => {
@@ -54,13 +54,13 @@ test('D5.2 设计 facet 渲染表格 (复用统一 renderer)', async ({ page }) 
   await expandTo(page, WD)
   await page.locator(`[data-tree="worker"] div[title="${WD}"]`).click()
   await page.waitForTimeout(1500)
-  const tableCount = await page.locator('.markdown-body table').count()
+  const tableCount = await page.locator('.wiki-prose table').count()
   // not all DESIGN.md have tables; at minimum check the rendered region exists with proper classes
   if (tableCount > 0) {
-    await expect(page.locator('.markdown-body table th').first()).toBeVisible()
+    await expect(page.locator('.wiki-prose table th').first()).toBeVisible()
   }
   // visible heading at least
-  await expect(page.locator('.markdown-body h1, .markdown-body h2').first()).toBeVisible()
+  await expect(page.locator('.wiki-prose h1, .wiki-prose h2').first()).toBeVisible()
 })
 
 test('D5.3 设计 facet 代码块语法高亮 (统一 renderer)', async ({ page }) => {
@@ -68,12 +68,9 @@ test('D5.3 设计 facet 代码块语法高亮 (统一 renderer)', async ({ page 
   await expandTo(page, WD)
   await page.locator(`[data-tree="worker"] div[title="${WD}"]`).click()
   await page.waitForTimeout(1500)
-  const codeCount = await page.locator('.markdown-body pre').count()
+  const codeCount = await page.locator('.wiki-prose pre').count()
   if (codeCount > 0) {
-    // if any code block has lang, prism injects .token spans
-    const tokenCount = await page.locator('.markdown-body pre .token').count()
-    // only assert if any code has language hint
-    if (tokenCount > 0) expect(tokenCount).toBeGreaterThan(0)
+    await expect(page.locator('.wiki-prose pre code').first()).toBeVisible()
   }
 })
 

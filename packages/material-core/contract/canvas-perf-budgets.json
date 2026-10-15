@@ -1,0 +1,24 @@
+{
+  "schema": "omni.canvas-perf-budgets/v1",
+  "revised": "2026-09-12",
+  "note": "画布浏览性能标准。lab 口径由 workshop/tools/canvas-perf-probe.mjs 用平板口径（1280×800、CPU×4）测；live 口径由画布前端采样器在真机后台按窗口上报（canvas_perf 事件）。TS 与 Python 都读这一份。",
+  "lab_note": "长任务预算按 CPU×4 口径。settle 是换档刚落定后 2.4s 的一次性预算：十几张卡从标题翻成图片 / Markdown / 资料文档本来就是一串挂载（连跑四次实测 9–13 次、0.9–1.6s、p95 150–280ms，网络与解码时序抖动大），预算按两倍留量只拦回退；idle / pan / zoom 是持续交互预算，才是严格的那几条（基线一次缩放 19 次 4.7s 的整板重渲在 zoom 一栏被拦）。",
+  "lab": {
+    "profile": { "viewport": [1280, 800], "cpuThrottle": 4 },
+    "settle": { "p95FrameMs": 350, "longTasks": 16, "longTaskMs": 2000 },
+    "idle": { "p95FrameMs": 20, "longTasks": 2, "longTaskMs": 400 },
+    "pan": { "p95FrameMs": 20, "longTasks": 1, "longTaskMs": 200 },
+    "zoom": { "p95FrameMs": 50, "longTasks": 3, "longTaskMs": 400 },
+    "liveIframesNotFullscreen": 0,
+    "readyMs": 5000,
+    "transferMB": 5
+  },
+  "live": {
+    "windowMs": 30000,
+    "interaction": { "p95FrameMs": 50, "over100PerWindow": 3 },
+    "idle": { "p95FrameMs": 24, "longTasksPerWindow": 2 },
+    "heapMB": 250,
+    "liveIframesNotFullscreen": 0,
+    "degradeAfterWindows": 2
+  }
+}

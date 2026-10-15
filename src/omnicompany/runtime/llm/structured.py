@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 DEFAULT_STRUCTURED_MODEL_ENV = "OMNI_STRUCTURED_LLM_MODEL"
-DEFAULT_STRUCTURED_MODEL = "deepseek-v4-pro"
+DEFAULT_STRUCTURED_MODEL = "deepseek-v4.1-flash"
 DEFAULT_MODEL = os.environ.get(DEFAULT_STRUCTURED_MODEL_ENV, DEFAULT_STRUCTURED_MODEL).strip() or DEFAULT_STRUCTURED_MODEL
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.IGNORECASE | re.DOTALL)

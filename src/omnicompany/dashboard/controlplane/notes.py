@@ -285,6 +285,10 @@ def get_note(note_id: str) -> dict[str, Any]:
         "path": str(md_path.relative_to(_project_root())).replace(os.sep, "/"),
         "content": content,
         "mtime": stat.st_mtime,
+        # JSON numbers are parsed as IEEE-754 doubles by browsers.  A native
+        # nanosecond timestamp already exceeds the exact integer range, so the
+        # revision must cross the HTTP boundary as text.
+        "mtime_ns": str(stat.st_mtime_ns),
         "size": stat.st_size,
     }
 
@@ -315,5 +319,6 @@ def put_note(note_id: str, body: NoteWrite) -> dict[str, Any]:
         "id": note_id,
         "ok": True,
         "mtime": stat.st_mtime,
+        "mtime_ns": str(stat.st_mtime_ns),
         "size": stat.st_size,
     }

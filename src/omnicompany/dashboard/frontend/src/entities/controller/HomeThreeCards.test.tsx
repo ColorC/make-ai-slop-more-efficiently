@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ccApi } from '../../api/ccClient'
 import { ccChatApi } from '../../api/ccChatClient'
-import { projectsApi } from '../../api/projectsClient'
 import { reviewstageApi } from '../../api/reviewstageClient'
 import { CONTROLLER_TAB_ID, usePanels, withDefaultTabs } from '../../stores/panelsStore'
 import HomeThreeCards from './HomeThreeCards'
@@ -14,12 +13,25 @@ describe('HomeThreeCards CLI-only conversation semantics', () => {
     vi.restoreAllMocks()
     vi.spyOn(ccChatApi, 'list').mockResolvedValue([])
     vi.spyOn(ccChatApi, 'activeSessions').mockResolvedValue([])
-    vi.spyOn(projectsApi, 'list').mockResolvedValue({ projects: [] } as any)
     vi.spyOn(reviewstageApi, 'list').mockResolvedValue({ items: [] } as any)
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({ plans: [], items: [] }),
     })))
+  })
+
+  it('does not load hidden conversations, teams, or project fan-out on first paint', async () => {
+    render(<HomeThreeCards />)
+
+    await waitFor(() => {
+      expect(reviewstageApi.list).toHaveBeenCalledWith({ limit: 80 })
+    })
+    expect(ccChatApi.list).not.toHaveBeenCalled()
+    expect(ccChatApi.activeSessions).not.toHaveBeenCalled()
+    const paths = vi.mocked(fetch).mock.calls.map(([path]) => String(path))
+    expect(paths).toContain('/api/boss-sight/plans')
+    expect(paths).not.toContain('/api/teams')
+    expect(paths.some((path) => path.startsWith('/api/projects'))).toBe(false)
   })
 
   it('opens a recent conversation by resuming it in a real CLI', async () => {

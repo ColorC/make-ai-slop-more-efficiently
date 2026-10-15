@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { webReviewRegistration, WEB_REVIEW_TARGETS } from './index'
+import { encodeWebPageId } from '../../lib/webTabHost'
 
 describe('web_review entity', () => {
   it('registers resolver and renderer under the same type', () => {
@@ -28,6 +29,17 @@ describe('web_review entity', () => {
     const e = await webReviewRegistration.resolver.fetch('vilo-os')
     expect(e.meta?.url).toBe('/vilo-os/')
     expect(e.meta?.route).toBe('/')
+  })
+
+  it('restores the requested browser profile for external pages', async () => {
+    const entity = await webReviewRegistration.resolver.fetch(
+      encodeWebPageId('https://example.com/private', 'private'),
+    )
+    expect(entity.meta).toEqual(expect.objectContaining({
+      url: 'https://example.com/private',
+      profile: 'private',
+      webPage: true,
+    }))
   })
 
   it('lists built-in targets and throws for unknown ids', async () => {

@@ -655,6 +655,15 @@ class ReadFileRouter(SingleToolRouter):
         path = args.get("file_path") or args.get("path", "")
         if not path:
             raise ToolExecutionError("file_path is required (absolute path to a file)")
+        resolved_path = _resolve_path_from_ctx(path, ctx)
+        allowed_read_files = getattr(ctx, "allowed_read_files", None) or ()
+        if allowed_read_files and resolved_path not in {
+            Path(item).expanduser().resolve() for item in allowed_read_files
+        }:
+            raise ToolExecutionError(
+                f"read_file REFUSED: {resolved_path} is outside allowed_read_files"
+            )
+        path = str(resolved_path)
         offset = args.get("offset", 0)
         limit = args.get("limit", 2000)
         is_full_read = offset == 0 and limit >= 2000

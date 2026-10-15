@@ -9,9 +9,24 @@ import re
 from pathlib import Path
 
 _SKIP = (".test.", ".d.ts")
-_EXCLUDE = {".git", "node_modules", "dist", "__pycache__", ".venv"}
+_EXCLUDE = {".git", "node_modules", "dist", "__pycache__", ".venv",
+            # 第三方 UI 套件 vendored 进来的原语(shadcn 的 components/ui/ 等)。
+            # 审它们的"信息层级"没有意义 —— 那是别人的组件, 我们只消费不排版;
+            # 不排除的话每装一个套件就多几条永远修不掉的 L3。
+            "ui"}
 _CJK = re.compile(r"[一-鿿]")
 _DESTRUCTIVE = ("删除", "delete", "-delete", "danger")
+
+
+# 注释不是界面文字。说明段这条指标要抓的是"整段说明堆在界面上", 拿注释去数等于
+# 惩罚写注释 —— 方向正好反了(2026-08-07 实锤: 一个只加了两段中文注释的 shadcn
+# 组件被判 🔴)。数之前先把注释剥掉。
+_LINE_COMMENT = re.compile(r"//[^\n]*")
+_BLOCK_COMMENT = re.compile(r"/\*[\s\S]*?\*/")
+
+
+def strip_comments(s: str) -> str:
+    return _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", s))
 
 
 def _iter_tsx(src_root: str, include_dirs: list[str], exclude: set[str]):
@@ -70,10 +85,17 @@ def enum_info(src_root: str, include_dirs=None, exclude=None) -> dict:
     for rel, s in _iter_tsx(src_root, include_dirs, exclude):
         if not rel.endswith(".tsx"):
             continue
+        # 字号/字重的写法不止内联样式一种。只认 `fontSize:` 会把所有 Tailwind 前端判成
+        # "信息无层级" —— 那是探测盲区不是设计缺陷(2026-08-07 实锤: BSide 实际有 4 档字号
+        # 3 档字重, 全写成 text-[13px] / font-semibold, 枚举器一档都没看见)。
         sizes = (set(re.findall(r"fontSize:\s*(\d{1,2})", s)) | set(re.findall(r"var\(--fp-fs-\d\)", s))
-                 | set(re.findall(r"FS\.\w+", s)) | set(re.findall(r"fontSize\.\w+", s)))
-        weights = set(re.findall(r'fontWeight:\s*(\d{3}|[\'"]?bold)', s))
-        longs = [m for m in re.findall(r"[>'\"`]([^<>'\"`{}]{0,200})", s) if len(_CJK.findall(m)) >= 16]
+                 | set(re.findall(r"FS\.\w+", s)) | set(re.findall(r"fontSize\.\w+", s))
+                 | set(re.findall(r"text-\[(\d{1,2})px\]", s))
+                 | set(re.findall(r"\btext-(xs|sm|base|lg|xl|2xl|3xl|4xl)\b", s)))
+        weights = (set(re.findall(r'fontWeight:\s*(\d{3}|[\'"]?bold)', s))
+                   | set(re.findall(r"\bfont-(thin|light|normal|medium|semibold|bold|extrabold)\b", s)))
+        longs = [m for m in re.findall(r"[>'\"`]([^<>'\"`{}]{0,200})", strip_comments(s))
+                 if len(_CJK.findall(m)) >= 16]
         rec = {"size_tiers": len(sizes), "weight_tiers": len(weights), "long_text": len(longs),
                "mono": s.count("mono") + s.count("Consolas") + s.count("Berkeley")}
         if sizes or longs:

@@ -3,7 +3,7 @@ import { noteResolver, type NoteEntity } from './resolver'
 import NoteSidebar from './NoteSidebar'
 import type { EntityRegistration } from '../registry'
 
-// 懒加载: note Editor 依赖 MarkdownRenderer(markdown 渲染栈), 打开 note tab 才下载对应 chunk。
+// 懒加载: note Editor 消费共享 Wiki Core，打开 note tab 才下载对应 chunk。
 const Editor = lazy(() => import('./Editor'))
 
 export type { NoteEntity } from './resolver'

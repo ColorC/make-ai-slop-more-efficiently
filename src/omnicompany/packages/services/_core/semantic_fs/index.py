@@ -99,12 +99,75 @@ def chunk_text(text: str, size: int = _CHUNK_CHARS, overlap: int = _CHUNK_OVERLA
     return [c.strip() for c in chunks if c.strip()]
 
 
+def upsert_text_projection(
+    *,
+    entity_id: str,
+    file_path: str,
+    summary: str,
+    text: str,
+    semantic_tags: list[str] | None = None,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Index canonical text immediately with deterministic lexical fallback.
+
+    Embeddings remain a rebuildable enhancement; canonical writes must not depend on
+    an external embedding service being available.
+    """
+    base = root or omni_workspace_root()
+    tags, bad = SC.validate_tags(semantic_tags or [], base)
+    if bad:
+        raise ValueError(f"非法标签(不在受控词表): {bad}")
+    chunks = chunk_text(text)
+    connection = _conn(base)
+    connection.execute(
+        "INSERT OR REPLACE INTO materials VALUES(?,?,?,?,?,?,?)",
+        (
+            entity_id,
+            file_path,
+            summary,
+            json.dumps(tags, ensure_ascii=False),
+            "lexical",
+            "[]",
+            _now(),
+        ),
+    )
+    connection.execute("DELETE FROM chunks WHERE entity_id=?", (entity_id,))
+    for index, chunk in enumerate(chunks):
+        connection.execute(
+            "INSERT OR REPLACE INTO chunks VALUES(?,?,?,?)",
+            (entity_id, index, chunk[:1000], "[]"),
+        )
+    connection.commit()
+    connection.close()
+    return {
+        "ok": True,
+        "entity_id": entity_id,
+        "chunks": len(chunks),
+        "model": "lexical",
+        "db": str(db_path(base)),
+    }
+
+
 # ── cosine ─────────────────────────────────────────────────────────────
 def _cos(a: list[float], b: list[float]) -> float:
     s = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
     nb = math.sqrt(sum(y * y for y in b))
     return s / (na * nb + 1e-9)
+
+
+def _lexical_score(query: str, text: str) -> float:
+    normalized_query = query.casefold().strip()
+    normalized_text = text.casefold()
+    if not normalized_query or not normalized_text:
+        return 0.0
+    if normalized_query in normalized_text:
+        return 1.0
+    terms = set(re.findall(r"[\w\u4e00-\u9fff]+", normalized_query))
+    if not terms:
+        return 0.0
+    hits = sum(1 for term in terms if term in normalized_text)
+    return hits / len(terms)
 
 
 # ── build index ────────────────────────────────────────────────────────
@@ -174,26 +237,37 @@ def search(query: str, *, top_k: int = 5, tags: list[str] | None = None,
            model: str = _DEFAULT_EMBED_MODEL, root: Path | None = None) -> list[dict]:
     """hybrid: 向量召回(整单元 + chunk 取 max)+ semantic_tags meta 硬过滤 + 重排。"""
     base = root or omni_workspace_root()
-    qv = embed_texts([query], model=model)[0]
+    try:
+        qv = embed_texts([query], model=model)[0]
+    except Exception:  # noqa: BLE001 - lexical fallback is a designed offline path
+        qv = None
     c = _conn(base)
     mats = c.execute("SELECT entity_id, file_path, summary, semantic_tags, vec FROM materials").fetchall()
     # chunk 最高分(单元内最相关片段)
     chunk_best: dict[str, float] = {}
-    for eid, _i, _t, cv in c.execute("SELECT entity_id, chunk_idx, text, vec FROM chunks").fetchall():
-        s = _cos(qv, json.loads(cv))
+    chunk_lexical: dict[str, float] = {}
+    for eid, _i, chunk, cv in c.execute("SELECT entity_id, chunk_idx, text, vec FROM chunks").fetchall():
+        vector = json.loads(cv)
+        s = _cos(qv, vector) if qv and vector else 0.0
         if s > chunk_best.get(eid, -1):
             chunk_best[eid] = s
+        lexical = _lexical_score(query, chunk)
+        if lexical > chunk_lexical.get(eid, 0.0):
+            chunk_lexical[eid] = lexical
     rows = []
     for eid, fp, summ, tags_json, vec in mats:
         mt = json.loads(tags_json or "[]")
         if tags and not all(t in mt for t in tags):  # meta 硬过滤: 要求含全部指定 tag
             continue
-        unit_s = _cos(qv, json.loads(vec))
+        vector = json.loads(vec)
+        unit_s = _cos(qv, vector) if qv and vector else 0.0
         ch_s = chunk_best.get(eid, 0.0)
-        score = 0.5 * unit_s + 0.5 * ch_s  # 重排: 整单元 + 最佳 chunk 各半
+        lexical = max(_lexical_score(query, f"{summ} {fp}"), chunk_lexical.get(eid, 0.0))
+        score = max(lexical, 0.5 * unit_s + 0.5 * ch_s)
         rows.append({"entity_id": eid, "file_path": fp, "summary": summ,
                      "semantic_tags": mt, "unit": round(unit_s, 4),
-                     "chunk": round(ch_s, 4), "score": round(score, 4)})
+                     "chunk": round(ch_s, 4), "lexical": round(lexical, 4),
+                     "score": round(score, 4)})
     c.close()
     rows.sort(key=lambda r: -r["score"])
     return rows[:top_k]

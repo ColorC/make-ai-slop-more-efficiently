@@ -1,17 +1,41 @@
-# [OMNI] origin=ai-ide ts=2026-05-23 type=infra
-# [OMNI] material_id="material:dashboard.boss_sight.package_init.py"
-"""boss_sight — BOSS SIGHT 总控 + 审阅台 + 多 agent 控制面板.
+# [OMNI] origin=arch-ratchet-surgery ts=2026-08-17 type=shim
+"""兼容 shim：boss_sight 已整包迁往 omnicompany.packages.services.boss_sight。
 
-落实 docs/plans/dashboard/[2026-05-23]BOSS-SIGHT/master_roadmap.md 描述的四块:
-
-- controller/  — 块 1: 总控 agent worker 本体 + 跟人对接通道
-- aggregator/  — 块 1 / 块 2: plan / subagent 状态聚合(给总控 ctx 用)
-- (后续块 2/3/4 在此目录添加更多子模块)
-
-设计原则:
-- 总控 prompt 由外部维护会话独立维护(用户原文 §3.1), 总控自己不能改自己 prompt
-- 总控不直接执行任务 / 不修代码 / 不汇报 / 不修 omnicompany 核心层(§2.14/15/17)
-- 严格按 boundaries.md 的工具白名单 + 路径黑名单
+旧路径 import 全部重定向到新位置的同一模块对象（无双实例）。
+新代码一律用新路径；本 shim 仅兜历史字符串/动态 import。
 """
+import importlib
+import importlib.abc
+import importlib.util
+import sys
 
-from __future__ import annotations
+_NEW = "omnicompany.packages.services.boss_sight"
+_OLD = __name__
+
+
+class _RedirectLoader(importlib.abc.Loader):
+    def __init__(self, module):
+        self._module = module
+
+    def create_module(self, spec):
+        return self._module
+
+    def exec_module(self, module):
+        pass
+
+
+class _RedirectFinder(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == _OLD or fullname.startswith(_OLD + "."):
+            real = _NEW + fullname[len(_OLD):]
+            module = importlib.import_module(real)
+            sys.modules[fullname] = module
+            return importlib.util.spec_from_loader(fullname, _RedirectLoader(module))
+        return None
+
+
+if not any(isinstance(f, _RedirectFinder) for f in sys.meta_path):
+    sys.meta_path.insert(0, _RedirectFinder())
+
+_pkg = importlib.import_module(_NEW)
+sys.modules[_OLD] = _pkg

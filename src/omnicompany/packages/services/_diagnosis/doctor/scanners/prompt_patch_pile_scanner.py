@@ -50,7 +50,7 @@ _SPECIFIC_PATTERNS = [
 
 # patch_marker: 显式补丁标
 # XXX 用 (?<![\w-])XXX(?![\w-]) 避开 AP-XXX / -XXX- 等反模式占位符假阳性
-# (2026-05-07 dogfood 6 doctor prompt 时发现 — meta_diagnostic_prompt.md "引 AP-XXX 反模式" 6 处被 \bXXX\b 误命中)
+# (2026-05-07 dogfood 6 旧元诊断 prompt 时发现 — "引 AP-XXX 反模式" 6 处被 \bXXX\b 误命中)
 _PATCH_MARKERS = [
     re.compile(r"\bTODO\b", re.IGNORECASE),
     re.compile(r"\bFIXME\b", re.IGNORECASE),

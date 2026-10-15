@@ -261,6 +261,45 @@ def save_node(node_id: str, info: dict) -> None:
     tmp.replace(path)
 
 
+def ensure_home_tunnel_task() -> str:
+    """Home 节点隧道自愈(2026-08-25 孤儿 ssh 断连事故): 仅当本机就是 home 盒子时,
+    把处于非 Running 状态(被终止 0x41306 不算失败, 不触发任务自身的失败重启)的
+    OmniHomeTunnel 计划任务拉起。
+
+    不重复保证: 只操作既有计划任务——Running 不动、Ready 才 Start、missing 只上报
+    绝不新建, 也绝不直接 spawn ssh 进程(任务侧 MultipleInstances=IgnoreNew 再兜一层)。
+    判别是否 home 盒子看 bootstrap 落盘的 tunnel_loop.ps1; 控制机没有该文件, 零开销跳过。
+    """
+    if os.name != "nt":
+        return "skip_not_windows"
+    loop_ps1 = (
+        Path(os.environ.get("ProgramData", r"C:\ProgramData"))
+        / "omnicompany-home"
+        / "tunnel_loop.ps1"
+    )
+    if not loop_ps1.exists():
+        return "skip_not_home_node"
+    ps = (
+        "$t = Get-ScheduledTask -TaskName 'OmniHomeTunnel' -ErrorAction SilentlyContinue; "
+        "if (-not $t) { 'missing' } "
+        "elseif ($t.State -eq 'Running') { 'running' } "
+        "else { Start-ScheduledTask -TaskName 'OmniHomeTunnel' -ErrorAction Stop; 'started' }"
+    )
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return f"error:{exc}"
+    result = (out.stdout or "").strip()
+    if result:
+        return result
+    return f"error_rc={out.returncode}:{(out.stderr or '').strip()[:200]}"
+
+
 def public_node_record(node_id: str, info: dict[str, Any]) -> dict[str, Any]:
     """Return the public node view, defensively removing secret fields."""
     rec = {
@@ -837,6 +876,17 @@ foreach ($taskName in @('OmniHomeNodeStatus', 'OmniHomeTunnel')) {
         $taskRows[$taskName] = [ordered]@{ state = 'missing'; last_run_time = ''; next_run_time = ''; missed_runs = 0; last_task_result = -1; actions = @() }
     }
 }
+# Self-heal: a terminated tunnel task sits in Ready forever (0x41306 is not a failure,
+# so RestartCount never fires). The reporter runs every 5 minutes as SYSTEM, so it is
+# the natural revive path (real incident 2026-08-25: orphan ssh carried the tunnel for
+# three days after the task died, then everything went dark).
+try {
+    $tunnelRow = $taskRows['OmniHomeTunnel']
+    if ($tunnelRow -and [string]$tunnelRow.state -eq 'Ready') {
+        Start-ScheduledTask -TaskName 'OmniHomeTunnel' -ErrorAction SilentlyContinue
+        $tunnelRow['revived_by_reporter'] = $true
+    }
+} catch {}
 $tunnelPs1 = Join-Path $homeDir 'tunnel_loop.ps1'
 $tunnelKey = Join-Path $homeDir 'tunnel_id_ed25519'
 $knownHosts = Join-Path $homeDir 'known_hosts'
@@ -936,10 +986,16 @@ while (`$true) {
             try { Stop-ScheduledTask -TaskName 'OmniHomeTunnel' -ErrorAction SilentlyContinue } catch {}
             Start-Sleep -Seconds 1
             $tAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$loopPs1`""
-            $tTrigger = New-ScheduledTaskTrigger -AtStartup
+            # AtStartup alone cannot revive a terminated task (0x41306 does not count as a
+            # failure, so RestartCount never fires; real incident 2026-08-25). Add a 5-minute
+            # repetition trigger as the revive path; IgnoreNew keeps a healthy loop untouched.
+            $tTriggers = @(
+                (New-ScheduledTaskTrigger -AtStartup),
+                (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5))
+            )
             $tPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-            $tSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances StopExisting -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
-            Register-ScheduledTask -TaskName 'OmniHomeTunnel' -Action $tAction -Trigger $tTrigger -Principal $tPrincipal -Settings $tSettings -Force | Out-Null
+            $tSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+            Register-ScheduledTask -TaskName 'OmniHomeTunnel' -Action $tAction -Trigger $tTriggers -Principal $tPrincipal -Settings $tSettings -Force | Out-Null
             Start-ScheduledTask -TaskName 'OmniHomeTunnel' -ErrorAction Stop
             WStep "OmniHomeTunnel v2 installed/updated and started (controller loopback :$tunnelPort)"
         }

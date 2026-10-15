@@ -8,7 +8,7 @@
 判定链:
   1. 确定性: 按段算 CJK 占比, 定"本段应为中文"; 段内取非白名单英文 token 作候选; forbidden_aliases 直接命中(给建议中文, 不走 LLM)。
   2. 性价比模型: 对去重后的候选 token(+样本上下文)逐条判 keep / change_to_chinese / unsure + 理由 + 建议中文。
-  3. 只报 findings(不自动改); change_to_chinese 的可进 human-inbox。
+  3. 只报 findings(不自动改); change_to_chinese 的可进 HumanBus 运行时人工复核队列。
 单一真源 = docs/standards/prose_terms.yaml(经 terms.py)。
 """
 from __future__ import annotations

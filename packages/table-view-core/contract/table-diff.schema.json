@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "omni.table-diff/v1",
+  "title": "TableDiff",
+  "description": "主键对齐的语义 diff。kind: value=普通值变 / formula=公式原文变 / formula-result=公式没变但结果变（依赖驱动）/ source=投影值没变但源侧表示变（round-trip 高发缝隙）。",
+  "type": "object",
+  "required": ["schema", "key_fields", "created", "updated", "deleted", "counts"],
+  "properties": {
+    "schema": { "const": "omni.table-diff/v1" },
+    "key_fields": { "type": "array", "items": { "type": "string" } },
+    "created": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "after"],
+        "properties": { "key": { "type": "object" }, "after": { "type": "object" } }
+      }
+    },
+    "updated": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "changes"],
+        "properties": {
+          "key": { "type": "object" },
+          "changes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["before", "after", "kind"],
+              "properties": {
+                "before": { "type": "object" },
+                "after": { "type": "object" },
+                "kind": { "enum": ["value", "formula", "formula-result", "source"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "deleted": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "before"],
+        "properties": { "key": { "type": "object" }, "before": { "type": "object" } }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["created", "updated", "deleted"],
+      "properties": {
+        "created": { "type": "integer" },
+        "updated": { "type": "integer" },
+        "deleted": { "type": "integer" }
+      }
+    }
+  }
+}

@@ -37,7 +37,7 @@ export default function ActiveConvoBadge({
       title={tip}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
-        fontSize: small ? 12 : 13, fontWeight: 600, color: 'var(--fp-ok)',
+        fontSize: small ? 12 : 13, fontWeight: 500, color: 'var(--fp-ok)',
         background: 'color-mix(in srgb, var(--fp-ok) 14%, transparent)',
         borderRadius: 999, padding: small ? '1px 8px' : '2px 9px',
         ...style,

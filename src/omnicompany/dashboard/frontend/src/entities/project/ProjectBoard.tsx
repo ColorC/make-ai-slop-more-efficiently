@@ -10,8 +10,49 @@
 // 数据: 项目走 GET /api/projects;快捷入口走 GET /api/project-views;活跃对话走 active-bindings(均未改)。
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Copy, ExternalLink, FolderOpen, ChevronDown, ChevronRight, Link2, Pin, RefreshCw, Search } from 'lucide-react'
-import { DynamicIcon } from 'lucide-react/dynamic'
+import {
+  Blocks,
+  BookOpen,
+  Brain,
+  BrainCircuit,
+  ChartCandlestick,
+  CodeXml,
+  Copy,
+  DatabaseBackup,
+  ExternalLink,
+  Factory,
+  Feather,
+  FileCheck,
+  FishSymbol,
+  FolderOpen,
+  Gamepad2,
+  GitBranch,
+  Globe,
+  Image as ImageIcon,
+  LayoutDashboard,
+  LayoutTemplate,
+  Layers,
+  Link2,
+  Music,
+  Package,
+  Palette,
+  PanelsTopLeft,
+  Pin,
+  Presentation,
+  RefreshCw,
+  ScanSearch,
+  Search,
+  Send,
+  ShieldCheck,
+  Smartphone,
+  Stethoscope,
+  Swords,
+  Table2,
+  TestTube,
+  ChevronDown,
+  ChevronRight,
+  type LucideIcon,
+} from 'lucide-react'
 import {
   projectsApi,
   type ProjectItem,
@@ -31,6 +72,7 @@ import { PickerMenu } from '../../components/PickerMenu'
 import { useHoverPreview } from '../../components/HoverCard'
 import { ActivityStrip } from './ActivityStrip'
 import './projectBoard.css'
+import { inertWhen } from '../../lib/motion'
 
 // ── 视图模式记忆(localStorage) ──────────────────────────────────────────────
 type ViewMode = 'list' | 'apps'
@@ -107,14 +149,79 @@ function introText(p: ProjectItem): string {
   return (p.desc || p.short || '').trim()
 }
 
-/** 项目小图标(lucide 矢量, kebab 名存在注册表 icon 字段)。未知名/未设置时不渲染, 不会崩。 */
+// 项目注册表当前使用的有限图标集。直接静态导入可避免首页为每张卡并发加载一个
+// lucide 动态 chunk；此前这些请求会堵住随后点击的 ProjectDetail chunk，首次进入
+// 项目出现 2–8 秒整页骨架。新图标未登记时安全退回 FolderOpen。
+const PROJECT_ICONS: Record<string, LucideIcon> = {
+  blocks: Blocks,
+  'book-open': BookOpen,
+  brain: Brain,
+  'brain-circuit': BrainCircuit,
+  'candlestick-chart': ChartCandlestick,
+  'code-xml': CodeXml,
+  'database-backup': DatabaseBackup,
+  factory: Factory,
+  feather: Feather,
+  'file-check': FileCheck,
+  'fish-symbol': FishSymbol,
+  'gamepad-2': Gamepad2,
+  'git-branch': GitBranch,
+  globe: Globe,
+  image: ImageIcon,
+  'layout-dashboard': LayoutDashboard,
+  'layout-template': LayoutTemplate,
+  layers: Layers,
+  music: Music,
+  package: Package,
+  palette: Palette,
+  'panels-top-left': PanelsTopLeft,
+  presentation: Presentation,
+  'scan-search': ScanSearch,
+  send: Send,
+  'shield-check': ShieldCheck,
+  smartphone: Smartphone,
+  stethoscope: Stethoscope,
+  swords: Swords,
+  'table-2': Table2,
+  'test-tube': TestTube,
+}
+
+/** 项目小图标(lucide 矢量, kebab 名存在注册表 icon 字段)。未知名用文件夹兜底, 不会崩。 */
 export function ProjectIcon({ name, size = 16, color = 'currentColor' }: { name?: string; size?: number; color?: string }) {
   if (!name) return null
+  const Icon = PROJECT_ICONS[name] || FolderOpen
   return (
     <span data-testid="project-card-icon" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color }}>
-      <DynamicIcon name={name as never} size={size} />
+      <Icon size={size} />
     </span>
   )
+}
+
+/** 项目专属图标优先;当该 URL 加载失败时回退到调用方原有的 lucide 形态。 */
+export function projectIconSource(iconUrl: string): string {
+  const url = iconUrl.trim()
+  if (!url.startsWith('/api/project-assets/')) return url
+  return `${url}${url.includes('?') ? '&' : '?'}w=320`
+}
+
+function ProjectIconImage({ p, size, fallback }: { p: ProjectItem; size: number; fallback: React.ReactNode }) {
+  const iconUrl = (p.icon_url || '').trim()
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  if (iconUrl && failedUrl !== iconUrl) {
+    return (
+      <img
+        src={projectIconSource(iconUrl)}
+        alt={`${p.name || p.id} icon`}
+        data-testid="project-icon-image"
+        loading="lazy"
+        decoding="async"
+        fetchPriority="low"
+        style={{ ...S.tileIconImg, width: size, height: size }}
+        onError={() => setFailedUrl(iconUrl)}
+      />
+    )
+  }
+  return fallback
 }
 
 /** 行尾「…更多」菜单: 收纳低频操作(后台打开 / 复制 id / 复制 index 路径 / 在编辑器打开根目录)。
@@ -227,7 +334,7 @@ function ProjectRow({ p, binding, pinned, onOpen, onCopyIndex, onTogglePin, prev
       onMouseLeave={() => preview.scheduleHide()}
     >
       <span className="pc-icon" aria-hidden="true">
-        {p.icon ? <ProjectIcon name={p.icon} size={20} /> : (p.name || p.id || '?').trim().charAt(0) || '·'}
+        <ProjectIconImage p={p} size={20} fallback={<ProjectIcon name={p.icon || 'folder-open'} size={20} />} />
       </span>
       <span className="pc-main">
         <span className="pc-t">
@@ -278,17 +385,25 @@ function AppTile({ app }: { app: ProjectViewApp }) {
       onMouseLeave={tileHoverOut}
     >
       {useImg
-        ? <img src={app.icon_url as string} alt="" style={S.tileIconImg} onError={() => setImgOk(false)} />
+        ? <img
+            src={projectIconSource(app.icon_url as string)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            style={S.tileIconImg}
+            onError={() => setImgOk(false)}
+          />
         : <span style={S.tileIcon}>{app.icon || <Link2 size={26} aria-hidden />}</span>}
       <span style={S.tileLabel}>{app.label}</span>
     </div>
   )
 }
 
-/** 应用视图项目的一格: 卡图(有 bg)→ 方形小图标; 否则 lucide 图标; 再否则底衬+首字。点击进详情。 */
+/** 应用视图项目的一格: bg 卡图形态保持不变, icon_url 叠在卡图内;无 bg 时才用专属图标 / lucide。 */
 function ProjectTile({ p, onOpen }: { p: ProjectItem; onOpen: (bg?: boolean) => void }) {
   const name = p.name || p.id
-  const firstChar = name.trim().charAt(0) || '·'
+  const hasIconUrl = !!(p.icon_url || '').trim()
   const hasBg = !!(p.bg || '').trim()
   const kebabItems: KebabItem[] = [
     { label: '打开项目', icon: <FolderOpen size={14} />, testid: 'project-tile-open', onClick: () => onOpen() },
@@ -307,10 +422,22 @@ function ProjectTile({ p, onOpen }: { p: ProjectItem; onOpen: (bg?: boolean) => 
         <KebabMenu items={kebabItems} testid="project-tile-more" iconSize={14} triggerStyle={{ background: 'rgba(11,15,23,.55)', borderColor: 'transparent' }} />
       </span>
       {hasBg
-        ? <div style={{ ...S.tileIconImg, background: thumbBackground(p) }} data-testid="project-app-tile-img" />
-        : p.icon
-          ? <span style={S.tileIcon}><ProjectIcon name={p.icon} size={30} /></span>
-          : <span style={{ ...S.tileIconLetter }}>{firstChar}</span>}
+        ? (
+          <div style={{ ...S.tileIconImg, position: 'relative', background: thumbBackground(p) }} data-testid="project-app-tile-img">
+            {hasIconUrl && (
+              <span style={S.tileIconOverlay} data-testid="project-app-tile-icon-overlay">
+                <ProjectIconImage
+                  p={p}
+                  size={22}
+                  fallback={<span style={S.tileIconOverlayFallback}><ProjectIcon name={p.icon || 'folder-open'} size={14} /></span>}
+                />
+              </span>
+            )}
+          </div>
+        )
+        : hasIconUrl
+        ? <ProjectIconImage p={p} size={58} fallback={<span style={S.tileIcon}><ProjectIcon name={p.icon || 'folder-open'} size={30} /></span>} />
+        : <span style={S.tileIcon}><ProjectIcon name={p.icon || 'folder-open'} size={30} /></span>}
       <span style={S.tileLabel}>{name}</span>
     </div>
   )
@@ -331,8 +458,8 @@ function thumbBackground(p: ProjectItem): string {
 
 // 应用视图(启动器)保留 V1 内联样式(本波不重置, 只跟随 token 换皮)。
 const S: Record<string, any> = {
-  launcherCap: { color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 600, margin: '0 2px 12px' },
-  launcherCapSplit: { color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 600, margin: '28px 2px 12px', paddingTop: 20, borderTop: '1px solid var(--fp-border)' },
+  launcherCap: { color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 500, margin: '0 2px 12px' },
+  launcherCapSplit: { color: 'var(--fp-text-2)', fontSize: 15, fontWeight: 500, margin: '28px 2px 12px', paddingTop: 20, borderTop: '1px solid var(--fp-border)' },
   appsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 10 },
   tile: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 9,
@@ -342,7 +469,8 @@ const S: Record<string, any> = {
   },
   tileIcon: { width: 58, height: 58, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, lineHeight: 1, color: 'var(--fp-text)', background: 'var(--fp-accent-weak)', border: '1px solid var(--fp-border)', flexShrink: 0 },
   tileIconImg: { width: 58, height: 58, borderRadius: 3, border: '1px solid rgba(0,0,0,.35)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.05)', flexShrink: 0, objectFit: 'cover', display: 'block' },
-  tileIconLetter: { width: 58, height: 58, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 600, lineHeight: 1, color: 'var(--fp-text-2)', border: '1px solid rgba(235,245,255,.45)', flexShrink: 0, fontFamily: 'var(--fp-bp-font-display)' },
+  tileIconOverlay: { position: 'absolute', left: 3, bottom: 3, width: 22, height: 22, display: 'block' },
+  tileIconOverlayFallback: { width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fp-text)', background: 'var(--fp-solid)', border: '1px solid var(--fp-border)', boxShadow: '0 1px 4px rgba(0,0,0,.45)' },
   tileLabel: { color: 'var(--fp-text)', fontSize: 13, fontWeight: 500, textAlign: 'center', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 }
 
@@ -586,19 +714,24 @@ export default function ProjectBoard() {
                   <span className="gh-name">{groupLabel(g)}</span>
                   <DimText>{rows.length}</DimText>
                 </button>
-                <div className={`pb-gitems${isCollapsed ? ' hidden' : ''}`}>
-                  {rows.map((p) => (
-                    <ProjectRow
-                      key={p.id}
-                      p={p}
-                      binding={bindings[p.id]}
-                      pinned={!!pins[p.id] || !!p.pinned}
-                      onOpen={(bg) => open(p, bg)}
-                      onCopyIndex={() => copyIndex(p)}
-                      onTogglePin={() => togglePin(p.id)}
-                      preview={preview}
-                    />
-                  ))}
+                {/* 折叠不再走 display:none 的瞬闪: .mo-collapse 用 grid-template-rows 0fr→1fr
+                    动画到内容真实高度(不测高、不写死 max-height、不触发子树 reflow)。
+                    收起时内容仍在 DOM 里, 故用 inert 把焦点与命中一并摘掉。 */}
+                <div className="mo-collapse" data-collapsed={isCollapsed ? 'true' : undefined} {...inertWhen(isCollapsed)}>
+                  <div className="pb-gitems mo-stagger">
+                    {rows.map((p) => (
+                      <ProjectRow
+                        key={p.id}
+                        p={p}
+                        binding={bindings[p.id]}
+                        pinned={!!pins[p.id] || !!p.pinned}
+                        onOpen={(bg) => open(p, bg)}
+                        onCopyIndex={() => copyIndex(p)}
+                        onTogglePin={() => togglePin(p.id)}
+                        preview={preview}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div className="bp-gsep" aria-hidden="true"><i /><b>+</b><i /></div>
               </div>

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -199,8 +200,50 @@ def is_inside_or_equal(path: Path, root: Path) -> bool:
         return False
 
 
+# 常见自动有序目录 (2026-09-12 用户裁定放宽): 由规范或 harness 按"任务/会话"自动分层,
+# 写进去不会变成游离垃圾, 无需计划声明即可放行。临时文件的首选落点仍是项目内
+# `.omni/tmp/<task-or-session>/` 并在 progress.md 留痕; harness 会话临时区只是放行,
+# 写入时由 hook 提醒改用项目内落点。系统临时目录下的散乱路径不在此列。
+PROJECT_TMP = "project_tmp"
+CLAUDE_SCRATCHPAD = "claude_scratchpad"
+CLAUDE_MEMORY = "claude_memory"
+
+_PROJECT_TMP_RE = re.compile(r"/\.omni/(?:tmp|sandbox/drafts)/[^/]+/")
+_CLAUDE_SCRATCHPAD_RE = re.compile(r"^claude/[^/]+/[^/]+/scratchpad/")
+_CLAUDE_MEMORY_RE = re.compile(r"^\.claude[^/]*/projects/[^/]+/memory/")
+
+TMP_PLACEMENT_HINT = (
+    "临时文件首选 <项目主目录>/.omni/tmp/<task-or-session>/ (任何项目下都直接放行), "
+    "并在当前计划 progress.md 留痕; 会话临时区随会话失联, 不留痕。"
+)
+
+
+def _relative_under(path_posix: str, root: Path) -> str | None:
+    try:
+        root_posix = root.resolve().as_posix().lower().rstrip("/") + "/"
+    except OSError:
+        return None
+    return path_posix[len(root_posix):] if path_posix.startswith(root_posix) else None
+
+
+def auto_ordered_write_kind(path: Path) -> str | None:
+    """Return which auto-ordered directory ``path`` falls in, or None."""
+    p = path.as_posix().lower()
+    if _PROJECT_TMP_RE.search(p):
+        return PROJECT_TMP
+    rel = _relative_under(p, Path(tempfile.gettempdir()))
+    if rel is not None and _CLAUDE_SCRATCHPAD_RE.match(rel):
+        return CLAUDE_SCRATCHPAD
+    rel = _relative_under(p, Path.home())
+    if rel is not None and _CLAUDE_MEMORY_RE.match(rel):
+        return CLAUDE_MEMORY
+    return None
+
+
 def is_allowed(path: Path, scope: PlannedWriteScope) -> bool:
     if any(path == allowed for allowed in scope.paths):
+        return True
+    if auto_ordered_write_kind(path) is not None:
         return True
     return any(is_inside_or_equal(path, root) for root in scope.roots)
 
@@ -248,6 +291,7 @@ def denial_message(tool_name: str, candidate: ToolPathCandidate, scope: PlannedW
         f"Workspace: {scope.workspace_root}\n"
         f"Active plan: {scope.plan_id or '(none)'}\n"
         f"Declared scope:\n{declared}\n\n"
+        f"临时/草稿文件不用申请外部目录: {TMP_PLACEMENT_HINT}\n\n"
         "To write there, first read the relevant standards/specs, then update "
         f"{plan_ref}{project_ref} frontmatter with one of:\n"
         "allowed_write_roots:\n"

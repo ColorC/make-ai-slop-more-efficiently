@@ -1,12 +1,12 @@
 # [OMNI] origin=claude-code domain=project_atlas ts=2026-07-04 type=health status=active
-# [OMNI] summary="技能库健康巡检:解析级体检(BOM/frontmatter/name+description)+ canonical→两生效目录导出漂移检测与自动修复(仅 atlas 管理的技能)+ 正文死绝对路径只报不修。"
-# [OMNI] why="canonical 真源之外还有两个生效目录(~/.claude/skills、~/.codex/skills),此前只在 approve/export 手动触发时才可能对齐,坏半库事故(手改生效目录/漏导)无持续巡检;本模块补上无人值守闭环,且明确不动非 atlas 管理的技能(如 lark-*)。"
+# [OMNI] summary="技能库健康巡检:解析级体检(BOM/frontmatter/name+description)+ canonical→各生效目录导出漂移检测与自动修复(仅 atlas 管理的技能)+ 正文死绝对路径只报不修。"
+# [OMNI] why="canonical 真源之外还有 Claude/Codex/跨 Agent 生效目录,此前只在 approve/export 手动触发时才可能对齐,坏半库事故(手改生效目录/漏导)无持续巡检;本模块补上无人值守闭环,且明确不动非 atlas 管理的技能(如 lark-*)。"
 # [OMNI] tags=project_atlas,health,skills,atlas,cron
 """project_atlas 技能库健康巡检(`omni atlas health`)。
 
 三类 finding:
   parse    —— BOM / frontmatter 开闭 / name·description 缺失(解析级体检,全部技能都查)
-  drift    —— canonical 已批准集合 vs 两个生效目录(~/.claude/skills、~/.codex/skills)缺失或内容不一致
+  drift    —— canonical 已批准集合 vs 生效目录(~/.claude/skills、~/.codex/skills、~/.agents/skills)缺失或内容不一致
               (仅对 canonical 里存在的名字做漂移检查; 生效目录独有的名字视为非 atlas 管理, 跳过)
   dead_ref —— canonical 正文里的绝对路径(盘符打头)在磁盘上不存在(只报不修, 语义内容不动)
 
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -25,14 +26,27 @@ from pathlib import Path
 from typing import Any
 
 from ._paths import DATA_ROOT, SKILLS_ROOT
+from .retired import retired_direct_skill_names
 
 HEALTH_DIR = DATA_ROOT / "health"
 
 _CLAUDE_SKILLS = Path.home() / ".claude" / "skills"
-_CODEX_SKILLS = Path.home() / ".codex" / "skills"
+_CODEX_HOME = os.environ.get("CODEX_HOME", "").strip()
+_CODEX_SKILLS = (
+    Path(_CODEX_HOME).expanduser() / "skills"
+    if _CODEX_HOME
+    else (Path.home() / ".codex-2" / "skills"
+          if (Path.home() / ".codex-2").is_dir()
+          else Path.home() / ".codex" / "skills")
+)
+_AGENTS_SKILLS = Path.home() / ".agents" / "skills"
 
 # 生效目录布局是扁平的 <name>/SKILL.md(无 space 子层, 见 atlas.py export)
-_EXPORT_TARGETS: tuple[tuple[str, Path], ...] = (("claude", _CLAUDE_SKILLS), ("codex", _CODEX_SKILLS))
+_EXPORT_TARGETS: tuple[tuple[str, Path], ...] = (
+    ("claude", _CLAUDE_SKILLS),
+    ("codex", _CODEX_SKILLS),
+    ("agents", _AGENTS_SKILLS),
+)
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 # Windows 绝对路径: 盘符打头, 如 C:/workspace/... 或 C:/workspace/...
@@ -165,8 +179,10 @@ def _check_drift(canonical: list[tuple[str, str, Path]]) -> list[Finding]:
     视为非 atlas 管理, 绝不动、也不报漂移。
     """
     findings: list[Finding] = []
-    canon_hash = {name: _content_hash(sk) for _sp, name, sk in canonical}
-    canon_space = {name: sp for sp, name, sk in canonical}
+    retired = retired_direct_skill_names()
+    managed = [(sp, name, sk) for sp, name, sk in canonical if name not in retired]
+    canon_hash = {name: _content_hash(sk) for _sp, name, sk in managed}
+    canon_space = {name: sp for sp, name, sk in managed}
     for target_name, root in _EXPORT_TARGETS:
         exported = dict(_iter_flat_export(root))
         for name, chash in canon_hash.items():
@@ -231,7 +247,10 @@ def _apply_drift_fixes(drift_findings: list[Finding]) -> dict[str, int]:
     """按 canonical 重新导出覆盖(复用 atlas export 的落盘逻辑: 直接覆盖拷贝 SKILL.md)。"""
     import shutil
 
-    canon_by_name = {name: sk for _sp, name, sk in _iter_canonical()}
+    retired = retired_direct_skill_names()
+    canon_by_name = {
+        name: sk for _sp, name, sk in _iter_canonical() if name not in retired
+    }
     n = 0
     for f in drift_findings:
         sk = canon_by_name.get(f.name)
@@ -274,6 +293,9 @@ def run_health(apply_fix: bool = False) -> dict[str, Any]:
         "kind": "atlas_health",
         "generated_at": _now(),
         "canonical_count": len(canonical),
+        "direct_retired_count": len(
+            [name for _sp, name, _sk in canonical if name in retired_direct_skill_names()]
+        ),
         "scanned_skill_files": len(all_skills),
         "counts": {
             "parse": len(parse_findings),

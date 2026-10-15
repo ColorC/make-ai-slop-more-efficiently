@@ -18,8 +18,8 @@ def _detect_shell_info() -> tuple[str, str]:
     _, shell_name = _TE._detect_shell()
     if shell_name == "git-bash":
         return "bash (Git Bash)", "Use standard bash/Linux syntax (cat, grep, heredoc, etc. all work)."
-    elif shell_name == "powershell":
-        return "PowerShell", "Use PowerShell syntax. Linux aliases (cat, ls) work, but heredoc (<<) does NOT."
+    elif shell_name in {"powershell", "powershell7"}:
+        return "PowerShell 7", "Use PowerShell 7 syntax. Linux aliases (cat, ls) work, but heredoc (<<) does NOT."
     return "cmd", "Use Windows cmd.exe syntax. Do NOT use Linux commands."
 
 

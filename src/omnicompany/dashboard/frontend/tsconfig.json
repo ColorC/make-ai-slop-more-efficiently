@@ -2,18 +2,55 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
+    "baseUrl": ".",
+    "paths": {
+      "@material-core": [
+        "../../../../packages/material-core/index.d.ts"
+      ],
+      "@material-client": [
+        "../../../../packages/material-client/index.d.ts"
+      ],
+      "@material-view-react": [
+        "../../../../packages/material-view-react/index.d.ts"
+      ],
+      "@material-note-core": [
+        "../../../../packages/material-note-core/index.ts"
+      ],
+      "@bside-material-plugin": [
+        "../../../../packages/material-http-plugin/index.ts"
+      ],
+      "@overlay-notes/*": [
+        "../notes-web/src/*"
+      ],
+      "@omni/material-core": [
+        "../../../../packages/material-core/index.d.ts"
+      ],
+      "@omni/material-client": [
+        "../../../../packages/material-client/index.d.ts"
+      ]
+    },
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
     "allowJs": true
   },
-  "include": ["src"],
-  "exclude": ["src/_legacy"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/_legacy",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
+  ]
 }

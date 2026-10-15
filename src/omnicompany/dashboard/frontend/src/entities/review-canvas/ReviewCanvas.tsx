@@ -32,7 +32,7 @@ function PostureToggle({ posture, onChange }: {
       key={key} type="button" data-testid={`posture-${key}`}
       onClick={() => onChange(key)}
       style={{
-        padding: '2px 9px', fontSize: 12, cursor: 'pointer', borderRadius: 5,
+        padding: '2px 9px', fontSize: 12, cursor: 'pointer', borderRadius: 2,
         background: posture === key ? 'color-mix(in srgb, var(--fp-accent) 18%, transparent)' : 'transparent',
         color: posture === key ? 'var(--fp-accent)' : 'var(--fp-text-3)',
         border: `1px solid ${posture === key ? 'var(--fp-accent)' : 'var(--fp-border-subtle)'}`,
@@ -47,11 +47,13 @@ const REL_LABEL: Record<string, string> = { parent: '承袭', supersedes: '下�
 
 // status → 色点(对齐 review/shared 的语义色 token)。
 // 决策库记录状态(浏览姿态用)与材料状态共用一张表: 生效绿/进行黄/否定红/中止紫。
+// 2026-08-06: violet 在 2026-07-18 已退位(见 shell/tokens.ts 域标识色注), 阻断/被挑战并入
+// warn 族(门禁/警告); partial 的裸 hex #39c5cf 收进 --fp-accent-2(青 = 另一条线索, 非状态)。
 const STATUS_COLOR: Record<string, string> = {
-  pending: 'var(--fp-warn)', accepted: 'var(--fp-ok)', rejected: 'var(--fp-err)', blocked: 'var(--fp-violet)',
+  pending: 'var(--fp-warn)', accepted: 'var(--fp-ok)', rejected: 'var(--fp-err)', blocked: 'var(--fp-warn)',
   adopted: 'var(--fp-ok)', proposed: 'var(--fp-warn)', superseded: 'var(--fp-text-3)', revoked: 'var(--fp-err)',
-  untested: 'var(--fp-warn)', searching: 'var(--fp-warn)', challenged: 'var(--fp-violet)',
-  supported: 'var(--fp-ok)', partial: '#39c5cf', falsified: 'var(--fp-err)',
+  untested: 'var(--fp-warn)', searching: 'var(--fp-warn)', challenged: 'var(--fp-warn)',
+  supported: 'var(--fp-ok)', partial: 'var(--fp-accent-2)', falsified: 'var(--fp-err)',
   open: 'var(--fp-warn)', resolved: 'var(--fp-ok)', promoted: 'var(--fp-ok)',
 }
 export const STATUS_LABEL: Record<string, string> = {
@@ -152,7 +154,7 @@ export default function ReviewCanvas({ project, onOpenMaterial, onOpenReader }: 
     <div style={S.root} data-testid="review-canvas">
       <div style={S.main}>
         <div style={S.toolbar}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fp-text-2)' }}>材料轨迹</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fp-text-2)' }}>材料轨迹</span>
           <PostureToggle posture={posture} onChange={setPosture} />
           {loading && <span style={S.loading}>载入中…</span>}
           {data?.stats && (
@@ -168,7 +170,7 @@ export default function ReviewCanvas({ project, onOpenMaterial, onOpenReader }: 
           )}
         </div>
 
-        <div style={S.canvasWrap}>
+        <div className="bp-corners" style={S.canvasWrap}>
           {error ? (
             <div style={S.emptyBox} data-testid="canvas-error">载入材料轨迹出错: {error}</div>
           ) : empty ? (
@@ -238,7 +240,7 @@ export function LaneBands({ layout }: { layout: CanvasLayout }) {
             <span style={{ position: 'absolute', left: 0, top: '14%', bottom: '14%', width: 3, borderRadius: '0 3px 3px 0', background: l.color }} />
             <span style={{
               writingMode: 'vertical-rl', textOrientation: 'upright',
-              fontSize: 13, letterSpacing: 6, fontWeight: 600, color: l.color, textShadow: `0 0 14px ${hexA(l.color, 0.5)}`,
+              fontSize: 13, letterSpacing: 6, fontWeight: 500, color: l.color, textShadow: `0 0 14px ${hexA(l.color, 0.5)}`,
             }}>{l.track}</span>
           </div>
         </div>
@@ -301,13 +303,26 @@ export function CardNode({ x, y, color, mat, selected, commentCount, onClick }: 
       style={{
         position: 'absolute', left: x, top: y, width: CARD_W, minHeight: CARD_H, boxSizing: 'border-box',
         display: 'flex', flexDirection: 'column', gap: 8, padding: '11px 13px',
-        background: 'linear-gradient(180deg, color-mix(in srgb, var(--fp-solid) 92%, #fff 3%), var(--fp-solid))',
-        border: `1px solid ${selected ? color : 'var(--fp-border)'}`,
-        borderLeft: `3px solid ${color}`, borderRadius: 11, cursor: 'pointer',
-        boxShadow: selected ? `var(--fp-shadow-sm), 0 0 0 1px ${color}` : 'var(--fp-shadow-sm)',
+        // 2026-08-06 蓝图: 顶光渐变实心卡 → 厚框纸件(2px 白色绘图线 + 纸叠纸硬错位影)。
+        // 选中不是"描一圈色", 而是铺 45° 剖面 hatch —— 制图里的选中标记是剖面线。
+        // 左缘保留 3px 泳道色条: 那是"这张图属于哪条线"的身份标记, 不是状态色。
+        background: selected
+          ? 'var(--fp-bp-hatch), var(--fp-bp-panel-text)'
+          : 'var(--fp-bp-panel)',
+        backdropFilter: 'var(--fp-bp-panel-blur)',
+        WebkitBackdropFilter: 'var(--fp-bp-panel-blur)',
+        border: `var(--fp-bp-frame-w) solid ${selected ? 'var(--fp-border-subtle)' : 'var(--fp-border)'}`,
+        borderLeft: `3px solid ${color}`, borderRadius: 'var(--fp-bp-r1)', cursor: 'pointer',
+        boxShadow: selected
+          ? 'inset 0 0 0 1px var(--fp-border-strong), var(--fp-bp-shadow-sm)'
+          : 'var(--fp-bp-shadow-sm)',
+        transition: 'background var(--fp-t-fast), border-color var(--fp-t-fast), box-shadow var(--fp-t-fast)',
       }}
     >
-      <div style={{ fontSize: 13, color: 'var(--fp-text)', lineHeight: 1.5, fontWeight: 500, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      {/* 标题走衬线 display 栈(LXGW WenKai), 与项目板卡名/multiagent 行标题同一档 */}
+      <div style={{ fontSize: 'var(--fp-fs-2)', color: 'var(--fp-text)', lineHeight: 1.45, fontWeight: 500,
+        fontFamily: 'var(--fp-bp-font-display)',
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
         {mat.title}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -319,8 +334,9 @@ export function CardNode({ x, y, color, mat, selected, commentCount, onClick }: 
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 'auto' }}>
-        <span style={{ fontSize: 12, color: 'var(--fp-text-3)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-          {fmtTime(mat.created_at)}
+        {/* 时间 = 尺寸标注线 ⊢…⊣(蓝图里"一个刻度上的量"就该这么画) */}
+        <span className="bp-dim" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <i aria-hidden />{fmtTime(mat.created_at)}<i aria-hidden />
         </span>
         {commentCount > 0 && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 12, color: 'var(--fp-text-3)' }} title="评论数">
@@ -343,23 +359,28 @@ function DecisionBadge({ x, y, active, onClick }: { x: number; y: number; active
       style={{
         position: 'absolute', left: x, top: y - LEADER, transform: 'translate(-50%, -100%)',
         display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
-        padding: '6px 11px', borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit',
-        background: 'linear-gradient(135deg, color-mix(in srgb, var(--fp-violet) 24%, var(--fp-solid)), var(--fp-solid))',
-        border: `1px solid ${active ? 'var(--fp-violet)' : 'color-mix(in srgb, var(--fp-violet) 55%, transparent)'}`,
-        color: 'var(--fp-text)', fontSize: 12, boxShadow: 'var(--fp-shadow-sm)',
+        padding: '5px 11px', borderRadius: 'var(--fp-bp-r1)', cursor: 'pointer',
+        // 2026-08-06: 紫色渐变药丸 → 黄铜标注旗。黄铜在 G 里就是"图上的批注/点缀"色,
+        // 而 violet 已退位; 形态用制图角缺口, 与 .v2-seg 选中同族。
+        fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.09em',
+        background: active ? 'var(--fp-bp-hatch), var(--fp-bp-solid)' : 'var(--fp-bp-solid)',
+        border: `1px solid ${active ? 'var(--fp-bp-brass-hi)' : 'var(--fp-bp-brass)'}`,
+        color: 'var(--fp-bp-brass-hi)', fontSize: 'var(--fp-fs-4)', boxShadow: 'var(--fp-bp-shadow-sm)',
+        clipPath: 'polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))',
       }}
     >
-      <Flag size={13} color="var(--fp-violet)" />
+      <Flag size={13} color="var(--fp-bp-brass-hi)" />
       决策过程
       {/* 引线: 徽章底部中心向下连到承袭线 */}
       <span aria-hidden style={{
         position: 'absolute', left: '50%', top: '100%', width: 2, height: LEADER,
-        background: 'linear-gradient(180deg, var(--fp-violet), color-mix(in srgb, var(--fp-violet) 35%, transparent))',
+        background: 'linear-gradient(180deg, var(--fp-bp-brass-hi), color-mix(in srgb, var(--fp-bp-brass) 35%, transparent))',
         transform: 'translateX(-50%)',
       }} />
       <span aria-hidden style={{
         position: 'absolute', left: '50%', top: `calc(100% + ${LEADER}px)`, width: 7, height: 7, borderRadius: '50%',
-        background: 'var(--fp-violet)', transform: 'translate(-50%, -50%)', boxShadow: '0 0 8px var(--fp-violet)',
+        background: 'var(--fp-bp-brass-hi)', transform: 'translate(-50%, -50%)',
+        boxShadow: '0 0 6px color-mix(in srgb, var(--fp-bp-brass) 70%, transparent)',
       }} />
     </button>
   )
@@ -480,13 +501,13 @@ function NodeDetail({ mat, project, onReload, onOpenMaterial }: {
       {/* 该版本评论列表 + 当场写新评论(挂 material_version) */}
       <Section title={`该版本审阅意见(${comments.length})`}>
         {comments.length === 0 ? (
-          <div style={{ color: 'var(--fp-text-3)', fontSize: 12.5 }}>还没有针对本版本的意见。</div>
+          <div style={{ color: 'var(--fp-text-3)', fontSize: 13 }}>还没有针对本版本的意见。</div>
         ) : (
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }} data-testid="canvas-comment-list">
             {comments.map((c) => (
               <li key={c.id} style={S.commentItem}>
                 <div style={{ color: 'var(--fp-text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{c.content}</div>
-                <div style={{ fontSize: 11, color: 'var(--fp-text-3)', marginTop: 3 }}>{c.author} · {relShort(c.created_at)}</div>
+                <div style={{ fontSize: 12, color: 'var(--fp-text-3)', marginTop: 3 }}>{c.author} · {relShort(c.created_at)}</div>
               </li>
             ))}
           </ul>
@@ -496,6 +517,7 @@ function NodeDetail({ mat, project, onReload, onOpenMaterial }: {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="给这个版本写一条审阅意见…"
+          className="bp-input"
           style={S.textarea}
         />
         {commentErr && <div style={{ color: 'var(--fp-err)', fontSize: 12, marginTop: 4 }} data-testid="canvas-comment-error">{commentErr}</div>}
@@ -508,9 +530,9 @@ function NodeDetail({ mat, project, onReload, onOpenMaterial }: {
       <Section title={`适用规范${adopted ? `(${adopted.length})` : ''}`}>
         <div data-testid="canvas-rules">
           {adopted === null ? (
-            <div style={{ color: 'var(--fp-text-3)', fontSize: 12.5 }}>载入中…</div>
+            <div style={{ color: 'var(--fp-text-3)', fontSize: 13 }}>载入中…</div>
           ) : adopted.length === 0 ? (
-            <div style={{ color: 'var(--fp-text-3)', fontSize: 12.5 }}>该项目决策库暂无已拍板裁决。</div>
+            <div style={{ color: 'var(--fp-text-3)', fontSize: 13 }}>该项目决策库暂无已拍板裁决。</div>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
               {adopted.map((d) => <RuleItem key={d.id} d={d} />)}
@@ -571,9 +593,9 @@ function EdgeDetail({ edge, project, matById }: {
       <Section title={`本次修改适用的规范${adopted ? `(${adopted.length})` : ''}`}>
         <div data-testid="canvas-rules">
           {adopted === null ? (
-            <div style={{ color: 'var(--fp-text-3)', fontSize: 12.5 }}>载入中…</div>
+            <div style={{ color: 'var(--fp-text-3)', fontSize: 13 }}>载入中…</div>
           ) : adopted.length === 0 ? (
-            <div style={{ color: 'var(--fp-text-3)', fontSize: 12.5 }}>该项目决策库暂无已拍板裁决。</div>
+            <div style={{ color: 'var(--fp-text-3)', fontSize: 13 }}>该项目决策库暂无已拍板裁决。</div>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
               {adopted.map((d) => <RuleItem key={d.id} d={d} />)}
@@ -593,7 +615,7 @@ function RuleItem({ d }: { d: DecisionNode }) {
         <div style={{ fontStyle: 'italic', color: 'var(--fp-text-3)', marginTop: 3, whiteSpace: 'pre-wrap' }}>“{d.anchor.excerpt}”</div>
       )}
       {d.anchor?.ref && (
-        <div style={{ fontFamily: 'var(--fp-font-mono)', color: 'var(--fp-text-3)', fontSize: 11, marginTop: 2, wordBreak: 'break-all' }}>{d.anchor.ref}</div>
+        <div style={{ fontFamily: 'var(--fp-font-mono)', color: 'var(--fp-text-3)', fontSize: 12, marginTop: 2, wordBreak: 'break-all' }}>{d.anchor.ref}</div>
       )}
     </li>
   )
@@ -629,7 +651,7 @@ export function hexA(hex: string, a: number): string {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginTop: 14 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fp-text-3)', marginBottom: 5 }}>{title}</div>
+      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fp-text-3)', marginBottom: 5 }}>{title}</div>
       {children}
     </div>
   )
@@ -638,58 +660,80 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 const S: Record<string, CSSProperties> = {
   root: { display: 'flex', height: '100%', width: '100%', fontFamily: 'var(--fp-font-sans)', background: 'transparent', color: 'var(--fp-text)' },
   main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: 10, gap: 10, boxSizing: 'border-box' },
+  // 工具行 = chrome: 蓝图玻璃 + 白线, 打字机小字
   toolbar: {
-    display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 11,
-    background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
-    border: '1px solid var(--fp-border)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
+    display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px', borderRadius: 'var(--fp-bp-r1)',
+    background: 'var(--fp-bp-panel)', backdropFilter: 'var(--fp-bp-panel-blur)',
+    WebkitBackdropFilter: 'var(--fp-bp-panel-blur)',
+    border: '1px solid var(--fp-border)',
+    fontFamily: 'var(--fp-font-mono)', letterSpacing: '.06em',
   },
-  loading: { color: 'var(--fp-text-3)', fontSize: 12 },
-  count: { marginLeft: 'auto', color: 'var(--fp-text-3)', fontSize: 12 },
+  loading: { color: 'var(--fp-text-3)', fontSize: 'var(--fp-fs-4)', fontFamily: 'var(--fp-font-mono)' },
+  count: { marginLeft: 'auto', color: 'var(--fp-bp-brass-hi)' },
   readerBtn: {
     display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid var(--fp-border)',
-    background: 'var(--fp-surface)', color: 'var(--fp-text-2)', borderRadius: 8, padding: '5px 11px',
-    fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+    background: 'var(--fp-bp-panel)', color: 'var(--fp-text-2)', borderRadius: 'var(--fp-bp-r1)',
+    padding: '5px 11px', fontSize: 'var(--fp-fs-4)', fontWeight: 500, cursor: 'pointer',
+    fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.09em',
   },
+  // 画布 = 图板本体: 深图板底 + 厚框, 制图角标由 .bp-corners 承担
   canvasWrap: {
-    flex: 1, minHeight: 0, position: 'relative', borderRadius: 11, overflow: 'hidden',
-    background: 'var(--fp-solid)', border: '1px solid var(--fp-border)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
+    flex: 1, minHeight: 0, position: 'relative', borderRadius: 'var(--fp-bp-r1)', overflow: 'hidden',
+    background: 'var(--fp-bp-solid)', border: 'var(--fp-bp-frame-w) solid var(--fp-border)',
+    boxShadow: 'var(--fp-bp-shadow-sm)',
   },
   scroll: { position: 'absolute', inset: 0, overflow: 'auto' },
   emptyBox: { padding: 28, color: 'var(--fp-text-3)', fontSize: 13, lineHeight: 1.7 },
   code: { color: 'var(--fp-text-2)', fontFamily: 'var(--fp-font-mono)' },
+  // 徽章 = 细线标注框 + 打字机大写(制图里一段标注就是个方框, 不是药丸)
   badge: {
-    display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '1px 8px', borderRadius: 6,
-    border: '1px solid var(--fp-border-subtle)', color: 'var(--fp-text-2)', background: 'color-mix(in srgb, var(--fp-text) 3%, transparent)',
+    display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--fp-fs-4)',
+    padding: '1px 8px', borderRadius: 'var(--fp-bp-r1)',
+    border: '1px solid var(--fp-border-subtle)', color: 'var(--fp-text-2)', background: 'transparent',
+    fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.09em',
     whiteSpace: 'nowrap',
   },
+  // 侧栏 = 厚框纸件(不是柔光玻璃条)
   sidebar: {
-    width: 380, flexShrink: 0, overflow: 'auto', padding: 16, fontSize: 13, margin: '10px 10px 10px 0', borderRadius: 11,
-    background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
-    border: '1px solid var(--fp-border)', boxShadow: 'var(--fp-shadow-sm), inset 0 1px 0 rgba(255,255,255,.08)',
+    width: 380, flexShrink: 0, overflow: 'auto', padding: 16, fontSize: 'var(--fp-fs-3)',
+    margin: '10px 10px 10px 0', borderRadius: 'var(--fp-bp-r1)',
+    background: 'var(--fp-bp-panel)', backdropFilter: 'var(--fp-bp-panel-blur)',
+    WebkitBackdropFilter: 'var(--fp-bp-panel-blur)',
+    border: 'var(--fp-bp-frame-w) solid var(--fp-border)', boxShadow: 'var(--fp-bp-shadow-sm)',
     color: 'var(--fp-text-2)',
   },
-  metaLine: { fontSize: 12, color: 'var(--fp-text-3)' },
-  sidebarTitle: { fontWeight: 600, margin: '4px 0 6px', color: 'var(--fp-text)', fontSize: 15, lineHeight: 1.4 },
+  metaLine: { fontSize: 'var(--fp-fs-4)', color: 'var(--fp-text-3)', fontFamily: 'var(--fp-font-mono)' },
+  sidebarTitle: {
+    fontWeight: 500, margin: '4px 0 6px', color: 'var(--fp-text)', fontSize: 'var(--fp-fs-1)',
+    lineHeight: 1.35, fontFamily: 'var(--fp-bp-font-display)',
+  },
+  // 主动作 = 朱红印章(G 口径: primary 是印章不是蓝色块)
   primaryBtn: {
-    border: '1px solid var(--fp-border)', background: 'color-mix(in srgb, var(--fp-accent) 12%, transparent)',
-    color: 'var(--fp-link)', borderRadius: 7, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-    fontFamily: 'inherit',
+    border: '1px solid rgba(255,240,235,.55)', background: 'var(--fp-bp-seal)',
+    color: '#fff', borderRadius: 'var(--fp-bp-r1)', padding: '7px 14px', fontSize: 'var(--fp-fs-4)',
+    fontWeight: 500, cursor: 'pointer', boxShadow: 'var(--fp-bp-shadow-sm)',
+    fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.09em',
   },
   linkBtnBox: {
-    border: '1px solid var(--fp-border)', background: 'var(--fp-surface)', color: 'var(--fp-text-2)',
-    borderRadius: 7, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none',
-    display: 'inline-flex', alignItems: 'center',
+    border: '1px solid var(--fp-border)', background: 'var(--fp-bp-panel)', color: 'var(--fp-text-2)',
+    borderRadius: 'var(--fp-bp-r1)', padding: '7px 14px', fontSize: 'var(--fp-fs-4)', fontWeight: 500,
+    cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center',
+    fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.09em',
   },
-  commentItem: { padding: '8px 0', borderBottom: '1px solid var(--fp-border-subtle)', fontSize: 12.5 },
-  ruleItem: { padding: '8px 0', borderBottom: '1px solid var(--fp-border-subtle)', fontSize: 12.5 },
+  // 12.5px 是个既破 12px 地板又不在字阶上的怪值, 收回 fs-3
+  commentItem: { padding: '8px 0', borderBottom: '1px solid var(--fp-border-subtle)', fontSize: 'var(--fp-fs-3)' },
+  ruleItem: { padding: '8px 0', borderBottom: '1px solid var(--fp-border-subtle)', fontSize: 'var(--fp-fs-3)' },
+  // 输入件 = 虚线测量件(G 口径), 聚焦转实线 + 黄铜环由 .bp-input 承担
   textarea: {
     width: '100%', boxSizing: 'border-box', marginTop: 8, minHeight: 58, resize: 'vertical',
-    background: 'var(--fp-solid)', color: 'var(--fp-text)', border: '1px solid var(--fp-border)', borderRadius: 7,
-    padding: '7px 9px', fontSize: 13, fontFamily: 'inherit', lineHeight: 1.5,
+    background: 'transparent', color: 'var(--fp-text)',
+    border: '1px dashed var(--fp-border)', borderRadius: 'var(--fp-bp-r1)',
+    padding: '7px 9px', fontSize: 'var(--fp-fs-3)', fontFamily: 'inherit', lineHeight: 1.5,
   },
   nextStepBtn: {
-    width: '100%', boxSizing: 'border-box', border: '1px solid var(--fp-accent)',
-    background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', borderRadius: 7, padding: '9px 0',
-    fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+    width: '100%', boxSizing: 'border-box', border: '1px solid rgba(255,240,235,.55)',
+    background: 'var(--fp-bp-seal)', color: '#fff', borderRadius: 'var(--fp-bp-r1)', padding: '9px 0',
+    fontSize: 'var(--fp-fs-4)', fontWeight: 500, cursor: 'pointer', boxShadow: 'var(--fp-bp-shadow-sm)',
+    fontFamily: 'var(--fp-font-mono)', textTransform: 'uppercase', letterSpacing: '.09em',
   },
 }

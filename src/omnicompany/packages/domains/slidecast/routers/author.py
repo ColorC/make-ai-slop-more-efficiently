@@ -103,6 +103,6 @@ def _fallback_ir(title: str, oneliner: str, body: str, source_label: str) -> dic
     for h in heads:
         slides.append({"layout": "statement", "title": h.strip()})
     slides.append({"layout": "end", "title": "完",
-                   "info": f"据 {source_label or 'colorc.cc 原文'} 自动生成(LLM 降级版)"})
+                   "info": f"据 {source_label or 'example.com 原文'} 自动生成(LLM 降级版)"})
     return {"meta": {"title": title, "subtitle": oneliner,
                      "info": f"slidecast · {source_label}"}, "slides": slides}

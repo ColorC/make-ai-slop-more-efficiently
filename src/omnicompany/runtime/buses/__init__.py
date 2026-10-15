@@ -11,7 +11,7 @@
   - `DiskBus`   — 文件写入 (Path.write_text / open('w') 收归)
   - `WebBus`    — HTTP 请求 (requests / httpx / OpenAI SDK 收归)
   - `BashBus`   — subprocess 执行 (subprocess.run / Popen 收归)
-  - `HumanBus`  — 人类审批 (暂存 / 核心层诊断 / 阻塞三类)
+  - `HumanBus`  — 通用运行时人类审批 (暂存 / 核心层诊断 / 阻塞三类)，不是持续学习设施
 
 设计目的 (2026-04-23 用户明示):
   - 预防: 非目标路径 / 错误路径 / 危险指令 / 危险内容

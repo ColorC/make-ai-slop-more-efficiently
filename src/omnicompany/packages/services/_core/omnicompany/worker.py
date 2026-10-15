@@ -35,7 +35,7 @@
     Router                              Worker          ← 本基类
     Format                              Material        ← 本模块 alias
     TeamSpec  (原 TeamSpec)         Team            ← 本模块 alias
-    EventBus                            Stock           ← 不别名 (bus 保留)
+    Material authority / run ledger     Stock           ← EventBus 仅审计投影
     FactoryEvent                        Material (实例) ← payload 层
 """
 from __future__ import annotations

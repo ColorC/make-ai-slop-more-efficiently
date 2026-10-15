@@ -215,6 +215,20 @@ describe('useWsAutoReconnect', () => {
     expect(MockWebSocket.instances).toHaveLength(1)
   })
 
+  it('reconnects immediately without waiting for backoff', () => {
+    const onOpen = vi.fn()
+    const { result } = renderHook(() => useWsAutoReconnect({
+      url: 'ws://test/echo',
+      onOpen,
+    }))
+    act(() => { MockWebSocket.instances[0].triggerOpen() })
+    act(() => { result.current.reconnect('geometry-resync') })
+    expect(MockWebSocket.instances).toHaveLength(2)
+    act(() => { MockWebSocket.instances[1].triggerOpen() })
+    expect(result.current.state).toBe('connected')
+    expect(onOpen.mock.calls[1][1]).toBe(true)
+  })
+
   it('CASE6 累计 longDisconnectMs 仍未连上 → state 切 disconnected', () => {
     const { result } = renderHook(() => useWsAutoReconnect({
       url: 'ws://test/echo',

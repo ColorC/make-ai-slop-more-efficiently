@@ -310,7 +310,7 @@ def submit_versioned_report(
     ② 报告不再每次堆一份在待审里(旧版自动归档, 待审只留最新)。
     """
     try:
-        from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+        from omnicompany.packages.services.boss_sight.reviewstage.routes import get_store
         store = get_store()
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": str(e)}
@@ -355,7 +355,7 @@ def submit_versioned_report(
     # authored/store.py 的 plan→project 前缀匹配(同一套项目名录真源=决策库); 匹配不上落
     # "unfiled"(义务在 agent 不在人, 自动化闭环不应被标签卡住)。
     try:
-        from omnicompany.dashboard.boss_sight.authored.store import _project_for_plan
+        from omnicompany.packages.services.boss_sight.authored.store import _project_for_plan
         project = _project_for_plan(plan_id) or "unfiled"
     except Exception:  # noqa: BLE001
         project = "unfiled"

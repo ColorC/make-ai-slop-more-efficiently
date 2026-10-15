@@ -1,5 +1,5 @@
 # [OMNI] origin=ai-ide domain=slidecast ts=2026-06-21T00:00:00Z type=helper status=active
-# [OMNI] summary="把生成好的 deck(dist)批量发布到 colorc.cc 真源(personal-homepage):拷 dist+点阵字体,写 demos.json 清单。"
+# [OMNI] summary="把生成好的 deck(dist)批量发布到 example.com 真源(personal-homepage):拷 dist+点阵字体,写 demos.json 清单。"
 # [OMNI] why="网页 demo 批量出口:repeatable —— 按文章清单找最新 run、发布、生成清单,供 demos.html/post.js 消费。"
 # [OMNI] tags=slidecast,publish,demos,colorc
 """slidecast 网页 demo 发布器(批量、可重复)。
@@ -19,7 +19,7 @@ from pathlib import Path
 from . import render as R
 from ._paths import runs_root, studio_root
 
-# colorc.cc 真源(memory: webworks/apps/personal-homepage 是 colorc.cc 真站)
+# example.com 真源(memory: webworks/apps/personal-homepage 是 example.com 真站)
 HOME = Path("C:/workspace/webworks/apps/personal-homepage")
 
 # 选定也出 demo 的 works(项目页,挑需要的;curated 已发布 posts 自动全收)
@@ -127,7 +127,7 @@ def _gen_script(run: Path, out: Path, force: bool = False) -> bool:
 
 def publish(articles: list[dict] | None = None, force_script: bool = False,
             rebuild: set[str] | None = None) -> list[dict]:
-    """发布所有(或给定子集)已生成 demo 到 colorc.cc 真源,写完整 demos.json。
+    """发布所有(或给定子集)已生成 demo 到 example.com 真源,写完整 demos.json。
     articles=None → 全部已发布文章(_articles());没 run 的跳过(留给 batch 先生成)。
     rebuild=None → 重建所有 deck(改皮/路由时用);rebuild={slugs} → 只重建这些,其余复用已构建产物(增量,省时)。"""
     _load_env()

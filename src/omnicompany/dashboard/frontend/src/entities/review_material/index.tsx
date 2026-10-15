@@ -10,6 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react'
+import { ReviewBoard } from '../review_queue/ReviewBoard'
 import {
   reviewstageApi,
   type Material,
@@ -20,12 +21,14 @@ import {
 import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
 import { usePanels } from '../../stores/panelsStore'
-import { COLORS, MaterialDetail } from '../review'
+import { COLORS } from '../review/shared'
+import { MaterialDetail } from '../review/MaterialDetail'
 import { useReviewStream } from '../review/streamStore'
 import { openMaterialNative } from '../../lib/surface'
 import { VscodeIcon } from '../../components/VscodeIcon'
 import { TabSidecarToggleButton } from '../../shell/TabSidecar'
 import { useReviewActive } from '../../stores/reviewActiveStore'
+import { usePanelVisible } from '../../shell/panelRuntime'
 
 export interface ReviewMaterialEntity extends Entity {
   type: 'review_material'
@@ -63,15 +66,20 @@ export function ReviewMaterialPanel({ id, embedded = false }: { id: string; embe
   const openTab = usePanels((s) => s.openTab)
   const streamMaterial = useReviewStream((s) => s.materials[id])
   const setActiveMaterial = useReviewActive((s) => s.setActiveMaterial)
+  const panelVisible = usePanelVisible()
 
   // WS 实时流: 引用计数订阅 (连接生命周期在 streamStore, 不挂本面板, 详见该文件头注释)。
   useEffect(() => useReviewStream.getState().acquire(), [])
 
   // 单条材料页签本身就是评价侧栏的选择源；页签激活/重新挂载时立即对齐，
   // 避免侧栏已经展开却仍显示“选中一条审阅材料”的空态。
+  //
+  // ⚠ 必须只在**面板可见**时写。2026-08-07 页签常驻之后所有审阅页签都挂着,
+  // 若每个都在挂载时宣告"当前材料是我", 最后水合的那个会赢 —— 侧栏指向后台材料,
+  // 而且 setActiveMaterial 还会 POST 给后端广播到别的 webview(VSCode 三区), 串得更远。
   useEffect(() => {
-    setActiveMaterial(id, 'local')
-  }, [id, setActiveMaterial])
+    if (panelVisible) setActiveMaterial(id, 'local')
+  }, [id, panelVisible, setActiveMaterial])
 
   useEffect(() => {
     let alive = true
@@ -150,7 +158,7 @@ export function ReviewMaterialPanel({ id, embedded = false }: { id: string; embe
             backdropFilter: 'var(--fp-blur)',
             WebkitBackdropFilter: 'var(--fp-blur)',
             border: `1px solid ${COLORS.rejected}55`,
-            borderRadius: 11,
+            borderRadius: 3,
             boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)',
             color: COLORS.rejected,
             fontSize: 13,
@@ -158,7 +166,7 @@ export function ReviewMaterialPanel({ id, embedded = false }: { id: string; embe
           }}
           data-testid="review-material-error"
         >
-          <span style={{ fontSize: 14, fontWeight: 650, flexShrink: 0, letterSpacing: '-0.01em' }}>出错</span>
+          <span style={{ fontSize: 14, fontWeight: 500, flexShrink: 0, letterSpacing: '-0.01em' }}>出错</span>
           <span style={{ color: COLORS.text, minWidth: 0, wordBreak: 'break-word' }}>{error}</span>
         </div>
       )}
@@ -200,6 +208,13 @@ export function ReviewMaterialPanel({ id, embedded = false }: { id: string; embe
 }
 
 const Editor: React.FC<{ entity: ReviewMaterialEntity; facet?: string }> = ({ entity }) => (
+  // 2026-08-14 复位: 材料深链落回审阅台并聚焦对应卡(旧 mat_xxx id 匹配迁移卡 mig-mat_xxx)。
+  // 旧 reviewstage 驱动实现保留在下方 LegacyReviewMaterialEditor。
+  <ReviewBoard focusCardId={entity.id} />
+)
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const LegacyReviewMaterialEditor: React.FC<{ entity: ReviewMaterialEntity; facet?: string }> = ({ entity }) => (
   <ReviewMaterialPanel id={entity.id} />
 )
 

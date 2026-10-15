@@ -54,6 +54,10 @@ const WATCHER_IGNORED_PATTERNS = [
 const PROJECTS_UPDATE_DEBOUNCE_MS = 500;
 const PROJECTS_UPDATE_MAX_WAIT_MS = 2_000;
 
+// omni: escape hatch back to the upstream polling watcher.  See the comment at
+// the chokidar.watch() call for why native watching is the default.
+const WATCH_USE_POLLING = process.env.OMNI_CHATUI_WATCH_POLLING === '1';
+
 const watchers: FSWatcher[] = [];
 
 type PendingWatcherUpdate = {
@@ -287,7 +291,16 @@ export async function initializeSessionsWatcher(): Promise<void> {
         ignoreInitial: true,
         followSymlinks: false,
         depth: 6,
-        usePolling: true,
+        // omni: polling attached one fs.watchFile StatWatcher per file and
+        // re-stat'ed every watched tree on a fixed interval, so the server
+        // burned ~5% of a core forever with zero clients connected (~6.7k
+        // files across the five roots on this machine, mostly
+        // ~/.local/share/opencode).  Native watching is event-driven and
+        // recursive on all three platforms (ReadDirectoryChangesW on Windows,
+        // FSEvents on macOS, inotify on Linux).  Set OMNI_CHATUI_WATCH_POLLING=1
+        // to fall back if a root ever lives on a mount where native events do
+        // not fire (network shares, some container bind mounts).
+        usePolling: WATCH_USE_POLLING,
         interval: 6_000,
         binaryInterval: 6_000,
       });

@@ -24,8 +24,7 @@
  *
  * 打开约定(接线在主线): openTab({type:'studio_reader', id:<project>}, ...)。
  */
-import type React from 'react'
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Check, Flag, GitBranch, History } from 'lucide-react'
 import type { Entity } from '../types'
 import type { EntityRegistration, EntityResolver } from '../registry'
@@ -37,7 +36,12 @@ import DecisionPanel from './DecisionPanel'
 import { KindIcon } from '../review/kindIcons'
 import { TraceMenu } from '../review/TraceMenu'
 import { DimText } from '../../components/Segmented'
+import { MaterialWikiManageBar } from './MaterialWikiManageBar'
 import './studioReader.css'
+
+const WorkshopSurface = lazy(() => import('./WorkshopSurface').then((module) => ({
+  default: module.WorkshopSurface,
+})))
 
 export interface StudioReaderEntity extends Entity {
   type: 'studio_reader'
@@ -135,7 +139,68 @@ function rowKeyDown(fn: () => void) {
   return (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() } }
 }
 
-export function StudioReaderPanel({ project, initialMaterialId }: { project: string; initialMaterialId?: string }) {
+// ── 游戏治理入口节（walker entries.json 投影, 2026-08-02 治理体系化）─────────────
+// 标准化入口（游戏本体/战斗 demo/画廊/展示壳/工具）陈列在阅读视图侧栏顶端，
+// 事实源 = walker-game assets/art/manifests/registry/entries.json（经 /walker-game 同源反代可达）。
+// 仅 walker 项目出现；其他项目零影响。
+interface GameEntry {
+  id: string
+  title: string
+  kind?: string
+  urlDashboard?: string | null
+  urlDev?: string | null
+  scope?: string
+  status?: string
+}
+
+function GameEntriesRail({ project }: { project: string }) {
+  const [entries, setEntries] = useState<GameEntry[] | null>(null)
+  useEffect(() => {
+    if (project !== 'walker') return
+    let alive = true
+    fetch('/walker-game/assets/art/manifests/registry/entries.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const list = (j as { entries?: GameEntry[] } | null)?.entries
+        if (alive && Array.isArray(list)) setEntries(list)
+      })
+      .catch(() => { /* 入口清单不可达时静默隐藏本节 */ })
+    return () => { alive = false }
+  }, [project])
+  if (project !== 'walker' || !entries || entries.length === 0) return null
+  return (
+    <div style={{ margin: '6px 4px 4px' }} data-testid="reader-section-entries">
+      <div className="sr-sechead" title="walker-game 标准化入口（entries.json 投影）">
+        <span className="nm">入口</span>
+        <DimText>{entries.length}</DimText>
+        <span className="ln" aria-hidden="true" />
+      </div>
+      {entries.map((e) => {
+        const href = e.urlDashboard ?? e.urlDev ?? null
+        return (
+          <a
+            key={e.id}
+            className="sr-row"
+            tabIndex={0}
+            aria-current={undefined}
+            data-testid={`reader-entry-${e.id}`}
+            href={href ?? '#'}
+            target={href ? '_blank' : undefined}
+            rel="noopener"
+            title={e.scope ?? e.title}
+            style={{ textDecoration: 'none', color: 'inherit', opacity: href ? undefined : 0.55 }}
+          >
+            <span className="sr-entry-dot" data-status={e.status ?? 'planned'} aria-hidden />
+            <span className="t" title={e.title}>{e.title}</span>
+            <DimText>{e.kind ?? ''}</DimText>
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
+export function ReviewProjectionReader({ project, initialMaterialId }: { project: string; initialMaterialId?: string }) {
   const [data, setData] = useState<CanvasResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
@@ -405,6 +470,7 @@ export function StudioReaderPanel({ project, initialMaterialId }: { project: str
             )}
 
             <div style={S.railScroll}>
+              <GameEntriesRail project={project} />
               {error && <div style={S.railError} data-testid="studio-reader-error">载入材料出错: {error}</div>}
               {!error && !data && <div style={S.railDim}>载入中…</div>}
               {data && all.length === 0 && (
@@ -587,6 +653,32 @@ export function StudioReaderPanel({ project, initialMaterialId }: { project: str
   )
 }
 
+export function StudioReaderPanel({ project, initialMaterialId }: { project: string; initialMaterialId?: string }) {
+  const [surface, setSurface] = useState<'wiki' | 'review'>('wiki')
+  const [openId, setOpenId] = useState(initialMaterialId)
+  if (surface === 'review') {
+    return (
+      <div style={{ height: '100%', position: 'relative' }}>
+        <button type="button" className="sr-wiki-return" onClick={() => setSurface('wiki')}>Material Wiki</button>
+        <ReviewProjectionReader project={project} initialMaterialId={initialMaterialId?.replace(/^material-wiki:/, '')} />
+      </div>
+    )
+  }
+  return (
+    <div style={{ height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <button type="button" className="sr-wiki-return" onClick={() => setSurface('review')}>审阅投影</button>
+        <MaterialWikiManageBar project={project} materialId={openId} onMaterialChange={setOpenId} />
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Suspense fallback={<div style={{ padding: 16, color: 'var(--fp-text-3)' }}>加载 Workshop 资料页...</div>}>
+          <WorkshopSurface kind="materials" project={project} materialId={openId} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
 const S: Record<string, CSSProperties> = {
   app: { display: 'flex', height: '100%', minHeight: 0, background: 'transparent', color: 'var(--fp-text)', fontFamily: 'var(--fp-font-sans)' },
 
@@ -602,8 +694,8 @@ const S: Record<string, CSSProperties> = {
   railActions: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--fp-border-subtle)', flexShrink: 0 },
 
   railScroll: { overflow: 'auto', flex: 1, minHeight: 0, padding: '8px 8px 24px' },
-  railError: { color: 'var(--fp-err)', fontSize: 12.5, padding: '10px 8px', lineHeight: 1.6 },
-  railDim: { color: 'var(--fp-text-3)', fontSize: 12.5, padding: '10px 8px', lineHeight: 1.6 },
+  railError: { color: 'var(--fp-err)', fontSize: 13, padding: '10px 8px', lineHeight: 1.6 },
+  railDim: { color: 'var(--fp-text-3)', fontSize: 13, padding: '10px 8px', lineHeight: 1.6 },
 
   stage: { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' },
   decWrap: { flex: 1, minHeight: 0, overflow: 'auto' },

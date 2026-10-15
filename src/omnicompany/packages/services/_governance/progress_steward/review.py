@@ -1,16 +1,16 @@
 # [OMNI] origin=claude-code domain=services/_governance/progress_steward ts=2026-06-27T00:00:00Z type=router
-# [OMNI] summary="进度型自述语义精判(轨一里程碑二, 性价比模型)。对确定性探针圈出的候选三态分类(进度漂移/决策设计/误报), 只喂 whatnow 当前状态+候选行降误报, findings 进 human-inbox 待审。"
+# [OMNI] summary="进度型自述语义精判(轨一里程碑二, 性价比模型)。对确定性探针圈出的候选三态分类(进度漂移/决策设计/误报), findings 进 HumanBus 运行时人工复核队列。"
 # [OMNI] why="纯词表会高误报(DocPrism 两段式经验);进度真源在 whatnow, 精判需对照它判'这行是否还成立/是否指涉别处进度'。决策叙述不可当垃圾删。"
-# [OMNI] tags=governance,progress-ssot,llm-semantic,human-inbox
+# [OMNI] tags=governance,progress-ssot,llm-semantic,human-review
 # [OMNI] material_id="material:governance.progress_steward.review.py"
-"""进度型自述语义精判 — 三态分类(性价比模型), 进 human-inbox。
+"""进度型自述语义精判 — 三态分类(性价比模型), 进运行时人工复核队列。
 
 形态(对齐 governance_semantic_first.md + doc_steward):
   - 输入 = 里程碑一确定性探针圈出的候选(progress_scan.json)。
   - 只喂"该计划在 whatnow 的当前状态摘要 + 候选行", 不灌全文(降幻觉/省 token)。
   - 三态: progress_drift(指涉式进度, 应剥离/标'以 whatnow 为准') / decision_design(决策设计叙述, 保留并可导向 decisions 域) / false_positive(放过)。
   - broken_ref 是确定性腐化, 不走 LLM 直接判 progress_drift。
-  - 每个 doc 有可处置项就开一条 human-inbox 待审(给证据列表, 不打分)。
+  - 每个 doc 有可处置项就开一条 HumanBus 运行时待审项(给证据列表, 不打分)。
 """
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ def run_progress_review(*, limit: int | None = None, model: str | None = None,
                         only_ref: bool = False, push_inbox: bool = True,
                         workers: int = 4, root: Path | None = None,
                         echo: Any = None) -> dict[str, Any]:
-    """对探针候选做三态精判, 可处置项进 human-inbox。"""
+    """对探针候选做三态精判, 可处置项进运行时人工复核队列。"""
     from omnicompany.runtime.llm.batch import run_parallel_items
     from omnicompany.runtime.llm.structured import call_json
 
@@ -162,7 +162,7 @@ def run_progress_review(*, limit: int | None = None, model: str | None = None,
             if not is_suppressed("progress_steward", f"{r['doc']}:{c.get('line')}:{c.get('state')}", base)
         ]
 
-    # 汇总 + 推 human-inbox
+    # 汇总 + 推 HumanBus 运行时人工复核队列
     inbox_opened = 0
     drift_total = decision_total = 0
     if push_inbox:

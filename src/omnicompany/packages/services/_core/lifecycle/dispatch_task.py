@@ -6,7 +6,7 @@
 """task 投递 / 观测 / 介入 / 兜底 — 全部复用现成设施。
 
 - 投递 dispatch_task: vscode 真实会话(winjump 注入) / sdk 受控会话(run_external_agent_request)
-- 观测 watch_target: 复用 ccdaemon _scan_claude/_scan_codex + _tail_lines, 实时逐行 + 卡死判断
+- 观测 watch_target: 复用 ccdaemon scan_claude/scan_codex + tail_lines, 实时逐行 + 卡死判断
 - 介入 inject_to_task: 复用 winjump set_clipboard + activate_location(paste)
 - 兜底 reassign_task / takeover_task: 改绑定 + 给接管上下文
 
@@ -87,7 +87,7 @@ def _resolve_agent_session(agent: str | None) -> dict[str, Any] | None:
     if not agent:
         return None
     try:
-        from omnicompany.dashboard.boss_sight.services.agent_registry import load_registry
+        from omnicompany.packages.services.boss_sight.services.agent_registry import load_registry
         reg = load_registry()
     except Exception:
         return None
@@ -153,7 +153,7 @@ def _dispatch_vscode(task: Any, plan_id: str, prompt: str, agent: str | None) ->
     rec = _resolve_agent_session(agent)
     location = (rec or {}).get("location") or "vscode"
     try:
-        from omnicompany.dashboard.boss_sight.services import winjump
+        from omnicompany.packages.services.boss_sight.services import winjump
         if not winjump.set_clipboard(prompt):
             raise RuntimeError("写入剪贴板失败")
         res = winjump.activate_location(location, paste=True, submit=True)
@@ -243,7 +243,7 @@ def submit_run_material(task: Any, plan_id: str, *, final_text: str = "",
         + f"\n\n## 完成验证标准\n{getattr(task, 'test_strategy', '') or '(无)'}\n"
     )
     try:
-        from omnicompany.dashboard.boss_sight.reviewstage.routes import get_store
+        from omnicompany.packages.services.boss_sight.reviewstage.routes import get_store
         title = f"task#{getattr(task,'id','?')} 执行产物: {getattr(task,'title','')}"[:80]
         # 编排端自动提交: 义务在 agent 不在人, 项目/轨道标签不阻塞这条自动闭环
         # (与 reviewstage/routes.py 的 /capture、/from_path 人工快捷端点同一处理:
@@ -267,8 +267,8 @@ def submit_run_material(task: Any, plan_id: str, *, final_text: str = "",
 def _all_live_sessions() -> list[dict[str, Any]]:
     """复用 ccdaemon 扫描, 返回所有本机会话 (含 transcript 文件路径)。"""
     try:
-        from omnicompany.dashboard.ccdaemon.import_routes import _scan_claude, _scan_codex
-        return list(_scan_claude()) + list(_scan_codex())
+        from omnicompany.dashboard.ccdaemon.api import scan_claude, scan_codex
+        return list(scan_claude()) + list(scan_codex())
     except Exception:
         return []
 
@@ -278,7 +278,7 @@ def watch_target(target: str, *, lines: int = 40) -> dict[str, Any]:
 
     target 可为 task_id 或 plan_id。先查绑定找 agent, 再扫会话 tail 它的 transcript。
     """
-    from omnicompany.dashboard.ccdaemon.import_routes import _tail_lines
+    from omnicompany.dashboard.ccdaemon.api import tail_lines
 
     binds = _load_bindings()
     if target in binds:
@@ -309,7 +309,7 @@ def watch_target(target: str, *, lines: int = 40) -> dict[str, Any]:
         fp = sess.get("file")
         if fp:
             try:
-                tail = _tail_lines(Path(fp), max_lines=lines)
+                tail = tail_lines(Path(fp), max_lines=lines)
             except Exception:
                 tail = []
         out_sessions.append({
@@ -333,7 +333,7 @@ def inject_to_task(task_id: str, message: str, *, plan_id: str | None = None) ->
     rec = _resolve_agent_session(b.get("agent"))
     location = (rec or {}).get("location") or "vscode"
     try:
-        from omnicompany.dashboard.boss_sight.services import winjump
+        from omnicompany.packages.services.boss_sight.services import winjump
         if not winjump.set_clipboard(message):
             raise RuntimeError("写入剪贴板失败")
         res = winjump.activate_location(location, paste=True, submit=True)

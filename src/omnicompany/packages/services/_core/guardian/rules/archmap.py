@@ -60,6 +60,13 @@ def _check_stray_config_in_src(ctx: FileContext) -> bool:
     # dashboard/frontend 项目根的标准 JS/TS 配置文件
     if ("/dashboard/frontend/" in p or "/dashboard/extensions/" in p) and name in _FRONTEND_PROJECT_FILES:
         return False
+    # Desktop is a colocated Tauri application. Keep this exemption narrow to
+    # package manifests, Tauri configuration, and explicit capability ACLs.
+    if p.startswith("src/omnicompany/desktop/"):
+        if name in {"package.json", "package-lock.json", "tauri.conf.json"}:
+            return False
+        if "/src-tauri/capabilities/" in p and ext == ".json":
+            return False
     # knowledge/ 目录里的 .md 是语义节点的文档模板，故意和 routers/formats colocate
     if "/knowledge/" in p and ext == ".md":
         return False

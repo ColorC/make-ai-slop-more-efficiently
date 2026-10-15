@@ -119,12 +119,34 @@ class DeterministicGate(Router):
             )
 
         failures, checked = _audit.audit_to_failures(report)
+        # 扫到 0 个文件 ≠ 审过了没问题。枚举器默认只认 entities/shell 这套目录约定,
+        # 换个前端就空扫; 空 report 与"审了没发现"外观一致, 报 audited 就是假绿。
+        # 如实降级, 并把该怎么办说清 —— 不给一个看起来合法的空结论。
+        # 只在 report **明确报了** scanned_files=0 时降级: 缺这个键 = 该 audit_fn 没报
+        # 扫描量(注入替身), 那就是未知而不是 0, 不替它下结论。
+        raw_scanned = report.get("scanned_files")
+        scanned = int(raw_scanned) if isinstance(raw_scanned, int) else -1
+        if scanned == 0:
+            return Verdict(
+                kind=VerdictKind.PASS,
+                output={**out, "failures": [], "checked": [],
+                        "gate_status": "skipped-扫到0个文件", "audited_src": str(src)},
+                diagnosis=(
+                    f"确定性门禁降级: 在 {src} 下扫到 0 个可审文件 —— 枚举器默认只看 "
+                    "entities/ 与 shell/(驾驶舱目录约定)。该前端若用别的目录名, "
+                    "需给 enum_* 传 include_dirs, 否则本次结果不代表'没问题'。"
+                ),
+                granted_tags=["domain.frontend_design", "stage.gate"],
+            )
         n_l3 = sum(1 for f in failures if f.get("triage") == "L3")
         return Verdict(
             kind=VerdictKind.PASS,
             output={**out, "failures": failures, "checked": checked,
-                    "gate_status": "audited", "audited_src": str(src)},
-            diagnosis=f"确定性门禁(ux_audit): {len(failures)} 项错位({n_l3} 项 L3) · src={src}",
+                    "gate_status": "audited", "audited_src": str(src),
+                    **({"scanned_files": scanned} if scanned >= 0 else {})},
+            diagnosis=(f"确定性门禁(ux_audit): "
+                       + (f"扫 {scanned} 个文件, " if scanned >= 0 else "")
+                       + f"{len(failures)} 项错位({n_l3} 项 L3) · src={src}"),
             granted_tags=["domain.frontend_design", "stage.gate"],
         )
 

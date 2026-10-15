@@ -147,14 +147,17 @@ def build_team() -> TeamSpec:
         "team_supervisor.test_results",
         vkind=ValidatorKind.SOFT,
         desc=(
-            "测试执行 · AGENT. 调 dispatch_team 工具真跑 target team (用 sample_input 或 traces 找), "
-            "用 evaluate_oracle 工具逐条假设跑 oracle 评估. observed 是句子. evidence 引用真锚点. "
-            "末步必调 submit_test_results 工具."
+            "测试执行 · 外置 AgentRuntime + Omni 控制面复合节点. 缺 sample_input 时 Cordis "
+            "仅做只读推断; Omni 按 ingress 已校验的固定 target_team_id 真跑 TeamRunner; "
+            "Cordis 再只读评估全部假设. AgentRuntime 不获得 Team dispatch 权限."
         ),
         routes={
             VerdictKind.PASS: Route(action=RouteAction.NEXT),
             VerdictKind.PARTIAL: Route(action=RouteAction.NEXT),
-            VerdictKind.FAIL: Route(action=RouteAction.RETRY, max_retries=1),
+            # The composite may already have executed a side-effectful target.
+            # Retrying the whole node would dispatch it twice; resume/retry must
+            # therefore be an explicit Omni control-plane decision.
+            VerdictKind.FAIL: Route(action=RouteAction.HALT),
         },
     ))
 

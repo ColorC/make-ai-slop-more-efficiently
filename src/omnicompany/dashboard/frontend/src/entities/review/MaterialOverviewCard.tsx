@@ -108,31 +108,31 @@ function KindCover({ m, h = 120, text = '' }: { m: Material; h?: number; text?: 
   const extra = (m.extra as Record<string, unknown> | undefined) || {}
   if (m.kind === 'image' || m.kind === 'aigc-image') {
     const src = m.file_relpath ? reviewstageApi.fileUrl(m.id) : `data:image/png;base64,${m.inline_content || ''}`
-    return <img data-testid="card-preview-image" src={src} alt={m.title} loading="lazy" decoding="async" style={{ width: '100%', height: h, objectFit: 'cover', borderRadius: 6, background: 'var(--fp-bg)', display: 'block' }} />
+    return <img data-testid="card-preview-image" src={src} alt={m.title} loading="lazy" decoding="async" style={{ width: '100%', height: h, objectFit: 'cover', borderRadius: 2, background: 'var(--fp-bg)', display: 'block' }} />
   }
   if (m.kind === 'video') {
     const poster = (extra.poster_url as string | undefined) || undefined
     return poster ? (
-      <img data-testid="card-preview-video" src={poster} alt={m.title} loading="lazy" decoding="async" style={{ width: '100%', height: h, objectFit: 'cover', borderRadius: 6, display: 'block' }} />
+      <img data-testid="card-preview-video" src={poster} alt={m.title} loading="lazy" decoding="async" style={{ width: '100%', height: h, objectFit: 'cover', borderRadius: 2, display: 'block' }} />
     ) : (
-      <div data-testid="card-preview-video" style={{ height: h, borderRadius: 6, background: 'var(--fp-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fp-accent)' }}><Play size={Math.max(20, Math.round(h / 3))} /></div>
+      <div data-testid="card-preview-video" style={{ height: h, borderRadius: 2, background: 'var(--fp-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fp-accent)' }}><Play size={Math.max(20, Math.round(h / 3))} /></div>
     )
   }
   if (WEB_KINDS.has(m.kind)) {
     const url = (extra.live_url as string | undefined) || (extra.url as string | undefined) || ''
     return (
-      <div data-testid="card-preview-html" style={{ height: h, borderRadius: 6, background: 'color-mix(in srgb, var(--fp-accent) 12%, var(--fp-solid))', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8, overflow: 'hidden' }}>
+      <div data-testid="card-preview-html" style={{ height: h, borderRadius: 2, background: 'color-mix(in srgb, var(--fp-accent) 12%, var(--fp-solid))', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 8, overflow: 'hidden' }}>
         <Globe size={Math.max(18, Math.round(h / 4))} color={domainColor.cyan} aria-hidden />
         <span style={{ fontSize: 12, color: COLORS.textDim, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url ? hostOf(url) : KIND_LABELS[m.kind] || '网页'}</span>
       </div>
     )
   }
   if (m.kind === 'key_question') {
-    return <div data-testid="card-preview-kq" style={{ height: h, borderRadius: 6, background: TIER_TINT.important, padding: 10, overflow: 'hidden', fontSize: 13, color: COLORS.text }}><CircleQuestionMark size={13} color="var(--fp-warn)" aria-hidden style={{ verticalAlign: -2 }} /> {KeyQuestionText(m.inline_content)}</div>
+    return <div data-testid="card-preview-kq" style={{ height: h, borderRadius: 2, background: TIER_TINT.important, padding: 10, overflow: 'hidden', fontSize: 13, color: COLORS.text }}><CircleQuestionMark size={13} color="var(--fp-warn)" aria-hidden style={{ verticalAlign: -2 }} /> {KeyQuestionText(m.inline_content)}</div>
   }
   // 文本封面(markdown / plan / agent-workflow-report):排版式封面,正文作摘要。
   return (
-    <div data-testid="card-preview-markdown" style={{ height: h, borderRadius: 6, background: TIER_TINT[m.tier] || TIER_TINT.processual, padding: 10, overflow: 'hidden', position: 'relative' }}>
+    <div data-testid="card-preview-markdown" style={{ height: h, borderRadius: 2, background: TIER_TINT[m.tier] || TIER_TINT.processual, padding: 10, overflow: 'hidden', position: 'relative' }}>
       <p style={{ margin: 0, fontSize: h > 100 ? 13 : 12, color: COLORS.textDim, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: Math.max(2, Math.floor(h / 20)), WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
         {mdExcerpt(text || m.inline_content, 300) || (KIND_LABELS[m.kind] || m.kind)}
       </p>
@@ -157,7 +157,7 @@ function WithCover({ m, h, coverNonce, children }: { m: Material; h: number; cov
   }, [coverNonce, m.id, m.updated_at])
   const src = reviewstageApi.coverUrl(m.id, `${m.updated_at || ''}:${coverNonce}:${retry}`)
   return (
-    <div style={{ position: 'relative', height: h, borderRadius: 6, overflow: 'hidden' }}>
+    <div style={{ position: 'relative', height: h, borderRadius: 2, overflow: 'hidden' }}>
       {children}
       <img
         data-testid="card-cover"
@@ -199,10 +199,10 @@ export function CardPreview({ m, h = 120, text = '', coverNonce = 0 }: { m: Mate
 function MetaRow({ m }: { m: Material }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--fp-bg)', background: TIER_COLOR[m.tier] || COLORS.processual, borderRadius: 999, padding: '1px 7px' }}>
+      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--fp-bg)', background: TIER_COLOR[m.tier] || COLORS.processual, borderRadius: 999, padding: '1px 7px' }}>
         {m.tier === 'mandatory' ? '必验收' : m.tier === 'important' ? '重要' : m.tier === 'processual' ? '过程' : '其余'}
       </span>
-      <span style={{ fontSize: 12, color: COLORS.textDim, border: `1px solid ${COLORS.border}`, borderRadius: 4, padding: '0 5px' }}>
+      <span style={{ fontSize: 12, color: COLORS.textDim, border: `1px solid ${COLORS.border}`, borderRadius: 3, padding: '0 5px' }}>
         {KIND_LABELS[m.kind] || m.kind}
       </span>
       <span data-testid="card-status" style={{ fontSize: 12, color: m.status === 'accepted' ? COLORS.accepted : m.status === 'rejected' ? COLORS.rejected : COLORS.textDim }}>
@@ -224,7 +224,7 @@ function MaterialOverviewCardImpl({ m, size, onOpen, coverNonce = 0 }: { m: Mate
     boxShadow: '0 4px 16px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.08)',
     border: `1px solid ${COLORS.border}`,
     borderLeft: `3px solid ${TIER_COLOR[m.tier] || COLORS.border}`,
-    borderRadius: 11,
+    borderRadius: 3,
     cursor: onOpen ? 'pointer' : 'default',
     overflow: 'hidden',
     position: 'relative',

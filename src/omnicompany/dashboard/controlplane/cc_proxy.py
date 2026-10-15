@@ -18,6 +18,7 @@ dashboard 主进程 (8200) 上挂的代理, 把所有 `/api/cc/*` 前缀转到 c
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 import httpx
@@ -117,6 +118,7 @@ async def _daemon_http_client() -> httpx.AsyncClient:
                 max_keepalive_connections=20,
                 keepalive_expiry=60.0,
             ),
+            verify=False,
             trust_env=False,
         )
         _HTTP_CLIENT_LOOP = loop
@@ -145,6 +147,174 @@ async def chatui_ensure() -> Response:
     return JSONResponse(res)
 
 
+def _agent_worker_command(provider: str, model: str | None) -> list[str]:
+    from omnicompany.packages.services._core.agent.control_plane import (
+        build_provider_command,
+    )
+
+    return build_provider_command(provider, model)
+
+
+def _record_compat_agent_worker_binding(
+    meta: dict,
+    payload: dict,
+    provider: str,
+) -> None:
+    """Preserve the Agent Worker identity contract on an older daemon."""
+    from omnicompany.packages.services._core.identity import update_session_binding
+
+    session_id = str(meta["id"])
+    binding_kind = (
+        "project"
+        if any(payload.get(key) for key in ("project", "workstream", "active_plan"))
+        else "unbound"
+    )
+    update_session_binding(
+        session_id,
+        session_id=session_id,
+        pty_id=session_id,
+        provider=provider,
+        cwd=meta.get("cwd") or payload.get("cwd"),
+        project=payload.get("project"),
+        workstream=payload.get("workstream"),
+        active_plan=payload.get("active_plan"),
+        topic=payload.get("topic") or payload.get("task"),
+        runtime_kind="cli",
+        worker_kind="external_agent_worker",
+        product_kind="agent_worker",
+        binding_kind=binding_kind,
+        parent_agent_id=payload.get("parent_agent_id"),
+        visibility=payload.get("visibility") or "visible",
+        model=payload.get("model"),
+        source="dashboard_agent_worker_compat",
+    )
+
+
+def _response_from_upstream(upstream: httpx.Response) -> Response:
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        headers=_filter_headers(dict(upstream.headers)),
+        media_type=upstream.headers.get("content-type"),
+    )
+
+
+@cc_proxy_router.post("/agent-workers")
+async def agent_worker_proxy(request: Request) -> Response:
+    """Bridge new Agent Worker creation onto a live pre-route daemon.
+
+    The normal path is still the canonical ``/cc/agent-workers`` endpoint.  A
+    fallback is used only for its exact route-missing 404, allowing Dashboard
+    code to update without restarting the session-owning 8201 process.
+    """
+    base = await asyncio.to_thread(_daemon_http_base)
+    body = await request.body()
+    client = await _daemon_http_client()
+    try:
+        upstream = await client.request(
+            method="POST",
+            url=f"{base}/cc/agent-workers",
+            headers=_filter_headers(dict(request.headers)),
+            content=body,
+        )
+    except httpx.ConnectError as exc:
+        raise HTTPException(status_code=503, detail=f"ccdaemon unreachable: {exc}") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {exc}") from exc
+    if upstream.status_code != 404:
+        return _response_from_upstream(upstream)
+
+    try:
+        payload = json.loads(body or b"{}")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="invalid Agent Worker JSON body") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Agent Worker body must be an object")
+    if payload.get("resume_provider_session_id") or payload.get("fork_from_provider_session_id"):
+        raise HTTPException(
+            status_code=409,
+            detail="live ccdaemon is too old for Agent Worker resume/fork; upgrade it before retrying",
+        )
+
+    provider = str(payload.get("provider") or "").strip().lower().replace("-", "_")
+    if provider == "claude":
+        provider = "claude_code"
+    supported = {"claude_code", "codex", "kimi", "opencode", "codebuddy", "kiro", "qoder"}
+    if provider not in supported:
+        raise HTTPException(status_code=400, detail=f"unsupported CLI Agent Worker provider: {provider!r}")
+    try:
+        command = _agent_worker_command(provider, payload.get("model"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        created = await client.request(
+            method="POST",
+            url=f"{base}/cc/sessions",
+            headers={"content-type": "application/json"},
+            content=json.dumps(
+                {
+                    "cmd": command,
+                    "cwd": payload.get("cwd"),
+                    "safe_mode": bool(payload.get("safe_mode", False)),
+                },
+                ensure_ascii=False,
+            ).encode("utf-8"),
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"ccdaemon compatibility bridge failed: {exc}") from exc
+    if not created.is_success:
+        return _response_from_upstream(created)
+
+    meta = created.json()
+    try:
+        _record_compat_agent_worker_binding(meta, payload, provider)
+    except Exception as exc:  # session creation remains useful even if decoration fails
+        logger.warning("compat Agent Worker binding failed for %s: %s", meta.get("id"), exc)
+
+    task = str(payload.get("task") or "").strip()
+    if task:
+        try:
+            from omnicompany.dashboard.ccdaemon.pty_routes import (
+                _with_shared_agent_instructions,
+            )
+
+            await client.request(
+                method="POST",
+                url=f"{base}/cc/sessions/{meta['id']}/input",
+                headers={"content-type": "application/json"},
+                content=json.dumps(
+                    {"data": _with_shared_agent_instructions(task), "submit": True},
+                    ensure_ascii=False,
+                ).encode("utf-8"),
+            )
+        except Exception as exc:
+            logger.warning("compat Agent Worker initial task failed for %s: %s", meta.get("id"), exc)
+
+    binding_kind = (
+        "project"
+        if any(payload.get(key) for key in ("project", "workstream", "active_plan"))
+        else "unbound"
+    )
+    response_payload = {
+        **meta,
+        "worker_id": meta["id"],
+        "pty_id": meta["id"],
+        "runtime_kind": "cli",
+        "worker_kind": "external_agent_worker",
+        "product_kind": "agent_worker",
+        "binding_kind": binding_kind,
+        "model": payload.get("model"),
+        "parent_agent_id": payload.get("parent_agent_id"),
+        "visibility": payload.get("visibility") or "visible",
+        "compatibility_bridge": True,
+    }
+    return Response(
+        content=json.dumps(response_payload, ensure_ascii=False),
+        media_type="application/json",
+    )
+
+
 # ── HTTP 透传 (catch-all) ──────────────────────────────────────────────────
 @cc_proxy_router.api_route(
     "/{path:path}",
@@ -152,7 +322,7 @@ async def chatui_ensure() -> Response:
 )
 async def http_proxy(path: str, request: Request) -> Response:
     """所有 /api/cc/{path} HTTP 请求转 daemon /cc/{path}, 透传 method / headers / body / query."""
-    base = _daemon_http_base()
+    base = await asyncio.to_thread(_daemon_http_base)
     target = f"{base}/cc/{path}"
     body = await request.body()
 
@@ -171,12 +341,7 @@ async def http_proxy(path: str, request: Request) -> Response:
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"ccdaemon proxy error: {e}")
 
-    return Response(
-        content=upstream.content,
-        status_code=upstream.status_code,
-        headers=_filter_headers(dict(upstream.headers)),
-        media_type=upstream.headers.get("content-type"),
-    )
+    return _response_from_upstream(upstream)
 
 
 # ── WebSocket 透传 ──────────────────────────────────────────────────────────
@@ -192,7 +357,7 @@ async def _ws_bridge(
     侧收到 disconnect 但内部 session 不动 (浏览器跟 daemon 间会话状态由 daemon
     持有, dashboard 只是穿透).
     """
-    base = _daemon_ws_base()
+    base = await asyncio.to_thread(_daemon_ws_base)
     if base is None:
         await client_ws.accept()
         await client_ws.close(code=1011, reason="ccdaemon not running")
@@ -308,6 +473,12 @@ async def pty_ws_proxy(ws: WebSocket, sid: str) -> None:
         f"/cc/sessions/{sid}/ws",
         enforce_frontend_protocol=True,
     )
+
+
+@cc_proxy_router.websocket("/web/{sid}/{path:path}")
+async def web_ws_proxy(ws: WebSocket, sid: str, path: str) -> None:
+    """Web-display 会话(DeepSeek Harness Web UI)的 WS 桥: /api/cc/web/{sid}/{path} → daemon."""
+    await _ws_bridge(ws, f"/cc/web/{sid}/{path}")
 
 
 @cc_proxy_router.websocket("/echo")

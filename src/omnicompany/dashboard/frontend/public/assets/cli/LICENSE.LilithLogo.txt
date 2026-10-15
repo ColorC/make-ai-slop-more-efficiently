@@ -1,0 +1,4 @@
+Source: official the_company Games website favicon
+https://the_companyimage.the_companycdn.com/allgames-official-web/the_company/pc/cn/favicon.ico
+Company: 上海the team网络科技有限公司 / the_company Games
+Used internally as the CLI brand mark for the the_company API Codex runtime (`codex_the_company`).

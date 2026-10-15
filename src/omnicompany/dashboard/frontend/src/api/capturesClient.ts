@@ -20,6 +20,8 @@ export interface CaptureSaveBody {
   dom_snapshot?: string | null
   /** 尽力截图(同源 canvas toDataURL); 后端落盘成 shot-*.png 并写进 md 的「截图」节。空/WebGL 未保留缓冲时省略。 */
   image_data_url?: string | null
+  /** P1.2 快照带日志: 浏览器日志环形缓冲当前内容(最近 50 条 {time, level, text}), 后端写进 md 的「浏览器日志」节。 */
+  logs?: Array<{ time: string; level: string; text: string }> | null
   /** true(提交)=存 pending 进 dispatch 批次; false(复制)=存 clips 只为拿文件链接, 不计入待处理。默认 true。 */
   enqueue?: boolean
 }
@@ -27,6 +29,12 @@ export interface CaptureSaveBody {
 export interface CaptureSaveResult {
   saved_path: string
   pending_count: number
+  /** P1.2 快照 URL 化: 该捕获文件的 http 可访问 URL(经 /api/boss-sight/captures/file 静态读取), 后端组装。 */
+  url?: string
+  share_id?: string
+  canonical_url?: string | null
+  share_status?: 'reserved' | 'capturing' | 'ready' | 'failed' | 'unavailable'
+  share_error?: string | null
 }
 
 export interface CaptureListResult {

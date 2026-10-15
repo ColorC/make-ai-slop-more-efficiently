@@ -1,0 +1,21 @@
+{
+  "name": "@omni/table-view-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "通用 table-view 核：TableDoc/ChangeSet/TableDiff 契约 + 唯一相等语义 + 公式忠实三层 diff + 审批 hash + round-trip 校验 harness。消费方：spark-workshop /tables 页、demogame-config portal 表格页签。IO 走插件（进程无关，讲 TableDoc JSON），本包不含任何 demogame/Spark 特化路径。",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./contract/table-doc.schema.json": "./contract/table-doc.schema.json",
+    "./contract/table-changeset.schema.json": "./contract/table-changeset.schema.json",
+    "./contract/table-diff.schema.json": "./contract/table-diff.schema.json"
+  },
+  "scripts": {
+    "test": "node test/core-smoke.mjs && node test/render-smoke.mjs && node test/plugins-smoke.mjs && node test/diff-shell-smoke.mjs && node test/clipboard-grid.test.mjs"
+  }
+}

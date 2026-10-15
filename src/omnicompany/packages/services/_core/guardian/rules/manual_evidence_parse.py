@@ -14,8 +14,8 @@
 参考:
   - 反例: stage_e_design_point_extractor / _test_coverage_mapper /
           _test_gap_filler / _semantic_acceptance_gate 都有 _parse_evidence
-  - 正例: packages/domains/demogame/ux/routers/prefab_rule_extraction_loop.py
-          的 SubmitReportRouter (TOOL_NAME='submit_report' + INPUT_SCHEMA)
+  - 正例: runtime.agent_runtime.run_readonly_structured_agent 的
+          expected_output_schema + 运行时 JSON Schema 验证
 
 扫描思路 (AST):
   文件含 字符串字面量 `===EVIDENCE===` 或 `===END===` 或 markdown fence regex
@@ -157,7 +157,7 @@ RULES: list[GuardianRule] = [
             "正确做法: 自定义 SubmitXxxRouter 子类 SingleToolRouter, INPUT_SCHEMA 定义结构化字段, "
             "LLM 给 args dict, _execute 直接消费 — 不做 text parse. "
             "memory: feedback_no_manual_parse_use_structured_output (2026-04-25 跨项目铁律). "
-            "正例: packages/domains/demogame/ux/routers/prefab_rule_extraction_loop.py SubmitReportRouter."
+            "正例: runtime.agent_runtime.run_readonly_structured_agent + expected_output_schema."
         ),
         check=_check_manual_evidence_parse,
         disposition=["warn"],

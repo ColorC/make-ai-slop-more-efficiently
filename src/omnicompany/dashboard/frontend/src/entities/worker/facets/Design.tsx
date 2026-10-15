@@ -1,10 +1,9 @@
 import React, { Suspense, useEffect, useState } from 'react'
 import { Copy, FileCode2 } from 'lucide-react'
 import { fetchWorkerDetail, type WorkerDetail, type WorkerEntity } from '../resolver'
-import MarkdownRenderer from '../../../shell/MarkdownRenderer'
+import WikiCoreMarkdown from '../../../shared/view/wiki/WikiCoreMarkdown'
 import EmptyState from '../../../shell/EmptyState'
 import KebabMenu, { type KebabItem } from '../../../shared/view/ui/KebabMenu'
-import { usePanels } from '../../../stores/panelsStore'
 import { copyText } from '../../../lib/copyText'
 import { openInVscode } from '../../../lib/openInVscode'
 
@@ -22,11 +21,11 @@ const S: Record<string, any> = {
   // 顶栏: DESIGN.md/源码 shadcn 分段控件 + 文件名次级标识 + ⋯(低频文件操作)。无标题头。
   bar: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', flexShrink: 0 },
   seg: {
-    display: 'inline-flex', gap: 2, padding: 3, borderRadius: 9,
+    display: 'inline-flex', gap: 2, padding: 3, borderRadius: 3,
     background: 'var(--fp-surface)', border: '1px solid var(--fp-border-subtle)', flexShrink: 0,
   },
   segBtn: (active: boolean): React.CSSProperties => ({
-    padding: '3px 13px', borderRadius: 7, border: '1px solid transparent', cursor: 'pointer',
+    padding: '3px 13px', borderRadius: 2, border: '1px solid transparent', cursor: 'pointer',
     background: active ? 'var(--fp-glass)' : 'transparent',
     boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,.08)' : 'none',
     borderColor: active ? 'var(--fp-border)' : 'transparent',
@@ -39,19 +38,18 @@ const S: Record<string, any> = {
   body: { flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', flexDirection: 'column' },
   // DESIGN.md 阅读区: 玻璃卡浮在渐变上(磨砂 + 边缘高光 + token 描边 + r11), 留呼吸边距。
   docCard: {
-    flex: 1, overflow: 'auto', margin: '0 14px 14px', borderRadius: 11, padding: '4px 22px 18px',
+    flex: 1, overflow: 'auto', margin: '0 14px 14px', borderRadius: 3, padding: '4px 22px 18px',
     background: 'var(--fp-glass)', backdropFilter: 'var(--fp-blur)', WebkitBackdropFilter: 'var(--fp-blur)',
     border: '1px solid var(--fp-border)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
   },
   // 长 mono 源码区保持安静(极淡 surface, 不盖死渐变)。
-  codeWrap: { flex: 1, overflow: 'hidden', minHeight: 0, margin: '0 14px 14px', borderRadius: 11, border: '1px solid var(--fp-border)', background: 'var(--fp-surface)' },
+  codeWrap: { flex: 1, overflow: 'hidden', minHeight: 0, margin: '0 14px 14px', borderRadius: 3, border: '1px solid var(--fp-border)', background: 'var(--fp-surface)' },
 }
 
 export default function WorkerDesignFacet({ entity }: { entity: WorkerEntity }) {
   const [detail, setDetail] = useState<WorkerDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<ViewKey>('design')
-  const openTab = usePanels((s) => s.openTab)
 
   useEffect(() => {
     setDetail(null); setError(null)
@@ -65,10 +63,6 @@ export default function WorkerDesignFacet({ entity }: { entity: WorkerEntity }) 
 
   if (error) return <EmptyState text={`加载失败: ${error}`} />
   if (!detail) return <EmptyState text="加载中..." />
-
-  const jumpToWikilink = (target: string) => {
-    openTab({ type: 'note', id: target }, target.split('/').pop() || target)
-  }
 
   // 低频文件操作收进共享 ⋯ 菜单(复制路径 / 在 VSCode 打开), 不在界面堆等权按钮。
   const kebabItems: KebabItem[] = [
@@ -109,7 +103,7 @@ export default function WorkerDesignFacet({ entity }: { entity: WorkerEntity }) 
         {view === 'design' ? (
           detail.design_md ? (
             <div style={S.docCard} data-testid="worker-design-doc">
-              <MarkdownRenderer source={detail.design_md} onWikilinkClick={jumpToWikilink} currentPath={detail.id} />
+              <WikiCoreMarkdown source={detail.design_md} />
             </div>
           ) : (
             <EmptyState text={`无 DESIGN.md：${detail.package}`} hint="切到源码查看代码" />

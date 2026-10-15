@@ -1,9 +1,9 @@
 # [OMNI] origin=claude-code domain=services/hypothesis ts=2026-07-10T00:00:00Z type=bindings status=active
 # [OMNI] material_id="material:services.learning.hypothesis.team.bindings_builder.py"
-"""hypothesis.run — 管线 bindings(v5:薄包装 Router 驱动 run_session)。
+"""hypothesis.run — 管线 bindings(外置 AgentRuntime 版)。
 
 照 vilo eval 系模式:管线节点=薄确定性包装,内部驱动真实多轮 agent 循环
-(run_session 自建 SQLiteBus 与两个 AgentNodeLoop)。修复旧 bindings 在
+(run_session 自建 SQLiteBus；Experimenter 与 Reflector 均已外置)。修复旧 bindings 在
 构造期裸建 AgentNodeLoop(缺 bus 必炸)导致 `omni run hypothesis` 不可用的问题。
 """
 
@@ -18,7 +18,7 @@ from omnicompany.runtime.routing.router import Router
 class HypothesisSessionRouter(Router):
     """单节点:hypothesis.session → hypothesis.store_diff(内部跑完整多轮循环)。"""
 
-    DESCRIPTION = "假设探索会话驱动器:Experimenter+BeliefReflector 多轮循环,猜想直写统一决策库"
+    DESCRIPTION = "假设探索会话驱动器:外置只读 Experimenter + 外置 Reflector 提案 + Omni 校验/写决策库"
     FORMAT_IN = "hypothesis.session"
     FORMAT_OUT = "hypothesis.store_diff"
 
@@ -43,6 +43,19 @@ class HypothesisSessionRouter(Router):
         session = new_session(domain, goal, max_iterations=max_iterations,
                               scene=payload.get("scene") or {})
         result = await _run_session_async(session)
+        status = result.get("status")
+        if status == "failed":
+            return Verdict(
+                kind=VerdictKind.FAIL,
+                output=result,
+                diagnosis=str(result.get("failure_reason") or "hypothesis session failed"),
+            )
+        if status == "partial":
+            return Verdict(
+                kind=VerdictKind.PARTIAL,
+                output=result,
+                diagnosis="hypothesis session stopped at an explicit evidence Andon",
+            )
         return Verdict(kind=VerdictKind.PASS, output=result,
                        diagnosis=f"{domain}: belief {result.get('total_beliefs')} 条, "
                                  f"状态分布 {result.get('by_status')}")

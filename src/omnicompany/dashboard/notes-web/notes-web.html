@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="icon" href="data:," />
+    <title>OmniDashboard 画布</title>
+    <script>
+      (function () {
+        var requested = new URLSearchParams(location.search).get("theme") || "";
+        var workshop = requested === "workshop" || requested === "warm";
+        document.documentElement.dataset.notesTheme = workshop ? "workshop" : "omni";
+        document.documentElement.style.colorScheme = workshop ? "light" : "dark";
+        document.documentElement.style.background = workshop ? "#F7F3EB" : "#0b1830";
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b1830;
+      }
+      html[data-notes-theme='workshop'],
+      html[data-notes-theme='workshop'] body {
+        background: #F7F3EB;
+      }
+      #app {
+        height: 100%;
+        position: relative; /* 画布根是 absolute, 由这里容住 */
+      }
+      .notes-boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 10px;
+        color: #dbe7f5;
+        font: 14px/1.5 system-ui, sans-serif;
+        background: inherit;
+      }
+      html[data-notes-theme='workshop'] .notes-boot {
+        color: #332D27;
+      }
+      .notes-boot small {
+        color: #7890ad;
+      }
+      html[data-notes-theme='workshop'] .notes-boot small {
+        color: #9A8B7D;
+      }
+      .notes-boot-spinner {
+        width: 22px;
+        height: 22px;
+        border: 2px solid #2f4662;
+        border-top-color: #75b7ff;
+        border-radius: 50%;
+        animation: notes-boot-spin 0.8s linear infinite;
+      }
+      .notes-boot button {
+        margin-top: 4px;
+        padding: 7px 14px;
+        border: 1px solid #45617f;
+        border-radius: 6px;
+        color: #dbe7f5;
+        background: #162b45;
+        cursor: pointer;
+      }
+      @keyframes notes-boot-spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="notes-boot" data-notes-boot="loading" role="status" aria-live="polite">
+        <span class="notes-boot-spinner" aria-hidden="true"></span>
+        <strong>正在加载札记…</strong>
+        <small>首次打开可能需要几秒</small>
+      </div>
+    </div>
+    <script>
+      // 启动观测哨(2026-08-16): 模块加载前就开始收集错误; 启动门 9s 未过自动上报到
+      // workshop 收集端, 运维侧不再依赖用户肉眼描述。上报走 /bside 写白名单(Bearer 由代理注入)。
+      (function () {
+        var errors = [];
+        function note(msg) {
+          if (errors.length < 20 && typeof msg === "string") errors.push(msg.slice(0, 500));
+        }
+        window.addEventListener("error", function (e) {
+          note((e && e.message ? e.message : "error") + " @" + (e && e.filename ? e.filename.split("/").pop() : "") + ":" + (e && e.lineno || 0));
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          note("unhandledrejection: " + String(e && e.reason).slice(0, 300));
+        });
+        var origErr = console.error;
+        console.error = function () {
+          note("console.error: " + Array.prototype.slice.call(arguments).join(" ").slice(0, 400));
+          return origErr.apply(console, arguments);
+        };
+        function report(reason) {
+          try {
+            fetch("/bside/api/client-boot-report", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              keepalive: true,
+              body: JSON.stringify({
+                at: new Date().toISOString(),
+                reason: reason,
+                href: location.href,
+                ua: navigator.userAgent,
+                errors: errors,
+                gateState: document.querySelector("[data-notes-boot]") ?
+                  document.querySelector("[data-notes-boot]").getAttribute("data-notes-boot") : "gone",
+              }),
+            }).catch(function () {});
+          } catch (e) { /* 上报失败静默 */ }
+        }
+        window.__notesBootReport = report;
+        setTimeout(function () {
+          var gate = document.querySelector("[data-notes-boot]");
+          if (gate && gate.getAttribute("data-notes-boot") === "loading") {
+            gate.querySelector("small").textContent = "加载时间过长 — 正在上报诊断，可尝试强制刷新（Ctrl+F5）";
+            report("gate-timeout-9s");
+          }
+        }, 9000);
+      })();
+    </script>
+    <script type="module" src="/src/notes-web.tsx"></script>
+  </body>
+</html>

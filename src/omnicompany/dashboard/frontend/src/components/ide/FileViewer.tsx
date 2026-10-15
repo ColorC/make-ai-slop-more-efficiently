@@ -46,7 +46,7 @@ export default function FileViewer() {
 
   if (fileChanges.length === 0) {
     return (
-      <div style={{ padding: 12, color: '#444', fontSize: 14 }}>
+      <div style={{ padding: 12, color: 'var(--fp-text-3)', fontSize: 14 }}>
         No file changes yet
       </div>
     )
@@ -64,7 +64,7 @@ export default function FileViewer() {
           display: 'flex',
           gap: 1,
           background: 'var(--fp-bg)',
-          borderBottom: '1px solid #222',
+          borderBottom: '1px solid var(--fp-border-subtle)',
           overflow: 'auto',
           flexShrink: 0,
         }}
@@ -77,10 +77,10 @@ export default function FileViewer() {
               onClick={() => setActiveIdx(i)}
               style={{
                 padding: '4px 10px',
-                background: i === activeIdx ? '#1a1a2a' : 'transparent',
+                background: i === activeIdx ? 'var(--fp-bp-paper-2)' : 'transparent',
                 border: 'none',
                 borderBottom: i === activeIdx ? '2px solid #90caf9' : '2px solid transparent',
-                color: i === activeIdx ? '#90caf9' : '#666',
+                color: i === activeIdx ? 'var(--fp-link)' : 'var(--fp-text-2)',
                 cursor: 'pointer',
                 fontSize: 14,
                 fontFamily: 'Consolas, Menlo, monospace',
@@ -95,7 +95,7 @@ export default function FileViewer() {
       </div>
 
       {/* File path */}
-      <div style={{ padding: '4px 8px', fontSize: 14, color: '#555', fontFamily: 'Consolas, Menlo, monospace' }}>
+      <div style={{ padding: '4px 8px', fontSize: 14, color: 'var(--fp-text-3)', fontFamily: 'Consolas, Menlo, monospace' }}>
         {file.path}
       </div>
 
@@ -103,7 +103,7 @@ export default function FileViewer() {
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Suspense
           fallback={
-            <div style={{ padding: 12, color: '#444' }}>Loading editor...</div>
+            <div style={{ padding: 12, color: 'var(--fp-text-3)' }}>Loading editor...</div>
           }
         >
           {isDiff ? (

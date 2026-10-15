@@ -15,12 +15,10 @@
 
 合法入口 (LLM 判断时参考):
     - 单次 LLM 调用    → LLMCallRouter (packages.services.agent.routers.llm_call)
-    - 多轮 agent 循环  → AgentNodeLoop (packages.services.agent)
+    - 多轮 agent 执行  → 语言无关 AgentRuntime 端口
     - 业务流程         → Team + Worker + Material 总线
 
 豁免清单 (写规则时硬编码):
-    - guardian 自己 3 个 AgentNodeLoop 子类 (judge_agent / llm_judge_agent / routers.HealthReporterRouter):
-      DESIGN.md 明示阶段 D runtime 统一后处理
     - packages/services/agent/* : 合法入口本身
     - runtime/llm/* : LLMClient 定义
     - _archive / _graveyard / vendors : 通用豁免
@@ -68,12 +66,6 @@ _PATH_EXEMPTIONS: tuple[str, ...] = (
     "src/omnicompany/packages/services/_core/omnicompany/material_events.py",
     "src/omnicompany/packages/services/omnicompany/material_dispatcher.py",
     "src/omnicompany/packages/services/omnicompany/material_events.py",
-    # 阶段性豁免 (到期日 2026-06-30 · plan [2026-04-18]AGENT-NODE-LOOP-ROUTERIZATION):
-    # guardian 自己 3 个 AgentNodeLoop 子类因本 service 基础设施特殊需求仍继承旧基类,
-    # DESIGN.md §已知局限 明示"阶段 D runtime 统一后一并迁". 到期未完成应重审.
-    "src/omnicompany/packages/services/guardian/judge_agent.py",      # expires: 2026-06-30
-    "src/omnicompany/packages/services/guardian/llm_judge_agent.py",  # expires: 2026-06-30
-    "src/omnicompany/packages/services/guardian/routers.py",          # expires: 2026-06-30
     # 架构永久: Guardian 自己的审计留档 (2026-04-24 GuardianAuditStore)
     # 防递归: 扫 Guardian 不应把 Guardian 自己的审计记录当违规候选
     "data/services/guardian/",
@@ -81,11 +73,7 @@ _PATH_EXEMPTIONS: tuple[str, ...] = (
 
 # 阶段豁免到期日监控 (plan §十二 要求)
 # TODO: 在 sentinel / patrol 周期检查中加一条: 若 today > expires, 升级告警
-_STAGED_EXEMPTIONS_EXPIRES: dict[str, str] = {
-    "src/omnicompany/packages/services/guardian/judge_agent.py": "2026-06-30",
-    "src/omnicompany/packages/services/guardian/llm_judge_agent.py": "2026-06-30",
-    "src/omnicompany/packages/services/guardian/routers.py": "2026-06-30",
-}
+_STAGED_EXEMPTIONS_EXPIRES: dict[str, str] = {}
 
 
 _FLOW_OUTSIDE_WORKER_EXEMPTIONS: tuple[str, ...] = (
@@ -404,8 +392,7 @@ RULES: list[GuardianRule] = [
         check=_check_old_agent_node_loop_inherit,
         disposition=["warn"],
         message_template=(
-            "{path}: 继承旧 runtime.agent.AgentNodeLoop. 迁到 packages.services.agent.AgentNodeLoop "
-            "(已知豁免: guardian/judge_agent · llm_judge_agent · routers.HealthReporterRouter)."
+            "{path}: 继承旧 runtime.agent.AgentNodeLoop. 迁到语言无关 AgentRuntime 端口."
         ),
         certainty="needs_judgment",
     ),

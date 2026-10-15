@@ -9,11 +9,75 @@ Subcommands (single source of truth — dashboard install button calls these):
 """
 
 import json
+import os
+from pathlib import Path
 
 import click
 
 from omnicompany.dashboard.ccdaemon import codex_installer as ci
 from omnicompany.dashboard.ccdaemon import installer as si
+
+
+_CLAUDE_ALTERNATE_SOURCE_ENV = {
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_MODEL",
+    "ANTHROPIC_SMALL_FAST_MODEL",
+    "ANTHROPIC_DEFAULT_FABLE_MODEL",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDE_CODE_USE_VERTEX",
+}
+
+_CLAUDE_PARENT_SESSION_ENV = {
+    "CLAUDECODE",
+    "CLAUDE_CODE_CHILD_SESSION",
+    "CLAUDE_CODE_ENTRYPOINT",
+    "CLAUDE_CODE_EXECPATH",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_PID",
+}
+
+#: 只属于"发起重启的那个 agent 会话"的账号与身份变量; 见 _ccdaemon_process_env。
+_AGENT_SESSION_ACCOUNT_ENV = {
+    "CODEX_HOME",
+    "CLAUDE_CONFIG_DIR",
+    "CODEX_SESSION_ID",
+    "OMNI_CC_PTY_ID",
+    "OMNI_AGENT_PROVIDER",
+}
+
+
+def _ccdaemon_process_env(source_env: dict[str, str] | None = None) -> dict[str, str]:
+    """Build a clean daemon environment for dashboard-owned agent sessions.
+
+    ``omni cc daemon`` is often restarted from inside another agent CLI. Blindly
+    copying that process environment made every later Dashboard Claude PTY inherit
+    the launcher's alternate Anthropic endpoint/model and stale Claude session
+    identity. Dashboard Claude sessions default to the official Claude login on
+    disk; set ``OMNI_CC_CLAUDE_SOURCE=inherit`` only when custom endpoint/API-key
+    inheritance is intentional.
+    """
+    env = dict(os.environ if source_env is None else source_env)
+    launched_inside_agent_session = bool(env.get("OMNI_CC_PTY_ID") or env.get("CLAUDECODE"))
+    for key in _CLAUDE_PARENT_SESSION_ENV:
+        env.pop(key, None)
+    if launched_inside_agent_session:
+        # 从某个 agent 会话里重启 daemon 时, 该会话的账号家目录(第二账号的
+        # CODEX_HOME / CLAUDE_CONFIG_DIR)和会话身份会被 daemon 继承, 之后面板起的
+        # "官方一号"会话其实全跑在二号账号上, 台账也会记错发起会话(2026-09-05 实测)。
+        # 只有会话里发起的重启才剥这些; 用户在系统环境里刻意设的家目录不受影响。
+        for key in _AGENT_SESSION_ACCOUNT_ENV:
+            env.pop(key, None)
+    source = env.get("OMNI_CC_CLAUDE_SOURCE", "official").strip().lower()
+    if source != "inherit":
+        for key in _CLAUDE_ALTERNATE_SOURCE_ENV:
+            env.pop(key, None)
+    return env
 
 
 def _integration_installer(provider: str):
@@ -71,9 +135,467 @@ def cc_status(scope: str, provider: str) -> None:
     click.echo(json.dumps(rep, indent=2, ensure_ascii=False))
 
 
+@cmd_cc.command("safety-install")
+@click.option("--provider", type=click.Choice(["claude_code", "codex"]), required=True)
+@click.option("--scope", type=click.Choice(["project", "user"]), default="user")
+@click.option("--settings-path", type=click.Path(path_type=Path),
+              help="One explicit ancestor/project config to migrate; never scans projects.")
+@click.option("--cleanup-only", is_flag=True,
+              help="Remove the old Omni hooks from this scope; use with a user safety installation.")
+@click.option("--receipt", type=click.Path(path_type=Path),
+              help="Absolute unused JSON receipt path including all backup paths.")
+def cc_safety_install(provider: str, scope: str, settings_path: Path | None,
+                      cleanup_only: bool, receipt: Path | None) -> None:
+    """Install only the fast destructive-operation guard, preserving unrelated hooks."""
+    from omnicompany.core.safety_installer import install
+
+    if settings_path is not None and not settings_path.is_absolute():
+        raise click.UsageError("settings-path must be absolute")
+    if receipt is not None and (not receipt.is_absolute() or receipt.exists()):
+        raise click.UsageError("receipt must be an absolute, unused file path")
+    try:
+        result = install(provider=provider, scope=scope, path=settings_path,
+                         add_hook=not cleanup_only)
+    except (ValueError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    if receipt is not None:
+        receipt.parent.mkdir(parents=True, exist_ok=True)
+        result["files"].append({"path": str(receipt), "purpose": "safety hook installation receipt"})
+        with receipt.open("x", encoding="utf-8") as stream:
+            json.dump(result, stream, indent=2, ensure_ascii=False)
+    click.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+@cmd_cc.command("repair-codex-launcher")
+@click.option("--receipt", type=click.Path(path_type=Path), required=True)
+def cc_repair_codex_launcher(receipt: Path) -> None:
+    """Make the obsolete pinned Windows shims follow the installed npm CLI."""
+    import subprocess
+
+    if os.name != "nt":
+        raise click.ClickException("this repair targets Windows Codex shims")
+    if not receipt.is_absolute() or receipt.exists():
+        raise click.UsageError("receipt must be an absolute, unused file path")
+    appdata = Path(os.environ["APPDATA"])
+    shim_dir = Path(os.environ["LOCALAPPDATA"]) / "OpenAI" / "Codex" / "cli-0.159.2-bin"
+    entry = appdata / "npm" / "node_modules" / "@openai" / "codex" / "bin" / "codex.js"
+    if not entry.is_file():
+        raise click.ClickException(f"installed npm Codex entry is missing: {entry}")
+    verified = subprocess.run(["node", str(entry), "--version"], capture_output=True,
+                              text=True, timeout=15, check=False)
+    if verified.returncode != 0 or not verified.stdout.startswith("codex-cli "):
+        raise click.ClickException(f"installed Codex failed --version: {entry}")
+    replacements = {
+        "codex.cmd": '@echo off\r\nnode "%APPDATA%\\npm\\node_modules\\@openai\\codex\\bin\\codex.js" %*\r\nexit /b %ERRORLEVEL%\r\n',
+        "codex.ps1": "& node (Join-Path $env:APPDATA 'npm/node_modules/@openai/codex/bin/codex.js') @args\nexit $LASTEXITCODE\n",
+    }
+    artifacts = []
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    for name, body in replacements.items():
+        target = shim_dir / name
+        if not target.is_file() or target.is_symlink():
+            raise click.ClickException(f"expected regular existing Codex shim: {target}")
+        backup = receipt.parent / (name + ".before-launcher-repair")
+        with backup.open("xb") as stream:
+            stream.write(target.read_bytes())
+        target.write_bytes(body.encode("utf-8"))
+        artifacts.extend([{"path": str(target), "role": "Codex launcher forwarding to installed npm CLI"},
+                          {"path": str(backup), "role": "original pinned launcher for rollback"}])
+    result = {"version": verified.stdout.strip(), "entry": str(entry), "artifacts": artifacts}
+    result["artifacts"].append({"path": str(receipt), "role": "launcher repair receipt"})
+    with receipt.open("x", encoding="utf-8") as stream:
+        json.dump(result, stream, indent=2, ensure_ascii=False)
+    click.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
 # ── ccdaemon lifecycle ([2026-05-09]DASHBOARD-DOGFOOD-RESILIENCE) ──
 # 独立 uvicorn 进程, 持有 chat / pty 真业务. 跟 dashboard 控制面进程拆开,
 # 确保 AI IDE 改控制面任意文件触发 reload 都不影响 chat 会话.
+#
+# 2026-08-20 口径修正（实测验证）: `omni cc daemon restart` 不杀 PTY 会话。
+# 每个 pty 会话由独立的 detached 宿主进程持有 ConPTY 和原生 CLI
+# (pty.py _spawn_detached_host, DETACHED_PROCESS|NEW_PROCESS_GROUP), daemon 只是
+# 桥; 新 daemon 启动时 _discover_host_sessions 按 data/pty_hosts/*.json 重新接管。
+# 实测: 25 个存活 pty 会话重启后宿主进程零损失。真正会断的只有 in-process 的
+# chat 类会话(NativeIdeAgent 跑在 daemon 内存里)和浏览器页签的 websocket(会自动重连)。
+
+def _pty_daemon_base() -> str:
+    """ccdaemon 本机基址(pty 页签操作用); 未跑就直接报错, 不静默吞。"""
+    from omnicompany.dashboard.ccdaemon import lifecycle
+    s = lifecycle.read_status()
+    if not (getattr(s, "alive", False) and getattr(s, "port", None)):
+        raise click.ClickException("ccdaemon 未运行(先 `omni cc daemon start`)")
+    return f"http://127.0.0.1:{s.port}"
+
+
+@cmd_cc.group("session")
+def cc_session() -> None:
+    """PTY 页签生命周期和经用户授权的精确输入。"""
+
+
+def _safe_session_inspection(row: dict) -> dict:
+    """Project operational metadata while excluding terminal/input secrets."""
+    import uuid
+
+    known = row.get("provider_runtime_known")
+    reclaim = row.get("reclaim")
+    raw_provider_session_id = row.get("provider_session_id")
+    provider_session_id = None
+    if isinstance(raw_provider_session_id, str):
+        try:
+            canonical_id = str(uuid.UUID(raw_provider_session_id))
+            if raw_provider_session_id == canonical_id:
+                provider_session_id = canonical_id
+        except (ValueError, AttributeError):
+            pass
+    if not isinstance(reclaim, dict):
+        reclaim = {}
+    return {
+        "pty_id": row.get("id"),
+        "provider": row.get("provider"),
+        "provider_session_id": provider_session_id,
+        "status": row.get("status"),
+        "cwd": row.get("cwd"),
+        "alive": row.get("alive"),
+        "working": row.get("working") if known is True else None,
+        "working_known": known if isinstance(known, bool) else None,
+        "working_source": row.get("working_source"),
+        "provider_runtime_state": row.get("provider_runtime_state") if known is True else None,
+        "provider_runtime_marker_at": row.get("provider_runtime_marker_at"),
+        "child_pid": row.get("child_pid"),
+        "host_pid": row.get("host_pid"),
+        "host_port": row.get("host_port"),
+        "hosted": row.get("hosted"),
+        "subscribers": row.get("subscribers"),
+        "started_at": row.get("started_at"),
+        "last_detach_at": row.get("last_detach_at"),
+        "last_submit_at": row.get("last_submit_at"),
+        "last_output_at": row.get("last_output_at"),
+        "origin": row.get("origin"),
+        "visibility": row.get("visibility"),
+        "reclaim": {
+            key: reclaim.get(key)
+            for key in ("required", "origin", "ttl_seconds", "deadline", "overdue")
+        },
+    }
+
+
+def _list_inspectable_sessions() -> list[dict]:
+    from omnicompany.packages.services._core.agent.control_plane import list_agent_workers
+
+    try:
+        rows = list_agent_workers()
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from None
+    return [_safe_session_inspection(row) for row in rows]
+
+
+@cc_session.command("list")
+def cc_session_list() -> None:
+    """List safe PTY/provider/reclaim metadata without reading terminal contents."""
+    click.echo(json.dumps({"items": _list_inspectable_sessions()}, indent=2, ensure_ascii=False))
+
+
+@cc_session.command("inspect")
+@click.argument("pty_id")
+def cc_session_inspect(pty_id: str) -> None:
+    """Inspect one exact PTY id using the native ccdaemon client."""
+    rows = _list_inspectable_sessions()
+    row = next((item for item in rows if item.get("pty_id") == pty_id), None)
+    if row is None:
+        click.echo(json.dumps({"status": "not_found", "pty_id": pty_id}, ensure_ascii=False))
+        raise SystemExit(1)
+    click.echo(json.dumps(row, indent=2, ensure_ascii=False))
+
+
+@cc_session.command("input")
+@click.argument("pty_id")
+@click.option("--text", default=None, help="用户授权发送的正文；现有 PTY 服务分开写正文和 Enter 并确认提交。")
+@click.option("--interrupt", is_flag=True, help="仅向此 PTY 发送 Ctrl+C，不关闭会话。")
+@click.option("--user-authorized", is_flag=True, help="声明当前用户明确授权此次输入；普通协作用 omni agent send。")
+def cc_session_input(pty_id: str, text: str | None, interrupt: bool, user_authorized: bool) -> None:
+    """通过现有输入设施控制一个精确 PTY；不把传输成功当作业务完成。"""
+    import re
+
+    if not user_authorized:
+        raise click.UsageError("需要 --user-authorized；普通协作请用 omni agent send")
+    if not re.fullmatch(r"[0-9a-f]{16}", pty_id):
+        raise click.UsageError("需要精确的 16 位 PTY id，不能传 provider 原生会话 id")
+    if interrupt == (text is not None):
+        raise click.UsageError("必须且只能指定 --text 或 --interrupt")
+    if text is not None and not text.strip():
+        raise click.UsageError("--text 不能为空")
+
+    from omnicompany.packages.services._core.agent.control_plane import send_agent_input
+
+    try:
+        result = send_agent_input(
+            pty_id, "\x03" if interrupt else text,
+            submit=not interrupt, daemon_base_url=_pty_daemon_base(),
+        )
+    except Exception as exc:  # noqa: BLE001 - surface the existing transport error
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(result, indent=2, ensure_ascii=False))
+    if not result.get("ok"):
+        raise SystemExit(1)
+
+
+@cc_session.command("probe")
+@click.argument("pty_id")
+@click.option("--receipt", type=click.Path(path_type=Path), required=True)
+def cc_session_probe(pty_id: str, receipt: Path) -> None:
+    """Measure terminal WebSocket round trips without sending keyboard input."""
+    import asyncio
+    import contextlib
+    import re
+    import statistics
+    import time
+    import websockets
+
+    if not re.fullmatch(r"[0-9a-f]{16}", pty_id):
+        raise click.UsageError("an exact native PTY id is required")
+    if not receipt.is_absolute() or receipt.exists():
+        raise click.UsageError("receipt must be an absolute, unused file path")
+
+    async def measure(url):
+        async with asyncio.timeout(20):
+            async with websockets.connect(url, open_timeout=5, close_timeout=2, max_size=None) as ws:
+                await ws.send(json.dumps({"type": "attach", "last_seq": 0}))
+
+                async def drain():
+                    async for _ in ws:
+                        pass
+
+                reader = asyncio.create_task(drain())
+                samples = []
+                try:
+                    for _ in range(30):
+                        started = time.perf_counter()
+                        pong = await ws.ping()
+                        await asyncio.wait_for(pong, timeout=2)
+                        samples.append((time.perf_counter() - started) * 1000)
+                        await asyncio.sleep(0.1)
+                finally:
+                    reader.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await reader
+                return {"samples": len(samples), "p50_ms": round(statistics.median(samples), 3),
+                        "p95_ms": round(sorted(samples)[28], 3), "max_ms": round(max(samples), 3)}
+
+    async def run():
+        daemon = _pty_daemon_base().replace("http://", "ws://")
+        suffix = f"/sessions/{pty_id}/ws?client_protocol=focused-visible-v1"
+        direct, gateway = await asyncio.gather(
+            measure(daemon + "/cc" + suffix),
+            measure("ws://127.0.0.1:8210/api/cc" + suffix),
+        )
+        return {"sampled_at": time.time(), "pty_id": pty_id, "keyboard_input_sent": False,
+                "direct": direct, "dashboard_gateway": gateway,
+                "artifact": {"path": str(receipt), "role": "read-only terminal WebSocket round-trip probe"}}
+
+    try:
+        result = asyncio.run(run())
+        receipt.parent.mkdir(parents=True, exist_ok=True)
+        with receipt.open("x", encoding="utf-8") as stream:
+            json.dump(result, stream, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        raise click.ClickException(f"terminal probe failed for {receipt}: {type(exc).__name__}: {exc}") from exc
+    click.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+@cc_session.command("kill")
+@click.argument("pty_ids", nargs=-1, required=True)
+def cc_session_kill(pty_ids: tuple[str, ...]) -> None:
+    """关掉一个或多个 pty 页签(参数是 pty id, 不是 provider 侧的会话 id)。"""
+    import urllib.error
+    import urllib.request
+
+    base = _pty_daemon_base()
+    results = []
+    for sid in pty_ids:
+        req = urllib.request.Request(f"{base}/cc/sessions/{sid}", method="DELETE")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310 - 本机 daemon
+                r.read()
+            results.append({"id": sid, "ok": True})
+        except urllib.error.HTTPError as e:
+            # 404 = 页签本来就不在了, 对"清掉它"这个意图来说等价于成功。
+            results.append({"id": sid, "ok": e.code == 404, "status": e.code,
+                            "detail": "已不存在" if e.code == 404 else e.reason})
+        except Exception as e:  # noqa: BLE001
+            results.append({"id": sid, "ok": False, "detail": str(e)})
+    click.echo(json.dumps({"killed": results}, indent=2, ensure_ascii=False))
+    if not all(r["ok"] for r in results):
+        raise SystemExit(1)
+
+
+@cc_session.command("output")
+@click.argument("pty_id")
+@click.option("--limit", type=click.IntRange(1, 100000), default=4000, show_default=True)
+def cc_session_output(pty_id: str, limit: int) -> None:
+    """Read the terminal output of one exact PTY without sending input."""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(
+            f"{_pty_daemon_base()}/cc/sessions/{pty_id}/output?limit={limit}", timeout=30
+        ) as response:
+            body = json.loads(response.read() or b"{}")
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(body, ensure_ascii=False, indent=2))
+
+
+@cc_session.command("resume")
+@click.argument("pty_ids", nargs=-1, required=True)
+def cc_session_resume(pty_ids: tuple[str, ...]) -> None:
+    """Resume ended provider PTYs through the account-aware recovery path."""
+    _resume_pty_sessions(pty_ids, "resume")
+
+
+@cc_session.command("migrate-codex-account")
+@click.argument("pty_ids", nargs=-1, required=True)
+def cc_session_migrate_codex_account(pty_ids: tuple[str, ...]) -> None:
+    """Move exact codex_2 PTYs to codex-1, preserving native history."""
+    _resume_pty_sessions(pty_ids, "migrate-codex-account")
+
+
+def _resume_pty_sessions(pty_ids: tuple[str, ...], action: str) -> None:
+    import urllib.error
+    import urllib.request
+
+    base = _pty_daemon_base()
+    results = []
+    for sid in pty_ids:
+        req = urllib.request.Request(
+            f"{base}/cc/sessions/{sid}/{action}",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as response:  # noqa: S310 - 本机 daemon
+                body = json.loads(response.read() or b"{}")
+            results.append({
+                "old_id": sid,
+                "ok": True,
+                "new_id": body.get("id"),
+                "provider": body.get("provider"),
+                "provider_session_id": body.get("provider_session_id"),
+                "cwd": body.get("cwd"),
+                "artifacts": body.get("artifacts", []),
+                "source_kept_open": body.get("source_kept_open"),
+            })
+        except urllib.error.HTTPError as exc:
+            detail = exc.reason
+            try:
+                detail = json.loads(exc.read() or b"{}").get("detail") or detail
+            except Exception:  # noqa: BLE001 - error reporting only
+                pass
+            results.append({"old_id": sid, "ok": False, "status": exc.code, "detail": detail})
+        except Exception as exc:  # noqa: BLE001 - surface the existing transport error
+            results.append({"old_id": sid, "ok": False, "detail": str(exc)})
+    click.echo(json.dumps({"resumed": results}, indent=2, ensure_ascii=False))
+    if not all(row["ok"] for row in results):
+        raise SystemExit(1)
+
+
+@cc_session.command("mark-user")
+@click.argument("pty_ids", nargs=-1, required=True)
+def cc_session_mark_user(pty_ids: tuple[str, ...]) -> None:
+    """Mark live PTYs as user-created so they are not agent-reclaimable."""
+    import urllib.error
+    import urllib.request
+
+    base = _pty_daemon_base()
+    results = []
+    for sid in pty_ids:
+        req = urllib.request.Request(
+            f"{base}/cc/sessions/{sid}/origin",
+            data=json.dumps({"origin": "human"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="PATCH",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:  # noqa: S310 - 本机 daemon
+                body = json.loads(response.read() or b"{}")
+            results.append({"id": sid, "ok": True, "origin": body.get("origin")})
+        except urllib.error.HTTPError as exc:
+            detail = exc.reason
+            try:
+                detail = json.loads(exc.read() or b"{}").get("detail") or detail
+            except Exception:  # noqa: BLE001 - error reporting only
+                pass
+            results.append({"id": sid, "ok": False, "status": exc.code, "detail": detail})
+        except Exception as exc:  # noqa: BLE001 - surface the existing transport error
+            results.append({"id": sid, "ok": False, "detail": str(exc)})
+    click.echo(json.dumps({"marked_user": results}, indent=2, ensure_ascii=False))
+    if not all(row["ok"] for row in results):
+        raise SystemExit(1)
+
+
+def _post_pty_session_action(
+    action: str,
+    pty_ids: tuple[str, ...],
+    *,
+    provider_session_id: str | None = None,
+) -> list[dict[str, object]]:
+    import urllib.error
+    import urllib.request
+
+    base = _pty_daemon_base()
+    results: list[dict[str, object]] = []
+    for sid in pty_ids:
+        payload = json.dumps(
+            {"provider_session_id": provider_session_id}
+            if provider_session_id
+            else {}
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            f"{base}/cc/sessions/{sid}/{action}",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:  # noqa: S310 - 本机 daemon
+                body = json.loads(response.read() or b"{}")
+            results.append({"id": sid, "ok": True, "status": body.get("status")})
+        except urllib.error.HTTPError as exc:
+            detail = exc.reason
+            try:
+                detail = json.loads(exc.read() or b"{}").get("detail") or detail
+            except Exception:  # noqa: BLE001 - error reporting only
+                pass
+            results.append({"id": sid, "ok": False, "status": exc.code, "detail": detail})
+        except Exception as exc:  # noqa: BLE001
+            results.append({"id": sid, "ok": False, "detail": str(exc)})
+    return results
+
+
+@cc_session.command("restore")
+@click.argument("pty_ids", nargs=-1, required=True)
+@click.option(
+    "--provider-session-id",
+    default=None,
+    help="仅单个 PTY 时可覆盖 provider 原生 session id，用于修复错误关联。",
+)
+def cc_session_restore(
+    pty_ids: tuple[str, ...],
+    provider_session_id: str | None,
+) -> None:
+    """把误杀墓碑修回 recoverable；仅在原生历史真实存在时成功。"""
+    if provider_session_id and len(pty_ids) != 1:
+        raise click.ClickException("--provider-session-id 只能与单个 PTY id 一起使用")
+    results = _post_pty_session_action(
+        "restore",
+        pty_ids,
+        provider_session_id=provider_session_id,
+    )
+    click.echo(json.dumps({"restored": results}, indent=2, ensure_ascii=False))
+    if not all(bool(row["ok"]) for row in results):
+        raise SystemExit(1)
+
 
 @cmd_cc.group("daemon")
 def cc_daemon() -> None:
@@ -84,13 +606,14 @@ def cc_daemon() -> None:
 @click.option("--port", type=int, default=8201, help="Listen port (default 8201).")
 @click.option("--host", default="127.0.0.1")
 @click.option("--reload/--no-reload", default=False,
-              help="Enable file watcher reload (default off — daemon自动 reload 会"
-                   "杀掉正在跑的 chat 会话, 改 ccdaemon 文件后请走 `omni cc daemon restart`).")
+              help="Enable file watcher reload (default off — reload 会重启 daemon 进程。"
+                   "PTY 会话由独立 detached 宿主进程持有、会自动重接，不受影响;"
+                   "只有 in-process chat 类会话会断。改 ccdaemon 文件后请走 "
+                   "`omni cc daemon restart`).")
 def cc_daemon_start(port: int, host: str, reload: bool) -> None:
     """Start the ccdaemon process (background)."""
     import subprocess
     import sys
-    import os
     import time
     from omnicompany.dashboard.ccdaemon import lifecycle
 
@@ -115,7 +638,7 @@ def cc_daemon_start(port: int, host: str, reload: bool) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     # 启动前 log 滚动 — 防长期 dogfood log 无限增长 (>10MB 自动轮转, 留 5 份历史)
     rotated = lifecycle.rotate_log_if_oversize()
-    env = os.environ.copy()
+    env = _ccdaemon_process_env()
     env["OMNI_CC_DAEMON_PORT"] = str(port)
     cmd = [
         sys.executable, "-m", "uvicorn",
@@ -143,15 +666,39 @@ def cc_daemon_start(port: int, host: str, reload: bool) -> None:
     }, indent=2, ensure_ascii=False))
 
 
+def _stop_daemon_process(pid: int, timeout: float) -> int | None:
+    """Stop only the verified daemon process and wait for actual exit.
+
+    Never walk children: detached PTY hosts survive a daemon reload. psutil
+    supplies correctly typed Windows process handles and reports access errors;
+    unchecked ctypes calls previously reported success while the daemon lived.
+    """
+    import psutil
+
+    try:
+        process = psutil.Process(pid)
+        command = process.cmdline()
+        if not any(arg in {"omnicompany.dashboard.ccdaemon.main:app",
+                           "omnicompany.dashboard.ccdaemon.main"} for arg in command):
+            raise RuntimeError(f"PID {pid} is not the registered ccdaemon command")
+        process.terminate()
+        try:
+            exit_code = process.wait(timeout=max(0.1, timeout))
+        except psutil.TimeoutExpired:
+            process.kill()
+            exit_code = process.wait(timeout=max(1.0, timeout))
+        if process.is_running():
+            raise RuntimeError(f"PID {pid} remains alive after shutdown")
+        return exit_code
+    except psutil.NoSuchProcess:
+        return None
+
+
 @cc_daemon.command("stop")
 @click.option("--timeout", type=float, default=5.0,
               help="Seconds to wait for graceful shutdown before kill -9 / TerminateProcess.")
 def cc_daemon_stop(timeout: float) -> None:
     """Stop the running ccdaemon (graceful → force after timeout)."""
-    import os
-    import sys
-    import time
-    import signal as _sig
     from omnicompany.dashboard.ccdaemon import lifecycle
 
     s = lifecycle.read_status()
@@ -162,31 +709,19 @@ def cc_daemon_stop(timeout: float) -> None:
     pid = s.pid
     assert pid is not None
     try:
-        if sys.platform == "win32":
-            import ctypes
-            kernel32 = ctypes.windll.kernel32
-            CTRL_BREAK_EVENT = 1
-            # GenerateConsoleCtrlEvent 仅对 process group 工作; DETACHED_PROCESS 起的没控制台
-            # → 直接 TerminateProcess (Windows 没 SIGTERM 概念)
-            PROCESS_TERMINATE = 0x0001
-            h = kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
-            if h:
-                kernel32.TerminateProcess(h, 0)
-                kernel32.CloseHandle(h)
-        else:
-            os.kill(pid, _sig.SIGTERM)
-            deadline = time.time() + timeout
-            while lifecycle._pid_alive(pid) and time.time() < deadline:
-                time.sleep(0.2)
-            if lifecycle._pid_alive(pid):
-                os.kill(pid, _sig.SIGKILL)
-    except (ProcessLookupError, PermissionError, OSError) as e:
-        click.echo(json.dumps({"ok": False, "reason": f"kill failed: {e}"}, indent=2))
-        return
+        exit_code = _stop_daemon_process(pid, timeout)
+    except Exception as exc:
+        # Preserve the marker on failure, and prevent `restart` from claiming
+        # success by adopting the same process it just failed to stop.
+        raise click.ClickException(f"ccdaemon PID {pid} did not stop: {type(exc).__name__}: {exc}") from exc
 
-    # 清陈旧 pid 文件 (lifecycle.read_status 已经会清, 但显式清更稳)
-    lifecycle.clear_pid()
-    click.echo(json.dumps({"ok": True, "killed_pid": pid}, indent=2))
+    try:
+        marker_pid = int(lifecycle.pid_file().read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        marker_pid = None
+    if marker_pid == pid:
+        lifecycle.clear_pid()
+    click.echo(json.dumps({"ok": True, "killed_pid": pid, "exit_code": exit_code}, indent=2))
 
 
 @cc_daemon.command("restart")
@@ -194,7 +729,12 @@ def cc_daemon_stop(timeout: float) -> None:
 @click.option("--host", default="127.0.0.1")
 @click.pass_context
 def cc_daemon_restart(ctx: click.Context, port: int, host: str) -> None:
-    """Stop then start. Equivalent to `stop` followed by `start`."""
+    """Stop then start. Equivalent to `stop` followed by `start`.
+
+    PTY 页签不受影响: 它们由独立 detached 宿主进程持有, 新 daemon 启动时自动
+    重新接管(2026-08-20 实测 25 个存活会话零损失)。会断的只有 in-process
+    chat 类会话。
+    """
     from omnicompany.dashboard.ccdaemon import lifecycle
     import time
 
@@ -224,6 +764,59 @@ def cc_daemon_status() -> None:
         "port_file": str(lifecycle.port_file()),
         "log_file": str(lifecycle.log_file()),
     }, indent=2, ensure_ascii=False))
+
+
+@cc_daemon.command("diagnostics")
+@click.option("--receipt", type=click.Path(path_type=Path), required=True,
+              help="Absolute JSON receipt path; an existing receipt is never overwritten.")
+def cc_daemon_diagnostics(receipt) -> None:
+    """Read live session ownership, process generations and passive latency."""
+    import time
+    import urllib.request
+    import psutil
+
+    if not receipt.is_absolute() or receipt.exists():
+        raise click.UsageError("receipt must be an absolute, unused file path")
+    base = _pty_daemon_base()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    def read(path):
+        with opener.open(base + path, timeout=30) as response:
+            return json.load(response)
+
+    try:
+        ptys = read("/cc/sessions?include_recoverable=false")["items"]
+        chat_health = read("/cc/chat/health")
+        latency = read("/cc/resources/latency")
+        fields = ("id", "provider", "source", "alive", "working", "hosted", "host_pid", "child_pid", "cmd")
+        live = [{key: item.get(key) for key in fields} for item in ptys if item.get("alive")]
+        live_chat_count = int(chat_health["session_count"])
+        processes = {}
+        for item in live:
+            for field in ("host_pid", "child_pid"):
+                pid = item.get(field)
+                if pid and str(pid) not in processes:
+                    process = psutil.Process(pid)
+                    processes[str(pid)] = {"created_at": process.create_time(), "exe": process.exe()}
+        # Native Codex processes must also survive a proxy reload.
+        for process in psutil.process_iter(["name", "create_time", "exe"]):
+            if str(process.info["name"] or "").lower() == "codex.exe":
+                processes[str(process.pid)] = {
+                    "created_at": process.info["create_time"], "exe": process.info["exe"],
+                }
+        report = {"sampled_at": time.time(), "sessions": live, "live_chat_count": live_chat_count,
+                  "processes": processes, "latency": latency,
+                  "artifacts": [{"path": str(receipt), "role": "live session/process and latency evidence"}]}
+        receipt.parent.mkdir(parents=True, exist_ok=True)
+        with receipt.open("x", encoding="utf-8") as stream:
+            json.dump(report, stream, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        raise click.ClickException(f"diagnostics failed for {receipt}: {type(exc).__name__}: {exc}") from exc
+    click.echo(json.dumps({"sessions": len(live), "live_chat_count": live_chat_count,
+                          "unhosted_sessions": [item["id"] for item in live
+                                                if not item["hosted"] and item["source"] == "ccdaemon.pty"],
+                          "processes": len(processes), "metrics": latency.get("metrics"),
+                          "artifacts": report["artifacts"]}, ensure_ascii=False, indent=2))
 
 
 # ── vendored CCUI (dashboard/chatui) lifecycle ([2026-06-24] 收编上游 CCUI 当聊天后端) ──
@@ -645,3 +1238,9 @@ def cc_remote_install_autostart(interval: int, uninstall: bool) -> None:
     }, indent=2, ensure_ascii=False))
     if not ok:
         raise SystemExit(1)
+
+
+# Exact native completion wait keeps CLI replacement inside existing lifecycle facilities.
+from omnicompany.cli.commands.cc_reload import cmd_reload_after_turn
+
+cmd_cc.add_command(cmd_reload_after_turn)

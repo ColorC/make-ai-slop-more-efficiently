@@ -12,6 +12,7 @@ import os
 import sys
 
 from . import _shared as sh
+from ..assistant import ASSISTANT_COMPACT_CONTEXT, ASSISTANT_TOPIC
 
 
 def main() -> int:
@@ -48,8 +49,33 @@ def main() -> int:
         payload=payload,
         reason="after compact",
     )
+    # Reassert the dedicated assistant contract after native history compaction.
+    # Binding lookup is best-effort so ordinary sessions and standalone hooks
+    # retain the existing minimal context behavior.
+    try:
+        from omnicompany.packages.services._core.identity import binding_for_session
+
+        binding = binding_for_session(
+            trace_id=sh.trace_id_for(payload),
+            provider=sh.binding_provider(payload),
+            session_id=sh.provider_session_id(payload),
+            pty_id=os.environ.get("OMNI_CC_PTY_ID"),
+        ) or {}
+    except Exception:
+        binding = {}
+    if binding.get("topic") == ASSISTANT_TOPIC:
+        text = f"{text}\n\n{ASSISTANT_COMPACT_CONTEXT}"[:800]
     audit["context_chars"] = len(text)
     sh.append_audit("compact", audit)
+
+    # Non-blocking lifecycle maintenance: enqueue only; the detached companion
+    # worker performs all model and store work after this hook returns.
+    try:
+        from .session_companion import enqueue_from_payload
+
+        enqueue_from_payload(payload, trigger="pre_compact")
+    except Exception:
+        pass
 
     # Claude/Codex 走 additionalContext JSON；Kimi 走纯文本 stdout（见 _shared.emit_context）。
     sh.emit_context(text, payload, "PreCompact")

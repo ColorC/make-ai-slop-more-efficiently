@@ -18,6 +18,7 @@ CLI 启动时会自动管理 data/cc_daemon.pid + data/cc_daemon.port + data/cc_
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import time
@@ -35,6 +36,23 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from . import lifecycle
 
 logger = logging.getLogger(__name__)
+
+
+class _CcAccessNoiseFilter(logging.Filter):
+    """Keep high-rate internal beacons out of ccdaemon's synchronous access log."""
+
+    _QUIET_PATHS = frozenset({"/api/boss-sight/captures/surface"})
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3:
+            path = str(args[2]).split("?", 1)[0]
+            if path in self._QUIET_PATHS:
+                return False
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_CcAccessNoiseFilter())
 
 
 # 显式加载项目根 .env (THE_COMPANY_API_KEY / NVIDIA_API_KEY 等).
@@ -62,7 +80,16 @@ async def lifespan(app: FastAPI):
     """
     import asyncio as _asyncio
 
-    _windows_accept.install_exception_filter(_asyncio.get_running_loop())
+    loop = _asyncio.get_running_loop()
+    from ..asyncio_runtime import configure_default_executor
+
+    configure_default_executor(
+        loop,
+        env_name="OMNI_CC_EXECUTOR_WORKERS",
+        default_workers=8,
+        thread_name_prefix="ccdaemon",
+    )
+    _windows_accept.install_exception_filter(loop)
     pid = os.getpid()
     # uvicorn 解析后实际监听端口由 server config 决定; 没有官方钩子拿端口, 走环境变量
     port = int(os.environ.get("OMNI_CC_DAEMON_PORT", str(lifecycle.DEFAULT_PORT)))
@@ -78,12 +105,14 @@ async def lifespan(app: FastAPI):
     app.state.daemon_pid = pid
     app.state.daemon_port = port
     resource_monitor = None
+    latency_monitor = None
+    focus_monitor = None
 
     # BOSS SIGHT 块 3: 挂 ControllerWaker + SubagentStatusAggregator
     try:
         from .chat import get_chat_manager
-        from ..boss_sight.services.controller_waker import ControllerWaker
-        from ..boss_sight.aggregator.subagent_status_aggregator import (
+        from omnicompany.packages.services.boss_sight.services.controller_waker import ControllerWaker
+        from omnicompany.packages.services.boss_sight.aggregator.subagent_status_aggregator import (
             SubagentStatusAggregator,
         )
 
@@ -105,7 +134,7 @@ async def lifespan(app: FastAPI):
 
         # N2d: workflow 编排器 — 订阅 subagent.completed 推进 fan-out → 综合。
         try:
-            from ..boss_sight.services.workflow_orchestrator import get_orchestrator
+            from omnicompany.packages.services.boss_sight.services.workflow_orchestrator import get_orchestrator
             orch = get_orchestrator()
             get_chat_manager().subscribe_events(orch.on_event)
             app.state.boss_sight_workflow = orch
@@ -123,7 +152,7 @@ async def lifespan(app: FastAPI):
     # BOSS SIGHT 块 4: reviewstage hub attach loop + store init
     try:
         import asyncio as _asyncio
-        from ..boss_sight.reviewstage.routes import get_hub, get_store
+        from omnicompany.packages.services.boss_sight.reviewstage.routes import get_hub, get_store
         hub = get_hub()
         hub.attach_loop(_asyncio.get_running_loop())
         store = get_store()
@@ -138,7 +167,7 @@ async def lifespan(app: FastAPI):
         # 不动 store.set_verdict / add_comment 本体 (单一职责), 走 subscriber 单点.
         waker_ref = getattr(app.state, "boss_sight_waker", None)
         if waker_ref is not None:
-            from ..boss_sight.services.controller_waker import make_reviewstage_bridge
+            from omnicompany.packages.services.boss_sight.services.controller_waker import make_reviewstage_bridge
             bridge = make_reviewstage_bridge(waker_ref)
             store.subscribe(bridge)
             app.state.boss_sight_review_to_waker_bridge = bridge
@@ -168,7 +197,7 @@ async def lifespan(app: FastAPI):
 
         def _prewarm() -> None:
             try:
-                from ..boss_sight.material_registry import build_material_registry
+                from omnicompany.packages.services.boss_sight.material_registry import build_material_registry
                 build_material_registry(limit=1)
             except Exception:  # noqa: BLE001
                 pass
@@ -176,6 +205,22 @@ async def lifespan(app: FastAPI):
         _threading.Thread(target=_prewarm, name="boss-sight-prewarm", daemon=True).start()
     except Exception:  # noqa: BLE001
         pass
+
+    # Passive timings ride along the existing event-loop, PTY and WebSocket
+    # paths. They add no probe traffic, process scans, or per-sample disk writes.
+    try:
+        from .latency_monitor import get_latency_monitor
+
+        latency_monitor = get_latency_monitor()
+        latency_monitor.start()
+        app.state.latency_monitor = latency_monitor
+        print(
+            f"[ccdaemon] passive latency monitor started "
+            f"interval={latency_monitor.loop_interval_s}s",
+            flush=True,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("ccdaemon: passive latency monitor failed to start")
 
     # Read-only process/resource observation. It records attribution and
     # confirmed anomalies, but intentionally exposes no kill/suspend action.
@@ -193,17 +238,91 @@ async def lifespan(app: FastAPI):
     except Exception:  # noqa: BLE001
         logger.exception("ccdaemon: resource monitor failed to start")
 
+    # Windows focus-steal forensics: two cheap Win32 calls per sample and no
+    # process scan. Details are resolved only when a console/browser actually
+    # becomes foreground, then joined to resource_monitor's session ownership.
+    try:
+        from .focus_monitor import get_focus_monitor
+
+        focus_monitor = get_focus_monitor()
+        focus_monitor.start()
+        app.state.focus_monitor = focus_monitor
+        print(
+            f"[ccdaemon] focus monitor started interval={focus_monitor.interval_s}s",
+            flush=True,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("ccdaemon: focus monitor failed to start")
+
+    # 2026-08-09 用户裁决: subagent 干完活不许当僵尸挂着。spawn 链路只通知不收工,
+    # 这里起一个清扫器补上收工(判据见 chat.should_reap_subagent: 只回收机器派出来的、
+    # 没人订阅、不在 turn 中、静默超阈值的会话; 人开的会话一律不动)。
+    subagent_reaper: _asyncio.Task | None = None
+    try:
+        from .chat import (
+            SUBAGENT_IDLE_REAP_S,
+            SUBAGENT_REAP_SWEEP_S,
+            get_chat_manager as _get_chat_manager,
+        )
+
+        if SUBAGENT_IDLE_REAP_S > 0:
+            async def _reap_loop() -> None:
+                while True:
+                    await _asyncio.sleep(max(5, SUBAGENT_REAP_SWEEP_S))
+                    try:
+                        reaped = await _get_chat_manager().reap_idle_subagents()
+                        if reaped:
+                            print(
+                                f"[ccdaemon] reaped idle subagents: {', '.join(reaped)}",
+                                flush=True,
+                            )
+                    except _asyncio.CancelledError:
+                        raise
+                    except Exception:  # noqa: BLE001
+                        logger.exception("ccdaemon: subagent reap sweep failed")
+
+            subagent_reaper = _asyncio.create_task(_reap_loop(), name="omni-subagent-reaper")
+            app.state.subagent_reaper = subagent_reaper
+            print(
+                f"[ccdaemon] subagent idle reaper started "
+                f"idle={SUBAGENT_IDLE_REAP_S}s sweep={SUBAGENT_REAP_SWEEP_S}s",
+                flush=True,
+            )
+        else:
+            print("[ccdaemon] subagent idle reaper disabled (OMNI_SUBAGENT_IDLE_REAP_S=0)", flush=True)
+    except Exception:  # noqa: BLE001
+        logger.exception("ccdaemon: subagent idle reaper failed to start")
+
     print(f"[ccdaemon] started pid={pid} port={port}", flush=True)
     try:
         yield
     finally:
+        if subagent_reaper is not None:
+            subagent_reaper.cancel()
+            with contextlib.suppress(BaseException):
+                await subagent_reaper
+        if latency_monitor is not None:
+            await latency_monitor.stop()
         if resource_monitor is not None:
             await resource_monitor.stop()
+        if focus_monitor is not None:
+            await focus_monitor.stop()
         lifecycle.clear_pid()
         print(f"[ccdaemon] stopped pid={pid}", flush=True)
 
 
 app = FastAPI(title="omnicompany ccdaemon", version="0.1.0", lifespan=lifespan)
+
+# Agent-to-agent traffic is a durable pull record, never provider input.  Keep
+# this middleware above every provider router so the legacy /input endpoint
+# remains compatible for real human prompts while the existing omni agents
+# sender becomes quiet without changing its wire envelope.
+try:
+    from omnicompany.core.quiet_coordination import QuietCoordinationMiddleware
+
+    app.add_middleware(QuietCoordinationMiddleware)
+except ImportError as e:
+    logger.warning("ccdaemon: quiet coordination middleware not loaded: %s", e)
 
 
 # ── 业务路由装载 ──
@@ -229,6 +348,18 @@ except ImportError as e:
     logger.warning("ccdaemon: pty router not loaded: %s", e)
 
 try:
+    from .codex_capacity_retry_routes import retry_router
+    app.include_router(retry_router)
+except ImportError as e:
+    logger.warning("ccdaemon: Codex capacity retry router not loaded: %s", e)
+
+try:
+    from .web_proxy import web_proxy_router
+    app.include_router(web_proxy_router)
+except ImportError as e:
+    logger.warning("ccdaemon: web proxy router not loaded: %s", e)
+
+try:
     from .resource_routes import resource_router
     app.include_router(resource_router)
 except ImportError as e:
@@ -243,35 +374,45 @@ except ImportError as e:
 
 # BOSS SIGHT 路由 (块 1 · 总控本体 + 总控和人对接)
 try:
-    from ..boss_sight.routes import boss_sight_router
+    from omnicompany.packages.services.boss_sight.routes import boss_sight_router
     app.include_router(boss_sight_router)
 except ImportError as e:
     logger.warning("ccdaemon: boss_sight router not loaded: %s", e)
 
 # BOSS SIGHT 块 4 审阅台
 try:
-    from ..boss_sight.reviewstage.routes import reviewstage_router
+    from omnicompany.packages.services.boss_sight.reviewstage.routes import reviewstage_router
     app.include_router(reviewstage_router)
 except ImportError as e:
     logger.warning("ccdaemon: reviewstage router not loaded: %s", e)
 
-# BOSS SIGHT 用户捕获(圈选/快照/调试交接 提交=存文件, 不进审阅; 2026-06-03)
+# Canonical Material Wiki: StudioReader and agents share the same write service.
 try:
-    from ..boss_sight.captures.routes import captures_router
+    from omnicompany.packages.services.boss_sight.material_wiki.routes import material_wiki_router
+    app.include_router(material_wiki_router)
+except ImportError as e:
+    logger.warning("ccdaemon: material-wiki router not loaded: %s", e)
+
+# BOSS SIGHT 用户捕获(圈选/快照/调试交接 提交=存文件, 不进审阅; 2026-06-03)
+# Formal-domain APIs share the existing Dashboard port.
+try:
+    from omnicompany.packages.services.boss_sight.material_domains.routes import material_domains_router
+    app.include_router(material_domains_router)
+except ImportError as e:
+    logger.warning("ccdaemon: material-domains router not loaded: %s", e)
+
+try:
+    from omnicompany.packages.services.boss_sight.captures.routes import captures_router
     app.include_router(captures_router)
 except ImportError as e:
     logger.warning("ccdaemon: captures router not loaded: %s", e)
 
 # BOSS SIGHT Vilo 草稿区文件 CRUD (创作者工作台草稿面板; 2026-06-14)
-try:
-    from ..boss_sight.vilo_drafts.routes import vilo_drafts_router
-    app.include_router(vilo_drafts_router)
-except ImportError as e:
-    logger.warning("ccdaemon: vilo-drafts router not loaded: %s", e)
+
 
 # BOSS SIGHT 统一自撰内容(札记): 评论/草稿/llm输入归一的中心 store (2026-06-14)
 try:
-    from ..boss_sight.authored.routes import notes_router
+    from omnicompany.packages.services.boss_sight.authored.routes import notes_router
     app.include_router(notes_router)
 except ImportError as e:
     logger.warning("ccdaemon: authored notes router not loaded: %s", e)
@@ -290,12 +431,12 @@ async def daemon_health() -> dict:
     chat_count = pty_count = 0
     try:
         from .chat import get_chat_manager
-        chat_count = len(get_chat_manager().list_meta())
+        chat_count = get_chat_manager().in_memory_session_count()
     except Exception:
         pass
     try:
         from .pty import get_manager
-        pty_count = len(get_manager().list_meta())
+        pty_count = get_manager().in_memory_session_count()
     except Exception:
         pass
     # 块 3: 报告 waker 接通情况

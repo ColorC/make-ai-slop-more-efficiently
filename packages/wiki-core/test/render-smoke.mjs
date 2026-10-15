@@ -31,6 +31,8 @@ tags:
 
 ==高亮文本== 与 %%隐藏注释%% 与 #酒馆 标签。
 
+行内实体 \`table:demogame/SettingOption\` 不应被 Obsidian 语法改写。
+
 > [!note] 提示
 > callout 正文。
 
@@ -54,6 +56,7 @@ ok("#标签 渲染为链接", html.includes('href="#tag/'));
 ok("callout 容器渲染", /callout/.test(html) && html.includes("callout 正文"));
 ok("图片嵌入走 resolveAsset", html.includes('src="/assets/tavern.png"'));
 ok("任务列表渲染 checkbox", /checkbox/.test(html));
+ok("行内代码占位可恢复", html.includes("<code>table:demogame/SettingOption</code>") && !html.includes("WIKI_CORE_PH"));
 ok("frontmatter 不泄漏进正文", !html.includes("tags:"));
 ok("frontmatter 解析为元数据", Array.isArray(data.tags) && data.tags[0] === "测试/烟测");
 

@@ -34,6 +34,7 @@ from omnicompany.packages.services._core.agent.external_workers.base import (
     ExternalAgentRunSpec,
     ExternalAgentStatus,
     ExternalAgentWorker,
+    _headless_process_kwargs,
 )
 from omnicompany.packages.services._core.agent.external_workers.codex import (
     _append_rollback_summary,
@@ -133,6 +134,7 @@ class KimiExecWorker(ExternalAgentWorker):
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                **_headless_process_kwargs(),
             )
         except FileNotFoundError:
             return ExternalAgentResult(

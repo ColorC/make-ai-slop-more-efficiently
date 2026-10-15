@@ -4,7 +4,8 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../../lib/utils';
 
 const alertVariants = cva(
-  'relative w-full rounded-lg border px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current',
+  // 2026-08-06 蓝图: 圆角提示框 → 锐角 + 左缘 3px 竖标(制图批注的读法: 一条边线指着这段)。
+'relative w-full rounded-[2px] border border-l-[3px] px-4 py-3 text-sm grid has-[>svg]:grid-cols-[calc(var(--spacing)*4)_1fr] grid-cols-[0_1fr] has-[>svg]:gap-x-3 gap-y-0.5 items-start [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current',
   {
     variants: {
       variant: {

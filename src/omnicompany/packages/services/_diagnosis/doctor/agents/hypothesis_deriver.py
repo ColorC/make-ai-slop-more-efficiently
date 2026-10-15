@@ -1,261 +1,329 @@
-# [OMNI] origin=ai-ide domain=services/_diagnosis/doctor/agents ts=2026-05-06T00:35:00Z type=router status=skeleton agent=ai-ide-current
-# [OMNI] summary="HypothesisDeriverAgent V0 骨架 — 拿规范/计划/代码源派生健康性假设入库. 不是诊断, 是供给假设给 HypothesisDiagnosticAgent"
-# [OMNI] why="阶段 2 后续 3: 解决 '假设从哪来' 瓶颈. 跟 4 个诊断 agent 互补 — 派生 agent 产假设, 诊断 agent 用假设"
-# [OMNI] tags=agent,configurable,doctor,hypothesis-derivation,skeleton,phase-2-step-12
-# [OMNI] material_id="material:diagnosis.doctor.agents.hypothesis_deriver.skeleton.py"
-"""HypothesisDeriverAgent · 假设派生 (V0 骨架)
+"""Derive hypothesis proposals externally; keep IDs and persistence in Omni."""
 
-跟 4 个诊断 agent (Spec/Hypothesis/Exemplar/Plan) 不同的是产物形态:
-- 4 个诊断 agent: 输入 → verdict + finding (健康判定)
-- HypothesisDeriverAgent: 输入 → doctor.hypothesis.statement 实例 yaml (生成假设入库)
-
-业务逻辑:
-- 输入: doctor.hypothesis_derivation.request (含 source_paths + derivation_focus + max_hypotheses)
-- 工作: agent 用 read_file / glob / grep 读规范文档 / plan / 代码源, LLM 派生'应满足什么'类的健康假设
-- 输出 1: 一组 doctor.hypothesis.statement 实例 yaml (走 write_hypothesis 工具落 data/services/doctor/hypotheses/)
-- 输出 2: doctor.hypothesis_derivation.report 派生过程报告 (走 submit_derivation_report 出口)
-
-派生原则:
-- 找规范里'必须 / 应 / 不得 / 一律'这类硬性表述, 每条独立成假设
-- 拿 plan 的需求清单 / 验收标准, 派生 plan 特定的应满足项
-- 拿代码 (例 现 worker 实现) 反推'应有'结构假设
-- hard rule 候选 (ast 能查的) 标 evidence_query 提示可转 guardian
-- 软语义 (LLM 才能判的) 留 doctor 用
-
-工具集 (跟诊断 agent 同 + 派生专属):
-- read_file / glob / grep / list_dir — framework 自带
-- write_hypothesis — 落假设 yaml (派生专属业务工具)
-- submit_derivation_report — 出口检查 (派生专属业务工具)
-
-## 待做 (V0 骨架 → V1)
-
-[ ] **dogfood**: 拿 worker.md 跑派生, 看产 ≥3 条新假设 (跳过已有 H-2026-05-05-001 重复)
-[ ] **跨源派生**: 当前一次跑只考虑同类源, V1 加跨规范+plan+代码同时考虑
-[ ] **假设升级**: 当 LLM 找到比现有假设更好的版本时, 写'升级假设' 类 finding 提示
-[ ] **测试基线**: 现 () 占位, 至少 1 红 1 绿
-[ ] **DESIGN.md 更**: doctor/DESIGN.md 加 HypothesisDeriverAgent 段
-"""
 from __future__ import annotations
 
-# 保险: import 触发 doctor.tools 注册业务工具到 TOOL_REGISTRY
-from omnicompany.packages.services._diagnosis.doctor import tools  # noqa: F401
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+import json
+from pathlib import Path
+import re
+from typing import Any
 
-from omnicompany.packages.services._core.agent import (
-    AgentSpec,
-    ConfigurableAgent,
+import yaml
+
+from omnicompany.core.config import omni_workspace_root
+from omnicompany.packages.services._core.agent import AgentSpec
+from omnicompany.packages.services._core.omnicompany import Worker
+from omnicompany.packages.services._diagnosis.doctor.tools.write_hypothesis import (
+    WriteHypothesisRouter,
 )
+from omnicompany.protocol.anchor import Verdict, VerdictKind
+from omnicompany.runtime.agent_runtime import run_readonly_structured_agent
+
+
+StructuredDerivationRunner = Callable[..., Awaitable[dict[str, Any]]]
+HypothesisPublisher = Callable[[dict[str, Any], str], Awaitable[str]]
+
+_ENTITY_KINDS = ("worker", "material", "team", "agent", "hook", "tool", "plan")
+_SOURCE_KINDS = ("spec", "plan", "code", "exemplar")
+_MAX_REQUEST_CHARS = 40_000
+
+_PROPOSAL_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "source_kind",
+        "source_path",
+        "source_excerpt",
+        "statement",
+        "motivation",
+        "applies_to",
+        "evidence_query",
+        "tags",
+    ],
+    "properties": {
+        "source_kind": {"type": "string", "enum": list(_SOURCE_KINDS)},
+        "source_path": {"type": "string", "minLength": 1, "maxLength": 1000},
+        "source_excerpt": {"type": "string", "minLength": 20, "maxLength": 4000},
+        "statement": {"type": "string", "minLength": 30, "maxLength": 4000},
+        "motivation": {"type": "string", "minLength": 50, "maxLength": 4000},
+        "applies_to": {"type": "string", "enum": list(_ENTITY_KINDS)},
+        "evidence_query": {"type": "string", "minLength": 20, "maxLength": 4000},
+        "tags": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {"type": "string", "minLength": 1, "maxLength": 200},
+        },
+    },
+}
+
+DERIVATION_RESULT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["status", "source_paths", "proposals", "narrative", "gaps"],
+    "properties": {
+        "status": {"type": "string", "enum": ["ok", "information_insufficient"]},
+        "source_paths": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {"type": "string", "minLength": 1, "maxLength": 1000},
+        },
+        "proposals": {"type": "array", "maxItems": 20, "items": _PROPOSAL_SCHEMA},
+        "narrative": {"type": "string", "minLength": 30, "maxLength": 8000},
+        "gaps": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {"type": "string", "minLength": 10, "maxLength": 2000},
+        },
+    },
+}
+
+_INSTRUCTIONS = """\
+You are a read-only hypothesis derivation worker. Inspect only the supplied source
+paths and optional falsified-hypothesis paths. Return novel hypothesis proposals;
+do not assign IDs, write YAML, publish Materials, mutate existing hypotheses, or
+call another agent. OmniCompany owns deduplication, ID allocation, and persistence.
+
+Each proposal must cite one concrete existing file under the supplied source roots
+and quote a concrete source excerpt. applies_to must exactly equal derivation_focus.
+Do not turn descriptive prose into a mandatory rule without evidence. Return zero
+proposals when no grounded novel hypothesis exists. Use information_insufficient
+with explicit gaps when sources cannot support a responsible derivation. Return one
+schema-valid JSON object without Markdown.
+"""
 
 
 HYPOTHESIS_DERIVER_SPEC = AgentSpec(
-
-    # ── 1. 注册信息 ─────────────────────────────────────
     id="doctor.hypothesis_deriver",
     name="HypothesisDeriverAgent",
     domain="doctor",
-    parent_worker_kind="agent",
-    registry_namespace="services.agent.instances",
-
-    # ── 2. LLM 配置 ────────────────────────────────────
-    llm_model="qwen-3.6-plus",
-    llm_temperature=0.3,                  # 派生需要点发散, 比诊断稍高
-    llm_max_tokens=16000,
-    llm_max_turns=1000,
+    llm_model="deepseek-v4-flash",
+    llm_max_tokens=12_000,
+    llm_max_turns=24,
     llm_timeout_seconds=600,
-
-    # ── 3. 产出 material ─────────────────────────────────
     output_materials=(
         "doctor.hypothesis_derivation.report",
-        "doctor.hypothesis.statement",   # 派生的假设实例 (走 write_hypothesis 落 yaml)
+        "doctor.hypothesis.statement",
     ),
     primary_output="doctor.hypothesis_derivation.report",
-
-    # ── 4. 触发 material ─────────────────────────────────
-    trigger_materials=(
-        "doctor.hypothesis_derivation.request",
-    ),
-    trigger_mode="any",
-
-    # ── 5. 响应范围 ─────────────────────────────────────
-    accepted_input_materials=(
-        "doctor.hypothesis_derivation.request",
-    ),
+    trigger_materials=("doctor.hypothesis_derivation.request",),
+    accepted_input_materials=("doctor.hypothesis_derivation.request",),
     forbidden_input_materials=(
         "doctor.hypothesis_derivation.report",
         "doctor.hypothesis.statement",
     ),
-
-    # ── 6. 用户输入 ─────────────────────────────────────
-    user_input_template=(
-        "请从以下源派生健康性假设入库.\n\n"
-        "源路径 (一组): {source_paths}\n"
-        "派生焦点: {derivation_focus} (worker / material / team / agent / hook / tool / plan)\n"
-        "上限: 最多派 {max_hypotheses} 条假设\n"
-        "已 falsified 假设 (V23 加, 应作升级信号读 challenge_log + resolution): {falsified_hypothesis_paths}\n\n"
-        "做法:\n"
-        "1. 用 read_file 读每个源 (规范文档 / plan / 代码)\n"
-        "2. 若 falsified_hypothesis_paths 非空, **必先 read_file 读这些 yaml 看 challenge_log "
-        "    跟 resolution.falsifying_evidence**, 学 ChallengeAgent 真识别的盲区 + 真升级方向, "
-        "    优先派升级版假设 (statement 含 falsifying_evidence 暴露的多模式 + tags 含 'upgraded-from-<id>')\n"
-        "3. 找'必须 / 应 / 不得 / 一律'类硬性表述, 或代码隐含的应有结构\n"
-        "4. 每条独立成假设, 走 write_hypothesis 工具落 yaml (id 用 'H-<YYYY-MM-DD>-<NNN>' 序号格式)\n"
-        "5. hard rule 候选在 evidence_query 注明 'ast 解析能查, 可转 guardian'\n"
-        "6. 调 submit_derivation_report 出口提交派生总结 (含跟 falsified 假设关系说明)"
-    ),
-    user_input_required_fields=(
-        "source_paths",
-        "derivation_focus",
-        "max_hypotheses",
-    ),
-    # V23 加 falsified_hypothesis_paths 作可选输入字段 — 通过
-    # run_hypothesis_derivation helper 传, deriver prompt 真识别后派升级版假设
-
-    # ── 7. 系统 prompt ─────────────────────────────────
-    prompt_path="src/omnicompany/packages/services/_diagnosis/doctor/agents/hypothesis_deriver_prompt.md",
-    prompt_substitutions={
-        "agent_role": "假设派生 agent",
-        "primary_output": "doctor.hypothesis_derivation.report",
-    },
-
-    # ── 8. 工具列表 ────────────────────────────────────
-    tools=(
-        "read_file",
-        "glob",
-        "grep",
-        "list_dir",
-        "write_hypothesis",         # 派生专属
-        "submit_derivation_report", # 派生专属
-    ),
-
-    # ── 9. 工作区 ─────────────────────────────────────
-    workspace={
-        "name": "doctor.hypothesis_deriver",
-        "write_prefixes": (
-            "data/services/doctor/hypotheses/",
-            "data/services/doctor/_notes/{task_id}/",
-        ),
-        "read_prefixes": "READ_ANY",
-        "bash_cwd_prefixes": ("",),
-    },
-
-    # ── 10-11. gates / context_triggers ─ V0 空 ─────────
-    gates=(),
-    context_triggers=(),
-
-    # ── 12. 含自定义代码 (override hooks 跟其他 agent 同) ──
-    allow_custom_code=True,
-
-    # ── 13. 测试基线 ─ 2026-05-06 self_audit §B-2 修复 ─────────
+    user_input_required_fields=("source_paths", "derivation_focus", "max_hypotheses"),
+    tools=(),
+    workspace={"permission_mode": "readonly", "write_prefixes": ()},
     test_baseline={
-        # 绿: worker.md (强制词富, 实测派 5 条 H-021..025 覆盖未派过的 R-XX)
-        "green_samples": (
-            "docs/standards/concepts/worker.md",
-        ),
-        # 红: random_readme (0 强制词的软介绍, 实测派 0 条, LLM 自律识别"无强制语义")
+        "green_samples": ("docs/standards/concepts/worker.md",),
         "red_samples": (
-            "src/omnicompany/packages/services/_diagnosis/doctor/_test_fixtures/red_sources/random_readme.md",
+            "src/omnicompany/packages/services/_diagnosis/doctor/"
+            "_test_fixtures/red_sources/random_readme.md",
         ),
-        "gradient_samples": (),
-        # 红绿对比脚本: _scratch/dogfood_red_green_deriver.py
-        # 实测 (2026-05-06): GREEN 派 5, RED 派 0, 极强判别力 (LLM 真自律)
-        "_baseline_validated_at": "2026-05-06",
-        "_baseline_overall": "PASS",
     },
 )
 
 
-def _build_derivation_extractor(bus):
-    """构造 HypothesisDeriver 用的 report 提取 Router (扫 messages 找 last 成功 submit_derivation_report)."""
-    from omnicompany.packages.services._core.agent.routers.extract_result import ExtractResultRouter
-    from omnicompany.protocol.anchor import Verdict, VerdictKind
-
-    class _DerivationReportRouter(ExtractResultRouter):
-        ROUTER_NAME = "hypothesis_deriver_extract_result"
-
-        def extract(self, *, final_text, messages, turn_count, stop_reason):
-            submitted = _find_last_submit(messages, "submit_derivation_report")
-            if submitted is None:
-                return Verdict(
-                    kind=VerdictKind.FAIL,
-                    output={
-                        "text": final_text,
-                        "turn_count": turn_count,
-                        "stop_reason": stop_reason,
-                        "derivation_protocol_breach": (
-                            "agent finished without successful submit_derivation_report call. "
-                            "report event NOT published to bus (dispatcher skips on FAIL)."
-                        ),
-                    },
-                    diagnosis=(
-                        "派生协议违反: agent 跳过 submit_derivation_report 出口检查. "
-                        f"raw text 长度 {len(final_text)}, turns {turn_count}, stop {stop_reason!r}."
-                    ),
-                )
-
-            kind = VerdictKind.PASS
-            if stop_reason == "max_turns":
-                kind = VerdictKind.PARTIAL
-            return Verdict(
-                kind=kind,
-                output={
-                    **submitted,
-                    "turn_count": turn_count,
-                    "stop_reason": stop_reason,
-                },
-                diagnosis="" if kind == VerdictKind.PASS else f"Budget exhausted: {turn_count} turns",
-            )
-
-    return _DerivationReportRouter(bus=bus)
+def _canonical_path(value: Any, *, label: str) -> tuple[str, Path]:
+    workspace = Path(omni_workspace_root()).resolve()
+    if not isinstance(value, (str, Path)) or not str(value).strip():
+        raise ValueError(f"{label} must be a non-empty workspace path")
+    raw = Path(str(value).strip())
+    resolved = raw.resolve() if raw.is_absolute() else (workspace / raw).resolve()
+    try:
+        relative = resolved.relative_to(workspace)
+    except ValueError as error:
+        raise ValueError(f"{label} is outside the OmniCompany workspace") from error
+    if not resolved.exists():
+        raise ValueError(f"{label} does not exist: {relative.as_posix()}")
+    return relative.as_posix(), resolved
 
 
-def _find_last_submit(messages: list[dict], tool_name: str) -> dict | None:
-    """扫 messages 找 last 成功的指定工具 tool_use input. 跟 spec_diagnostic 同思路, 通用化."""
-    uses: dict[str, dict] = {}
-    for msg in messages:
-        if msg.get("role") != "assistant":
+def _normalized_statement(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+
+
+def _existing_hypotheses() -> list[dict[str, Any]]:
+    root = Path(omni_workspace_root()) / "data" / "services" / "doctor" / "hypotheses"
+    values: list[dict[str, Any]] = []
+    if not root.is_dir():
+        return values
+    for path in sorted([*root.glob("*.yaml"), *root.glob("*.yml")]):
+        try:
+            value = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except Exception:
             continue
-        content = msg.get("content")
-        if not isinstance(content, list):
-            continue
-        for block in content:
-            if not isinstance(block, dict):
-                continue
-            if block.get("type") == "tool_use" and block.get("name") == tool_name:
-                uid = block.get("id")
-                if uid:
-                    uses[uid] = block.get("input") or {}
-    if not uses:
-        return None
-
-    successful_input: dict | None = None
-    for msg in messages:
-        if msg.get("role") != "user":
-            continue
-        content = msg.get("content")
-        if not isinstance(content, list):
-            continue
-        for block in content:
-            if not isinstance(block, dict) or block.get("type") != "tool_result":
-                continue
-            uid = block.get("tool_use_id")
-            if uid not in uses:
-                continue
-            if block.get("is_error"):
-                continue
-            successful_input = uses[uid]
-    return successful_input
+        if isinstance(value, dict):
+            values.append(dict(value))
+    return values
 
 
-class HypothesisDeriverAgent(ConfigurableAgent):
-    """假设派生 agent — 拿规范/计划/代码源派生健康性假设入库."""
+def _allocate_ids(count: int, existing: list[dict[str, Any]]) -> list[str]:
+    day = datetime.now(UTC).date().isoformat()
+    pattern = re.compile(rf"^H-{re.escape(day)}-(\d+)$")
+    highest = max(
+        (int(match.group(1)) for item in existing if (match := pattern.match(str(item.get("id") or "")))),
+        default=0,
+    )
+    return [f"H-{day}-{highest + offset:03d}" for offset in range(1, count + 1)]
+
+
+class HypothesisDeriverAgent(Worker):
+    """External proposal generation followed by Omni ID allocation and publishing."""
 
     SPEC = HYPOTHESIS_DERIVER_SPEC
+    DESCRIPTION = "Read-only external derivation with Omni-owned hypothesis persistence."
+    FORMAT_IN = "doctor.hypothesis_derivation.request"
+    FORMAT_OUT = "doctor.hypothesis_derivation.report"
 
-    def build_tool_context(self, *, input_data, turn, trace_id):
-        ctx = super().build_tool_context(input_data=input_data, turn=turn, trace_id=trace_id)
-        ctx["current_task_id"] = trace_id
-        ctx["agent_id"] = self.SPEC.id
-        ctx["scratch"] = ctx.get("scratch", {})
-        return ctx
+    def __init__(
+        self,
+        *,
+        bus: Any | None = None,
+        model: str | None = None,
+        report_runner: StructuredDerivationRunner = run_readonly_structured_agent,
+        hypothesis_publisher: HypothesisPublisher | None = None,
+        existing_loader: Callable[[], list[dict[str, Any]]] = _existing_hypotheses,
+        **_: Any,
+    ) -> None:
+        self._bus = bus
+        self._model = model or "deepseek-v4-flash"
+        self._report_runner = report_runner
+        self._publisher = hypothesis_publisher or self._publish
+        self._existing_loader = existing_loader
 
-    def build_extract_result(self, *, bus):
-        return _build_derivation_extractor(bus=bus)
+    async def _publish(self, hypothesis: dict[str, Any], task_id: str) -> str:
+        if self._bus is None:
+            raise RuntimeError("hypothesis publication requires an EventBus audit sink")
+        verdict = await WriteHypothesisRouter(bus=self._bus).run(
+            {
+                "trace_id": task_id,
+                "tool_name": "write_hypothesis",
+                "tool_use_id": f"omni-{hypothesis['id']}",
+                "tool_args": hypothesis,
+                "context": {
+                    "cwd": omni_workspace_root(),
+                    "project_root": omni_workspace_root(),
+                    "trace_id": task_id,
+                    "current_task_id": task_id,
+                    "agent_id": self.SPEC.id,
+                    "origin": "omni-control-plane",
+                },
+            }
+        )
+        if verdict.output.get("is_error"):
+            raise RuntimeError(str(verdict.output.get("result") or "hypothesis publication failed"))
+        return str(verdict.output.get("result") or "")
+
+    async def run(self, input_data: Any) -> Verdict:
+        if not isinstance(input_data, dict):
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="derivation input must be an object")
+        try:
+            raw_sources = input_data.get("source_paths")
+            if not isinstance(raw_sources, list) or not raw_sources:
+                raise ValueError("source_paths must be a non-empty list")
+            sources = [_canonical_path(value, label=f"source_paths[{index}]") for index, value in enumerate(raw_sources)]
+            raw_falsified = input_data.get("falsified_hypothesis_paths") or []
+            if not isinstance(raw_falsified, list):
+                raise ValueError("falsified_hypothesis_paths must be a list")
+            falsified = [_canonical_path(value, label=f"falsified_hypothesis_paths[{index}]") for index, value in enumerate(raw_falsified)]
+            focus = str(input_data.get("derivation_focus") or "").strip()
+            if focus not in _ENTITY_KINDS:
+                raise ValueError(f"derivation_focus must be one of {_ENTITY_KINDS}")
+            maximum = input_data.get("max_hypotheses")
+            if type(maximum) is not int or maximum < 1 or maximum > 20:
+                raise ValueError("max_hypotheses must be an integer from 1 through 20")
+            existing = self._existing_loader()
+            request = {
+                "source_paths": [item[0] for item in sources],
+                "falsified_hypothesis_paths": [item[0] for item in falsified],
+                "derivation_focus": focus,
+                "max_hypotheses": maximum,
+                "existing_hypotheses": [
+                    {"id": item.get("id", ""), "statement": item.get("statement", "")}
+                    for item in existing[:500]
+                ],
+            }
+            serialized = json.dumps(request, ensure_ascii=False, indent=2)
+            if len(serialized) > _MAX_REQUEST_CHARS:
+                raise ValueError(f"derivation request exceeds {_MAX_REQUEST_CHARS} characters")
+            response = await self._report_runner(
+                task="# Hypothesis derivation request\n" + serialized,
+                instructions=_INSTRUCTIONS,
+                result_schema=DERIVATION_RESULT_SCHEMA,
+                workspace_cwd=omni_workspace_root(),
+                caller="doctor.hypothesis-deriver",
+                model=self._model,
+                max_steps=24,
+                max_output_tokens=12_000,
+                timeout_seconds=600,
+            )
+        except Exception as error:  # noqa: BLE001
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"external derivation failed: {type(error).__name__}: {error}")
+        if not response.get("ok") or not isinstance(response.get("final"), dict):
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"external derivation failed: {response.get('error') or 'missing result'}", details={"agent_runtime": response.get("runtime", {})})
+        result = dict(response["final"])
+        if result.get("status") == "information_insufficient":
+            gaps = result.get("gaps")
+            if not isinstance(gaps, list) or not gaps:
+                return Verdict(kind=VerdictKind.FAIL, output=result, diagnosis="information_insufficient result lacks gaps")
+            return Verdict(kind=VerdictKind.PARTIAL, output={"andon": True, "gaps": gaps}, diagnosis="deriver requested more evidence", details={"agent_runtime": response.get("runtime", {})})
+        proposals = result.get("proposals")
+        if result.get("status") != "ok" or not isinstance(proposals, list) or len(proposals) > maximum:
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="invalid derivation proposal envelope")
+        if result.get("source_paths") != [item[0] for item in sources]:
+            return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis="source_paths must exactly echo the canonical request")
+
+        known = {_normalized_statement(item.get("statement")) for item in existing}
+        source_roots = [item[1] for item in sources]
+        for index, proposal in enumerate(proposals):
+            if not isinstance(proposal, dict) or proposal.get("applies_to") != focus:
+                return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"proposal {index} has invalid applies_to")
+            statement = _normalized_statement(proposal.get("statement"))
+            if not statement or statement in known:
+                return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"proposal {index} duplicates an existing or proposed statement")
+            known.add(statement)
+            try:
+                canonical, evidence_path = _canonical_path(proposal.get("source_path"), label=f"proposals[{index}].source_path")
+            except ValueError as error:
+                return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=str(error))
+            if canonical != proposal.get("source_path") or not evidence_path.is_file():
+                return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"proposal {index} source_path must be a canonical file")
+            if not any(evidence_path == root or (root.is_dir() and evidence_path.is_relative_to(root)) for root in source_roots):
+                return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"proposal {index} source_path is outside supplied sources")
+            excerpt = str(proposal.get("source_excerpt") or "").strip()
+            try:
+                source_text = evidence_path.read_text(encoding="utf-8")
+            except Exception as error:
+                return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"proposal {index} source cannot be verified: {error}")
+            if excerpt not in source_text:
+                return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"proposal {index} source_excerpt is not verbatim source text")
+            for field, minimum in (("statement", 30), ("motivation", 50), ("evidence_query", 20)):
+                if len(str(proposal.get(field) or "").strip()) < minimum:
+                    return Verdict(kind=VerdictKind.FAIL, output={}, diagnosis=f"proposal {index}.{field} is too short")
+
+        ids = _allocate_ids(len(proposals), existing)
+        applied: list[dict[str, Any]] = []
+        for index, (hypothesis_id, proposal) in enumerate(zip(ids, proposals, strict=True)):
+            hypothesis = {"id": hypothesis_id, **proposal, "status": "active"}
+            try:
+                publication = await self._publisher(hypothesis, f"derivation-{hypothesis_id}")
+            except Exception as error:  # noqa: BLE001
+                return Verdict(kind=VerdictKind.FAIL, output={"applied": applied}, diagnosis=f"hypothesis application {index} failed: {type(error).__name__}: {error}", details={"agent_runtime": response.get("runtime", {})})
+            applied.append({"id": hypothesis_id, "publication": publication})
+        return Verdict(
+            kind=VerdictKind.PASS,
+            output={
+                "source_paths": result["source_paths"],
+                "derived_hypothesis_ids": ids,
+                "narrative": result.get("narrative", ""),
+                "applied": applied,
+                "_meta": {"stage": "external_proposal_omni_application", "authority": "omni-control-plane", "agent_runtime": response.get("runtime", {})},
+            },
+            diagnosis=f"Omni published {len(applied)} derived hypotheses",
+            details={"agent_runtime": response.get("runtime", {})},
+        )
+
+
+__all__ = ["DERIVATION_RESULT_SCHEMA", "HYPOTHESIS_DERIVER_SPEC", "HypothesisDeriverAgent"]

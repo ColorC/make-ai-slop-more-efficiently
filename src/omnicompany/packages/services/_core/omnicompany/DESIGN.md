@@ -127,9 +127,9 @@ __all__ = ["MyWorker1", "MyWorker2", "ALL_WORKERS"]
 
 ## 架构决策
 
-### D1 — 不造新 runtime, 复用 EventBus
+### D1 — Material ledger 掌权，EventBus 只投影
 
-Stock = 已有的 `bus.SQLiteBus` / `bus.MemoryBus`（用户 2026-04-20 洞察）。加一层 MaterialDispatcher (~230 行) 即可让 Worker 订阅激活。
+MaterialDispatcher 的 run-scoped ledger 保存正文、因果和激活游标；跨 run 查询由 canonical Material authority/BlackboardCoordinator 提供。`SQLiteBus` / `MemoryBus` 只接收 bodyless `material.published` 审计投影，投影失败不阻断 Material 执行。
 
 ### D2 — 引入 `Worker` 基类 + `Material` / `Team` 别名（2026-04-20 用户洞察修正）
 
@@ -155,9 +155,7 @@ class MyWorker(Worker):
 ### D3 — TeamRunner 与 MaterialDispatcher 分工, 不是二重权威
 
 TeamRunner 是显式 DAG 编排: 调用方已经知道流程节点和边, 适合 50+ 注册管线的有向执行。
-MaterialDispatcher 是材料黑板执行器: Worker 通过 FORMAT_IN 订阅 EventBus 上的 material,
-由 material 到达触发激活。二者共享同一 EventBus / FactoryEvent / Format 体系, 是两种编排语义,
-不是两套权威。2026-06-13 材料统一计划已裁决 MaterialDispatcher 转正, 不再按 pilot/临时过渡理解。
+MaterialDispatcher 是材料黑板执行器：Worker 通过 FORMAT_IN 订阅直接 ledger 中的 material，由 material 到达触发激活。二者共享 Format 体系但不共享状态权威；FactoryEvent 只作为现有 `run_job()` 返回值的兼容信封。
 
 ### D3b — 兼容原 PipelineRunner
 
@@ -177,20 +175,22 @@ Dispatcher 与 PipelineRunner 并存。Worker 按 R-23 平铺 output 两者都�
 [外部调用]
     ↓  初始 material (kind.source)
 MaterialDispatcher.run_job()
-    ↓ publish 初始 event → EventBus (trace_id=job_id)
+    ↓ append 初始 material → run-scoped ledger (scope=job_id)
     ↓
 循环:
-    ├─ 读取 stock 待处理 event
+    ├─ 读取 ledger 待处理 material
     ├─ 按 event_type 匹配订阅 worker (FORMAT_IN_MODE 决定累计策略)
     ├─ Q1 单次激活 key: (event.trace_id, worker_id)
     ├─ 激活 → worker.run(input_data) → Verdict
-    ├─ kind=PASS → publish output (event_type=FORMAT_OUT)
+    ├─ kind=PASS → append output (format_id=FORMAT_OUT)
     │   └─ output._emit_as_new_job=True → 用新 trace_id (子 job, R-25)
     └─ kind=FAIL → 不 publish (Q2.C 控制流退化为 material 不产出)
     ↓
-直到 stock 无新 event 或达 max_iterations
+直到 ledger 无新 material 或达 max_iterations
     ↓
-返回全部 events (含 source / internal / sink + 诊断结果)
+可选投影 bodyless material.published 审计事件
+    ↓
+返回全部兼容信封 (含 source / internal / sink + 诊断结果)
 ```
 
 ## 已知局限
@@ -213,7 +213,7 @@ MaterialDispatcher.run_job()
   - [guardian/workers/](../guardian/workers/) — 类 A 迁移 4 Worker 样本
   - [agent_team_demo.py](agent_team_demo.py) — Agent Team 4 Worker 样本
 - **Plan**:
-  - MATERIAL-UNIFICATION/plan.md
+  - 材料 Wiki 全量设施化总计划
   - BLACKBOARD-ARCHITECTURE/plan.md
   - migration_log.md
 - **SKILL**: `.claude/skills/omnicompany-dev/SKILL.md` §2.10 / §2.11
@@ -221,7 +221,7 @@ MaterialDispatcher.run_job()
 ## 接收意愿
 
 - **welcome_themes**:
-  - dispatcher 优化（并发激活 / 真 SQLite bus 订阅）
+  - dispatcher 优化（并发激活 / durable Material authority adapter）
   - 新 pub/sub 模式 / 更高效订阅匹配
   - Q4 诊断规则扩展（新的 orphan / redundant 检测）
   - Agent Team 变体（Diagnosis Agent Worker 实装）

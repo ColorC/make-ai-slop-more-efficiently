@@ -72,34 +72,34 @@ const S: Record<string, any> = {
   root: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'transparent', color: 'var(--fp-text)' },
   // ① 无标题头: 仅留右对齐玻璃控件条(搜索 + ⋯)。内容紧随其下从顶部开始。
   bar: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px' },
-  search: { flex: 1, height: 32, border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-text)', borderRadius: 7, padding: '0 12px', fontSize: 13, minWidth: 0, outline: 'none' },
-  iconBtn: { width: 32, height: 32, border: '1px solid var(--fp-border)', borderRadius: 7, background: 'var(--fp-glass)', backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR, color: 'var(--fp-text-2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'all 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
+  search: { flex: 1, height: 32, border: '1px solid var(--fp-border)', background: 'var(--fp-card)', color: 'var(--fp-text)', borderRadius: 2, padding: '0 12px', fontSize: 13, minWidth: 0, outline: 'none' },
+  iconBtn: { width: 32, height: 32, border: '1px solid var(--fp-border)', borderRadius: 2, background: 'var(--fp-glass)', backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR, color: 'var(--fp-text-2)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'all 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
   // 大滚动区: 放宽呼吸 (4px 栅格)。
   scroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '4px 16px 28px', display: 'flex', flexDirection: 'column', gap: 24 },
   // 项目分区
   group: { display: 'flex', flexDirection: 'column', gap: 12 },
   groupHead: { display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 2 },
   // ④ 分区名 15 建层级
-  groupName: { color: 'var(--fp-text)', fontSize: 15, fontWeight: 650, letterSpacing: '-0.01em' },
+  groupName: { color: 'var(--fp-text)', fontSize: 15, fontWeight: 500, letterSpacing: '-0.01em' },
   // 计数 = 胶囊 chip, 弱化
-  groupCount: { color: 'var(--fp-text-2)', fontSize: 12, fontWeight: 600, borderRadius: 999, padding: '1px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid var(--fp-border)' },
+  groupCount: { color: 'var(--fp-text-2)', fontSize: 12, fontWeight: 500, borderRadius: 999, padding: '1px 10px', background: 'rgba(255,255,255,.06)', border: '1px solid var(--fp-border)' },
   // ⑥ 卡片网格 (auto-fill, minmax) — 照 ThreadMonitorPanel
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 },
   // ③ 磨砂玻璃卡片解剖
-  card: { display: 'flex', flexDirection: 'column', minWidth: 0, background: GLASS_BG, backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR, border: '1px solid var(--fp-border)', borderRadius: 11, padding: 14, cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)', transition: 'border-color 150ms cubic-bezier(0.175,0.885,0.32,1.1), transform 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
+  card: { display: 'flex', flexDirection: 'column', minWidth: 0, background: GLASS_BG, backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR, border: '1px solid var(--fp-border)', borderRadius: 3, padding: 14, cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.08)', transition: 'border-color 150ms cubic-bezier(0.175,0.885,0.32,1.1), transform 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
   cardTop: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
   // ④ 标题 flex1 醒目 (15/650), 链图标 + 名字
-  cardTitle: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, color: 'var(--fp-text)', fontSize: 15, fontWeight: 650, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  chainIcon: { width: 20, height: 20, borderRadius: 5, flexShrink: 0, background: 'var(--fp-accent-weak)', border: '1px solid var(--fp-border)', color: 'var(--fp-link)', fontSize: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, color: 'var(--fp-text)', fontSize: 15, fontWeight: 500, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  chainIcon: { width: 20, height: 20, borderRadius: 2, flexShrink: 0, background: 'var(--fp-accent-weak)', border: '1px solid var(--fp-border)', color: 'var(--fp-link)', fontSize: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   // 状态徽章
-  badge: (on: boolean): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, borderRadius: 4, padding: '1px 7px', whiteSpace: 'nowrap', color: on ? 'var(--fp-ok)' : 'var(--fp-text-3)', background: on ? 'color-mix(in srgb, var(--fp-ok) 12%, transparent)' : 'rgba(255,255,255,.05)', border: `1px solid ${on ? 'color-mix(in srgb, var(--fp-ok) 38%, transparent)' : 'var(--fp-border)'}` }),
+  badge: (on: boolean): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500, borderRadius: 3, padding: '1px 7px', whiteSpace: 'nowrap', color: on ? 'var(--fp-ok)' : 'var(--fp-text-3)', background: on ? 'color-mix(in srgb, var(--fp-ok) 12%, transparent)' : 'rgba(255,255,255,.05)', border: `1px solid ${on ? 'color-mix(in srgb, var(--fp-ok) 38%, transparent)' : 'var(--fp-border)'}` }),
   // ④ 包路径 = 弱灰等宽微字 (12)
   pkg: { color: 'var(--fp-text-3)', fontSize: 12, fontFamily: "'Berkeley Mono','Consolas','Menlo',monospace", margin: '10px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 },
   // ④ 时间 = 弱灰等宽微字
   time: { color: 'var(--fp-text-3)', fontSize: 12, fontFamily: "'Berkeley Mono','Consolas','Menlo',monospace", marginTop: 4 },
   // ⑤ 底部整宽主操作按钮
   foot: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 },
-  openBtn: { flex: 1, border: '1px solid var(--fp-accent)', background: 'var(--fp-accent)', color: 'var(--fp-accent-fg)', borderRadius: 7, padding: '7px 0', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', transition: 'filter 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
+  openBtn: { flex: 1, border: '1px solid rgba(255,240,235,.55)', background: 'var(--fp-bp-seal)', color: '#fff', borderRadius: 2, padding: '7px 0', cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: 'inherit', transition: 'filter 150ms cubic-bezier(0.175,0.885,0.32,1.1)' },
   empty: { color: 'var(--fp-text-3)', padding: 32, fontSize: 14, textAlign: 'center' as const },
   err: { color: 'var(--fp-err)', fontSize: 14, padding: '10px 16px' },
 }
@@ -174,7 +174,7 @@ export default function TeamRecentBoard() {
         {groups.map((g) => (
           <div key={g.key} style={S.group} data-testid="team-project-group" data-project={g.projId || 'none'}>
             <div style={S.groupHead}>
-              {g.projId ? <ProjectIcon id={g.projId} size={20} /> : <span style={{ width: 20, height: 20, borderRadius: 5, background: 'var(--fp-bg-overlay)', border: '1px solid var(--fp-border)', display: 'inline-block' }} />}
+              {g.projId ? <ProjectIcon id={g.projId} size={20} /> : <span style={{ width: 20, height: 20, borderRadius: 2, background: 'var(--fp-bg-overlay)', border: '1px solid var(--fp-border)', display: 'inline-block' }} />}
               <span style={S.groupName}>{g.label}</span>
               <span style={S.groupCount}>{g.teams.length}</span>
             </div>

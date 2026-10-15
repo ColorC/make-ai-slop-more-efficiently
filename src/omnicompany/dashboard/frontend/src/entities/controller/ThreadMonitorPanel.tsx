@@ -1,50 +1,67 @@
-// 线程监控面板 — 也被 SurfaceShell「执行者(控制台)」复用(entities/controller 持有)。
+// CLI Hub 面板(原"线程监控面板")— 也被 SurfaceShell「执行者(控制台)」复用(entities/controller 持有)。
 // 2026-07-19 蓝图 G 重置(阶段四第四波): 玻璃卡+裸 hex(#f0b429/#241d0b/#3a5cff 等)清零 →
 //   会话卡=厚框纸件(2px 白框);运行状态=`.v2-status` 六态徽章(与全站同一套状态语言);
 //   provider tag=黄铜/白线描边身份标记;fresh 高亮改 data-fresh 属性驱动(CSS,不再内联色);
 //   accent 实心按钮海(打开/采纳/载入)清零 → 幽灵小按钮,每卡一个白线描边主操作;
 //   弹层=实底纸件(无玻璃);执行者 select=虚线测量件。数据接线 / testid / 交互全保留。
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ccApi, type CcSessionMeta } from '../../api/ccClient'
-import { ccChatApi, type CcChatSessionMeta, type CcChatProvider, type ImportableSession } from '../../api/ccChatClient'
+import { ccChatApi, type CcChatSessionMeta, type ImportableSession } from '../../api/ccChatClient'
 import { usePanels } from '../../stores/panelsStore'
 import { useControllerView } from './viewStore'
 import { relTimeEn as relTime } from '../../lib/time'
 import { openChatInVscode } from '../../lib/surface'
 import KebabMenu, { type KebabItem } from '../../shared/view/ui/KebabMenu'
 import { Activity, Circle, Folder } from 'lucide-react'
-import { Code2, Download, MessageSquare, RefreshCw, Plus, RotateCcw, Search, Trash2 } from 'lucide-react'
+import { Code2, Download, MessageSquare, RefreshCw, Plus, RotateCcw, Search, Trash2, TerminalSquare } from 'lucide-react'
+import { BlueprintSelect } from '../../components/BlueprintSelect'
+import { ProviderIcon } from '../multiagent/ProviderIcon'
+import { ProjectIcon } from '../../lib/projectIcon'
+import { sessionProjectionTitle } from '../cc_session/sessionProjection'
+import { useCcTabStatusSnapshot } from '../cc_session/tabStatus'
 
-type NewSessionKind = CcChatProvider | 'plain_cli' | 'claude_cli' | 'codex_cli' | 'codebuddy_cli' | 'kimi_cli' | 'opencode_cli' | 'powershell'
+type NewSessionKind = 'plain_cli' | 'claude_cli' | 'codex_cli' | 'codex_the_company_cli' | 'codebuddy_cli' | 'kimi_cli' | 'opencode_cli' | 'kiro_cli' | 'qoder_cli' | 'dsh_web_cli' | 'zcode_cli' | 'grok_cli' | 'powershell'
 const SESSION_RENDER_BATCH = 36
 
 // 与 Lofa 同一心智模型：真实对话和远程 CLI 共用一个新建入口。
 const SESSION_OPTIONS: Array<{ value: NewSessionKind; label: string }> = [
   { value: 'plain_cli', label: '纯 CLI（手动唤起）' },
   { value: 'claude_cli', label: 'Claude CLI' },
-  { value: 'codex_cli', label: 'Codex CLI' },
+  { value: 'codex_cli', label: 'Codex CLI（官方订阅）' },
+  { value: 'codex_the_company_cli', label: 'Codex CLI（the_company API）' },
   { value: 'codebuddy_cli', label: 'CodeBuddy CLI' },
   { value: 'kimi_cli', label: 'Kimi CLI' },
   { value: 'opencode_cli', label: 'OpenCode CLI' },
+  { value: 'kiro_cli', label: 'Kiro CLI' },
+  { value: 'qoder_cli', label: 'Qoder CLI' },
+  { value: 'dsh_web_cli', label: 'DeepSeek Harness' },
+  { value: 'zcode_cli', label: 'ZCode CLI（智谱 GLM）' },
+  { value: 'grok_cli', label: 'Grok Build CLI' },
   { value: 'powershell', label: 'PowerShell' },
 ]
 
 const SESSION_LABELS: Record<NewSessionKind, string> = {
-  controller: '总控对话',
-  claude_code: 'Claude 对话',
-  codex: 'Codex 对话',
-  codebuddy: 'CodeBuddy 对话',
-  kimi: 'Kimi 对话',
-  opencode: 'OpenCode 对话',
-  omni_agent: 'OmniAgent 对话',
   plain_cli: '纯 CLI',
   claude_cli: 'Claude CLI',
   codex_cli: 'Codex CLI',
+  codex_the_company_cli: 'the_company API',
   codebuddy_cli: 'CodeBuddy CLI',
   kimi_cli: 'Kimi CLI',
   opencode_cli: 'OpenCode CLI',
+  kiro_cli: 'Kiro CLI',
+  qoder_cli: 'Qoder CLI',
+  dsh_web_cli: 'DeepSeek Harness',
+  zcode_cli: 'ZCode',
+  grok_cli: 'Grok Build',
   powershell: 'PowerShell',
+}
+
+// 下拉菜单带 logo: 每个新建入口 → provider 身份(供 ProviderIcon 取图标)
+const KIND_PROVIDER: Partial<Record<NewSessionKind, string>> = {
+  claude_cli: 'claude_code', codex_cli: 'codex', codex_the_company_cli: 'codex_the_company', codebuddy_cli: 'codebuddy',
+  kimi_cli: 'kimi', opencode_cli: 'opencode', kiro_cli: 'kiro', qoder_cli: 'qoder',
+  dsh_web_cli: 'dsh_web', zcode_cli: 'zcode', grok_cli: 'grok',
 }
 
 type ThreadRow = {
@@ -61,6 +78,8 @@ type ThreadRow = {
   subscribers: number
   cwd: string
   providerSessionId?: string | null
+  project?: string | null
+  resumable?: boolean
 }
 
 type ManagedSession =
@@ -99,22 +118,27 @@ function sessionFallbackTitle(provider: string, cwd: string): string {
 }
 
 function activeSessionTitle(item: ImportableSession, managedRow: ThreadRow | null): string {
-  return normalizeSessionTitle(item.digest?.title)
-    || normalizeSessionTitle(item.preview)
-    || normalizeSessionTitle(item.last_user)
-    || normalizeSessionTitle(managedRow?.title)
-    || sessionFallbackTitle(item.provider, item.cwd)
+  return sessionProjectionTitle({
+    provider: item.provider,
+    sessionId: item.session_id,
+    summaryTitle: item.digest?.title,
+    nativeTitle: managedRow?.title,
+    firstMessage: item.last_user,
+    preview: item.preview,
+  })
 }
 
 function SessionIdentity({
   title,
   sessionId,
+  project,
   status,
   fresh = false,
   actions,
 }: {
   title: string
   sessionId: string
+  project?: string | null
   status: React.ReactNode
   fresh?: boolean
   actions?: React.ReactNode
@@ -126,7 +150,10 @@ function SessionIdentity({
         {status}
       </div>
       <div className="tm-session-identity">
-        <div className="tm-title tm-session-title" data-testid="session-title" title={title}>{title}</div>
+        <div className="tm-title tm-session-title" data-testid="session-title" title={title} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {project ? <ProjectIcon id={project} size={18} /> : null}
+          <span>{title}</span>
+        </div>
         <div className="tm-session-id" data-testid="session-id" title={sessionId}>
           <span className="tm-session-id-label">ID</span>
           <span>{sessionId}</span>
@@ -140,12 +167,19 @@ function SessionIdentity({
 function providerForPty(m: CcSessionMeta): string {
   if (m.provider) return m.provider
   const command = String(m.cmd?.[0] || 'claude').toLowerCase()
-  return command.includes('codex') ? 'codex'
-    : command.includes('codebuddy') || command.includes('cbc') ? 'codebuddy'
-      : command.includes('kimi') ? 'kimi'
-      : command.includes('opencode') ? 'opencode'
-        : command.includes('powershell') || command.includes('pwsh') ? 'shell'
-          : 'claude_code'
+  const fullCommand = String(m.cmd?.join(' ') || '').toLowerCase()
+  return command.includes('codex') && !command.includes('zcode') ? 'codex'
+    : command.includes('zcode') ? 'zcode'
+      : command.includes('grok') ? 'grok'
+        : command.includes('codebuddy') || command.includes('cbc') ? 'codebuddy'
+        : command.includes('kimi') ? 'kimi'
+          : command.includes('opencode') ? 'opencode'
+            : command.includes('kiro-cli') ? 'kiro'
+              : command.includes('qodercli') ? 'qoder'
+                : fullCommand.includes('dsh-web.py') ? 'dsh_web'
+                  : fullCommand.includes('omni-dsh-pty') ? 'dsh'
+                    : command.includes('powershell') || command.includes('pwsh') ? 'shell'
+                      : 'claude_code'
 }
 
 function isPlainLiveCli(m: CcSessionMeta): boolean {
@@ -168,7 +202,8 @@ function isContentfulRemoteOpenCode(m: CcSessionMeta): boolean {
 
 function providerLabel(provider: string): string {
   const labels: Record<string, string> = {
-    claude_code: 'Claude', codex: 'Codex', codebuddy: 'CodeBuddy', kimi: 'Kimi', opencode: 'OpenCode',
+    claude_code: 'Claude', codex: 'Codex', codex_the_company: 'the_company API', codebuddy: 'CodeBuddy', kimi: 'Kimi', opencode: 'OpenCode', kiro: 'Kiro',
+    qoder: 'Qoder', dsh: 'DeepSeek Harness', dsh_web: 'DeepSeek Harness', zcode: 'ZCode', grok: 'Grok Build',
     shell: '纯 CLI', powershell: 'PowerShell', controller: '总控', omni_agent: 'OmniAgent',
   }
   return labels[provider] || provider || 'Agent'
@@ -249,23 +284,30 @@ function chatToRow(m: CcChatSessionMeta): ThreadRow {
     subscribers: Number(m.subscribers || 0),
     cwd: m.cwd,
     providerSessionId: m.claude_session_id,
+    project: (m as CcChatSessionMeta & { project?: string | null }).project || null,
   }
 }
 
 function sessionTabTitle(title: string, sessionId: string): string {
   const shortId = sessionId.slice(0, 8)
-  return shortId ? `${title} \u00b7 ${shortId}` : title
+  return shortId && !title.includes(shortId) ? `${title} \u00b7 ${shortId}` : title
 }
 
 function ptyToRow(m: CcSessionMeta): ThreadRow {
-  const status = m.working ? 'working' : m.alive ? 'waiting' : 'done'
-  const cwdName = m.cwd.split(/[\\/]/).filter(Boolean).pop() || m.cwd
+  // Web-display 会话没有 working 标记; starting 阶段算等待, 就绪(有 URL)算 idle。
+  const status = m.display_kind === 'web'
+    ? (m.alive ? (m.web_url ? 'idle' : 'waiting') : 'done')
+    : m.working ? 'working' : m.alive ? 'waiting' : 'done'
   const planName = m.active_plan ? planShortName(m.active_plan) : ''
   const provider = providerForPty(m)
-  const title = normalizeSessionTitle(m.display_title)
-    || normalizeSessionTitle(m.provider_title)
-    || planName
-    || sessionFallbackTitle(provider, cwdName)
+  const title = sessionProjectionTitle({
+    provider,
+    sessionId: m.id,
+    topic: m.topic,
+    summaryTitle: m.display_title,
+    nativeTitle: m.provider_title,
+    preview: planName,
+  })
   return {
     kind: 'pty',
     id: m.id,
@@ -279,10 +321,34 @@ function ptyToRow(m: CcSessionMeta): ThreadRow {
     subscribers: Number(m.subscribers || 0),
     cwd: m.cwd,
     providerSessionId: m.provider_session_id || m.claude_session_id,
+    project: m.project || null,
+    resumable: m.alive || m.status === 'recoverable' || m.resumable === true,
   }
 }
 
+function withTimeoutFallback<T>(promise: Promise<T>, fallback: T, timeoutMs: number): Promise<T> {
+  return new Promise((resolve) => {
+    let settled = false
+    const timer = window.setTimeout(() => {
+      settled = true
+      resolve(fallback)
+    }, timeoutMs)
+    promise.then((value) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      resolve(value)
+    }).catch(() => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      resolve(fallback)
+    })
+  })
+}
+
 export default function ThreadMonitorPanel() {
+  const tabStatusSnapshot = useCcTabStatusSnapshot()
   const [threads, setThreads] = useState<ThreadRow[]>([])
   const [activeSessions, setActiveSessions] = useState<ImportableSession[]>([])
   const [importableSessions, setImportableSessions] = useState<ImportableSession[]>([])
@@ -294,6 +360,7 @@ export default function ThreadMonitorPanel() {
   const [ptySessions, setPtySessions] = useState<CcSessionMeta[]>([])
   const [quickPreview, setQuickPreview] = useState<QuickPreviewData | null>(null)
   const quickPreviewCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastCatalogRefreshRef = useRef<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newSessionKind, setNewSessionKind] = useState<NewSessionKind>('codex_cli')
@@ -330,15 +397,28 @@ export default function ThreadMonitorPanel() {
     setVisibleSessionLimit(SESSION_RENDER_BATCH)
   }, [sessionQuery])
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [chat, pty, active, importable] = await Promise.all([
-        ccChatApi.list({ limit: 80, includeArchived: false }).catch(() => [] as CcChatSessionMeta[]),
-        ccApi.list().catch(() => [] as CcSessionMeta[]),
-        ccChatApi.activeSessions(7 * 86400, 80).catch(() => [] as ImportableSession[]),
-        ccChatApi.importable(120).catch(() => [] as ImportableSession[]),
+      // The full importable-session scan can traverse a very large local history.
+      // Keep it useful, but do not let that secondary list hold the whole monitor
+      // in "加载中" indefinitely. Core live state gets a bounded first paint;
+      // the larger restorable list arrives independently when ready.
+      const importable = ccChatApi.importable(120)
+      void importable.then(setImportableSessions).catch(() => setImportableSessions([]))
+      // /active 冷启要把本机所有 Claude/Codex 账号目录的 transcript 全扫一遍(重启后实测
+      // ~60s, 之后走 TTL 缓存毫秒级)。它和上面的可恢复列表一样, 不该拖住活着的会话首屏 ——
+      // 以前放在 Promise.all 里配 12s 兜底, 一超时整张列表就空("0 个会话")。
+      void withTimeoutFallback(
+        ccChatApi.activeSessions(7 * 86400, 80), [] as ImportableSession[], 120_000,
+      ).then(setActiveSessions)
+      const [chat, pty] = await Promise.all([
+        withTimeoutFallback(ccChatApi.list({ limit: 80, includeArchived: false }), [] as CcChatSessionMeta[], 12_000),
+        // 首次拉列表服务端要做可恢复会话的全盘扫描(本机实测 11-12s),
+        // 12s 兜底会与其赛跑, 一超时整个会话列表就空("0 个会话")。
+        // 给足扫描时间; 服务端有 TTL 缓存, 后续调用毫秒级。
+        withTimeoutFallback(ccApi.list(), [] as CcSessionMeta[], 30_000),
       ])
       // claude_session_id → 自管 chat 会话(渲染时拿权威 plan + 自管 id 供"打开")
       const managed = new Map<string, ManagedSession>()
@@ -359,16 +439,12 @@ export default function ThreadMonitorPanel() {
       }
       setManagedByTranscript(managed)
       setPtySessions(pty)
-      setImportableSessions(importable)
-      // 统一对话列表 = 所有有 transcript 的对话(自管 + 外部), /active 已按最近活动排好序。
-      // 自管会话的 transcript 也在 ~/.claude/projects, 一样被 /active 摘要, 所以不再过滤掉它们。
-      setActiveSessions(active)
-      // 线程列表只留"还没 transcript"的(全新没说话的 chat / pty), 避免和上面重复。
-      const activeSids = new Set(active.map((a) => a.session_id))
-      const hasTranscript = (sid: string | null | undefined) => Boolean(sid && activeSids.has(sid))
+      // 统一对话列表 = 所有有 transcript 的对话(自管 + 外部), /active 已按最近活动排好序;
+      // 自管会话的 transcript 也在账号目录里, 一样被 /active 摘要, 所以不过滤掉它们。
+      // 去重放到渲染时按当前 activeSessions 算 —— /active 是独立到达的, 这里拿不到它的最新值。
       const rows = [
-        ...chat.filter((c) => !hasTranscript(c.claude_session_id)).map(chatToRow),
-        ...pty.filter((p) => !hasTranscript(p.provider_session_id || p.claude_session_id)).map(ptyToRow),
+        ...chat.map(chatToRow),
+        ...pty.map(ptyToRow),
       ].sort((a, b) => b.startedAt - a.startedAt)
       setThreads(rows)
     } catch (e) {
@@ -376,15 +452,50 @@ export default function ThreadMonitorPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    load()
-  }, [])
+    void load()
+  }, [load])
+
+  const observedLivePtyIds = tabStatusSnapshot.ptyLoaded
+    ? Object.entries(tabStatusSnapshot.metas)
+      .filter(([id, meta]) => (
+        meta.kind === 'pty'
+        && !meta.resumeAliasFor
+        && tabStatusSnapshot.states[id] !== 'ended'
+      ))
+      .map(([id]) => id)
+      .sort()
+      .join('|')
+    : null
+  const listedLivePtyIds = ptySessions
+    .filter((meta) => meta.alive)
+    .map((meta) => meta.id)
+    .sort()
+    .join('|')
+
+  useEffect(() => {
+    if (observedLivePtyIds === null || loading) return
+    if (observedLivePtyIds === listedLivePtyIds) {
+      lastCatalogRefreshRef.current = null
+      return
+    }
+
+    // /api/cc/tab-states is already polled every two seconds for tab badges.
+    // Treat a membership change there as the cheap invalidation signal for the
+    // richer session list.  Previously this panel loaded only on mount/manual
+    // refresh, so workers started by `omni agent start/resume` stayed invisible.
+    const transition = `${listedLivePtyIds}->${observedLivePtyIds}`
+    if (lastCatalogRefreshRef.current === transition) return
+    lastCatalogRefreshRef.current = transition
+    void load()
+  }, [listedLivePtyIds, load, loading, observedLivePtyIds])
 
   async function openThread(thread: ThreadRow) {
     try {
       if (thread.kind === 'pty' && !thread.alive) {
+        if (!thread.resumable) return
         const fresh = await ccApi.resume(thread.id)
         usePanels.getState().closeTab(`cc_session:${thread.id}`)
         openTab({ type: 'cc_session', id: fresh.id }, `${fresh.cmd?.[0] || 'CLI'} · ${fresh.id.slice(0, 8)}`)
@@ -428,27 +539,20 @@ export default function ThreadMonitorPanel() {
   async function onCreate(kind: NewSessionKind = newSessionKind) {
     setError(null)
     try {
-      const cliCommands: Partial<Record<NewSessionKind, string[] | undefined>> = {
-        plain_cli: ['powershell', '-NoLogo'],
-        claude_cli: undefined,
-        codex_cli: ['codex'],
-        codebuddy_cli: ['codebuddy'],
-        kimi_cli: ['kimi'],
-        opencode_cli: ['opencode'],
-        powershell: ['powershell'],
+      const cliCommands: Partial<Record<NewSessionKind, string[]>> = {
+        plain_cli: ['pwsh', '-NoLogo'],
+        powershell: ['pwsh'],
       }
-      if (kind in cliCommands) {
-        const meta = await ccApi.create({ cmd: cliCommands[kind] })
-        openTab({ type: 'cc_session', id: meta.id }, `${SESSION_LABELS[kind]} · ${meta.id.slice(0, 8)}`)
-      } else {
-        const meta = await ccChatApi.create({ provider: kind as CcChatProvider })
-        if (kind === 'controller') {
-          useControllerView.getState().setView('chat')
-          openTab({ type: 'controller', id: 'main' }, '总控')
-        } else {
-          openTab({ type: 'cc_session', id: meta.id }, `${meta.name || meta.provider || '对话'} · ${meta.id.slice(-6)}`)
-        }
+      const providers: Partial<Record<NewSessionKind, 'claude_code' | 'codex' | 'codex_the_company' | 'codebuddy' | 'kimi' | 'opencode' | 'kiro' | 'qoder' | 'dsh_web' | 'zcode' | 'grok'>> = {
+        claude_cli: 'claude_code', codex_cli: 'codex', codex_the_company_cli: 'codex_the_company', codebuddy_cli: 'codebuddy',
+        kimi_cli: 'kimi', opencode_cli: 'opencode', kiro_cli: 'kiro', qoder_cli: 'qoder',
+        dsh_web_cli: 'dsh_web', zcode_cli: 'zcode', grok_cli: 'grok',
       }
+      const provider = providers[kind]
+      const meta = provider
+        ? await ccApi.createAgentWorker({ provider, visibility: 'visible' })
+        : await ccApi.create({ cmd: cliCommands[kind] })
+      openTab({ type: 'cc_session', id: meta.id }, `${SESSION_LABELS[kind]} · ${meta.id.slice(0, 8)}`)
       void load()
     } catch (cause) {
       setError(`新建失败: ${cause instanceof Error ? cause.message : String(cause)}`)
@@ -473,12 +577,20 @@ export default function ThreadMonitorPanel() {
   }
 
   const plainLiveCliSessions = ptySessions.filter(isPlainLiveCli)
+  // DeepSeek Harness Web 展示面会话: 与 CLI 会话统一收进 CLI Hub 列表,
+  // 且不参与下面的"远程 OpenCode/活跃会话"预算 —— 独立置顶区块, 关掉页签也能找回来。
+  const webDisplaySessions = ptySessions.filter((meta) => meta.display_kind === 'web' && meta.alive)
   const currentOpenTabIds = new Set(openTabIds)
   const remoteOpenCodeSessions = ptySessions
     .filter(isContentfulRemoteOpenCode)
     .sort((a, b) => b.started_at - a.started_at)
   const remoteOpenCodeIds = new Set(remoteOpenCodeSessions.map((meta) => meta.id))
-  const remainingThreads = threads.filter((thread) => !remoteOpenCodeIds.has(thread.id))
+  // 线程列表只留"还没 transcript"的(全新没说话的 chat / pty), 已经出现在统一对话列表里的不重复列。
+  const transcriptSessionIds = new Set(activeSessions.map((item) => item.session_id))
+  const remainingThreads = threads.filter((thread) => (
+    !remoteOpenCodeIds.has(thread.id)
+    && !(thread.providerSessionId && transcriptSessionIds.has(thread.providerSessionId))
+  ))
   const normalizedSessionQuery = sessionQuery.trim().toLocaleLowerCase()
   const remoteProviderSessionIds = new Set(
     remoteOpenCodeSessions
@@ -511,10 +623,13 @@ export default function ThreadMonitorPanel() {
   let renderBudget = visibleSessionLimit
   const visibleRemoteOpenCodeSessions = filteredRemoteOpenCodeSessions.slice(0, renderBudget)
   renderBudget -= visibleRemoteOpenCodeSessions.length
-  const visibleActiveSessions = filteredActiveSessions.slice(0, Math.max(0, renderBudget))
-  renderBudget -= visibleActiveSessions.length
+  // Fresh PTYs have no transcript yet, so they live in remainingThreads. Give
+  // them budget before the (often very large) transcript history; otherwise a
+  // newly discovered worker updates the count but stays beyond "再显示更多".
   const visibleRemainingThreads = filteredRemainingThreads.slice(0, Math.max(0, renderBudget))
   renderBudget -= visibleRemainingThreads.length
+  const visibleActiveSessions = filteredActiveSessions.slice(0, Math.max(0, renderBudget))
+  renderBudget -= visibleActiveSessions.length
   const visibleHistoricalSessions = filteredHistoricalSessions.slice(0, Math.max(0, renderBudget))
   const visibleSessionCount = (
     visibleRemoteOpenCodeSessions.length
@@ -603,7 +718,7 @@ export default function ThreadMonitorPanel() {
       setImportOpen(false)
       // 切到总控对话, 让用户看到载入的前文 + 总控的简短确认。
       useControllerView.getState().setView('chat')
-      openTab({ type: 'controller', id: 'main' }, '总控')
+      openTab({ type: 'controller', id: 'main' }, '中枢')
       setLoadNote(
         `已把这段对话(${res.message_count ?? 0} 条)载入为总控前文${res.truncated ? '(内容较长, 已截断尾部)' : ''} —— 在总控对话里可见`,
       )
@@ -614,7 +729,7 @@ export default function ThreadMonitorPanel() {
     }
   }
 
-  // #2 接管式采纳: resume 这段别处会话当 subagent(总控可驱动/你可接管), 打开成 chat 页签。
+  // 兼容采纳：把历史 provider session 恢复成真实 CLI Agent Worker。
   // 主“打开”应始终在 Dashboard 内恢复会话，不能依赖 VSCode WebView host bridge。
   // fork/resume 保留原 transcript；采纳为 subagent 等管理动作继续放在 More。
   async function openExistingSession(item: ImportableSession) {
@@ -641,7 +756,13 @@ export default function ThreadMonitorPanel() {
     setAdoptingId(item.session_id)
     setError(null)
     try {
-      const m = await ccChatApi.create({ adopt_session_id: item.session_id, provider: item.provider, cwd: item.cwd })
+      const m = await ccApi.createAgentWorker({
+        provider: item.provider as 'claude_code' | 'codex' | 'kiro',
+        resume_provider_session_id: item.session_id,
+        cwd: item.cwd,
+        from_controller: true,
+        visibility: 'hidden',
+      })
       openTab({ type: 'cc_session', id: m.id }, `采纳 · ${item.provider === 'codex' ? 'Codex' : 'Claude'} · ${item.session_id.slice(0, 6)}`)
     } catch (e) {
       setError(`采纳失败: ${e instanceof Error ? e.message : String(e)}`)
@@ -669,17 +790,22 @@ export default function ThreadMonitorPanel() {
           <span className="tm-search-count" data-testid="thread-session-search-count">
             {sessionMatchCount} 个会话
           </span>
-          <select
+          <BlueprintSelect
             className="tm-select"
             value={newSessionKind}
-            onChange={(e) => setNewSessionKind(e.target.value as NewSessionKind)}
+            onChange={(v) => setNewSessionKind(v as NewSessionKind)}
             data-testid="thread-new-provider"
+            label="执行者"
             aria-label="选择执行者"
-          >
-            {SESSION_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            menuMinWidth={280}
+            options={SESSION_OPTIONS.map((o) => ({
+              value: o.value,
+              label: o.label,
+              icon: KIND_PROVIDER[o.value]
+                ? <ProviderIcon provider={KIND_PROVIDER[o.value]} label={o.label} size={16} />
+                : <TerminalSquare size={14} aria-hidden />,
+            }))}
+          />
           <button type="button" className="ct-newbtn" onClick={() => { void onCreate() }} data-testid="thread-new-session">
             <Plus size={13} aria-hidden />新建
           </button>
@@ -699,7 +825,7 @@ export default function ThreadMonitorPanel() {
             </button>
           )}
           <KebabMenu testid="thread-actions" items={[
-            { label: '打开活跃会话 / Multiagent', icon: <Activity size={15} />, testid: 'thread-open-multiagent', onClick: () => openTab({ type: 'multiagent', id: 'main' }, '活跃会话') },
+            { label: '打开活跃会话', icon: <Activity size={15} />, testid: 'thread-open-multiagent', onClick: () => openTab({ type: 'multiagent', id: 'main' }, '会话') },
             ...(plainLiveCliSessions.length > 0 ? [{
               label: `清理后台纯 CLI（${plainLiveCliSessions.length}）`,
               icon: <Trash2 size={15} />,
@@ -707,14 +833,14 @@ export default function ThreadMonitorPanel() {
               danger: true,
               onClick: () => setCleanupOpen(true),
             }] : []),
-            { label: '新建总控对话', icon: <MessageSquare size={15} />, testid: 'thread-new-controller', onClick: () => { void onCreate('controller') } },
-            { label: '新建 Claude 对话', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('claude_code') } },
-            { label: '新建 Codex 对话', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('codex') } },
-            { label: '新建 CodeBuddy 对话', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('codebuddy') } },
-            { label: '新建 Kimi 对话', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('kimi') } },
-            { label: '新建 OpenCode 对话', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('opencode') } },
-            { label: '新建 OmniAgent 对话', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('omni_agent') } },
-            { label: '载入对话为前文', icon: <Download size={15} />, testid: 'thread-import-session', onClick: () => { void openImport() } },
+            { label: '新建 Claude Agent Worker', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('claude_cli') } },
+            { label: '新建 Codex Agent Worker', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('codex_cli') } },
+            { label: '新建 Kiro Agent Worker', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('kiro_cli') } },
+            { label: '新建 CodeBuddy Agent Worker', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('codebuddy_cli') } },
+            { label: '新建 Kimi Agent Worker', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('kimi_cli') } },
+            { label: '新建 OpenCode Agent Worker', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('opencode_cli') } },
+            { label: '新建 Qoder Agent Worker', icon: <MessageSquare size={15} />, onClick: () => { void onCreate('qoder_cli') } },
+            { label: '载入 provider 历史', icon: <Download size={15} />, testid: 'thread-import-session', onClick: () => { void openImport() } },
             { label: '刷新', icon: <RefreshCw size={15} />, testid: 'thread-refresh', onClick: () => { void load() } },
           ] as KebabItem[]} />
         </div>
@@ -723,6 +849,61 @@ export default function ThreadMonitorPanel() {
       {/* #1 修复: 载入错误以前只在弹窗里显示, 这里(其他目录的对话)点"载入"出错被吞掉了 → 看着像没反应。现在两处都显示。 */}
       {importError && <div className="tm-error" data-testid="import-error">{importError}</div>}
       {loadNote && <div className="tm-note" style={{ color: 'var(--fp-ok)' }} data-testid="load-note">{loadNote}</div>}
+      {webDisplaySessions.length > 0 && (
+        <div style={{ marginBottom: 12 }} data-testid="web-display-sessions">
+          <div className="tm-note" style={{ marginBottom: 8 }}>
+            DeepSeek Harness · Web 展示面会话
+          </div>
+          <div className="tm-grid">
+            {webDisplaySessions.map((meta) => {
+              const cwdName = meta.cwd.split(/[\\/]/).filter(Boolean).pop() || meta.cwd
+              const phaseLabel = meta.web_phase === 'ready' ? '运行中' : '启动中'
+              return (
+                <div
+                  key={`web-${meta.id}`}
+                  className="tm-card"
+                  data-testid="web-display-session-row"
+                  data-web-phase={meta.web_phase || 'starting'}
+                >
+                  <div>
+                    <SessionIdentity
+                      title={normalizeSessionTitle(meta.display_title) || `DeepSeek Harness \u00b7 ${cwdName}`}
+                      sessionId={meta.id}
+                      status={<StatusBadge status={meta.web_phase === 'ready' ? 'idle' : 'waiting'} />}
+                    />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      <span className="tm-ptag">DeepSeek Harness</span>
+                      <span className={`tm-source ${meta.web_phase === 'ready' ? 'source-detached' : ''}`}>{phaseLabel}</span>
+                    </div>
+                    <div className="tm-doing">官方 Web UI 会话；展示面是网页，可在列表里随时找回</div>
+                    <div className="tm-meta">
+                      {meta.cwd} · {relTime(meta.started_at)} · {meta.id}
+                    </div>
+                  </div>
+                  <div className="tm-foot">
+                    <button
+                      type="button"
+                      className="ct-btn ct-btn-go"
+                      data-testid={`web-display-open-${meta.id}`}
+                      onClick={() => openTab({ type: 'cc_session', id: meta.id }, `DeepSeek Harness \u00b7 ${meta.id.slice(0, 8)}`)}
+                    >
+                      打开
+                    </button>
+                    <button
+                      type="button"
+                      className="ct-btn"
+                      data-testid={`web-display-end-${meta.id}`}
+                      onClick={() => { void endPtySession(meta.id) }}
+                    >
+                      结束
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
       {visibleRemoteOpenCodeSessions.length > 0 && (
         <div style={{ marginBottom: 12 }} data-testid="remote-opencode-sessions">
           <div className="tm-note" style={{ marginBottom: 8 }}>
@@ -825,6 +1006,7 @@ export default function ThreadMonitorPanel() {
                   <SessionIdentity
                     title={displayTitle}
                     sessionId={it.session_id}
+                    project={managedRow?.project || it.digest?.project}
                     fresh={fresh}
                     status={<StatusBadge status={managedRow?.status || it.status} />}
                     actions={<KebabMenu testid="active-session-more" items={(managed
@@ -838,9 +1020,9 @@ export default function ThreadMonitorPanel() {
                     <span className={`tm-ptag${it.provider === 'codex' ? ' codex' : ''}`}>{providerLabel(it.provider)}</span>
                     <span className={`tm-source source-${runtime}`}>{sourceLabel}</span>
                   </div>
-                  {(it.digest?.project || planLabel) && (
+                  {(managedRow?.project || it.digest?.project || planLabel) && (
                     <div className="tm-meta" style={{ color: 'var(--fp-link)', marginTop: 8 }} data-testid="active-session-project">
-                      <Folder size={12} aria-hidden style={{ verticalAlign: -2, marginRight: 4 }} />{it.digest?.project || '—'}{planLabel ? ` · ${planLabel}` : ''}
+                      <Folder size={12} aria-hidden style={{ verticalAlign: -2, marginRight: 4 }} />{managedRow?.project || it.digest?.project || '—'}{planLabel ? ` · ${planLabel}` : ''}
                     </div>
                   )}
                   <div className="tm-doing" data-testid="active-session-did" title={it.digest?.last_step || it.last_did || ''}>
@@ -877,7 +1059,7 @@ export default function ThreadMonitorPanel() {
               : 'dashboard'
             const sourceLabel = runtime === 'attached' ? '网页已连接'
               : runtime === 'detached' ? '后台保活'
-                : runtime === 'ended' ? '可续接' : '可用 CLI 续接'
+                : runtime === 'ended' ? (thread.resumable ? '可续接' : '已结束 · 无原生历史') : '可用 CLI 续接'
             const previewData = {
               title: thread.title,
               source: sourceLabel,
@@ -905,6 +1087,7 @@ export default function ThreadMonitorPanel() {
                 <SessionIdentity
                   title={thread.title}
                   sessionId={thread.id}
+                  project={thread.project}
                   fresh={fresh}
                   status={<StatusBadge status={thread.status} />}
                 />
@@ -915,7 +1098,11 @@ export default function ThreadMonitorPanel() {
                 </div>
               </div>
               <div className="tm-foot">
-                <button type="button" className="ct-btn" onClick={() => { void openThread(thread) }}>{thread.kind === 'pty' && !thread.alive ? '续接 CLI' : '打开 CLI'}</button>
+                {(thread.alive || thread.resumable) ? (
+                  <button type="button" className="ct-btn" onClick={() => { void openThread(thread) }}>{thread.kind === 'pty' && !thread.alive ? '续接 CLI' : '打开 CLI'}</button>
+                ) : (
+                  <span className="tm-meta" data-testid="thread-session-unavailable">原生会话记录缺失，保留条目</span>
+                )}
                 {thread.kind === 'pty' && thread.alive && (
                   <KebabMenu
                     testid={`thread-session-actions-${thread.id}`}
@@ -947,6 +1134,7 @@ export default function ThreadMonitorPanel() {
               <SessionIdentity
                 title={activeSessionTitle(item, null)}
                 sessionId={item.session_id}
+                project={item.digest?.project}
                 status={<StatusBadge status={item.status || 'idle'} />}
               />
               <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>

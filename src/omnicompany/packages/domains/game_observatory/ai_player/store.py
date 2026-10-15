@@ -382,6 +382,15 @@ class AIPlayerStore:
         if current is not None:
             yield current
             return
+        reusable = getattr(self._connection_local, "reusable_connection", None)
+        if reusable is not None:
+            self._connection_local.connection = reusable
+            try:
+                with reusable:
+                    yield reusable
+            finally:
+                self._connection_local.connection = None
+            return
         connection = sqlite3.connect(self.db_path, timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA busy_timeout=30000")
@@ -392,6 +401,25 @@ class AIPlayerStore:
                 yield connection
         finally:
             self._connection_local.connection = None
+            connection.close()
+
+    @contextmanager
+    def reusable_connection_session(self) -> Iterator[None]:
+        """Reuse one connection while preserving one commit boundary per store call."""
+
+        current = getattr(self._connection_local, "reusable_connection", None)
+        if current is not None:
+            yield
+            return
+        connection = sqlite3.connect(self.db_path, timeout=30)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute("PRAGMA foreign_keys=ON")
+        self._connection_local.reusable_connection = connection
+        try:
+            yield
+        finally:
+            self._connection_local.reusable_connection = None
             connection.close()
 
     @contextmanager
@@ -7395,6 +7423,17 @@ class AIPlayerStore:
             )
             return
 
+        semantic_metadata = step.metadata.get("canonical_semantic_execution")
+        if isinstance(semantic_metadata, dict):
+            self._validate_semantic_action_quality_sample(
+                sample,
+                step=step,
+                evidence_run=evidence_run,
+                action_run=action_run,
+                metadata=semantic_metadata,
+            )
+            return
+
         metadata = step.metadata.get("autonomous_execution")
         expected_metadata = {
             "schema": "game-observatory.ai-player.autonomous-evidence.v1",
@@ -7526,6 +7565,171 @@ class AIPlayerStore:
             evidence_run=evidence_run,
             action_run=action_run,
         )
+
+    @staticmethod
+    def _semantic_effect_predicate_matches(
+        expected: Mapping[str, Any], actual: Mapping[str, Any]
+    ) -> bool:
+        """Validate an independently observed semantic postcondition."""
+
+        if actual.get("satisfied") is not True or "kind" in actual:
+            return False
+        predicate = str(expected.get("predicate") or "").strip()
+        if predicate == "semantic-surface-changed":
+            before = str(actual.get("before_semantic_sha256") or "")
+            after = str(actual.get("after_semantic_sha256") or "")
+            return bool(
+                len(before) == 64
+                and len(after) == 64
+                and all(character in "0123456789abcdef" for character in before)
+                and all(character in "0123456789abcdef" for character in after)
+                and before != after
+            )
+        if predicate == "any-semantic-marker":
+            required = {
+                str(value).strip()
+                for value in expected.get("required_markers") or ()
+                if str(value).strip()
+            }
+            observed = {
+                str(value).strip()
+                for value in actual.get("observed_markers") or ()
+                if str(value).strip()
+            }
+            return bool(required and required & observed)
+        if predicate == "active-run-surface":
+            return actual.get("active_run_surface") is True
+        if predicate == "route-map-visible":
+            return actual.get("route_map_visible") is True
+        return False
+
+    def _validate_semantic_action_quality_sample(
+        self,
+        sample: ActionQualitySampleV1,
+        *,
+        step: Any,
+        evidence_run: Any,
+        action_run: Any,
+        metadata: dict[str, Any],
+    ) -> None:
+        """Rebuild a semantic sample from coordinate-free terminal artifacts."""
+
+        if metadata.get("schema") != "game-observatory.ai-player.semantic-execution.v1":
+            raise ValueError("semantic execution metadata schema is invalid")
+        if step.action.type != "semantic" or step.action.semantic_command != metadata.get(
+            "semantic_command"
+        ):
+            raise ValueError("semantic execution action does not match canonical metadata")
+        expected_identity = (
+            sample.environment_id,
+            sample.session_id,
+            sample.task_id,
+            sample.command_id,
+        )
+        actual_identity = tuple(
+            metadata.get(key)
+            for key in ("environment_id", "session_id", "task_id", "command_id")
+        )
+        if actual_identity != expected_identity:
+            raise ValueError("semantic execution crosses canonical attempt identity")
+        if (
+            action_run.status != "passed"
+            or evidence_run.status != "passed"
+            or step.status != "passed"
+            or step.metadata.get("capture_profile") != "semantic_trace"
+            or not step.stability.settled
+        ):
+            raise ValueError("semantic execution terminal bundle is incomplete")
+        artifact_ids = [step.before_ui_tree_id, step.after_ui_tree_id]
+        if any(not artifact_id for artifact_id in artifact_ids):
+            raise ValueError("semantic execution lacks before/after JSON traces")
+        traces: dict[str, dict[str, Any]] = {}
+        for artifact_id in artifact_ids:
+            artifact = self.observatory_store.get_artifact(str(artifact_id))
+            if artifact is None or artifact.kind != "runtime_state":
+                raise ValueError("semantic execution trace artifact is missing")
+            path = Path(artifact.path)
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != artifact.sha256:
+                raise ValueError("semantic execution trace artifact bytes changed")
+            try:
+                trace = json.loads(path.read_text(encoding="utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError("semantic execution trace is not structured JSON") from exc
+            if not isinstance(trace, dict) or trace.get("command_id") != sample.command_id:
+                raise ValueError("semantic execution trace crosses command identity")
+            role = str(trace.get("role") or "")
+            if (
+                trace.get("schema") != "game-observatory.arknights.semantic-trace.v1"
+                or role not in {"before", "after"}
+                or role in traces
+            ):
+                raise ValueError("semantic execution trace role/schema is invalid")
+            traces[role] = trace
+        if set(traces) != {"before", "after"}:
+            raise ValueError("semantic execution lacks one exact before/after trace pair")
+        before_trace = traces["before"]
+        after_trace = traces["after"]
+        trace_binding = (
+            metadata.get("attempt_id"),
+            metadata.get("exploration_id"),
+            metadata.get("intent_id"),
+            metadata.get("evidence_receipt"),
+        )
+        for trace in (before_trace, after_trace):
+            if tuple(
+                trace.get(key)
+                for key in (
+                    "attempt_id",
+                    "exploration_id",
+                    "intent_id",
+                    "evidence_receipt",
+                )
+            ) != trace_binding:
+                raise ValueError("semantic execution trace crosses attempt/effect identity")
+        for proof_name in ("evidence_binding", "safety_channel"):
+            proof = before_trace.get(proof_name)
+            if not isinstance(proof, dict) or tuple(
+                proof.get(key)
+                for key in ("exploration_id", "intent_id", "evidence_receipt")
+            ) != trace_binding[1:]:
+                raise ValueError("semantic execution before trace crosses proof identity")
+        if after_trace.get("facility_duration_ms") != metadata.get(
+            "facility_duration_ms"
+        ):
+            raise ValueError("semantic execution duration crosses canonical metadata")
+        effect_proof = after_trace.get("effect_proof")
+        if not isinstance(effect_proof, dict):
+            raise ValueError("semantic execution trace lacks structured effect proof")
+        effect_kind = str(metadata.get("effect_kind") or "").strip()
+        expected_effect = effect_proof.get("expected")
+        actual_effect = effect_proof.get("actual")
+        if (
+            not effect_kind
+            or not isinstance(expected_effect, dict)
+            or not isinstance(actual_effect, dict)
+            or effect_proof.get("kind") != effect_kind
+            or expected_effect.get("kind") != effect_kind
+        ):
+            raise ValueError("semantic execution effect kind is absent")
+        if not self._semantic_effect_predicate_matches(
+            expected_effect, actual_effect
+        ):
+            raise ValueError("semantic execution effect predicate is not proved")
+        from .semantic_action_quality import produce_semantic_action_quality_sample
+
+        expected = produce_semantic_action_quality_sample(
+            environment_id=sample.environment_id,
+            session_id=sample.session_id,
+            task_id=str(sample.task_id),
+            command_id=sample.command_id,
+            action_run_id=action_run.id,
+            evidence_step_id=step.id,
+            effect_proof=effect_proof,
+            evidence_refs=sample.evidence_refs,
+            created_at=str(step.ended_at),
+        )
+        if expected != sample:
+            raise ValueError("semantic action-quality sample is not canonically derived")
 
     def _recompute_executed_action_quality_sample(
         self,

@@ -28,7 +28,7 @@
 .qb2-goal { flex-direction: column; align-items: stretch; gap: 0; padding: 12px 14px 10px; margin: 12px 0; }
 .qb2-goal.pinned { border-color: var(--fp-border-strong); box-shadow: inset 3px 0 0 var(--fp-bp-seal), var(--fp-shadow-sm); }
 .qb2-ghead { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.qb2-gtitle { color: var(--fp-text); font-size: var(--fp-fs-2); font-weight: 650;
+.qb2-gtitle { color: var(--fp-text); font-size: var(--fp-fs-2); font-weight: 500;
   font-family: var(--fp-bp-font-display); cursor: pointer; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .qb2-gtitle:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -99,21 +99,21 @@
 .qb2-inbox { margin-top: 26px; }
 .qb2-inbox-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 4px 8px; }
 .qb2-inbox-title { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-  color: transparent; -webkit-text-stroke: 1px rgba(235,245,255,.68); font-family: var(--fp-font-mono);
-  font-weight: 600; letter-spacing: .18em; text-transform: uppercase; font-size: 17px;
+  color: var(--fp-text-2); -webkit-text-stroke: 0; /* 2026-08-06: 废空心描边(CJK 上糊成一团), 改制图等线细字 */ font-family: var(--fp-font-mono);
+  font-weight: 500; letter-spacing: .18em; text-transform: uppercase; font-size: 17px;
   background: transparent; border: 0; padding: 0; font-style: normal; }
 .qb2-inbox-title .chev { color: var(--fp-text-3); -webkit-text-stroke: 0; display: inline-flex; }
 .qb2-inbox-note { color: var(--fp-text-3); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono); }
 .qb2-sync { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
   border: 1px dashed var(--fp-border-strong); background: transparent; color: var(--fp-text);
-  border-radius: var(--fp-r1); padding: 5px 12px; font-size: var(--fp-fs-4); font-weight: 600;
+  border-radius: var(--fp-r1); padding: 5px 12px; font-size: var(--fp-fs-4); font-weight: 500;
   font-family: var(--fp-font-mono); letter-spacing: .08em; text-transform: uppercase;
   transition: all var(--fp-t-fast); }
 .qb2-sync:hover { border-style: solid; border-color: var(--fp-bp-brass); box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); }
 .qb2-sync:active { transform: translateY(1px); }
 
 /* hover 预览卡内容(容器玻璃在 HoverCard.tsx;这里只管排版) */
-.qb2-pv .pv-t { display: flex; align-items: center; gap: 8px; font-weight: 700;
+.qb2-pv .pv-t { display: flex; align-items: center; gap: 8px; font-weight: 500;
   font-size: var(--fp-fs-2); font-family: var(--fp-bp-font-display); color: var(--fp-text); }
 .qb2-pv .pv-sub { margin: 4px 0 6px; color: var(--fp-text-3); font-size: var(--fp-fs-4);
   font-family: var(--fp-font-mono); }

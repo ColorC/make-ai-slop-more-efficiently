@@ -11,8 +11,8 @@
 >      plan 的对话, 提取相关上下文, 获取用户的额外指示并总结落地情况.
 
 落地形态:
-- ConversationAuditor: 输入(1). AgentNodeLoop 子类, 带 read_file/grep/glob/list_dir/bash 工具,
-  逐条核对用户指示在「对话后续」和「实际硬盘」的落地情况.
+- ConversationAuditor: 输入(1). 通过外置 AgentRuntime 获得受 grant 限制的
+  read/list/search/分片读与 Git 历史证据，不拥有通用 shell 或写权限。
 - PlanAuditor: 输入(2). 先定位真正在执行/起草 plan 的对话(关联挖掘在 discovery.py),
   再对每个相关对话跑同样的指示核对, 叠加 plan.md 的 exit_criteria.
 
@@ -23,7 +23,6 @@
 from omnicompany.packages.services._core.plan_audit.auditor import (
     ConversationAuditor,
     PlanAuditor,
-    AUDIT_TOOL_ROUTERS,
 )
 from omnicompany.packages.services._core.plan_audit.discovery import (
     find_conversation_by_session_id,
@@ -39,7 +38,6 @@ from omnicompany.packages.services._core.plan_audit.run import (
 __all__ = [
     "ConversationAuditor",
     "PlanAuditor",
-    "AUDIT_TOOL_ROUTERS",
     "find_conversation_by_session_id",
     "load_full_transcript",
     "discover_plan_conversations",

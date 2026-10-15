@@ -47,7 +47,7 @@
 .v2-filterbar { display: flex; align-items: center; gap: var(--fp-s3); flex-wrap: wrap; }
 
 /* ===== 状态徽章(色点+文字,六态;G 在跑=朱红 seal 点) ===== */
-.v2-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fp-fs-4); font-weight: 550;
+.v2-status { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fp-fs-4); font-weight: 500;
   padding: 2px 9px; border-radius: var(--fp-r-pill); line-height: 1.5; white-space: nowrap; }
 .v2-status .led { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
 .v2-status.st-ok { color: var(--fp-ok); background: color-mix(in srgb, var(--fp-ok) 13%, transparent); }
@@ -61,7 +61,7 @@
 /* ===== 计数徽章(黄铜描边;hot=朱红实底) ===== */
 .v2-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
   padding: 0 6px; border-radius: var(--fp-r-pill); border: 1px solid var(--fp-bp-brass); color: var(--fp-bp-brass-hi);
-  font-size: var(--fp-fs-4); font-weight: 600; font-family: var(--fp-font-mono); line-height: 1; }
+  font-size: var(--fp-fs-4); font-weight: 500; font-family: var(--fp-font-mono); line-height: 1; }
 .v2-count.hot { background: var(--fp-bp-seal); border-color: transparent; color: #fff; }
 
 /* ===== 新鲜度 7 方格 hatch 阵(G.3②:9×9 gap 2px,活跃=青白密纹/非活跃=暗纹) ===== */
@@ -87,7 +87,7 @@
 .bp-titleblock .tb { padding: 3px 10px; border-right: 1px solid var(--fp-border); font-size: var(--fp-fs-4);
   letter-spacing: .12em; color: var(--fp-text-3); text-transform: uppercase; }
 .bp-titleblock .tb:last-child { border-right: 0; }
-.bp-titleblock .tb b { display: block; color: var(--fp-text-2); font-weight: 600; font-size: var(--fp-fs-4); }
+.bp-titleblock .tb b { display: block; color: var(--fp-text-2); font-weight: 500; font-size: var(--fp-fs-4); }
 
 /* ===== 图例(新鲜度/在跑的读法说明) ===== */
 .v2-legend { display: inline-flex; align-items: center; gap: 12px; font-size: var(--fp-fs-4);
@@ -160,6 +160,203 @@
 .pk-btn:hover { border-color: var(--fp-border-strong); color: var(--fp-text); }
 .pk-btn[aria-expanded="true"] { border-style: solid; border-color: var(--fp-bp-brass);
   box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); color: var(--fp-text); }
-.pk-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--fp-bp-brass);
+.pk-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--fp-r-pill); background: var(--fp-bp-brass);
   color: #fff; font-size: var(--fp-fs-4); display: inline-grid; place-items: center;
   font-family: var(--fp-font-mono); box-sizing: border-box; }
+
+/* ============================================================
+   不透明但仍带格纸的面板(2026-08-06,用户反馈:「multiagent 所在的那个侧边栏
+   还是没有蓝图纹路的感觉」)。
+
+   成因: 侧栏盖在主内容(CLI)之上, 所以必须不透明, 于是它写了 background: var(--fp-bg)
+   —— 那只是 scene 的**底色**, 不含格纸, 把 #bp-grid 整块盖死, 纹路自然就没了。
+   直接改 transparent 不行: 会透出底下的终端。
+
+   解法: 给它铺一份自己的格纸, 但用 background-attachment: fixed。
+   #bp-grid 是 position:fixed;inset:0 锚在视口上的, 而 fixed 附着让这层的贴图原点
+   同样落在视口左上角 —— 两张网格因此像素级对齐, 面板边界处看不出接缝。
+   这既拿回了纹路, 又没有违背 G.7「格纸唯一层, 不许各容器自铺导致断开」的本意:
+   那条铁律要防的是滚动/分栏处网格错位, 而 fixed 附着的网格不随内容滚动, 天然不会错位。
+   ============================================================ */
+.bp-opaque-scene {
+  background: var(--fp-bp-scene-grad), var(--fp-bp-scene);
+  background-attachment: fixed;
+}
+
+/* ============================================================
+   制图等线字(2026-08-06,用户裁决:「加粗+白色的方式不适合做蓝图文字,
+   现在这个粗体文字不是很看得清」)。
+
+   道理:图纸上的字是单笔画等线字(ISO 3098 / Leroy 那一路)——笔画粗细恒定,
+   靠 **字号 + 字距 + 大写** 建层级,从不靠加粗。纯白粗体压在深蓝底上会起光晕
+   (halation),笔画间的空隙被糊掉;CJK 笔画又密,于是越粗越难认。
+   全站字重已封顶到 500(CSS 115 处 + 内联 336 处),下面是配套的两条形态规则。
+   ============================================================ */
+
+/* ① 区段标题:废掉空心描边(1px 描边在 CJK 上直接糊成一团,且描边字在制图语言里没有出处),
+   改「细字 + 宽字距 + 向右延伸的引线」—— 这才是图纸上区段标题的画法。
+   引线用 ::after 吃掉剩余宽度,不占额外高度。 */
+.bp-sechead {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  font-family: var(--fp-font-mono); font-weight: 500;
+  font-size: var(--fp-fs-2); letter-spacing: .26em; text-transform: uppercase;
+  color: var(--fp-text-2); white-space: nowrap;
+}
+.bp-sechead::after {
+  content: ""; flex: 1; height: 1px; min-width: 12px;
+  background: linear-gradient(90deg, rgba(235,245,255,.28), rgba(235,245,255,.06));
+}
+
+/* ② 已有的各页区段标题(.gh-name 等)统一收进这套口径:实心细字 + 宽字距。
+   字号仍由各页自己给(密度不同),这里只统一「怎么写字」。 */
+.gh-name, .pd-sec, .sr-brand, .pa-sec-head .t, .tb-ghead .gh-name, .mr-ghead .gh-name {
+  font-weight: 500;
+  letter-spacing: .24em;
+}
+
+/* ③ 正文/标题一律不超过 500。留一条兜底,防止后续再有人写 bold ——
+   G 的层级工具是字号(18/15/13/12)与字距,不是字重。 */
+.v2-card, .v2-btn, .v2-status, .v2-count, .bp-dim, .bp-titleblock,
+.pb-card, .ma-row, .tm-card, .mr-card { font-synthesis-weight: none; }
+
+/* ===== 裁决印章(2026-08-06 从 demo theme.css 搬进生产;此前定义了 --fp-bp-stamp-idle
+   却零消费)。用户裁决「纸质感只做局部小巧思, 不要给审阅出障碍」——
+   所以印章是一次性仪式件, 不是常驻水印: 盖下 → 停留 → 淡出, 全程 pointer-events:none,
+   永远不挡正文, 常驻的状态标识仍由顶栏 .v2-status 承担。 ===== */
+.bp-stamp {
+  position: absolute; top: 18px; right: 22px; z-index: 12;
+  width: 92px; height: 92px; border-radius: 50%;
+  display: grid; place-items: center; pointer-events: none;
+  border: 3px double currentColor; color: var(--fp-bp-seal);
+  font-family: var(--fp-bp-font-display); font-size: 22px; font-weight: 500; letter-spacing: .14em;
+  transform: rotate(-8deg);
+  /* 中心略实、边缘略透 = 油墨没吃匀的手感(纯 mask, 不是贴图) */
+  mask-image: radial-gradient(circle at 40% 38%, #000 62%, rgba(0,0,0,.82) 78%, #000 100%);
+  -webkit-mask-image: radial-gradient(circle at 40% 38%, #000 62%, rgba(0,0,0,.82) 78%, #000 100%);
+}
+.bp-stamp::before { content: ""; position: absolute; inset: 7px; border: 1px solid currentColor;
+  border-radius: 50%; opacity: .8; }
+.bp-stamp > span { text-align: center; line-height: 1.15; }
+.bp-stamp > span small { display: block; font-family: var(--fp-font-mono); font-size: var(--fp-fs-4);
+  letter-spacing: .22em; font-weight: 400; }
+/* 驳回章 = 蓝灰退稿方章(与通过章的朱红圆章一眼可分, 不靠读字) */
+.bp-stamp.rejected { color: var(--fp-bp-stamp-idle); border-radius: 6px; width: 104px; height: 64px; }
+.bp-stamp.rejected::before { border-radius: 3px; }
+
+/* ===== 制图角标(chrome 框专用)。功能性铁律:内容卡片一律不加 —— 角标是"这是一张图纸"的
+   框标记, 每张卡都戴就变成装饰噪音。只给面板/图签这类外壳。 ===== */
+.bp-corners { position: relative; }
+.bp-corners::before, .bp-corners::after {
+  content: ""; position: absolute; width: 10px; height: 10px; pointer-events: none;
+}
+.bp-corners::before { top: -1px; left: -1px;
+  border-top: 1.5px solid var(--fp-border-strong); border-left: 1.5px solid var(--fp-border-strong); }
+.bp-corners::after { bottom: -1px; right: -1px;
+  border-bottom: 1.5px solid var(--fp-border-strong); border-right: 1.5px solid var(--fp-border-strong); }
+
+/* ===== 指引线(leader line):chip / 元数据前的引线 + 端点圆点,
+   制图里"这条标注指向那个东西"的语言。纯 ::before, 零布局成本。 ===== */
+.bp-leader { display: inline-block; width: 26px; height: 1px; background: var(--fp-border);
+  position: relative; vertical-align: middle; flex: none; }
+.bp-leader::before { content: ""; position: absolute; left: -1px; top: -2px; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--fp-border-strong); }
+
+/* ===== 输入件焦点态(G 口径:输入/筛选件平时是虚线测量件,聚焦转实线 + 黄铜环)。
+   内联样式够不到 :focus,凡内联写了 dashed 边的 input/textarea 都该挂这个类。 ===== */
+.bp-input:focus, .bp-input:focus-visible {
+  outline: none;
+  border-style: solid !important;
+  border-color: var(--fp-bp-brass) !important;
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft);
+}
+.bp-input::placeholder { color: var(--fp-text-3); opacity: 1; }
+
+/* ===== 单选下拉 BlueprintSelect(2026-08-06:替代原生 <select>)
+   原生 select 展开的 option 弹层由系统渲染、CSS 够不着,在深色下就是一块系统黑
+   (用户原话「黑色下拉框」)。这里是自绘件:收起态 = 虚线测量件(与 .v2-search/.pk-btn 同族),
+   弹层样式内联在 BlueprintSelect.tsx(描图纸 + 卷角,沿 glass-scope 弹层白名单口径)。 ===== */
+.bp-select { position: relative; display: inline-flex; min-width: 0; }
+.bps-btn { display: inline-flex; align-items: center; gap: 8px; width: 100%; min-width: 0;
+  padding: 5px 10px; border-radius: var(--fp-bp-r1); box-sizing: border-box;
+  border: 1px dashed var(--fp-border); background: transparent; color: var(--fp-text-2);
+  font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); letter-spacing: .06em;
+  cursor: pointer; text-align: left; white-space: nowrap;
+  transition: border-color var(--fp-t-fast), color var(--fp-t-fast), box-shadow var(--fp-t-fast); }
+.bps-btn:hover { border-color: var(--fp-border-strong); color: var(--fp-text); }
+.bps-btn:focus-visible, .bps-btn[aria-expanded="true"] {
+  outline: none; border-style: solid; border-color: var(--fp-bp-brass);
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); color: var(--fp-text); }
+.bps-btn:disabled { opacity: .45; cursor: not-allowed; }
+.bps-v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 7px; }
+.bps-o-icon { flex: none; display: inline-flex; align-items: center; width: 18px; justify-content: center; position: relative; }
+.bps-o-icon img { width: 16px; height: 16px; object-fit: contain; display: block; }
+/* ProviderIcon 的 .ma-cli-mark 是为会话卡片设计的(absolute 右下角定位 + 呼吸描边),
+   在下拉选项里必须退化为普通行内图标, 否则全部图标会挤到弹层右下角。 */
+.bps-o-icon .ma-cli-mark { position: static; inset: auto; width: 16px; height: 16px; }
+.bps-o-icon .ma-cli-mark::after { display: none; }
+.bps-chev { flex: none; color: var(--fp-text-3); transition: transform var(--fp-t-fast) var(--fp-ease); }
+.bps-btn[aria-expanded="true"] .bps-chev { transform: rotate(180deg); }
+/* 弹层分组标题 = 打字机小标 */
+.bps-h { font-size: var(--fp-fs-4); color: var(--fp-text-3); padding: 5px 10px 3px; font-weight: 500;
+  font-family: var(--fp-font-mono); letter-spacing: .1em; text-transform: uppercase; }
+.bps-empty { padding: 8px 10px; font-size: var(--fp-fs-4); color: var(--fp-text-3);
+  font-family: var(--fp-font-mono); }
+/* 选项行复用 .v2-checkrow;单选语义走 aria-selected(多选那套走 aria-checked),
+   键盘高亮 data-active 与鼠标 hover 同一档,免得两种高亮同时出现。 */
+.bps-o[aria-selected="true"] .cb {
+  background: repeating-linear-gradient(45deg, rgba(210,235,255,.55) 0 2px, transparent 2px 5px);
+  border-color: #fff; color: #fff; }
+.bps-o[data-active] { background: var(--fp-bp-paper-2); color: var(--fp-text); }
+.bps-o:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ===== 按钮(2026-08-06 补齐:demo theme.css 有 .v2-btn,生产 blueprint.css 一直缺,
+   于是全站按钮只能退回 shadcn 的 rounded-md + 旧蓝底 —— 用户说的「朴实的原版按钮」。
+   G 口径:打字机标签(mono/大写/字距 .09em)+ 锐利 r1 + 纸叠纸硬错位影 + 按压凹入;
+   primary = 朱红 seal 印章底 + 白线描边(制图语言里 primary 是印章,不是蓝色块)。 ===== */
+.v2-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--fp-bp-r1); box-sizing: border-box;
+  border: 1px solid var(--fp-border); background: var(--fp-bp-panel); color: var(--fp-text);
+  font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); font-weight: 500;
+  text-transform: uppercase; letter-spacing: .09em; white-space: nowrap; cursor: pointer;
+  backdrop-filter: var(--fp-bp-panel-blur); -webkit-backdrop-filter: var(--fp-bp-panel-blur);
+  transition: background var(--fp-t-fast) var(--fp-ease), border-color var(--fp-t-fast) var(--fp-ease),
+              color var(--fp-t-fast) var(--fp-ease), box-shadow var(--fp-t-fast) var(--fp-ease),
+              transform var(--fp-t-fast) var(--fp-ease); }
+.v2-btn:hover { background: var(--fp-bp-panel-hover); border-color: var(--fp-border-strong); }
+/* 按压 = 纸被按进去(位移 + 影收窄),不是缩放 —— 与 .v2-card 同一手感 */
+.v2-btn:active { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(6,16,38,.5); }
+.v2-btn:focus-visible { outline: none; border-style: solid; border-color: var(--fp-bp-brass);
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); }
+.v2-btn:disabled { opacity: .45; cursor: not-allowed; }
+.v2-btn:disabled:active { transform: none; }
+
+/* primary = 朱红印章 */
+.v2-btn.primary { background: var(--fp-bp-seal); color: #fff;
+  border: 1px solid rgba(255,240,235,.55); box-shadow: var(--fp-bp-shadow-sm);
+  backdrop-filter: none; -webkit-backdrop-filter: none; }
+.v2-btn.primary:hover { background: var(--fp-bp-seal); filter: brightness(1.08);
+  border-color: rgba(255,240,235,.85); }
+.v2-btn.primary:active { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(6,16,38,.5); }
+
+/* ghost = 无面无框,只有字(工具行次动作) */
+.v2-btn.ghost { background: transparent; border-color: transparent; color: var(--fp-text-2);
+  backdrop-filter: none; -webkit-backdrop-filter: none; }
+.v2-btn.ghost:hover { background: var(--fp-bp-panel-hover); color: var(--fp-text);
+  border-color: var(--fp-border-subtle); }
+
+/* outline = 虚线测量件(与 search/picker 同族,表达"可填/可选"而非"可执行") */
+.v2-btn.outline { background: transparent; border-style: dashed; color: var(--fp-text-2);
+  backdrop-filter: none; -webkit-backdrop-filter: none; }
+.v2-btn.outline:hover { border-style: dashed; border-color: var(--fp-border-strong); color: var(--fp-text); }
+
+/* danger = 朱红字,只有 hover 才现红底(破坏性动作不该常驻高饱和) */
+.v2-btn.danger { background: transparent; border-color: transparent; color: var(--fp-err);
+  backdrop-filter: none; -webkit-backdrop-filter: none; }
+.v2-btn.danger:hover { background: color-mix(in srgb, var(--fp-err) 16%, transparent);
+  border-color: color-mix(in srgb, var(--fp-err) 45%, transparent); color: var(--fp-err); }
+
+/* 尺寸档:sm 工具行 / lg 主裁决按钮 */
+.v2-btn.sm { padding: 4px 10px; }
+.v2-btn.lg { padding: 10px 22px; font-size: var(--fp-fs-3); }
+/* 纯图标按钮走 .v2-iconbtn;这里只给"图标 + 文字"的正方补丁 */
+.v2-btn.square { padding: 7px; }

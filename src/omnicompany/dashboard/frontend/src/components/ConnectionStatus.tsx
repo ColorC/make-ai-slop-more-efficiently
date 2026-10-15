@@ -61,8 +61,8 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
       data-conn-label={label ?? ''}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '2px 8px', borderRadius: 12, background: '#181818',
-        border: `1px solid ${color}33`, color: '#cccccc', fontSize: 14,
+        padding: '2px 8px', borderRadius: 3, background: 'var(--fp-bp-solid)',
+        border: `1px solid ${color}33`, color: 'var(--fp-text)', fontSize: 14,
         fontFamily: 'monospace',
       }}
     >
@@ -75,9 +75,9 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           animation: state === 'reconnecting' ? 'cs-pulse 1s infinite' : 'none',
         }}
       />
-      {label && <span style={{ color: '#888' }}>{label}</span>}
+      {label && <span style={{ color: 'var(--fp-text-2)' }}>{label}</span>}
       <span style={{ color }}>{text}</span>
-      {detail && <span style={{ color: '#888' }}>{detail}</span>}
+      {detail && <span style={{ color: 'var(--fp-text-2)' }}>{detail}</span>}
       <style>{`
         @keyframes cs-pulse {
           0%, 100% { opacity: 1 }

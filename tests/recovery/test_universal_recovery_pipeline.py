@@ -237,7 +237,6 @@ def test_four_provider_byte_recovery_end_to_end(tmp_path: Path) -> None:
     assert not (workspace / "deleted-after.txt").exists()
     assert not (workspace / "concurrent.txt").exists()
     assert list(artifacts.rglob("prompt-image.png"))
-
     repeated = apply_plan(
         plan_path, snapshot_dir=snapshot, confirm_workspace=str(workspace.resolve()), artifact_dir=artifacts
     )
@@ -267,6 +266,15 @@ def test_four_provider_byte_recovery_end_to_end(tmp_path: Path) -> None:
     )
     assert any(row["status"] == "rolled-back" for row in rolled_back["results"])
     assert not (workspace / "shared.txt").exists()
+
+
+def test_builtin_codex_sources_include_all_local_and_litework_managed_homes() -> None:
+    definition = default_registry(load_entry_points=False).definitions["codex"]
+
+    assert "%USERPROFILE%/.codex" in definition.roots
+    assert "%USERPROFILE%/.codex-2" in definition.roots
+    assert "%APPDATA%/liwork-dev/codex-runtime-home/home" in definition.roots
+    assert "auth.json" in definition.excludes
 
 
 @pytest.mark.parametrize("failpoint,written", [
