@@ -16,7 +16,7 @@ import math
 import sqlite3
 import time
 from dataclasses import dataclass
-from enum import StrEnum
+from omnicompany.core.pycompat import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Mapping
 

@@ -10,7 +10,7 @@ import random
 import statistics
 import time
 from dataclasses import dataclass, field
-from enum import StrEnum
+from omnicompany.core.pycompat import StrEnum
 from typing import Any, Callable, Protocol, Sequence
 
 from .action_loop import ActionLoopOutcomeV1, BattleActionLoop, BattleFrameSampler

@@ -42,7 +42,8 @@ import math
 import re
 import sqlite3
 import subprocess
-from datetime import UTC, datetime
+from datetime import datetime
+from omnicompany.core.pycompat import UTC
 from pathlib import Path
 from typing import Any
 

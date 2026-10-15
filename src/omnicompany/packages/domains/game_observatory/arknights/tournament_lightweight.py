@@ -14,7 +14,7 @@ import math
 import os
 from collections.abc import Callable
 from datetime import datetime, timezone
-from enum import StrEnum
+from omnicompany.core.pycompat import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 

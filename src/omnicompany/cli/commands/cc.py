@@ -357,30 +357,32 @@ def cc_session_probe(pty_id: str, receipt: Path) -> None:
     if not receipt.is_absolute() or receipt.exists():
         raise click.UsageError("receipt must be an absolute, unused file path")
 
+    async def measure_unbounded(url):
+        async with websockets.connect(url, open_timeout=5, close_timeout=2, max_size=None) as ws:
+            await ws.send(json.dumps({"type": "attach", "last_seq": 0}))
+
+            async def drain():
+                async for _ in ws:
+                    pass
+
+            reader = asyncio.create_task(drain())
+            samples = []
+            try:
+                for _ in range(30):
+                    started = time.perf_counter()
+                    pong = await ws.ping()
+                    await asyncio.wait_for(pong, timeout=2)
+                    samples.append((time.perf_counter() - started) * 1000)
+                    await asyncio.sleep(0.1)
+            finally:
+                reader.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await reader
+            return {"samples": len(samples), "p50_ms": round(statistics.median(samples), 3),
+                    "p95_ms": round(sorted(samples)[28], 3), "max_ms": round(max(samples), 3)}
+
     async def measure(url):
-        async with asyncio.timeout(20):
-            async with websockets.connect(url, open_timeout=5, close_timeout=2, max_size=None) as ws:
-                await ws.send(json.dumps({"type": "attach", "last_seq": 0}))
-
-                async def drain():
-                    async for _ in ws:
-                        pass
-
-                reader = asyncio.create_task(drain())
-                samples = []
-                try:
-                    for _ in range(30):
-                        started = time.perf_counter()
-                        pong = await ws.ping()
-                        await asyncio.wait_for(pong, timeout=2)
-                        samples.append((time.perf_counter() - started) * 1000)
-                        await asyncio.sleep(0.1)
-                finally:
-                    reader.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await reader
-                return {"samples": len(samples), "p50_ms": round(statistics.median(samples), 3),
-                        "p95_ms": round(sorted(samples)[28], 3), "max_ms": round(max(samples), 3)}
+        return await asyncio.wait_for(measure_unbounded(url), timeout=20)
 
     async def run():
         daemon = _pty_daemon_base().replace("http://", "ws://")

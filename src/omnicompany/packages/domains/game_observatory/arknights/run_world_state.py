@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from enum import StrEnum
+from omnicompany.core.pycompat import StrEnum
 from pathlib import Path
 from typing import Any, Iterable
 

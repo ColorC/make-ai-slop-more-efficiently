@@ -186,7 +186,7 @@ class AgentRuntimeProcessClient:
             await process.stdin.wait_closed()
         try:
             await asyncio.wait_for(process.wait(), timeout=self._close_timeout_seconds)
-        except TimeoutError:
+        except asyncio.TimeoutError:
             process.kill()
             await process.wait()
         if self._reader_task is not None:

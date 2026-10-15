@@ -123,7 +123,7 @@ class UniversalFallbackLoop:
                 ),
                 timeout=config.wall_clock_s,
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             return self._result(
                 "timeout",
                 allowed_output,

@@ -17,7 +17,8 @@ navigation whitelist -- that absence is itself the finding.
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import datetime
+from omnicompany.core.pycompat import UTC
 from typing import Any, Iterator
 
 from .sources import Inputs, Report

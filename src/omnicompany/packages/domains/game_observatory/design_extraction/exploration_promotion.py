@@ -37,7 +37,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from datetime import UTC, datetime
+from datetime import datetime
+from omnicompany.core.pycompat import UTC
 from pathlib import Path
 from typing import Any, Sequence
 

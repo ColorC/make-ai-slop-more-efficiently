@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import datetime
+from omnicompany.core.pycompat import UTC
 import json
 from pathlib import Path
 import re

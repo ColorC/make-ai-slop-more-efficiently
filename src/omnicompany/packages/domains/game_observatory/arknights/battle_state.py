@@ -14,7 +14,7 @@ import hashlib
 import json
 import re
 import time
-from enum import StrEnum
+from omnicompany.core.pycompat import StrEnum
 from pathlib import Path
 from typing import Any, Generic, Protocol, TypeVar
 

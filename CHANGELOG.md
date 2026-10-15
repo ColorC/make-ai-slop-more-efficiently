@@ -2,6 +2,11 @@
 
 本文件记录发布版的用户可见变更。包名 `omnicompany`，命令行 `omni`。
 
+## 2026-10-16
+
+- Restored Python 3.10 runtime compatibility for time zones, typed material records, string enums and bounded terminal operations.
+- Declared the Windows time zone database dependency for clean installations.
+
 ## 2026-10-15
 
 - Expanded CLI agent runtime support, account isolation, terminal handling and native session recovery.

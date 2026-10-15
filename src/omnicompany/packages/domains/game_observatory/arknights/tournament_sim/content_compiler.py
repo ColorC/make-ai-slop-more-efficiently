@@ -10,7 +10,7 @@ package can be emitted.  Any ambiguity is rejected rather than guessed.
 from __future__ import annotations
 
 import json
-from enum import StrEnum
+from omnicompany.core.pycompat import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator

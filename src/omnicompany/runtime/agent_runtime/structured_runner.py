@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from omnicompany.core.pycompat import UTC
 import os
 from pathlib import Path
 from typing import Any, Mapping

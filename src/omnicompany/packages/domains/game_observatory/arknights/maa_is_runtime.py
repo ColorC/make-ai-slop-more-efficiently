@@ -7,7 +7,8 @@ import json
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
+from omnicompany.core.pycompat import UTC
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 

@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
   "policy_version": "2026-10-15.1",
-  "created_at": "2026-10-15T15:54:16.982619+00:00",
+  "created_at": "2026-10-15T16:32:19.421146+00:00",
   "source": {
     "path": ".",
-    "head": "80a930584b8848ee728b10c6df9743a17c851d38",
+    "head": "e05644b2fe602450a717fbb62f5a07c60fce5340",
     "dirty": false,
-    "tracked_considered": 27020,
-    "missing_tracked_count": 17505
+    "tracked_considered": 27022,
+    "missing_tracked_count": 6856
   },
   "additional_sources": [
     {
       "name": "wiki-core",
-      "head": "80a930584b8848ee728b10c6df9743a17c851d38",
+      "head": "e05644b2fe602450a717fbb62f5a07c60fce5340",
       "package_path": "packages/wiki-core",
       "package_dirty": false,
       "tracked_considered": 35,
@@ -23,19 +23,21 @@
   ],
   "selection": {
     "input": "git ls-files -z --cached",
-    "included_tracked": 3954,
-    "excluded_tracked": 5596,
+    "included_tracked": 3956,
+    "excluded_tracked": 16245,
     "scrubbed_tracked": 383,
     "excluded_by_rule": {
-      "private_product_path": 2626,
-      "not_allowlisted": 1917,
+      "not_allowlisted": 6764,
+      "private_product_path": 6234,
+      "unsafe_path_part": 2291,
       "non_source_runtime_evidence": 462,
       "service_not_allowlisted": 205,
       "domain_not_allowlisted": 143,
-      "unsafe_path_part": 127,
       "generated_static_only": 75,
       "standard_not_allowlisted": 37,
-      "internal_release_machinery": 4
+      "source_file_too_large": 29,
+      "internal_release_machinery": 4,
+      "unsafe_suffix:.mp4": 1
     }
   },
   "dashboard_static_build": {
@@ -810,13 +812,13 @@
     ],
     "reuse_provenance": {
       "built_from_source_commit": "e29fc52895e7a539481af5dada39506b0a6719db",
-      "validated_source_commit": "80a930584b8848ee728b10c6df9743a17c851d38",
+      "validated_source_commit": "e05644b2fe602450a717fbb62f5a07c60fce5340",
       "validation": "git diff --quiet for all frontend inputs"
     }
   },
   "output": {
-    "files_excluding_manifest_and_audit": 4344,
-    "bytes_excluding_manifest_and_audit": 65995919
+    "files_excluding_manifest_and_audit": 4346,
+    "bytes_excluding_manifest_and_audit": 66005339
   },
   "files": [
     {
@@ -872,7 +874,7 @@
     {
       "path": "CHANGELOG.md",
       "origin": "injected_public_release_file",
-      "bytes": 1716
+      "bytes": 1941
     },
     {
       "path": "config/agents/agent-environments.v1.json",
@@ -1302,7 +1304,7 @@
     {
       "path": "packages/material-core/LICENSE",
       "origin": "git_tracked_source",
-      "bytes": 1074
+      "bytes": 1095
     },
     {
       "path": "packages/material-core/lint.js",
@@ -1417,7 +1419,7 @@
     {
       "path": "packages/material-view-react/LICENSE",
       "origin": "git_tracked_source",
-      "bytes": 1074
+      "bytes": 1095
     },
     {
       "path": "packages/material-view-react/package.json",
@@ -1772,7 +1774,7 @@
     {
       "path": "pyproject.toml",
       "origin": "git_tracked_source",
-      "bytes": 3505
+      "bytes": 3597
     },
     {
       "path": "README.md",
@@ -2012,7 +2014,7 @@
     {
       "path": "src/omnicompany/cli/commands/cc.py",
       "origin": "git_tracked_source",
-      "bytes": 55510
+      "bytes": 55503
     },
     {
       "path": "src/omnicompany/cli/commands/cc_reload.py",
@@ -2488,6 +2490,11 @@
       "path": "src/omnicompany/core/provider_identity.py",
       "origin": "git_tracked_source",
       "bytes": 10670
+    },
+    {
+      "path": "src/omnicompany/core/pycompat.py",
+      "origin": "git_tracked_source",
+      "bytes": 1556
     },
     {
       "path": "src/omnicompany/core/quiet_coordination.py",
@@ -6617,7 +6624,7 @@
     {
       "path": "src/omnicompany/dashboard/frontend/public/assets/cli/antigravity-color.svg",
       "origin": "git_tracked_source",
-      "bytes": 7635
+      "bytes": 7636
     },
     {
       "path": "src/omnicompany/dashboard/frontend/public/assets/cli/claudecode-color.svg",
@@ -14862,7 +14869,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/battle_plan_queue.py",
       "origin": "git_tracked_source",
-      "bytes": 16393
+      "bytes": 16414
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/battle_roster.py",
@@ -14872,7 +14879,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/battle_state.py",
       "origin": "git_tracked_source",
-      "bytes": 81084
+      "bytes": 81105
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/chapter_progression_run.py",
@@ -14917,12 +14924,12 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/intent_runtime.py",
       "origin": "git_tracked_source",
-      "bytes": 31584
+      "bytes": 31605
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/is_policy.py",
       "origin": "git_tracked_source",
-      "bytes": 57843
+      "bytes": 57864
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/is_runtime_integration.py",
@@ -14932,12 +14939,12 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/is_shell.py",
       "origin": "git_tracked_source",
-      "bytes": 13899
+      "bytes": 13920
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/live_battle.py",
       "origin": "git_tracked_source",
-      "bytes": 32489
+      "bytes": 32510
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/live_battle_run.py",
@@ -14957,7 +14964,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/maa_is_runtime.py",
       "origin": "git_tracked_source",
-      "bytes": 21529
+      "bytes": 21566
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/maa_operator.py",
@@ -15037,7 +15044,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/run_world_state.py",
       "origin": "git_tracked_source",
-      "bytes": 22676
+      "bytes": 22697
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/screens.py",
@@ -15077,7 +15084,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/tournament_lightweight.py",
       "origin": "git_tracked_source",
-      "bytes": 19875
+      "bytes": 19896
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/tournament_lightweight_hooks.py",
@@ -15112,7 +15119,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/tournament_sim/content_compiler.py",
       "origin": "git_tracked_source",
-      "bytes": 10466
+      "bytes": 10487
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/arknights/tournament_sim/effect_definitions.py",
@@ -15512,7 +15519,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/delegation/save_history.py",
       "origin": "git_tracked_source",
-      "bytes": 14032
+      "bytes": 14069
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/delegation/save_reader.py",
@@ -15562,7 +15569,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/design_extraction/exploration_promotion.py",
       "origin": "git_tracked_source",
-      "bytes": 22877
+      "bytes": 22914
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/design_extraction/live_facts.py",
@@ -15582,7 +15589,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/design_extraction/render_docs.py",
       "origin": "git_tracked_source",
-      "bytes": 31511
+      "bytes": 31548
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/design_extraction/render_live.py",
@@ -15687,7 +15694,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/metrics/build.py",
       "origin": "git_tracked_source",
-      "bytes": 2467
+      "bytes": 2504
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/metrics/dashboard.py",
@@ -15702,7 +15709,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/metrics/free_claims.py",
       "origin": "git_tracked_source",
-      "bytes": 22015
+      "bytes": 22052
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/metrics/guardian.py",
@@ -15717,7 +15724,7 @@
     {
       "path": "src/omnicompany/packages/domains/game_observatory/metrics/runs.py",
       "origin": "git_tracked_source",
-      "bytes": 35506
+      "bytes": 35543
     },
     {
       "path": "src/omnicompany/packages/domains/game_observatory/metrics/save_read.py",
@@ -18397,7 +18404,7 @@
     {
       "path": "src/omnicompany/packages/services/_core/material_core/types.py",
       "origin": "git_tracked_source",
-      "bytes": 1432
+      "bytes": 1415
     },
     {
       "path": "src/omnicompany/packages/services/_core/material_domains/__init__.py",
@@ -19222,7 +19229,7 @@
     {
       "path": "src/omnicompany/packages/services/_core/team_supervisor/run.py",
       "origin": "git_tracked_source",
-      "bytes": 16087
+      "bytes": 16124
     },
     {
       "path": "src/omnicompany/packages/services/_core/team_supervisor/SKILL.md",
@@ -19487,7 +19494,7 @@
     {
       "path": "src/omnicompany/packages/services/_diagnosis/doctor/agents/hypothesis_deriver.py",
       "origin": "git_tracked_source",
-      "bytes": 16177
+      "bytes": 16214
     },
     {
       "path": "src/omnicompany/packages/services/_diagnosis/doctor/agents/hypothesis_diagnostic.py",
@@ -20322,7 +20329,7 @@
     {
       "path": "src/omnicompany/packages/services/_focus/meegle_dispatch.py",
       "origin": "git_tracked_source",
-      "bytes": 19788
+      "bytes": 19976
     },
     {
       "path": "src/omnicompany/packages/services/_focus/plan_progress_recorder/__init__.py",
@@ -21777,7 +21784,7 @@
     {
       "path": "src/omnicompany/runtime/agent_runtime/client.py",
       "origin": "git_tracked_source",
-      "bytes": 10280
+      "bytes": 10288
     },
     {
       "path": "src/omnicompany/runtime/agent_runtime/domain_events.py",
@@ -21807,7 +21814,7 @@
     {
       "path": "src/omnicompany/runtime/agent_runtime/structured_runner.py",
       "origin": "git_tracked_source",
-      "bytes": 6393
+      "bytes": 6430
     },
     {
       "path": "src/omnicompany/runtime/buses/__init__.py",
@@ -21927,7 +21934,7 @@
     {
       "path": "src/omnicompany/runtime/info_audit/fallback.py",
       "origin": "git_tracked_source",
-      "bytes": 9844
+      "bytes": 9852
     },
     {
       "path": "src/omnicompany/runtime/info_audit/guarded_write.py",
@@ -22420,6 +22427,11 @@
       "bytes": 3553
     },
     {
+      "path": "tests/platform/test_python310_compat.py",
+      "origin": "git_tracked_source",
+      "bytes": 6147
+    },
+    {
       "path": "tests/platform/test_runtime_write_isolation.py",
       "origin": "git_tracked_source",
       "bytes": 1734
@@ -22462,7 +22474,7 @@
     {
       "path": "tests/protocol/test_agent_runtime_process_client.py",
       "origin": "git_tracked_source",
-      "bytes": 7726
+      "bytes": 8344
     },
     {
       "path": "tests/protocol/test_agent_runtime_rollout.py",

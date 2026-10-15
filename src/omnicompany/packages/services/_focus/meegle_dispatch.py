@@ -299,7 +299,7 @@ async def _submit_managed_pane(pane_id: str, message: str) -> dict[str, Any]:
     uri = f"ws://127.0.0.1:{daemon.port}/cc/sessions/{pane_id}/ws"
     try:
         async with websockets.connect(uri, max_size=None, open_timeout=5) as socket:
-            async with asyncio.timeout(10):
+            async def wait_for_snapshot():
                 while True:
                     payload = json.loads(await socket.recv())
                     if payload.get("type") == "exit":
@@ -311,11 +311,15 @@ async def _submit_managed_pane(pane_id: str, message: str) -> dict[str, Any]:
                     if payload.get("type") == "snapshot_end":
                         break
 
+            snapshot_error = await asyncio.wait_for(wait_for_snapshot(), timeout=10)
+            if snapshot_error is not None:
+                return snapshot_error
+
             # 终端的括号粘贴模式保证多行消息先作为一个输入块进入，再由 \r 提交。
             data = f"\x1b[200~{message}\x1b[201~\r"
             await socket.send(json.dumps({"type": "input", "data": data}, ensure_ascii=False))
             return {"ok": True, "submitted": True}
-    except (OSError, TimeoutError, websockets.WebSocketException) as exc:
+    except (OSError, TimeoutError, asyncio.TimeoutError, websockets.WebSocketException) as exc:
         return {"ok": False, "submitted": False, "error": str(exc)}
 
 

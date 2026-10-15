@@ -1,8 +1,6 @@
 """Public static types for Material Core graph payloads."""
 
-from __future__ import annotations
-
-from typing import NotRequired, TypedDict
+from omnicompany.core.pycompat import NotRequired, TypedDict
 
 
 class MaterialSourceRef(TypedDict):

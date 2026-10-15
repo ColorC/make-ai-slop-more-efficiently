@@ -180,6 +180,26 @@ async def test_process_client_rejects_invalid_request_before_spawn(tmp_path: Pat
 
 
 @pytest.mark.asyncio
+async def test_process_client_close_kills_a_host_that_ignores_stdin_eof() -> None:
+    import asyncio
+
+    client = AgentRuntimeProcessClient(
+        [sys.executable, "-u", "-c", "import sys,time; sys.stdin.read(); time.sleep(30)"],
+        close_timeout_seconds=0.02,
+    )
+    await client.start()
+    process = client._process
+    try:
+        await asyncio.wait_for(client.close(), timeout=5)
+        assert process.returncode is not None
+        assert client._process is None
+    finally:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
+
+
+@pytest.mark.asyncio
 async def test_process_client_sends_cancel_while_run_is_active(tmp_path: Path) -> None:
     import asyncio
 

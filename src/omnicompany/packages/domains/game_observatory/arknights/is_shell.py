@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from enum import StrEnum
+from omnicompany.core.pycompat import StrEnum
 from typing import Protocol, Sequence
 
 __all__ = [
