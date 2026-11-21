@@ -1,0 +1,41 @@
+/* 引导演示覆盖层。root pointer-events:none 让底下真实 UI 可交互，卡片/面板单独 auto。 */
+.demo-tour { position: fixed; inset: 0; z-index: 9000; pointer-events: none; }
+.demo-tour .demo-spotlight {
+  position: fixed; border: 2px solid #ffd166; border-radius: 8px;
+  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); transition: all 0.2s ease; pointer-events: none; z-index: 9001;
+}
+.demo-tour .demo-card {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  width: min(560px, 92vw); background: #14121a; border: 1px solid rgba(255, 209, 102, 0.5);
+  border-radius: 10px; padding: 12px 16px; color: #e8e4da; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  pointer-events: auto; z-index: 9002; font-family: inherit;
+}
+.demo-tour .demo-card.is-min { width: auto; min-width: 180px; padding: 6px 10px; }
+.demo-tour .demo-card.is-min .demo-card-head { margin-bottom: 0; }
+.demo-tour .demo-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.demo-tour .demo-drag { cursor: move; user-select: none; }
+.demo-tour .demo-mini { margin-left: auto; background: transparent; border: 0; color: #cbbf9f; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; }
+.demo-tour .demo-mini:hover { color: #ffd166; }
+.demo-tour .demo-step-counter { color: #ffd166; font-size: 12px; font-weight: 700; }
+.demo-tour .demo-step-title { font-size: 15px; }
+.demo-tour .demo-narration { font-size: 13.5px; line-height: 1.6; color: #cdc7bb; margin-bottom: 10px; }
+.demo-tour .demo-card-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.demo-tour .demo-btn {
+  background: #1f1b27; border: 1px solid rgba(255, 209, 102, 0.4); color: #e8e4da;
+  border-radius: 6px; padding: 4px 12px; font-size: 13px; cursor: pointer;
+}
+.demo-tour .demo-btn:disabled { opacity: 0.4; cursor: default; }
+.demo-tour .demo-btn.demo-comment { background: #ffd166; color: #1a1308; border: 0; font-weight: 700; }
+.demo-tour .demo-comment-panel {
+  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); width: min(520px, 90vw);
+  background: #1d1a24; border: 1px solid rgba(255, 209, 102, 0.4); border-radius: 8px; padding: 10px 12px;
+  pointer-events: auto; z-index: 9003; display: flex; flex-direction: column; gap: 8px;
+}
+.demo-tour .dcp-head { display: flex; justify-content: space-between; align-items: center; color: #ffd166; font-size: 13px; }
+.demo-tour .dcp-head .dcp-close { background: transparent; border: 0; color: #cbbf9f; cursor: pointer; }
+.demo-tour .dcp-input {
+  background: #14121a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 5px; color: #e8e4da;
+  padding: 6px 8px; font-size: 12.5px; min-height: 60px; resize: vertical; font-family: inherit;
+}
+.demo-tour .dcp-actions { display: flex; justify-content: flex-end; }
+.demo-tour .dcp-submit { background: #ffd166; color: #1a1308; border: 0; border-radius: 5px; padding: 4px 14px; font-weight: 700; cursor: pointer; }

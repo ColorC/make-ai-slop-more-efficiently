@@ -1,0 +1,44 @@
+{
+  "kind": "run.start",
+  "protocol_version": "0.1.0",
+  "request_id": "req-run-1",
+  "run_id": "run-1",
+  "session_id": "session-1",
+  "task_id": "task:example",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "workspace_cwd": "C:/workspace/omnicompany",
+  "input": {
+    "instructions": "Act as a read-only runtime boundary inspector.",
+    "text": "Inspect the runtime boundary and return a short report.",
+    "material_refs": ["material:example.input"],
+    "artifact_refs": []
+  },
+  "context": {
+    "context_refs": ["plan:_cross/[2026-08-14]AGENT-RUNTIME-EXTERNALIZATION"],
+    "material_refs": ["material:example.input"],
+    "artifact_refs": [],
+    "inline_context": ["The runtime may read but must not mutate the workspace."],
+    "provenance": ["decision:DEC-2026-08-14-004"]
+  },
+  "capability_grant": {
+    "grant_id": "grant:run-1",
+    "policy_ref": "policy:agent-runtime-readonly",
+    "permission_mode": "readonly",
+    "allowed_tools": [],
+    "allowed_material_refs": ["material:example.input"],
+    "allowed_read_roots": ["C:/workspace/omnicompany"],
+    "allowed_write_paths": [],
+    "allowed_write_roots": [],
+    "allowed_shell_roots": [],
+    "allowed_shell_command_prefixes": [],
+    "network_access": false
+  },
+  "budget": {
+    "max_output_tokens": 4096,
+    "max_steps": 8
+  },
+  "metadata": {
+    "source": "contract-fixture"
+  }
+}

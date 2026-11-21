@@ -1,0 +1,31 @@
+/* ============================================================
+   web_review 网页审阅(iframe 页) · 蓝图 G 壳层处理(2026-07-19 阶段四第四波):
+   iframe 内是外部内容(walker-game/vilo demo),不可达;本实体只做壳层:
+   · 工具行 = chrome 格纸(弱化路由 mono 虚线件 + 重载 iconbtn + ⋯),无重复标题。
+   · iframe = 白底外部内容,2px 白框纸件框住(浮在 scene 格纸上,与壳分层)。
+   ============================================================ */
+
+.wr-page { display: flex; flex-direction: column; height: 100%; min-height: 0;
+  overflow: hidden; box-sizing: border-box; color: var(--fp-text);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+
+/* 工具行(chrome 区) */
+.wr-tools { display: flex; align-items: center; gap: 10px; flex: none; padding: 6px 12px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+  background: transparent; /* G.7:私有格纸清除,透出 #bp-grid 统一连续网格 */ }
+/* 当前路由 = 虚线 mono 标注件(页签已标识身份,这里只标"看的是哪条路由") */
+.wr-route { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border: 1px dashed var(--fp-border); border-radius: var(--fp-r1);
+  color: var(--fp-text-3); font-size: var(--fp-fs-4); font-family: var(--fp-font-mono);
+  overflow: hidden; white-space: nowrap; }
+.wr-route .r { overflow: hidden; text-overflow: ellipsis; }
+
+/* iframe 外框 = 厚框纸件;iframe 本体保持白底(外部内容,不算面板 chrome) */
+.wr-frame { position: relative; flex: 1; min-height: 0; margin: 10px; overflow: hidden;
+  border: var(--fp-bp-frame-w) solid var(--fp-border); border-radius: var(--fp-r2);
+  box-shadow: var(--fp-shadow-sm); background: #fff; }
+.wr-frame iframe { display: block; width: 100%; height: 100%; border: none; background: #fff; }
+
+@media (max-width: 599px) {
+  .wr-frame { margin: 6px; }
+}

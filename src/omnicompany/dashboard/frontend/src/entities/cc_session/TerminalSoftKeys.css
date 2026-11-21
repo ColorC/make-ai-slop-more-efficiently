@@ -1,0 +1,24 @@
+/* Touch terminal soft keys appear above the active input without resizing the
+   xterm grid. Pointer-down focus retention keeps the IME open while tapping. */
+.cs-softkeys {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 21;
+  display: flex; gap: 6px;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 8px 6px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: var(--fp-bp-paper); border-bottom: 1px solid var(--fp-border-strong);
+  box-shadow: var(--fp-bp-shadow-pop);
+}
+.cs-softkey {
+  flex: 0 0 auto; min-width: 40px; height: 40px; padding: 0 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; border: 1px solid var(--fp-border-strong);
+  background: var(--fp-bp-paper-2); color: var(--fp-text);
+  font: 600 var(--fp-fs-3)/1 var(--fp-font-sans);
+  cursor: pointer; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+}
+.cs-softkey:active { transform: translateY(1px); background: var(--fp-bp-paper); }
+.cs-softkey-active {
+  border-color: var(--fp-accent-2); color: var(--fp-bp-paper-deep);
+  background: var(--fp-accent-2);
+}

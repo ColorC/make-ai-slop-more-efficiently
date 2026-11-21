@@ -1,0 +1,274 @@
+/* Workshop 札记完整外观。与 Omni 并列写全，不靠“没改就继承暗色”。
+   主题层 = 下面整表 token；定制层 = 圆角 / 软阴影 / 字体。 */
+html[data-notes-theme='workshop'] {
+  color-scheme: light;
+  background: #F7F3EB;
+  --notes-r: 8px;
+  --notes-r2: 12px;
+  --notes-r3: 16px;
+  --notes-shadow: 0 10px 24px rgba(80, 64, 48, 0.12);
+  --notes-shadow-menu: 0 12px 28px rgba(80, 64, 48, 0.16);
+  --notes-shadow-pop: 0 20px 48px rgba(80, 64, 48, 0.2);
+
+  --fp-bg: #F7F3EB;
+  --fp-bg-grad: none;
+  --fp-glass: rgba(255, 252, 246, 0.78);
+  --fp-glass-2: rgba(255, 252, 246, 0.92);
+  --fp-surface: #FFFCF6;
+  --fp-solid: #FFFCF6;
+  --fp-card: #FFFCF6;
+  --fp-bg-doc: #FFFCF6;
+  --fp-bg-overlay: #F0EADF;
+  --fp-border: #DED6C9;
+  --fp-border-strong: #CEC2B2;
+  --fp-border-subtle: #E6DDD0;
+  --fp-spec: 0 0 0 0 rgba(0, 0, 0, 0);
+  --fp-shadow: 0 10px 24px rgba(80, 64, 48, 0.12);
+  --fp-shadow-sm: 0 4px 12px rgba(80, 64, 48, 0.1);
+  --fp-shadow-pop: 0 16px 36px rgba(80, 64, 48, 0.16);
+  --fp-text: #332D27;
+  --fp-text-2: #73675B;
+  --fp-text-3: #9A8B7D;
+  --fp-accent: #A85E38;
+  --fp-accent-fg: #FFFCF6;
+  --fp-accent-weak: rgba(168, 94, 56, 0.12);
+  --fp-accent-2: #C47A4A;
+  --fp-link: #A85E38;
+  --fp-violet: #8A6A4A;
+  --fp-ok: #3F7D55;
+  --fp-warn: #B8862A;
+  --fp-err: #B44A3C;
+  --fp-idle: #9A8B7D;
+  --fp-blur: blur(10px);
+  --fp-r1: 8px;
+  --fp-r2: 12px;
+  --fp-r3: 16px;
+  --fp-r-pill: 999px;
+  --fp-r-sheet: 12px;
+
+  --fp-bp-scene: #F7F3EB;
+  --fp-bp-scene-grad: none;
+  --fp-bp-paper: #FFFCF6;
+  --fp-bp-paper-2: #F0EADF;
+  --fp-bp-solid: #FFFCF6;
+  --fp-bp-tracing: rgba(255, 252, 246, 0.86);
+  --fp-bp-tracing-strong: rgba(255, 252, 246, 0.96);
+  --fp-bp-tracing-blur: blur(10px);
+  --fp-bp-panel: rgba(255, 252, 246, 0.86);
+  --fp-bp-panel-hover: rgba(240, 234, 223, 0.94);
+  --fp-bp-panel-text: rgba(255, 252, 246, 0.96);
+  --fp-bp-panel-blur: blur(8px) saturate(120%);
+  --fp-bp-line: #DED6C9;
+  --fp-bp-line-strong: #CEC2B2;
+  --fp-bp-line-subtle: #E6DDD0;
+  --fp-bp-text: #332D27;
+  --fp-bp-text-2: #73675B;
+  --fp-bp-text-3: #9A8B7D;
+  --fp-bp-accent: #A85E38;
+  --fp-bp-accent-fg: #FFFCF6;
+  --fp-bp-accent-soft: rgba(168, 94, 56, 0.12);
+  --fp-bp-seal: #B44A3C;
+  --fp-bp-seal-soft: rgba(180, 74, 60, 0.14);
+  --fp-bp-stamp-idle: #9A8B7D;
+  --fp-bp-brass: #A85E38;
+  --fp-bp-brass-hi: #C47A4A;
+  --fp-bp-brass-soft: rgba(168, 94, 56, 0.14);
+  --fp-bp-ok: #3F7D55;
+  --fp-bp-warn: #B8862A;
+  --fp-bp-err: #B44A3C;
+  --fp-bp-idle: #9A8B7D;
+  --fp-bp-doc: #FFF8EC;
+  --fp-bp-doc-ink: #332D27;
+  --fp-bp-vellum: #F3E8D4;
+  --fp-bp-vellum-ink: #332D27;
+  --fp-bp-r1: 8px;
+  --fp-bp-r2: 12px;
+  --fp-bp-r3: 16px;
+  --fp-bp-shadow-sm: 0 4px 12px rgba(80, 64, 48, 0.1);
+  --fp-bp-shadow: 0 10px 24px rgba(80, 64, 48, 0.12);
+  --fp-bp-shadow-pop: 0 16px 36px rgba(80, 64, 48, 0.16);
+}
+
+html[data-notes-theme='workshop'],
+html[data-notes-theme='workshop'] body {
+  background: #F7F3EB;
+  color: #332D27;
+}
+
+html[data-notes-theme='workshop'] .material-notes-workspace {
+  --canvas-bg: #F7F3EB;
+  --canvas-panel: rgba(255, 252, 246, 0.96);
+  --canvas-card: #FFFCF6;
+  --canvas-border: #DED6C9;
+  --canvas-text: #332D27;
+  --canvas-muted: #9A8B7D;
+  --canvas-accent: #A85E38;
+}
+
+html[data-notes-theme='workshop'] input,
+html[data-notes-theme='workshop'] textarea,
+html[data-notes-theme='workshop'] select,
+html[data-notes-theme='workshop'] option,
+html[data-notes-theme='workshop'] button {
+  color-scheme: light !important;
+  color: #332D27 !important;
+  background: #FFFCF6 !important;
+  border-color: #DED6C9 !important;
+  caret-color: #332D27;
+}
+
+html[data-notes-theme='workshop'] input::placeholder,
+html[data-notes-theme='workshop'] textarea::placeholder {
+  color: #9A8B7D !important;
+}
+
+html[data-notes-theme='workshop'] .material-canvas-menu-trigger,
+html[data-notes-theme='workshop'] .material-canvas-menu,
+html[data-notes-theme='workshop'] .material-context-menu,
+html[data-notes-theme='workshop'] .material-dialog,
+html[data-notes-theme='workshop'] .material-relation-toolbar {
+  color: #332D27 !important;
+  background: rgba(255, 252, 246, 0.96) !important;
+  border-color: #DED6C9 !important;
+  box-shadow: var(--notes-shadow-menu);
+}
+
+html[data-notes-theme='workshop'] .material-canvas-menu > button,
+html[data-notes-theme='workshop'] .material-context-menu button,
+html[data-notes-theme='workshop'] .material-view-switch button,
+html[data-notes-theme='workshop'] .doc-outline-item,
+html[data-notes-theme='workshop'] .doc-toolbar button,
+html[data-notes-theme='workshop'] .material-toolbar-actions button,
+html[data-notes-theme='workshop'] .material-dialog button,
+html[data-notes-theme='workshop'] .material-canvas-boot button {
+  color: #332D27 !important;
+  background: #FFFCF6 !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .material-view-switch button {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+html[data-notes-theme='workshop'] .material-view-switch button.active,
+html[data-notes-theme='workshop'] .material-canvas-menu > button:hover,
+html[data-notes-theme='workshop'] .material-context-menu button:hover:not(:disabled),
+html[data-notes-theme='workshop'] .doc-outline-item:hover,
+html[data-notes-theme='workshop'] .doc-toolbar button:hover,
+html[data-notes-theme='workshop'] .material-toolbar-actions button:hover,
+html[data-notes-theme='workshop'] .material-dialog button:hover {
+  color: #332D27 !important;
+  background: #F0EADF !important;
+  border-color: #CEC2B2 !important;
+}
+
+html[data-notes-theme='workshop'] .material-canvas-name,
+html[data-notes-theme='workshop'] .doc-editor,
+html[data-notes-theme='workshop'] .material-card-body textarea,
+html[data-notes-theme='workshop'] .material-relation-toolbar input,
+html[data-notes-theme='workshop'] .material-search-form input {
+  color: #332D27 !important;
+  background: #FFFCF6 !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .doc-view,
+html[data-notes-theme='workshop'] .doc-outline,
+html[data-notes-theme='workshop'] .doc-block.editing,
+html[data-notes-theme='workshop'] .doc-block:hover {
+  color: #332D27 !important;
+  background: rgba(255, 252, 246, 0.86) !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .doc-block-tools button,
+html[data-notes-theme='workshop'] .doc-fullscreen-body header button,
+html[data-notes-theme='workshop'] .material-markdown-mode-button {
+  color: #73675B !important;
+  background: rgba(255, 252, 246, 0.96) !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .doc-fullscreen-body,
+html[data-notes-theme='workshop'] .material-fullscreen-layer,
+html[data-notes-theme='workshop'] .material-canvas-card,
+html[data-notes-theme='workshop'] .material-markdown-preview {
+  color: #332D27 !important;
+  background: #FFFCF6 !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .material-font-size-combobox,
+html[data-notes-theme='workshop'] .material-font-size-combobox input {
+  color: #332D27 !important;
+  background: #FFFCF6 !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .material-node-toolbar .material-font-size-toggle {
+  color: #73675B !important;
+  background: #F0EADF !important;
+  border-left-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .material-font-size-options {
+  color: #332D27 !important;
+  background: #FFFCF6 !important;
+  border-color: #DED6C9 !important;
+  box-shadow: var(--notes-shadow-menu);
+}
+
+html[data-notes-theme='workshop'] .material-font-size-options button,
+html[data-notes-theme='workshop'] .material-node-toolbar .material-font-size-options button {
+  color: #332D27 !important;
+  background: #FFFCF6 !important;
+}
+
+html[data-notes-theme='workshop'] .material-font-size-options button[aria-selected="true"],
+html[data-notes-theme='workshop'] .material-font-size-options button:hover {
+  color: #332D27 !important;
+  background: #F0EADF !important;
+}
+
+html[data-notes-theme='workshop'] .material-canvas-stage .react-flow__controls,
+html[data-notes-theme='workshop'] .material-notes-workspace .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid #DED6C9 !important;
+  border-radius: var(--notes-r) !important;
+  background: #FFFCF6 !important;
+  box-shadow: var(--notes-shadow) !important;
+}
+
+html[data-notes-theme='workshop'] .material-canvas-stage .react-flow__controls-button,
+html[data-notes-theme='workshop'] .material-notes-workspace .react-flow__controls-button {
+  width: 28px;
+  height: 28px;
+  color: #332D27 !important;
+  fill: #332D27 !important;
+  background: #FFFCF6 !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .material-canvas-stage .react-flow__controls-button svg,
+html[data-notes-theme='workshop'] .material-notes-workspace .react-flow__controls-button svg {
+  fill: currentColor !important;
+}
+
+html[data-notes-theme='workshop'] .material-canvas-stage .react-flow__controls-button:hover,
+html[data-notes-theme='workshop'] .material-notes-workspace .react-flow__controls-button:hover {
+  color: #332D27 !important;
+  background: #F0EADF !important;
+}
+
+html[data-notes-theme='workshop'] .material-node-toolbar {
+  color: #332D27 !important;
+  background: rgba(255, 252, 246, 0.96) !important;
+  border-color: #DED6C9 !important;
+}
+
+html[data-notes-theme='workshop'] .material-canvas-boot,
+html[data-notes-theme='workshop'] .material-preview-message,
+html[data-notes-theme='workshop'] .doc-loading {
+  color: #73675B !important;
+}

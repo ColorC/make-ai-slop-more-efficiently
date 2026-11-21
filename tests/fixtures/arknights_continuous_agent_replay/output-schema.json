@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema", "results"],
+  "properties": {
+    "schema": {"const": "arknights-continuous-agent-replay-result.v1"},
+    "results": {
+      "type": "array", "minItems": 20, "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["case_id", "commands", "query_turns", "decision_summary", "selected_operator_id", "candidate_ids", "gaps", "coverage_reasoning", "alternatives"],
+        "properties": {
+          "case_id": {"type": "string"},
+          "commands": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 12},
+          "query_turns": {"type": "integer", "minimum": 0, "maximum": 20},
+          "decision_summary": {"type": "string"},
+          "selected_operator_id": {"type": ["string", "null"]},
+          "candidate_ids": {"type": "array", "items": {"type": "string"}},
+          "gaps": {"type": "array", "items": {"type": "string"}},
+          "coverage_reasoning": {"type": "string"},
+          "alternatives": {"type": "array", "items": {"type": "object", "required": ["operator_id", "why_not"], "properties": {"operator_id": {"type": "string"}, "why_not": {"type": "string"}}, "additionalProperties": false}}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

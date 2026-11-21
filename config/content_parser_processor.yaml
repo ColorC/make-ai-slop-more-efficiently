@@ -1,0 +1,162 @@
+# Content Parser Processor Configuration
+# 内容解析处理器配置文件
+# 
+# This configuration defines parsing rules for extending filesystem content.
+# 此配置定义用于扩展文件系统内容的解析规则。
+
+name: "content_parser_processor"
+version: "1.0.0"
+description: "Extends content from filesystem and writes results to specified files"
+
+# Input configuration
+# 输入配置
+input:
+  type: "fs.content.file_text"
+  description: "Content fetched from filesystem"
+  supported_formats:
+    - text/plain
+    - fs.content.tool_executor
+    - json
+
+# Parsing rules
+# 解析规则
+parsing_rules:
+  # Rule 1: Extract JSON fields
+  # 规则 1: 提取 JSON 字段
+  - name: "extract_exit_code"
+    type: "json_extract"
+    description: "Extract exit_code from JSON output"
+    json_path: "exit_code"
+    enabled: true
+    metadata:
+      field_type: "int"
+  
+  # Rule 2: Extract stdout content
+  # 规则 2: 提取标准输出内容
+  - name: "extract_stdout"
+    type: "json_extract"
+    description: "Extract stdout from tool execution output"
+    json_path: "stdout"
+    enabled: true
+  
+  # Rule 3: Add line numbers
+  # 规则 3: 添加行号
+  - name: "add_line_numbers"
+    type: "text_transform"
+    description: "Add line numbers to content"
+    transform_func: "add_line_numbers"
+    enabled: false
+  
+  # Rule 4: Regex pattern matching
+  # 规则 4: 正则表达式匹配
+  - name: "find_timestamps"
+    type: "regex"
+    description: "Find timestamp patterns in content"
+    pattern: "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
+    replacement: "[TIMESTAMP]"
+    enabled: false
+    metadata:
+      multiline: false
+      ignorecase: false
+  
+  # Rule 5: Clean whitespace
+  # 规则 5: 清理空白字符
+  - name: "clean_whitespace"
+    type: "text_transform"
+    description: "Normalize whitespace in content"
+    transform_func: "strip_whitespace"
+    enabled: false
+  
+  # Rule 6: Remove empty lines
+  # 规则 6: 移除空行
+  - name: "remove_empty_lines"
+    type: "text_transform"
+    description: "Remove empty lines from content"
+    transform_func: "remove_empty_lines"
+    enabled: false
+
+# Output configuration
+# 输出配置
+output:
+  format: "json"
+  include_metadata: true
+  include_diagnostics: true
+  pretty_print: true
+  encoding: "utf-8"
+
+# Output types produced
+# 生成的输出类型
+output_types:
+  - "fs.content.processed"
+  - "fs.path.output_file"
+  - "content_parser_processor.result"
+
+# Error handling
+# 错误处理
+error_handling:
+  on_parse_error:
+    action: "log_and_continue"
+    log_level: "WARNING"
+  
+  on_file_write_error:
+    action: "raise"
+    include_original: true
+
+# Usage examples
+# 使用示例
+usage_examples:
+  python: |
+    from handlers.content_parser_processor import ContentParserProcessor, ParseRule, ParseRuleType
+    
+    # Create processor with config
+    config = {
+        "parsing_rules": [
+            {
+                "name": "extract_data",
+                "type": "json_extract",
+                "json_path": "data"
+            }
+        ]
+    }
+    processor = ContentParserProcessor(config)
+    
+    # Process content
+    content = '{"exit_code": 0, "stdout": "Hello World"}'
+    result = processor.parse(content, source_type="fs.content.tool_executor")
+    
+    # Write result
+    output_path = processor.write_result(result, "output.json")
+    print(f"Written to: {output_path}")
+  
+  cli_basic: |
+    # Basic usage: read from file, write to output
+    python handlers/content_parser_processor.py -i input.txt -o output.json
+  
+  cli_with_config: |
+    # Use configuration file
+    python handlers/content_parser_processor.py -c config/content_parser_processor.yaml -i input.json -o processed.json
+  
+  cli_stdin: |
+    # Read from stdin
+    cat input.txt | python handlers/content_parser_processor.py -o output.json
+  
+  cli_verbose: |
+    # Verbose mode with dry-run
+    python handlers/content_parser_processor.py -v --dry-run -i input.txt
+
+# Integration with tool executor
+# 与工具执行器集成
+tool_executor_integration:
+  input_types:
+    - "fs.content.file_text"
+    - "fs.content.tool_executor"
+    - "bash.stdout.text"
+  
+  output_types:
+    - "fs.content.processed"
+    - "content_parser_processor.result"
+  
+  compatible_tools:
+    - "bash"
+    - "str_replace_editor"
+    - "tool_executor_formatter"

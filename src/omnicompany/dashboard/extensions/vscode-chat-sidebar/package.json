@@ -1,0 +1,180 @@
+{
+  "name": "omni-chat",
+  "displayName": "Omni Chat",
+  "description": "Permanent thin loader for the BOSS SIGHT cockpit; impl hot-swaps from the repo without restarting VSCode.",
+  "version": "0.3.4",
+  "publisher": "omnicompany",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/loader.js",
+  "activationEvents": [
+    "onWebviewPanel:omniChat",
+    "onUri"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "omniChat.openInEditor",
+        "title": "Open in Editor Tab",
+        "category": "Omni Chat",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "omniChat.focusSidebar",
+        "title": "Focus Sidebar",
+        "category": "Omni Chat"
+      },
+      {
+        "command": "omniChat.backendStatus",
+        "title": "Backend Status",
+        "category": "Omni Chat"
+      },
+      {
+        "command": "omniChat.restartBackend",
+        "title": "Restart Backend",
+        "category": "Omni Chat"
+      },
+      {
+        "command": "omniChat.reloadWebviews",
+        "title": "Reload Webviews",
+        "category": "Omni Chat"
+      },
+      {
+        "command": "omniChat.hotReloadImpl",
+        "title": "Hot Reload Impl",
+        "category": "Omni Chat"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "omniChat.openInEditor",
+          "when": "view == omniChat.project",
+          "group": "navigation"
+        },
+        {
+          "command": "omniChat.restartBackend",
+          "when": "view == omniChat.project",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "omniChat",
+          "title": "Omni Chat",
+          "icon": "$(comment-discussion)"
+        },
+        {
+          "id": "omniChatAux",
+          "title": "Omni Chat 评论",
+          "icon": "$(comment)"
+        }
+      ]
+    },
+    "views": {
+      "omniChat": [
+        {
+          "type": "webview",
+          "id": "omniChat.project",
+          "name": "项目",
+          "icon": "$(project)"
+        },
+        {
+          "type": "webview",
+          "id": "omniChat.plan",
+          "name": "计划",
+          "icon": "$(checklist)"
+        },
+        {
+          "type": "webview",
+          "id": "omniChat.threads",
+          "name": "对话",
+          "icon": "$(comment-discussion)"
+        },
+        {
+          "type": "webview",
+          "id": "omniChat.multiagent",
+          "name": "Agent",
+          "icon": "$(server-process)"
+        },
+        {
+          "type": "webview",
+          "id": "omniChat.queue",
+          "name": "审阅材料",
+          "icon": "$(inbox)"
+        },
+        {
+          "type": "webview",
+          "id": "omniChat.reviewOverview",
+          "name": "审阅总览",
+          "icon": "$(book)"
+        },
+        {
+          "type": "webview",
+          "id": "omniChat.authored",
+          "name": "札记",
+          "icon": "$(note)"
+        }
+      ],
+      "omniChatAux": [
+        {
+          "type": "webview",
+          "id": "omniChat.comments",
+          "name": "评论 / 对话",
+          "icon": "$(comment)"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Omni Chat",
+      "properties": {
+        "omniChat.dashboardUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Override dashboard URL. Empty uses the BOSS SIGHT cockpit at omniChat.dashboardPort."
+        },
+        "omniChat.backendRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the omnicompany repo root. Empty auto-detects from the open workspace."
+        },
+        "omniChat.dashboardPort": {
+          "type": "number",
+          "default": 8210,
+          "description": "Dashboard/controlplane port started by the VSCode OmniChat supervisor."
+        },
+        "omniChat.daemonPort": {
+          "type": "number",
+          "default": 8201,
+          "description": "ccdaemon port started by the VSCode OmniChat supervisor."
+        },
+        "omniChat.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python executable used to start dashboard and ccdaemon."
+        },
+        "omniChat.autoStartBackend": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start dashboard and ccdaemon automatically when OmniChat opens."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

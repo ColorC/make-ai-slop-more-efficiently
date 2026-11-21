@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workshop.example.com/schema/workshop/plugin/v1",
+  "title": "后端插件登记 plugin v1",
+  "description": "项目插件登记表里的一条（projects/<项目>/plugins/registry.json 的 plugins.<id>）。kind：transform 跑在沙箱、可调接口；script 跑在本机运行器、可读写声明的目录；view 是网页扩展（发布成 /views/<viewId>）。上传后 pending，管理员 approve 后才能运行或发布。",
+  "type": "object",
+  "required": [
+    "id",
+    "manifest",
+    "revision",
+    "status",
+    "owner",
+    "createdAt",
+    "updatedAt",
+    "files"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,40}$",
+      "description": "插件 id（小写字母数字与 -）。"
+    },
+    "manifest": {
+      "$ref": "#/$defs/manifest",
+      "description": "插件自述（plugin.json 原样）：id、kind、权限、预算、入口。"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "上传序号，每次 put 加一。"
+    },
+    "decisionRevision": {
+      "type": "integer",
+      "description": "审批针对的 revision。"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "archived"
+      ],
+      "description": "审批状态。"
+    },
+    "owner": {
+      "$ref": "#/$defs/actor",
+      "description": "上传者。"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "登记时间（ISO）。"
+    },
+    "updatedAt": {
+      "type": "string",
+      "description": "最近修改时间（ISO）。"
+    },
+    "approvedBy": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/actor"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "批准人（未批准为 null）。"
+    },
+    "approvedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "批准时间（ISO；未批准为 null）。"
+    },
+    "note": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "审批备注 / 驳回原因。"
+    },
+    "files": {
+      "type": "array",
+      "description": "包内文件清单。",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "size"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "插件包内相对路径。"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "字节数。"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "内容哈希。"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "publishedView": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/published"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "view 型最近一次发布。"
+    },
+    "publishedViews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/published"
+      },
+      "description": "全部已发布的网页扩展（一个插件可发多页）。"
+    },
+    "purgedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "彻底清除时间（ISO；未清除为 null）。"
+    },
+    "purgeReceipts": {
+      "type": "object",
+      "description": "清除回执（删了哪些文件、谁删的）。"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "actor": {
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "上传人账号 id。"
+        },
+        "name": {
+          "type": "string",
+          "description": "上传人显示名。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "published": {
+      "type": "object",
+      "required": [
+        "viewId",
+        "viewRevision",
+        "pluginRevision"
+      ],
+      "properties": {
+        "viewId": {
+          "type": "string",
+          "description": "网页扩展 id。"
+        },
+        "viewRevision": {
+          "type": "integer",
+          "description": "网页扩展版本。"
+        },
+        "pluginRevision": {
+          "type": "integer",
+          "description": "对应的插件版本。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "manifest": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "entry",
+        "permissions",
+        "budget"
+      ],
+      "description": "插件清单（包根 manifest.json，上传时校验）。",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,40}$",
+          "description": "插件 id（项目内唯一）。"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "显示名。"
+        },
+        "description": {
+          "type": "string",
+          "description": "一句话说明。"
+        },
+        "kind": {
+          "enum": [
+            "transform",
+            "script",
+            "view"
+          ],
+          "description": "transform 沙箱 / script 本机运行器 / view 网页扩展。"
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "入口文件；view 缺省 index.html，其余缺省 main.js。"
+        },
+        "view": {
+          "type": "object",
+          "required": [
+            "viewId",
+            "baseRevision"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "发布成的网页扩展 id（/views/<viewId>）。"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "description": "基于网页扩展的哪一版（乐观锁）。"
+            },
+            "boundMaterialId": {
+              "type": "string",
+              "description": "绑定的资料 id。"
+            },
+            "boundCanvasId": {
+              "type": "string",
+              "description": "绑定的画布 id。"
+            }
+          },
+          "additionalProperties": false,
+          "description": "view 型：发布到哪个网页扩展、绑定哪份资料或画布。"
+        },
+        "permissions": {
+          "type": "object",
+          "required": [
+            "api",
+            "read",
+            "write"
+          ],
+          "properties": {
+            "api": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "允许调用的 Workshop 接口前缀。"
+            },
+            "read": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "允许读的数据范围。"
+            },
+            "write": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "允许写的数据范围。"
+            }
+          },
+          "additionalProperties": false,
+          "description": "transform 只许 api；script 只许 read/write。"
+        },
+        "budget": {
+          "type": "object",
+          "required": [
+            "wallMs",
+            "cpuMs",
+            "memoryMb",
+            "apiCalls",
+            "scratchBytes"
+          ],
+          "properties": {
+            "wallMs": {
+              "type": "number",
+              "description": "墙钟时间上限（毫秒）。"
+            },
+            "cpuMs": {
+              "type": "number",
+              "description": "CPU 时间上限（毫秒）。"
+            },
+            "memoryMb": {
+              "type": "number",
+              "description": "内存上限（MB）。"
+            },
+            "apiCalls": {
+              "type": "number",
+              "description": "接口调用次数上限。"
+            },
+            "scratchBytes": {
+              "type": "number",
+              "description": "临时目录字节上限。"
+            }
+          },
+          "additionalProperties": false,
+          "description": "单次运行预算（超了就停）。"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "x-wsh": {
+    "kind": "plugin",
+    "title": "后端插件",
+    "ts": "server/src/plugins/registry.ts → PluginRecord / PluginManifest",
+    "store": "projects/<项目>/plugins/registry.json（plugins.<id>）+ 包文件",
+    "routes": "GET/POST /api/plugins、POST /api/plugins/:id/{status,run,purge}、DELETE /api/plugins/:id",
+    "web": "工作区管理 → 扩展",
+    "commands": [
+      {
+        "verb": "ls",
+        "cmd": "wsh plugin ls"
+      },
+      {
+        "verb": "get",
+        "cmd": "wsh plugin show <id>"
+      },
+      {
+        "verb": "new",
+        "cmd": "wsh plugin put <目录>",
+        "note": "目录根放 manifest.json；管理员可加 --approve"
+      },
+      {
+        "verb": "set",
+        "cmd": "wsh plugin put <目录>",
+        "note": "同 id 再上传 = 新 revision，重新待审"
+      },
+      {
+        "verb": "rm",
+        "cmd": "wsh plugin rm <id>"
+      }
+    ],
+    "example": {
+      "id": "hello-transform",
+      "title": "示例转换",
+      "kind": "transform",
+      "entry": "main.js",
+      "permissions": {
+        "api": [
+          "GET /api/canvases"
+        ],
+        "read": [],
+        "write": []
+      },
+      "budget": {
+        "wallMs": 30000,
+        "cpuMs": 10000,
+        "memoryMb": 64,
+        "apiCalls": 20,
+        "scratchBytes": 16777216
+      }
+    },
+    "exampleNote": "这是包根 manifest.json 的写法（= 登记记录的 manifest 字段）。"
+  }
+}

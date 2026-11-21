@@ -1,0 +1,22 @@
+site_name: Make AI Slop More Efficiently
+site_description: AI 原生的软件工厂 —— 给命令行 AI agent 一个声明清晰、全程留痕、能自我诊断修复的工作环境（包 omnicompany / 命令 omni）。
+repo_url: https://github.com/ColorC/make-ai-slop-more-efficiently
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - tables
+
+# 不写显式 nav: mkdocs 按 docs/ 目录结构自动建导航(index.md 为首页)。

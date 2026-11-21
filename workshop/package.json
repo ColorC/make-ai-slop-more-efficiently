@@ -1,0 +1,8 @@
+{
+  "name": "workshop-core",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": { "test": "node --experimental-strip-types --test test/*.test.mjs" },
+  "dependencies": { "quickjs-emscripten": "^0.32.0" }
+}

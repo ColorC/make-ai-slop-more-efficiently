@@ -1,0 +1,570 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnicompany.local/contracts/agent-runtime/v0/agent-runtime.schema.json",
+  "title": "Omni AgentRuntime protocol v0",
+  "oneOf": [
+    { "$ref": "#/$defs/CapabilitiesRequest" },
+    { "$ref": "#/$defs/CapabilitiesResponse" },
+    { "$ref": "#/$defs/RunStart" },
+    { "$ref": "#/$defs/RunResume" },
+    { "$ref": "#/$defs/RunCancel" },
+    { "$ref": "#/$defs/RunApproval" },
+    { "$ref": "#/$defs/RunState" },
+    { "$ref": "#/$defs/RunOutputDelta" },
+    { "$ref": "#/$defs/RunApprovalRequested" },
+    { "$ref": "#/$defs/RunMaterialProposed" },
+    { "$ref": "#/$defs/RunArtifactProduced" },
+    { "$ref": "#/$defs/RunWarning" },
+    { "$ref": "#/$defs/RunResult" }
+  ],
+  "$defs": {
+    "NonBlank": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "ProtocolVersion": {
+      "const": "0.1.0"
+    },
+    "RequestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "RunId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "Timestamp": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 40,
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T"
+    },
+    "Ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "RefList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Ref" },
+      "uniqueItems": true,
+      "maxItems": 1024
+    },
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "maxProperties": 128
+    },
+    "RuntimeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime_id", "implementation", "implementation_version"],
+      "properties": {
+        "runtime_id": { "$ref": "#/$defs/NonBlank" },
+        "implementation": { "$ref": "#/$defs/NonBlank" },
+        "implementation_version": { "$ref": "#/$defs/NonBlank" }
+      }
+    },
+    "RuntimeFeatures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "streaming",
+        "session_resume",
+        "context_fork",
+        "approval",
+        "cancel",
+        "parallel_runs"
+      ],
+      "properties": {
+        "streaming": { "type": "boolean" },
+        "session_resume": { "type": "boolean" },
+        "context_fork": { "type": "boolean" },
+        "approval": { "type": "boolean" },
+        "cancel": { "enum": ["none", "process", "run"] },
+        "parallel_runs": { "type": "boolean" }
+      }
+    },
+    "RuntimeLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_parallel_runs"],
+      "properties": {
+        "max_parallel_runs": { "type": "integer", "minimum": 1 },
+        "max_inline_context_bytes": { "type": "integer", "minimum": 1 },
+        "max_output_bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ContextEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_refs",
+        "material_refs",
+        "artifact_refs",
+        "inline_context",
+        "provenance"
+      ],
+      "properties": {
+        "context_refs": { "$ref": "#/$defs/RefList" },
+        "material_refs": { "$ref": "#/$defs/RefList" },
+        "artifact_refs": { "$ref": "#/$defs/RefList" },
+        "inline_context": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 128
+        },
+        "provenance": { "$ref": "#/$defs/RefList" },
+        "checkpoint_ref": { "$ref": "#/$defs/Ref" }
+      }
+    },
+    "CapabilityGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grant_id",
+        "policy_ref",
+        "permission_mode",
+        "allowed_tools",
+        "allowed_read_roots",
+        "allowed_write_paths",
+        "allowed_write_roots",
+        "allowed_shell_roots",
+        "allowed_shell_command_prefixes",
+        "network_access"
+      ],
+      "properties": {
+        "grant_id": { "$ref": "#/$defs/NonBlank" },
+        "policy_ref": { "$ref": "#/$defs/Ref" },
+        "permission_mode": { "enum": ["readonly", "workspace-write"] },
+        "allowed_tools": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NonBlank" },
+          "uniqueItems": true,
+          "maxItems": 256
+        },
+        "allowed_material_refs": { "$ref": "#/$defs/RefList" },
+        "allowed_read_roots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NonBlank" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "allowed_write_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NonBlank" },
+          "uniqueItems": true
+        },
+        "allowed_write_roots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NonBlank" },
+          "uniqueItems": true
+        },
+        "allowed_shell_roots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NonBlank" },
+          "uniqueItems": true
+        },
+        "allowed_shell_command_prefixes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NonBlank" },
+          "uniqueItems": true
+        },
+        "network_access": { "type": "boolean" },
+        "expires_at": { "$ref": "#/$defs/Timestamp" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "permission_mode": { "const": "readonly" } },
+            "required": ["permission_mode"]
+          },
+          "then": {
+            "properties": {
+              "allowed_tools": {
+                "not": {
+                  "type": "array",
+                  "contains": {
+                    "enum": ["bash", "powershell", "edit", "write"]
+                  }
+                }
+              },
+              "allowed_write_paths": { "type": "array", "maxItems": 0 },
+              "allowed_write_roots": { "type": "array", "maxItems": 0 },
+              "allowed_shell_roots": { "type": "array", "maxItems": 0 },
+              "allowed_shell_command_prefixes": { "type": "array", "maxItems": 0 },
+              "network_access": { "type": "boolean", "const": false }
+            }
+          }
+        }
+      ]
+    },
+    "RunInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "material_refs", "artifact_refs"],
+      "properties": {
+        "instructions": { "$ref": "#/$defs/NonBlank" },
+        "text": { "$ref": "#/$defs/NonBlank" },
+        "material_refs": { "$ref": "#/$defs/RefList" },
+        "artifact_refs": { "$ref": "#/$defs/RefList" },
+        "expected_output_schema": {
+          "type": "object",
+          "minProperties": 1
+        }
+      }
+    },
+    "RunBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deadline_at": { "$ref": "#/$defs/Timestamp" },
+        "max_output_tokens": { "type": "integer", "minimum": 1 },
+        "max_steps": { "type": "integer", "minimum": 1 },
+        "max_cost_microunits": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "FinalOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" },
+        "structured": {}
+      }
+    },
+    "Usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "cached_tokens": { "type": "integer", "minimum": 0 },
+        "cost_microunits": { "type": "integer", "minimum": 0 },
+        "duration_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "RuntimeError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": {
+          "enum": [
+            "contract_error",
+            "permission_denied",
+            "approval_rejected",
+            "budget_exceeded",
+            "timeout",
+            "runtime_crash",
+            "provider_error",
+            "invalid_output",
+            "tool_error",
+            "unsupported_capability",
+            "cancelled",
+            "unknown"
+          ]
+        },
+        "message": { "$ref": "#/$defs/NonBlank" },
+        "retryable": { "type": "boolean" },
+        "details": { "$ref": "#/$defs/Metadata" }
+      }
+    },
+    "CapabilitiesRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "protocol_version", "request_id"],
+      "properties": {
+        "kind": { "const": "runtime.capabilities.request" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "request_id": { "$ref": "#/$defs/RequestId" }
+      }
+    },
+    "CapabilitiesResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "request_id",
+        "runtime",
+        "supported_protocol_versions",
+        "features",
+        "limits"
+      ],
+      "properties": {
+        "kind": { "const": "runtime.capabilities" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "runtime": { "$ref": "#/$defs/RuntimeIdentity" },
+        "supported_protocol_versions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ProtocolVersion" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "features": { "$ref": "#/$defs/RuntimeFeatures" },
+        "limits": { "$ref": "#/$defs/RuntimeLimits" },
+        "metadata": { "$ref": "#/$defs/Metadata" }
+      }
+    },
+    "RunStart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "request_id",
+        "run_id",
+        "session_id",
+        "provider",
+        "model",
+        "workspace_cwd",
+        "input",
+        "context",
+        "capability_grant",
+        "budget"
+      ],
+      "properties": {
+        "kind": { "const": "run.start" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "session_id": { "$ref": "#/$defs/NonBlank" },
+        "task_id": { "$ref": "#/$defs/Ref" },
+        "team_id": { "$ref": "#/$defs/Ref" },
+        "position_id": { "$ref": "#/$defs/Ref" },
+        "parent_run_id": { "$ref": "#/$defs/RunId" },
+        "provider": { "$ref": "#/$defs/NonBlank" },
+        "model": { "$ref": "#/$defs/NonBlank" },
+        "workspace_cwd": { "$ref": "#/$defs/NonBlank" },
+        "input": { "$ref": "#/$defs/RunInput" },
+        "context": { "$ref": "#/$defs/ContextEnvelope" },
+        "capability_grant": { "$ref": "#/$defs/CapabilityGrant" },
+        "budget": { "$ref": "#/$defs/RunBudget" },
+        "metadata": { "$ref": "#/$defs/Metadata" }
+      }
+    },
+    "RunResume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "request_id",
+        "run_id",
+        "checkpoint_ref",
+        "capability_grant"
+      ],
+      "properties": {
+        "kind": { "const": "run.resume" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "checkpoint_ref": { "$ref": "#/$defs/Ref" },
+        "input": { "$ref": "#/$defs/RunInput" },
+        "capability_grant": { "$ref": "#/$defs/CapabilityGrant" },
+        "metadata": { "$ref": "#/$defs/Metadata" }
+      }
+    },
+    "RunCancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "protocol_version", "request_id", "run_id", "reason"],
+      "properties": {
+        "kind": { "const": "run.cancel" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "reason": { "$ref": "#/$defs/NonBlank" }
+      }
+    },
+    "RunApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "request_id",
+        "run_id",
+        "approval_id",
+        "decision"
+      ],
+      "properties": {
+        "kind": { "const": "run.approval" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "approval_id": { "$ref": "#/$defs/NonBlank" },
+        "decision": { "enum": ["approve", "reject", "amend"] },
+        "amendments": { "$ref": "#/$defs/Metadata" }
+      }
+    },
+    "EventBase": {
+      "type": "object",
+      "required": ["protocol_version", "run_id", "sequence", "timestamp"],
+      "properties": {
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" }
+      }
+    },
+    "RunState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "protocol_version", "run_id", "sequence", "timestamp", "state"],
+      "properties": {
+        "kind": { "const": "run.state" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" },
+        "state": { "enum": ["starting", "running", "awaiting_human", "cancelling"] },
+        "checkpoint_ref": { "$ref": "#/$defs/Ref" }
+      }
+    },
+    "RunOutputDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "protocol_version", "run_id", "sequence", "timestamp", "text"],
+      "properties": {
+        "kind": { "const": "run.output.delta" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" },
+        "text": { "type": "string" }
+      }
+    },
+    "RunApprovalRequested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "run_id",
+        "sequence",
+        "timestamp",
+        "approval_id",
+        "action",
+        "reason"
+      ],
+      "properties": {
+        "kind": { "const": "run.approval.requested" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" },
+        "approval_id": { "$ref": "#/$defs/NonBlank" },
+        "action": { "$ref": "#/$defs/NonBlank" },
+        "reason": { "$ref": "#/$defs/NonBlank" },
+        "details": { "$ref": "#/$defs/Metadata" },
+        "checkpoint_ref": { "$ref": "#/$defs/Ref" }
+      }
+    },
+    "RunMaterialProposed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "run_id",
+        "sequence",
+        "timestamp",
+        "material_ref"
+      ],
+      "properties": {
+        "kind": { "const": "run.material.proposed" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" },
+        "material_ref": { "$ref": "#/$defs/Ref" },
+        "role": { "$ref": "#/$defs/NonBlank" }
+      }
+    },
+    "RunArtifactProduced": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "run_id",
+        "sequence",
+        "timestamp",
+        "artifact_ref"
+      ],
+      "properties": {
+        "kind": { "const": "run.artifact.produced" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" },
+        "artifact_ref": { "$ref": "#/$defs/Ref" },
+        "media_type": { "$ref": "#/$defs/NonBlank" }
+      }
+    },
+    "RunWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "protocol_version", "run_id", "sequence", "timestamp", "code", "message"],
+      "properties": {
+        "kind": { "const": "run.warning" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "timestamp": { "$ref": "#/$defs/Timestamp" },
+        "code": { "$ref": "#/$defs/NonBlank" },
+        "message": { "$ref": "#/$defs/NonBlank" },
+        "details": { "$ref": "#/$defs/Metadata" }
+      }
+    },
+    "RunResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "protocol_version",
+        "request_id",
+        "run_id",
+        "session_id",
+        "status",
+        "final_output",
+        "material_refs",
+        "artifact_refs",
+        "usage"
+      ],
+      "properties": {
+        "kind": { "const": "run.result" },
+        "protocol_version": { "$ref": "#/$defs/ProtocolVersion" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "run_id": { "$ref": "#/$defs/RunId" },
+        "session_id": { "$ref": "#/$defs/NonBlank" },
+        "status": { "enum": ["succeeded", "failed", "cancelled", "timed_out", "permission_denied"] },
+        "final_output": { "$ref": "#/$defs/FinalOutput" },
+        "material_refs": { "$ref": "#/$defs/RefList" },
+        "artifact_refs": { "$ref": "#/$defs/RefList" },
+        "usage": { "$ref": "#/$defs/Usage" },
+        "checkpoint_ref": { "$ref": "#/$defs/Ref" },
+        "error": { "$ref": "#/$defs/RuntimeError" },
+        "metadata": { "$ref": "#/$defs/Metadata" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["failed", "timed_out", "permission_denied"] } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "error": { "$ref": "#/$defs/RuntimeError" } },
+            "required": ["error"]
+          }
+        }
+      ]
+    }
+  }
+}

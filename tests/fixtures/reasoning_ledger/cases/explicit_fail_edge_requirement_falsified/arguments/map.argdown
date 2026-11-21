@@ -1,0 +1,15 @@
+[H-034]: 没有显式 condition=FAIL edge 的 team 可能缺错误处理。
+  + <V19 batch finding>
+  - <V21 csv_to_md counterexample>
+  - <V26 five fail patterns>
+
+[H-038]: team 的合法错误处理可以通过多种模式体现，不能只检查显式 condition=FAIL edge。
+  + <V21 csv_to_md counterexample>
+  + <V26 five fail patterns>
+  -> [H-034]
+
+<V19 batch finding>: V19/V20 批量诊断中，多个 team 在字面扫描下缺少显式 condition=FAIL edge。
+
+<V21 csv_to_md counterexample>: csv_to_md 没有显式 FAIL edge，但通过节点内 Verdict(FAIL)+RETRY 合法处理错误。
+
+<V26 five fail patterns>: V26 审计发现至少五种错误处理模式，显式 FAIL edge 只是其中一种。

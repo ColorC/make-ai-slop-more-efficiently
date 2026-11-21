@@ -1,0 +1,32 @@
+{
+  "name": "@omni/dashboard-notes-web",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "OmniDashboard 唯一画布前端(notes-web 三视图: 画布/文档/审阅)。2026-08-17 从已退役的 overlay-shell 仓移植至此, 由 dashboard ui-update 统一构建并经 8210 /lofa/overlay/app/ 服务。",
+  "scripts": {
+    "build": "vite build --config vite.web.config.ts",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@omni/material-core": "file:../../../../packages/material-core",
+    "@omni/material-note-core": "file:../../../../packages/material-note-core",
+    "@omni/table-view-core": "file:../../../../packages/table-view-core",
+    "@tauri-apps/api": "^2",
+    "@xyflow/react": "^12.11.2",
+    "dompurify": "^3.4.11",
+    "elkjs": "^0.12.0",
+    "lucide-react": "^1.21.0",
+    "micromark": "^4.0.2",
+    "micromark-extension-gfm": "^3.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}

@@ -1,0 +1,30 @@
+.wiki-core-markdown {
+  min-width: 0;
+}
+
+/* Wiki Core deliberately emits a readable fallback link for transclusions.
+   Once a Material Core/Review renderer is mounted into that same canonical
+   placeholder, hide only the fallback link—not the placeholder itself. */
+.wiki-core-markdown .transclude.wiki-core-rich-embed > .transclude-fallback {
+  display: none;
+}
+
+.wiki-core-material-embed {
+  min-width: 0;
+  margin: 14px 0;
+  border: 1px solid var(--fp-border-subtle);
+  background: var(--fp-surface);
+}
+
+.wiki-core-material-embed > header {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+  color: var(--fp-text-2);
+  font-size: 12px;
+}
+
+.wiki-core-material-embed__surface {
+  height: clamp(320px, 58vh, 720px);
+  min-width: 0;
+  overflow: hidden;
+}

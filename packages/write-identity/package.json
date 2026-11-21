@@ -1,0 +1,16 @@
+{
+  "name": "@omni/write-identity",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Passive write-identity resolver for Node callers: machine (MachineGuid + owner binding), agent runtime, vendor-native session id (the jsonl file on disk), purpose/batch. Shared by workshop server, canvas builders and CLIs; no host repository dependency.",
+  "license": "MIT",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": { ".": "./index.ts" },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@omni/material-core": "file:../material-core"
+  }
+}

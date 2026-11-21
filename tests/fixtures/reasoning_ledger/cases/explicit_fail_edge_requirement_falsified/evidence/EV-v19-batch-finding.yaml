@@ -1,0 +1,25 @@
+id: EV-v19-batch-finding
+type: evidence
+kind: batch_scan
+
+summary: "V19/V20 批量诊断中，多个 team 在字面扫描下缺少显式 condition=FAIL edge。"
+
+supports:
+  - H-034
+
+attacks: []
+
+source:
+  source_type: report
+  artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v19_h034_batch_finding_2026-05-07.md"
+  producer: "HypothesisDiagnosticAgent"
+  method: "LLM diagnosis + batch report"
+
+quality:
+  strength: medium
+  limitation: "该证据只说明字面显式 FAIL edge 缺失，不足以证明 team 缺少所有错误处理。"
+  reproducibility: partial
+
+observed:
+  - "多个 team 缺显式 condition=FAIL edge。"
+  - "早期报告曾高估系统级缺陷比例。"

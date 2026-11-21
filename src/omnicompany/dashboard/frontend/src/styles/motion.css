@@ -1,0 +1,165 @@
+/* ============================================================
+   动效系统(2026-08-06 新建)。
+   在此之前全站 17 个 @keyframes 里 8 个是 spinner, 其余是 pulse/fade ——
+   没有入场、没有层次、没有"从 A 到 B"的过渡, 所有状态切换都是硬跳变
+   (分组折叠靠 display:none、数据到达靠条件渲染直出、面板切换靠整块替换)。
+
+   纪律来自 docs/projects/frontend-design/dashboard/设计语言.md §2.6:
+     状态 150ms / 弹层 200ms / 浮层 300ms, 统一缓动, 尊重 prefers-reduced-motion。
+   这里在那三档之上补齐 M3 式的缓动族(进场减速 / 出场加速 / 标准), 因为
+   "入场用出场的曲线"是动效看着廉价的最常见原因。
+
+   性能铁律(用户前提: 性能不能多花):
+     · 只动 transform / opacity / filter —— 这三样走合成器, 不触发 layout 与 paint。
+       绝不动 width/height/top/left/margin/padding(那会每帧 reflow)。
+     · 折叠展开用 grid-template-rows: 0fr→1fr, 不测高、不写 JS、不 reflow 子树。
+     · will-change 只在动画期间挂(靠 :hover/[data-animating]), 不常驻 —— 常驻会
+       为每个元素永久开一层合成层, 显存换不来帧率。
+     · 入场动画一律 animation-fill-mode: both + 一次性, 不留常驻 transition。
+   ============================================================ */
+
+:root {
+  /* ── 缓动族(M3 口径) ───────────────────────────────────────
+     standard  : 位置/大小的一般变化(有始有终, 两端都收)
+     decelerate: 入场 —— 快进慢停, 元素"飞进来落稳"
+     accelerate: 出场 —— 慢起快出, 元素"被抽走"
+     emphasis  : 强调/回弹(= 既有 --fp-ease, 带一点过冲)
+     linear    : 进度/加载这类匀速语义 */
+  --mo-standard: cubic-bezier(0.2, 0, 0, 1);
+  --mo-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --mo-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --mo-emphasis: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+
+  /* ── 时长(对齐设计语言 §2.6 三档, 另补两档端点) ───────────── */
+  --mo-t-micro: 90ms;    /* 按压/勾选这类"必须跟手"的即时反馈 */
+  --mo-t-fast: 150ms;    /* 状态/hover */
+  --mo-t-pop: 200ms;     /* 菜单/toast/弹层 */
+  --mo-t-over: 300ms;    /* 浮层/抽屉/大面板 */
+  --mo-t-slow: 420ms;    /* 印章、抽图这类仪式性一次动作 */
+
+  /* 列表 stagger 的每项延迟。项数多时总时长会失控, 故在 .mo-stagger 里对
+     序号封顶(--mo-i 最大 12), 第 13 项之后与第 12 项同时入场。 */
+  --mo-stagger-step: 26ms;
+}
+
+/* ── 无障碍总闸 ───────────────────────────────────────────────
+   prefers-reduced-motion 下: 动画立即完成(不是"不播放"——不播放会让
+   fill-mode:both 的入场件停在 opacity:0 上, 直接变成看不见的界面)。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   1) 入场 —— 消灭"数据到了就啪一下出现"
+   ============================================================ */
+
+/* 纸件落到图板上: 轻微上移 + 淡入。位移只有 6px, 大位移在密集列表里会晕。 */
+@keyframes mo-rise {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+/* 从右侧抽出一张图(详情列/抽屉) */
+@keyframes mo-draw-in {
+  from { opacity: 0; transform: translate3d(22px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+/* 描图纸从上方覆下来(悬浮预览/弹层): 覆上 ≠ 淡入, 这是 G 的既定语言 */
+@keyframes mo-drop {
+  from { opacity: 0; transform: translate3d(0, -8px, 0) scale(.99); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes mo-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.mo-rise    { animation: mo-rise var(--mo-t-pop) var(--mo-decelerate) both; }
+.mo-draw-in { animation: mo-draw-in var(--mo-t-over) var(--mo-decelerate) both; }
+.mo-drop    { animation: mo-drop var(--mo-t-pop) var(--mo-emphasis) both; }
+.mo-fade    { animation: mo-fade var(--mo-t-fast) var(--mo-standard) both; }
+
+/* 列表 stagger: 父容器挂 .mo-stagger, 子项自己带 --mo-i(第几个)。
+   用 :nth-child 兜底前 12 项, 组件不传 --mo-i 也有效果。 */
+.mo-stagger > * { animation: mo-rise var(--mo-t-pop) var(--mo-decelerate) both; }
+.mo-stagger > *:nth-child(1)  { animation-delay: calc(0  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(2)  { animation-delay: calc(1  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(3)  { animation-delay: calc(2  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(4)  { animation-delay: calc(3  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(5)  { animation-delay: calc(4  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(6)  { animation-delay: calc(5  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(7)  { animation-delay: calc(6  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(8)  { animation-delay: calc(7  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(9)  { animation-delay: calc(8  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(10) { animation-delay: calc(9  * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(11) { animation-delay: calc(10 * var(--mo-stagger-step)); }
+.mo-stagger > *:nth-child(n+12) { animation-delay: calc(11 * var(--mo-stagger-step)); }
+
+/* ============================================================
+   2) 折叠展开 —— 消灭 display:none 的瞬闪
+   grid-template-rows 0fr→1fr 是目前唯一"不用 JS 测高、不写死 max-height、
+   且能动画到内容真实高度"的做法。子元素必须 min-height:0 + overflow:hidden,
+   否则 0fr 那一端压不下去。
+   ============================================================ */
+.mo-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--mo-t-pop) var(--mo-standard),
+              opacity var(--mo-t-fast) var(--mo-standard);
+}
+.mo-collapse > * { min-height: 0; overflow: hidden; }
+.mo-collapse[data-collapsed="true"] { grid-template-rows: 0fr; opacity: 0; }
+
+/* ============================================================
+   3) 印章 —— 审阅裁决的仪式动作(demo theme.css 写好过, 一直没搬进生产)
+   ============================================================ */
+@keyframes mo-stamp {
+  0%   { opacity: 0; transform: translate3d(0, -26px, 0) rotate(-8deg) scale(1.5); }
+  70%  { opacity: 1; transform: translate3d(0, 1px, 0) rotate(-8deg) scale(.96); }
+  85%  { transform: translate3d(0, -1px, 0) rotate(-8.5deg) scale(1.01); }
+  100% { transform: translate3d(0, 0, 0) rotate(-8deg) scale(1); }
+}
+.mo-stamp { animation: mo-stamp var(--mo-t-slow) var(--mo-emphasis) both; }
+
+/* ============================================================
+   4) 度量值生长 —— 进度/新鲜度/计数不再直接跳到终值
+   45° 剖面线填充从左往右长出来(scaleX + transform-origin, 不动 width)。
+   ============================================================ */
+@keyframes mo-grow-x {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.mo-grow-x { transform-origin: left center; animation: mo-grow-x var(--mo-t-over) var(--mo-decelerate) both; }
+
+/* 新鲜度方格逐格点亮(每格 40ms, 7 格共 280ms) */
+.mo-cells > * { animation: mo-fade var(--mo-t-fast) var(--mo-standard) both; }
+.mo-cells > *:nth-child(1) { animation-delay: 0ms; }
+.mo-cells > *:nth-child(2) { animation-delay: 40ms; }
+.mo-cells > *:nth-child(3) { animation-delay: 80ms; }
+.mo-cells > *:nth-child(4) { animation-delay: 120ms; }
+.mo-cells > *:nth-child(5) { animation-delay: 160ms; }
+.mo-cells > *:nth-child(6) { animation-delay: 200ms; }
+.mo-cells > *:nth-child(7) { animation-delay: 240ms; }
+
+/* ============================================================
+   5) 骨架 → 内容 交叉淡入 —— 消灭"骨架消失、内容啪一下顶上来"
+   ============================================================ */
+.mo-swap { display: grid; }
+.mo-swap > * { grid-area: 1 / 1; transition: opacity var(--mo-t-fast) var(--mo-standard); }
+.mo-swap > [data-swap="out"] { opacity: 0; pointer-events: none; }
+
+/* ============================================================
+   6) 跟手反馈 —— 按压/勾选的即时档
+   90ms 是"感觉到了但不拖沓"的下限; 比这更长, 连点会有黏滞感。
+   ============================================================ */
+.mo-press { transition: transform var(--mo-t-micro) var(--mo-standard); }
+.mo-press:active { transform: translate3d(0, 1px, 0); }
+
+/* 内容切换时给一次淡入(页签/分面切换用, key 变化即重放) */
+.mo-swap-in { animation: mo-fade var(--mo-t-fast) var(--mo-standard) both; }

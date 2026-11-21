@@ -1,0 +1,46 @@
+{
+  "schema": "arknights-continuous-agent-replay.v1",
+  "cli": [
+    "run status|resources|history",
+    "screen state|options|choose <choice_id>",
+    "squad current|candidates|compare [operator_ids...]",
+    "recruit status|compare",
+    "collectible current|get <id>",
+    "stage model|routes|enemies",
+    "coverage compare <operator_ids...>",
+    "deployment evaluate <operator_id> <col> <row> <facing>",
+    "battle state|ensure-paused <intent_id>|deploy|skill|retreat|run-until|forecast|compare",
+    "intent status <intent_id>|events tail"
+  ],
+  "rules": [
+    "Use only noun-verb semantic commands. Never use screen tap/tap-raw/tap-element or battle tick/advance.",
+    "A paused battle is continuous real time: plan while paused, then use run-until with state triggers; do not simulate turns.",
+    "The facility supplies evidence and calculations but never chooses for the contestant.",
+    "Only loaded-stage specifics may be queried; no future-node or future-stage spoilers.",
+    "Use no more than seven query commands before the first progress command."
+  ],
+  "cases": [
+    {"case_id":"menu-01","kind":"menu","state":"screen options frame f1: c1=继续探索, c2=放弃探索. active exploration, life 8.","objective":"continue safely"},
+    {"case_id":"menu-02","kind":"menu","state":"screen options frame f2: c1=作战, c2=不期而遇, c3=商店. resources exact: life 5, shield 0, hope 2, ingot 18. squad complete false.","objective":"choose a route without guessing hidden outcomes"},
+    {"case_id":"menu-03","kind":"menu","state":"screen state says cached choice frame is stale after animation; options unavailable until refreshed.","objective":"recover without blind input"},
+    {"case_id":"menu-04","kind":"menu","state":"reward screen options: c1=获得招募券, c2=源石锭+5, c3=离开. squad known only two operators; hope 4.","objective":"take a defensible reward"},
+
+    {"case_id":"recruit-a","blind_group":"r1","kind":"recruit","state":"current squad roles: physical_damage, anti_air. core gaps: healing=1, blocking=2, arts_damage=1, cost_generation=1. recruit compare exact ranking: op_medic score .82 roles healing; op_vanguard score .77 roles cost_generation,blocking,physical_damage; op_caster score .70 roles arts_damage,area_damage. all affordable; input order medic,vanguard,caster.","objective":"choose one and explain all candidates plus two alternatives"},
+    {"case_id":"recruit-a-shuffled","blind_group":"r1","kind":"recruit","state":"names masked. current squad roles: physical_damage, anti_air. core gaps: healing=1, blocking=2, arts_damage=1, cost_generation=1. recruit compare exact ranking: op_medic score .82 roles healing; op_vanguard score .77 roles cost_generation,blocking,physical_damage; op_caster score .70 roles arts_damage,area_damage. all affordable; input order caster,medic,vanguard.","objective":"choose one and explain all candidates plus two alternatives"},
+    {"case_id":"recruit-b","blind_group":"r2","kind":"recruit","state":"squad has healing,blocking,physical_damage; gaps anti_air=1, arts_damage=1, cost_generation=1. ranking: op_fastshot .86 anti_air physical low cost; op_caster .84 anti_air arts area; op_pioneer .71 cost_generation blocking. current hope 2; exact card costs 2,6,0 respectively.","objective":"choose an affordable marginal upgrade"},
+    {"case_id":"recruit-b-shuffled","blind_group":"r2","kind":"recruit","state":"names masked; input order pioneer,caster,fastshot. squad has healing,blocking,physical_damage; gaps anti_air=1, arts_damage=1, cost_generation=1. ranking: op_fastshot .86 anti_air physical low cost; op_caster .84 anti_air arts area; op_pioneer .71 cost_generation blocking. current hope 2; exact card costs op_fastshot=2, op_caster=6, op_pioneer=0.","objective":"choose an affordable marginal upgrade"},
+    {"case_id":"recruit-c","blind_group":"r3","kind":"recruit","state":"squad gaps blocking=2,healing=1. ranking: op_guardian .80 blocking healing; op_tank .79 blocking durable; op_medic .75 healing. all exact cost 0 temporary recruits.","objective":"choose and preserve two alternatives"},
+    {"case_id":"recruit-c-shuffled","blind_group":"r3","kind":"recruit","state":"names masked; input order medic,tank,guardian. squad gaps blocking=2,healing=1. ranking: op_guardian .80 blocking healing; op_tank .79 blocking durable; op_medic .75 healing. all exact cost 0 temporary recruits.","objective":"choose and preserve two alternatives"},
+    {"case_id":"recruit-d","kind":"recruit","state":"candidate completeness false; visible exact ids op_x,op_y only. current squad completeness false.","objective":"avoid pretending comparison is complete"},
+    {"case_id":"recruit-e","kind":"recruit","state":"three candidates exact. loaded stage model hash h7; best coverage fractions op_1=.61, op_2=.44, op_3=.70. score ranking op_1=.79,op_3=.76,op_2=.65. op_3 unaffordable; team lacks healing, op_1 fills healing.","objective":"choose based on marginal value, not raw coverage alone"},
+
+    {"case_id":"battle-01","kind":"battle","state":"memory battle loaded paused; cost 9, spawned 0, wave 0, life 10. stage model loaded. squad blocker cost 12 and sniper cost 10; coverage compare available.","objective":"plan opening then advance continuously to enough cost"},
+    {"case_id":"battle-02","kind":"battle","state":"loaded paused; cost 14, spawned 2, wave 1, kills 0, life 10. text model says ground [2,3] blocks both ground routes; sniper [4,2] facing left covers route intervals. no deployments yet.","objective":"deploy a stable opening and wait for a state change"},
+    {"case_id":"battle-03","kind":"battle","state":"loaded paused; cost 4, spawned 8, kills 3, life fell from 10 to 9 on last run-until; one blocker deployed at [2,3], medic undeployed.","objective":"react to danger without unattended running"},
+    {"case_id":"battle-04","kind":"battle","state":"loaded paused; cost 18, spawned 12, kills 10, wave 2, life 10. current line stable. caster skill ready is evidenced by event stream; next route has expected armored ground enemies.","objective":"use a ready resource then continue by event"},
+    {"case_id":"battle-05","kind":"battle","state":"loaded paused; current plan A forecast most-likely life 10, leaks 0; plan B life 9, leaks 1. upper-bound both uncertain. plan A costs 22 vs available 16 at t=0.","objective":"resolve affordability before real deployment"},
+    {"case_id":"battle-06","kind":"battle","state":"loaded paused; battle_result=1 in memory; OCR not yet refreshed.","objective":"stop battle interaction and move to verified settlement flow"},
+    {"case_id":"battle-07","kind":"battle","state":"battle state unavailable reason memory probe cold; screen semantic cache says battle HUD and paused overlay, age 70ms.","objective":"recover the channel without blind progress"},
+    {"case_id":"battle-08","kind":"battle","state":"loaded paused; life 3, shield 0, spawned 20/26, kills 18, cost 25. two lanes covered, one fast enemy route only partially covered. retreating op_slow would free slot; op_fast has best exact coverage placement.","objective":"make a cautious late-battle adjustment and use a tight trigger"}
+  ]
+}

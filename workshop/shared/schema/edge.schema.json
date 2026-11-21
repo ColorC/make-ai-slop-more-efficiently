@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workshop.example.com/schema/workshop/edge/v1",
+  "title": "画布连线 edge v1（存储里叫 relation）",
+  "description": "两张卡之间的一条关系。存储字段名是 relations[]，网页叫连线。source/target 是卡 id；端点切片 sourceSlice/targetSlice 是权威，sourceHandle/targetHandle 只是派生缓存。",
+  "type": "object",
+  "required": [
+    "id",
+    "source",
+    "target"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "连线 id，画布内唯一。"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "起点卡 id（必须在同一画布上）。"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "终点卡 id（必须在同一画布上）。"
+    },
+    "kind": {
+      "enum": [
+        "continues",
+        "transitions-to",
+        "annotates",
+        "references",
+        "derived",
+        "contradicts"
+      ],
+      "description": "关系类型（封闭）：continues 主线串联、transitions-to 界面跳转（必须带 trigger）、annotates 说明、references 旁证、derived 派生、contradicts 冲突。缺省 = 未定，推荐总是写。"
+    },
+    "trigger": {
+      "type": "string",
+      "description": "跳转触发条件（\"点 btn_close\"）。kind=transitions-to 时必填。"
+    },
+    "sourceSlice": {
+      "$ref": "https://workshop.example.com/schema/workshop/card/v1#/$defs/slice",
+      "description": "起点切片（从卡里的哪一块出发）。"
+    },
+    "targetSlice": {
+      "$ref": "https://workshop.example.com/schema/workshop/card/v1#/$defs/slice",
+      "description": "终点切片。"
+    },
+    "label": {
+      "type": "string",
+      "description": "旧版单标签；推荐改写 userLabel。",
+      "deprecated": true
+    },
+    "userLabel": {
+      "type": "string",
+      "description": "人写的标签（推荐）。"
+    },
+    "programLabel": {
+      "type": "string",
+      "description": "程序 / agent 写的事实标签，人不改。"
+    },
+    "userLabelPosition": {
+      "$ref": "#/$defs/labelPosition",
+      "description": "人写标签在线上的位置。"
+    },
+    "programLabelPosition": {
+      "$ref": "#/$defs/labelPosition",
+      "description": "程序标签在线上的位置。"
+    },
+    "layer": {
+      "enum": [
+        "under",
+        "content",
+        "over"
+      ],
+      "description": "语义层级；缺省由 kind 派生。"
+    },
+    "sourceHandle": {
+      "type": "string",
+      "description": "派生缓存，不要手写。"
+    },
+    "targetHandle": {
+      "type": "string",
+      "description": "派生缓存，不要手写。"
+    },
+    "path": {
+      "const": "curve",
+      "description": "统一的端点贝塞尔曲线；只能是 curve。"
+    },
+    "arrow": {
+      "enum": [
+        "closed",
+        "open",
+        "none"
+      ],
+      "description": "箭头样式。"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "transitions-to"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "trigger"
+        ],
+        "properties": {
+          "trigger": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "labelPosition": {
+      "type": "object",
+      "required": [
+        "t"
+      ],
+      "properties": {
+        "t": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "沿曲线的位置（0 起点，1 终点）。"
+        },
+        "offsetX": {
+          "type": "number",
+          "description": "相对曲线点的横向偏移（像素）。"
+        },
+        "offsetY": {
+          "type": "number",
+          "description": "相对曲线点的纵向偏移（像素）。"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "x-wsh": {
+    "kind": "edge",
+    "title": "画布连线",
+    "parent": "canvas",
+    "ts": "vendor/webworks/packages/material-core/note.ts → CanvasRelationRecord",
+    "store": "data/projects/<项目>/material/notes/canvases/<lifecycle>/<画布>.json 的 relations[]",
+    "web": "/canvas?project=<项目>&canvas=<画布>",
+    "commands": [
+      {
+        "verb": "ls",
+        "cmd": "wsh canvas cat <画布> --json",
+        "note": "看 document.relations"
+      },
+      {
+        "verb": "new",
+        "cmd": "wsh canvas apply <画布> --file patch.json",
+        "note": "写 {\"relations\":[{id,source,target,kind}]}；流程组内串联也可用 wsh flow link <画布> <卡a> <卡b>"
+      },
+      {
+        "verb": "set",
+        "cmd": "wsh canvas apply <画布> --file patch.json",
+        "note": "同 id 覆盖"
+      },
+      {
+        "verb": "rm",
+        "cmd": "wsh canvas apply <画布> --file patch.json",
+        "note": "写 {\"remove_relations\":[\"<连线 id>\"]}；流程组内也可用 wsh flow unlink"
+      }
+    ],
+    "example": {
+      "id": "goal-to-plan",
+      "source": "goal-note",
+      "target": "plan-note",
+      "kind": "continues"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "nav": "Results",
+  "empty": "No canvas cards, images, videos or files mentioned in this session yet.",
+  "noTranscript": "This session has no readable transcript yet.",
+  "refresh": "Reload",
+  "openTab": "Open as tab",
+  "openWindow": "Open in new window",
+  "viewInCanvas": "View in canvas",
+  "viewText": "View text",
+  "cardMissing": "This card is no longer on the canvas.",
+  "cardLogin": "Sign in to Workshop to read this card.",
+  "fileOwnerOnly": "Only the owner's devices can open local files.",
+  "canvasTab": "Canvas · {{canvas}}",
+  "fullscreen": "Fullscreen",
+  "exitFullscreen": "Exit fullscreen",
+  "close": "Close (Esc)",
+  "prev": "Previous (←)",
+  "next": "Next (→)"
+}

@@ -1,0 +1,4 @@
+ROOT=catalog/current
+PATTERN=*.route
+EXPECTED=ROUTE_ID=terra-event-bus
+FORBIDDEN=catalog/archive,outside-scope

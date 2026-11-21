@@ -1,0 +1,57 @@
+// project 实体 — 项目工作板(首页)与项目详情页签。
+// 数据源 /api/projects (注册表 + PROJECT_INDEX.md frontmatter 浮出), 与 omni project CLI 同源。
+// 注册进 entity registry 后, 项目自动出现在全局搜索/命令面板(搜 name/id/tags)。
+
+import type { Entity } from '../types'
+import type { EntityRegistration } from '../registry'
+import { projectsApi, type ProjectItem } from '../../api/projectsClient'
+import { lazy } from 'react'
+
+const ProjectDetail = lazy(() => import('./ProjectDetail'))
+
+export interface ProjectEntity extends Entity {
+  type: 'project'
+  meta: { project: ProjectItem }
+}
+
+let _cache: { ts: number; items: ProjectEntity[] } | null = null
+const TTL = 15_000
+
+async function fetchList(): Promise<ProjectEntity[]> {
+  if (_cache && Date.now() - _cache.ts < TTL) return _cache.items
+  const b = await projectsApi.list()
+  const items = b.projects.map((p): ProjectEntity => ({
+    type: 'project',
+    id: p.id,
+    title: p.name || p.id,
+    tags: [p.group, ...(p.tags || [])],
+    meta: { project: p },
+  }))
+  _cache = { ts: Date.now(), items }
+  return items
+}
+
+export const projectRegistration: EntityRegistration<ProjectEntity> = {
+  label: '项目',
+  icon: 'folder-kanban',
+  resolver: {
+    type: 'project',
+    fetch: async (id: string) => {
+      const items = await fetchList()
+      const found = items.find((e) => e.id === id)
+      if (!found) throw new Error(`未注册的项目: ${id}`)
+      return found
+    },
+    list: fetchList,
+    search: async (q: string) => {
+      const items = await fetchList()
+      const s = q.trim().toLowerCase()
+      if (!s) return items
+      return items.filter((e) => `${e.id} ${e.title} ${(e.tags || []).join(' ')}`.toLowerCase().includes(s))
+    },
+  },
+  renderer: {
+    type: 'project',
+    Editor: ProjectDetail as any,
+  },
+}

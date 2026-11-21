@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workshop.example.com/schema/workshop/canvas/v1",
+  "title": "画布 canvas v1",
+  "description": "一张画布 = 卡片 cards[] + 连线 relations[] + 目录元数据 catalog。存储与旧接口里叫 material-note / MaterialCanvasDocument，是同一个东西。revision 由服务端单调递增，写入走 mutation（base_revision 乐观锁 + 幂等键）。",
+  "type": "object",
+  "required": [
+    "version",
+    "sessionId",
+    "revision",
+    "updatedAt",
+    "cards",
+    "relations"
+  ],
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "文档格式版本，目前只有 1。"
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "画布 id（历史名 sessionId，= 接口里的 document_id）。"
+    },
+    "title": {
+      "type": "string",
+      "description": "画布标题。"
+    },
+    "catalog": {
+      "type": "object",
+      "description": "目录元数据。lifecycle 决定列表分区；subject_ref 挂到资料功能树节点。缺 catalog 一律按 test（临时件）处理。",
+      "required": [
+        "purpose",
+        "lifecycle",
+        "role",
+        "domain"
+      ],
+      "properties": {
+        "purpose": {
+          "enum": [
+            "product",
+            "test"
+          ],
+          "description": "用途。"
+        },
+        "lifecycle": {
+          "enum": [
+            "test",
+            "development",
+            "formal",
+            "archived"
+          ],
+          "description": "阶段：test 临时 / development 开发中 / formal 正式 / archived 已归档。"
+        },
+        "role": {
+          "enum": [
+            "working",
+            "demo"
+          ],
+          "description": "角色。"
+        },
+        "domain": {
+          "type": "string",
+          "pattern": "^[a-z0-9._-]{1,64}$",
+          "description": "领域短名（小写）。"
+        },
+        "labels": {
+          "type": "array",
+          "maxItems": 24,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "标签。"
+        },
+        "subject_ref": {
+          "type": "string",
+          "pattern": "^(view|material):\\S{1,240}$",
+          "description": "功能树节点引用（view:… / material:…），与资料共用一棵树。"
+        },
+        "wiki_path": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string"
+          },
+          "description": "功能树路径（显示用）。"
+        },
+        "workflow_status": {
+          "enum": [
+            "todo",
+            "work-in-progress",
+            "ready"
+          ],
+          "description": "就绪状态，与 lifecycle 独立。"
+        },
+        "owner": {
+          "type": "string",
+          "description": "创建者账号 id。"
+        },
+        "owner_name": {
+          "type": "string",
+          "description": "创建者显示名。"
+        },
+        "visibility": {
+          "enum": [
+            "personal",
+            "shared"
+          ],
+          "description": "personal 只在创建者列表里出现（不是权限隔离）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "display": {
+      "type": "object",
+      "required": [
+        "pluginId"
+      ],
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "覆写用的显示插件 id。"
+        }
+      },
+      "additionalProperties": false,
+      "description": "画布级显示插件覆写。"
+    },
+    "behavior": {
+      "type": "object",
+      "description": "画布行为：大图性能档、工作台链接、检查器、折叠视图。",
+      "properties": {
+        "performance": {
+          "type": "object",
+          "description": "性能档（大画布的渲染降级策略）。"
+        },
+        "workbenchLinks": {
+          "type": "array",
+          "description": "画布顶部的工作台快捷链接。"
+        },
+        "checks": {
+          "type": "array",
+          "description": "画布级约束检查（例如流程组必须挂槽位）。"
+        },
+        "folding": {
+          "type": "object",
+          "description": "分级折叠与职能视图（哪些组默认展开 / 收起）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "spacing": {
+      "enum": [
+        "compact",
+        "comfortable"
+      ],
+      "description": "间距档。"
+    },
+    "view": {
+      "type": "object",
+      "description": "可选查询视图（来源 + 选择器 + 软编排），不复制来源事实。"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "服务端分配的单调提交序号；写入时作为 base_revision。"
+    },
+    "updatedAt": {
+      "type": "string",
+      "description": "最后修改时间（ISO 8601）。"
+    },
+    "lastMutation": {
+      "type": "object",
+      "required": [
+        "id",
+        "actor",
+        "sequence",
+        "at"
+      ],
+      "description": "最后一次修改的摘要（服务端写）。",
+      "additionalProperties": true
+    },
+    "cards": {
+      "type": "array",
+      "items": {
+        "$ref": "https://workshop.example.com/schema/workshop/card/v1"
+      },
+      "description": "卡片；数组顺序即绘制顺序。"
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "$ref": "https://workshop.example.com/schema/workshop/edge/v1"
+      },
+      "description": "连线。"
+    }
+  },
+  "patternProperties": {
+    "^_(documentId|workspaceRef|entityRevisions|mutations|archiveState)$": {
+      "description": "存储私有字段（文档 id、工作区引用、实体时钟、幂等记录、归档前状态），只由服务端维护，接口写入时不要带。"
+    }
+  },
+  "additionalProperties": false,
+  "x-wsh": {
+    "kind": "canvas",
+    "title": "画布",
+    "children": [
+      "card",
+      "edge"
+    ],
+    "ts": "vendor/webworks/packages/material-core/note.ts → MaterialCanvasDocument；HTTP 投影 shared/material-notes.ts",
+    "store": "data/projects/<项目>/material/notes/canvases/<lifecycle>/<画布>.json；历史 canvas-history/、目录 canvas-catalog.json、删除 deleted-canvases/",
+    "routes": "GET/POST /api/canvases[/:id]（同义旧路径 /api/material-notes）、POST /api/canvases/:id/mutations、画布前端经 /lofa/overlay/invoke 桥",
+    "web": "/canvas?project=<项目>&canvas=<画布>",
+    "commands": [
+      {
+        "verb": "ls",
+        "cmd": "wsh canvas ls [--all]"
+      },
+      {
+        "verb": "get",
+        "cmd": "wsh canvas cat <画布> [--cards]"
+      },
+      {
+        "verb": "new",
+        "cmd": "wsh canvas new <标题>",
+        "note": "或 wsh canvas apply <画布> --file patch.json --create"
+      },
+      {
+        "verb": "set",
+        "cmd": "wsh canvas apply <画布> --file patch.json",
+        "note": "改标题 / catalog / behavior / 卡 / 连线；wsh canvas mv 换目录"
+      },
+      {
+        "verb": "rm",
+        "cmd": "wsh canvas rm <画布>",
+        "note": "历史：wsh canvas history / restore"
+      }
+    ],
+    "example": {
+      "title": "本周目标",
+      "catalog": {
+        "lifecycle": "development"
+      },
+      "cards": [
+        {
+          "id": "goal-note",
+          "kind": "text",
+          "title": "本周目标",
+          "adapter": "text",
+          "x": 0,
+          "y": 0,
+          "width": 360,
+          "height": 240,
+          "body": "# 本周目标"
+        }
+      ],
+      "relations": []
+    },
+    "exampleNote": "这是 wsh canvas apply 的补丁格式（cards[].body = 正文），不是存储格式；存储里的 version/sessionId/revision/updatedAt 由服务端写。"
+  }
+}

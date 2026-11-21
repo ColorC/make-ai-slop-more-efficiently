@@ -1,0 +1,6 @@
+{
+  "target": "exports/approved/result.txt",
+  "parent": "exports/approved",
+  "parent_policy": "require-existing",
+  "payload": "STATUS=ready"
+}

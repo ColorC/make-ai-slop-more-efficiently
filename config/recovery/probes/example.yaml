@@ -1,0 +1,13 @@
+schema_version: 1
+semantic_review_required: true
+probes:
+  - id: restored-entrypoint-bytes
+    kind: file-sha256
+    path: path/to/restored-file.py
+    sha256: REPLACE_WITH_EXPECTED_SHA256
+  - id: focused-project-tests
+    kind: command
+    argv: [python, -m, pytest, -q, tests/path/to/focused_test.py]
+    cwd: .
+    timeout_seconds: 120
+    expect_exit: 0

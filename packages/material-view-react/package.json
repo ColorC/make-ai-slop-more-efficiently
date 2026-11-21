@@ -1,0 +1,34 @@
+{
+  "name": "@omni/material-view-react",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared themeable React reader for Omni Material View read models.",
+  "license": "MIT",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./read-model": "./read-model.js",
+    "./styles.css": "./styles.css"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "renderers.js",
+    "read-model.js",
+    "styles.css",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@omni/material-core": ">=0.2.0",
+    "@omni/material-client": ">=0.1.0",
+    "react": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

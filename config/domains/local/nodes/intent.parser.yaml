@@ -1,0 +1,34 @@
+node_id: "local.intent.parser"
+description: "Parse user request into a structured intent specifying what semantic type we have now (from_type) and what we want to produce (to_type). Bridges user_request into the semantic routing network."
+impl_kind: "soft"
+maturity: "mature"
+source_channel: "private:local"
+
+input_types:
+  - type_id: "user_request"
+
+output_types:
+  - type_id: "intent.structured"
+
+processing_prompt: |
+  You receive a raw user request. Parse it into a structured intent that the semantic
+  routing network can use to find the right execution path.
+
+  Output JSON:
+  {
+    "task": "rewritten task in one clear sentence",
+    "from_type": "the semantic type of what we currently have as input (e.g. user_request, fs.path.file, bash.stdout.log)",
+    "to_type": "the semantic type of the desired output (e.g. analysis, output, fs.path.written_file, code.output, bash.stdout.result)",
+    "entities": ["key entities or paths mentioned in the task"],
+    "is_pure_generation": true/false
+  }
+
+  is_pure_generation: true if the task requires ONLY language generation (no file reads,
+  no shell commands, no DB queries). The result can still be sedimented as a node.
+
+  Common to_type values:
+  - "output"               general text answer / explanation
+  - "analysis"             structured analysis of data or code
+  - "code.output"          generated code
+  - "fs.path.written_file" something written to disk
+  - "bash.stdout.result"   result of a command

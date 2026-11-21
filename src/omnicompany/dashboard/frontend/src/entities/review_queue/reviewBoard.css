@@ -1,0 +1,116 @@
+/* 审阅台页壳(2026-08-14 第二轮复位)。
+   铁律: 列表行/筛选件/裁决条的样式**全部**来自旧审阅台的蓝图类
+   (../review/reviewFlow.css + styles/blueprint.css + @overlay-notes reviewShared.css),
+   本文件只做三件事:
+     ① 页面骨架(顶栏行 / 左列表列 / 右详情窗口的高度与滚动约束);
+     ② 给 reviewShared.css 需要的 --canvas-* 变量填蓝图 token 的值(那套共享件原本长在
+        overlay 画布根上, 画布根定义了这四个变量);
+     ③ 用户裁决「消灭全部圆角矩形」—— 本页范围内把矩形件的圆角一律压到 0
+        (状态色点/LED 是圆形, 不在此列)。 */
+
+.omni-review-board {
+  /* ② reviewShared.css 的四个消费变量 → 蓝图 token 同值 */
+  --canvas-bg: transparent;
+  --canvas-card: var(--fp-bp-paper);
+  --canvas-text: var(--fp-text);
+  --canvas-muted: var(--fp-text-3);
+
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  color: var(--fp-text);
+  font-family: var(--fp-font-sans);
+  overflow: hidden;
+}
+
+/* ① 骨架 */
+.omni-review-board .rb-main { flex: 1; display: flex; min-height: 0; }
+.omni-review-board .rb-side-wrap {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--fp-border-subtle);
+}
+/* 窄容器(手机 / 伴随侧栏内): 列表与详情不并排, 谁在场谁占满。 */
+.omni-review-board[data-narrow="1"] .rb-side-wrap {
+  flex: 1 1 auto;
+  border-right: 0;
+}
+
+.omni-review-board .rb-side { flex: 1; min-height: 0; overflow-y: auto; }
+.omni-review-board .rb-detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.omni-review-board .rb-detail-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+}
+/* 详情预览区 = 窗口主角位: 撑满剩余高度, 自己滚 */
+.omni-review-board .rb-preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.omni-review-board .rb-error {
+  flex: none;
+  padding: 7px 12px;
+  color: var(--fp-err);
+  font-size: var(--fp-fs-3);
+  border-bottom: 1px solid var(--fp-border-subtle);
+}
+
+/* 队列行副标题(来源会话·画布·提审日期): 单行 mono 暗字, 与旧行的 hover 预览卡同类信息,
+   这里直接平铺一行 —— 用户要求信息平铺时克制, 所以只一行、不折行、不做卡片。 */
+.omni-review-board .rf-qrow .rb-sub {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  color: var(--fp-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 详情头(复用 .rf-bar)里的元数据一行到底, 不换行不成块 */
+.omni-review-board .rf-bar .rf-bizsub { flex: 1; min-width: 0; }
+
+/* 裁决条在详情头下方常驻一行(共享件自带 border-bottom) */
+.omni-review-board .submission-verdict { flex: none; }
+
+/* ③ 消灭圆角矩形(圆点/LED 的 50% 不动) */
+.omni-review-board .rf-qrow,
+.omni-review-board .rf-bar .rf-bizicon,
+.omni-review-board .rf-bizaction,
+.omni-review-board .rf-bizchip,
+.omni-review-board .v2-search,
+.omni-review-board .v2-iconbtn,
+.omni-review-board .v2-count,
+.omni-review-board .pk-btn,
+.omni-review-board .pk-n,
+.omni-review-board .bp-newtag,
+.omni-review-board .submission-verdict button,
+.omni-review-board .submission-note,
+.omni-review-board input,
+.omni-review-board textarea,
+.omni-review-board img,
+.omni-review-board iframe { border-radius: 0; }
+
+.omni-review-board .rb-spin { animation: rb-spin 1s linear infinite; }
+@keyframes rb-spin { to { rotate: 360deg; } }

@@ -1,0 +1,6 @@
+{
+  "allowed_change": "owned/target.txt",
+  "protected_path": "user-changes/notes.txt",
+  "protected_content": "USER_DRAFT=keep-my-change",
+  "expected_target": "STATUS=ready"
+}

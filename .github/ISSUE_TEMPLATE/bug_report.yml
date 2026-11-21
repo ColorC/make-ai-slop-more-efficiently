@@ -1,0 +1,26 @@
+name: Bug report
+description: 报告一个 bug
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 期望行为 vs 实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 尽量给最小可复现的命令序列
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: OS / Python 版本 / omni 版本（`omni --version` 或 commit）
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 报错（可选）
+      render: shell

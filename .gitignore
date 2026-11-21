@@ -1,0 +1,206 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.next/
+*.egg
+.eggs/
+node_modules/
+
+# Dev tool binaries (S3b.1 2026-04-08): 仓根 tools/ 是 protoc 等二进制, 不进版本库
+# 但 service 内 tools/ 子目录是业务工具源码 (e.g., doctor/tools/, mass_materialization/tools/), 例外允许
+/tools/
+!src/**/tools/
+.devtools/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data / Runtime
+data/
+/temp/
+*.db
+*.sqlite3
+!var/runtime/arknights/is4-worker-sandbox/out/arknights-is4.sqlite3
+*.log
+
+# Environment
+.env
+.env.local
+
+# Test / Coverage
+.pytest_cache/
+.pytest_tmp/
+.coverage
+coverage/
+htmlcov/
+.tox/
+_scratch/
+src/omnicompany/dashboard/frontend/test-results/
+src/omnicompany/dashboard/frontend/playwright-report/
+src/omnicompany/dashboard/static/
+
+# Plan-local 二进制缓存 (figma renders 等), 单 plan 100MB+ 量级, 不入版本库
+docs/plans/**/cache/
+
+# Agent-generated temp files (from BigCodeBench runtime)
+BigCodeBench/
+# bigcodebench / 竞赛目录污染防御
+# 2026-04-21 修复: 原 test_*.py 和 solution*.py 是全局 ignore, 误杀了整个
+# 项目的 tests/ 下 82 个单元测试。收缩到 bigcodebench*/ 子目录。
+bigcodebench*/
+bigcodebench*/solution*.py
+bigcodebench*/solutions/
+bigcodebench*/task/
+bigcodebench*/task*/
+bigcodebench*/task_*.py
+bigcodebench*/test_*.py
+C*workspacesolution.py
+_commit_msg.txt
+*.pyc
+
+# Root-level anti-pollution (L1 2026-04-24 · CS-Agent 防垃圾网):
+# agent bash 相对路径写入容易污染根 (Homestead.csv / MallGoods.lua 762KB / 1{for(i).
+# 根级数据文件类永不该在此. 子目录 data/ src/ 不受影响.
+/*.csv
+/*.lua
+/*.xlsm
+/*.xlsx
+/*.xls
+/HomesteadBuilding.*
+/HomesteadEntity.*
+/HomesteadDecoFormula.*
+/MallGoods.*
+/MallSchedule.*
+/Schedule.*
+/1[{]*
+/2
+/test_cli.csv
+/nul
+
+# private domain — not for sharing
+domains/local/
+
+# Logs
+logs/
+
+# Local Claude/Codex machine state
+.claude/settings.local.json
+.claude/settings.json.pending-restart
+.claude/settings.json.bak.*
+.omni/core_activity_ts.json
+.omni/sessions/_current.txt
+.omni/sessions/*.json
+.omni/tmp/
+.omni/sandbox/
+src/**/.omni/
+*.tsbuildinfo
+src/omnicompany/dashboard/extensions/*/out/
+src/omnicompany/dashboard/extensions/**/*.vsix
+
+# Domains (gitignore local only; demogame is config)
+domains/local/
+
+# Autonomous runtime logs
+data/autonomous/*.log
+# demogame learned scripts (generated per table, should not be committed)
+data/demogame/learned_scripts/
+data/demogame/logs/
+token_data.json
+*.token.json
+scripts/extract_appsecret.py
+scripts/refresh_token_test.py
+scripts/try_tenant_access_token.py
+scripts/extract_appsecret.py
+scripts/feishu_auth_once.py
+scripts/check_token.py
+
+# personal_site: 站点 ssh/endpoint 含敏感信息, 走 yaml.example 模板入 git
+config/personal_site/site.yaml
+
+# Bilibili software-demo runtime media and offline bakes are cold/data assets.
+# Keep source, manifests, scripts and JSON provenance in Git; publish binaries elsewhere.
+src/omnicompany/packages/domains/bilibili_publish/episodes/*/video/bake/
+src/omnicompany/packages/domains/bilibili_publish/episodes/*/video/assets/**/*.webm
+src/omnicompany/packages/domains/bilibili_publish/episodes/*/video/assets/**/*.wav
+src/omnicompany/packages/domains/bilibili_publish/episodes/*/video/assets/**/recordings/rrweb/**/events.json
+src/omnicompany/packages/domains/bilibili_publish/episodes/*/video/assets/**/review/**/*.png
+src/omnicompany/packages/domains/bilibili_publish/episodes/*/video/assets/**/review/**/*.jpg
+
+# guardian 运行态隔离区(卫士移入的污染, 留档但不跟踪)
+.omni/quarantine/
+
+# job_apply: 个人事实/自评/简历等运行态数据绝不进 git 代码目录(权威副本在 gitignored data/job_apply/)
+scripts/job_apply/facts.json
+scripts/job_apply/self_eval.md
+scripts/job_apply/*.local.*
+
+# ⛔ 运行时/临时/数据产物 — 永不入 git(2026-08-17 事故: 一笔 checkpoint 提交把 28GB 数据扫进
+# main 历史, 自动备份每 30min 重打包 12GB 内存拖垮整机。git 只存代码与文档, 数据走对象备份队列)
+/tmp/
+/.tmp/
+/.codex-tmp/
+/.reviewstage-staging/
+/exports/
+/sandbox/
+/artifacts/
+/output/
+/.local/
+/.pytest-tmp/
+/_remake_tmp/
+/.playwright-cli/
+/hypothesis/
+/var/runtime/arknights/remote-sync-*/
+/var/runtime/arknights/lightweight-tournament/recordings/
+/var/vendor/_download/
+
+# ── voxelcraft 数据区白名单 (阶段一 1-6, 2026-07-06) ──
+# curated references (~1.3MB 人工整理/抓取, 不可再生) + MANIFEST 进 git;
+# twilightforest/source (124MB 上游克隆) / 贴图池 / 缓存仍走重建 (见 data/domains/voxelcraft/MANIFEST.yaml)
+!data/
+data/*
+# task-core 个人附加层词表 —— 是口径不是运行时台账, 必须入库
+# (人读面: docs/plans/_cross/[2026-09-01]TASK-CORE-PERSONAL-TASK-BUS/personal-task-profile.md)
+!data/task_core_profile.json
+!data/domains/
+data/domains/*
+!data/domains/voxelcraft/
+data/domains/voxelcraft/*
+!data/domains/voxelcraft/MANIFEST.yaml
+!data/domains/voxelcraft/references/
+data/domains/voxelcraft/references/twilightforest/source/
+# north-stars 权威源 (2026-07-26 从 docs/north-stars/ 迁入, OMNI-035h):
+# 人工策展不可再生, 比照 voxelcraft 白名单进 git
+!data/domains/personal_site/
+data/domains/personal_site/*
+!data/domains/personal_site/north-stars.json
+
+# Generated live configuration review cache
+/var/config-center/
+docs/plans/demoproject/**/specs/*-result.json
+
+# ARCH-RATCHET-SURGERY: import/测试副作用产生的运行时工件, 不入库
+src/omnicompany/data/registry/health/
+/var/runtime/router_assembly.json
+/.gate-deps/
+
+# Managed Git worktrees live under the repository, not as main-repo changes.
+/.worktrees/
+/.gate-deps/

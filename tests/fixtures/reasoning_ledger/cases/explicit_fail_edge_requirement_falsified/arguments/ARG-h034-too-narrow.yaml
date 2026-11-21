@@ -1,0 +1,30 @@
+id: ARG-h034-too-narrow
+type: argument
+structure: toulmin
+
+claim: H-034
+conclusion: "H-034 作为全局诊断规则被证伪；它只能保留为局部模式检查。"
+
+grounds:
+  - EV-v21-csv-to-md-fail-retry
+  - EV-v26-five-fail-patterns
+
+warrant: "如果一个诊断规则把合法错误处理模式误判为失败，则该规则的判定条件过窄，不能作为全局规则。"
+
+backing:
+  - "V21 提供具体反例：csv_to_md 无显式 FAIL edge 但有节点内 FAIL+RETRY。"
+  - "V26 提供模式审计：项目中至少五种错误处理模式。"
+
+rebuttal:
+  - "若某 team 同时没有显式 FAIL edge、没有 AnchorSpec routes、没有节点内 retry、没有外部 driver、没有 dispatcher 兜底，则仍可能缺错误处理。"
+  - "因此 H-034 的局部检查价值仍存在。"
+
+qualifier: "证伪全局形式；保留局部检查形式。"
+
+result:
+  target_status_change:
+    claim: H-034
+    from: supported
+    to: falsified
+  derived_claim:
+    - H-038

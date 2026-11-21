@@ -1,0 +1,19 @@
+{
+  "nav": "结果",
+  "empty": "这个会话还没有提到画布卡、图片、视频或文件。",
+  "noTranscript": "这个会话还没有可读的对话记录。",
+  "refresh": "重新读取",
+  "openTab": "作为页签打开",
+  "openWindow": "在新窗口打开",
+  "viewInCanvas": "在画布里看",
+  "viewText": "看正文",
+  "cardMissing": "这张卡已经不在画布上了。",
+  "cardLogin": "需要先登录 Workshop 才能读取卡片。",
+  "fileOwnerOnly": "只有机主设备能打开本机文件。",
+  "canvasTab": "画布 · {{canvas}}",
+  "fullscreen": "全屏",
+  "exitFullscreen": "退出全屏",
+  "close": "关闭（Esc）",
+  "prev": "上一个（←）",
+  "next": "下一个（→）"
+}

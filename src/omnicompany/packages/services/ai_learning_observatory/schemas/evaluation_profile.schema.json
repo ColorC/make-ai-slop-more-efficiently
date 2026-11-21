@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project-specific semantic-first evaluation profile",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "string", "const": "project-evaluation-profile-v1"},
+    "project_id": {"type": "string", "minLength": 1},
+    "project_name": {"type": "string", "minLength": 1},
+    "work_type": {"type": "string", "minLength": 1},
+    "summary": {"type": "string", "minLength": 1},
+    "user_concerns": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {"$ref": "#/$defs/user_concern"}
+    },
+    "task_classes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {"$ref": "#/$defs/task_class"}
+    },
+    "dimensions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "#/$defs/dimension"}
+    },
+    "correctness_gate": {"$ref": "#/$defs/correctness_gate"},
+    "source_connections": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {"$ref": "#/$defs/source_connection"}
+    },
+    "comparison_policy": {"$ref": "#/$defs/comparison_policy"},
+    "current_baseline": {"$ref": "#/$defs/current_baseline"}
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "project_name",
+    "work_type",
+    "summary",
+    "user_concerns",
+    "task_classes",
+    "dimensions",
+    "correctness_gate",
+    "source_connections",
+    "comparison_policy",
+    "current_baseline"
+  ],
+  "$defs": {
+    "string_list": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "maxItems": 16
+    },
+    "user_concern": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "user_question": {"type": "string", "minLength": 1},
+        "semantic_acceptance": {"type": "string", "minLength": 1},
+        "unacceptable_tradeoffs": {"$ref": "#/$defs/string_list"},
+        "evidence_authority": {"$ref": "#/$defs/string_list"}
+      },
+      "required": [
+        "id",
+        "label",
+        "user_question",
+        "semantic_acceptance",
+        "unacceptable_tradeoffs",
+        "evidence_authority"
+      ]
+    },
+    "task_class": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "unit_of_work": {"type": "string", "minLength": 1},
+        "complexity_axes": {"$ref": "#/$defs/string_list"},
+        "scale_axes": {"$ref": "#/$defs/string_list"},
+        "risk_axes": {"$ref": "#/$defs/string_list"},
+        "absolute_quality_bar": {"$ref": "#/$defs/string_list"},
+        "completion_evidence": {"$ref": "#/$defs/string_list"}
+      },
+      "required": [
+        "id",
+        "label",
+        "unit_of_work",
+        "complexity_axes",
+        "scale_axes",
+        "risk_axes",
+        "absolute_quality_bar",
+        "completion_evidence"
+      ]
+    },
+    "dimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": [
+            "time",
+            "token_cost",
+            "user_expectation",
+            "objective_outcome",
+            "human_attention"
+          ]
+        },
+        "user_question": {"type": "string", "minLength": 1},
+        "objective_observations": {"$ref": "#/$defs/string_list"},
+        "semantic_judgment": {"type": "string", "minLength": 1},
+        "comparability_conditions": {"$ref": "#/$defs/string_list"},
+        "anti_gaming": {"$ref": "#/$defs/string_list"},
+        "unknown_when": {"$ref": "#/$defs/string_list"}
+      },
+      "required": [
+        "id",
+        "user_question",
+        "objective_observations",
+        "semantic_judgment",
+        "comparability_conditions",
+        "anti_gaming",
+        "unknown_when"
+      ]
+    },
+    "correctness_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primary_question": {"type": "string", "minLength": 1},
+        "must_hold": {"$ref": "#/$defs/string_list"},
+        "independent_evidence": {"$ref": "#/$defs/string_list"},
+        "failure_conditions": {"$ref": "#/$defs/string_list"},
+        "unknown_conditions": {"$ref": "#/$defs/string_list"}
+      },
+      "required": [
+        "primary_question",
+        "must_hold",
+        "independent_evidence",
+        "failure_conditions",
+        "unknown_conditions"
+      ]
+    },
+    "source_connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1},
+        "linking_keys": {"$ref": "#/$defs/string_list"},
+        "current_strength": {
+          "type": "string",
+          "enum": ["connected", "partial", "discovered_only", "missing"]
+        },
+        "limitations": {"$ref": "#/$defs/string_list"}
+      },
+      "required": [
+        "source_id",
+        "role",
+        "linking_keys",
+        "current_strength",
+        "limitations"
+      ]
+    },
+    "comparison_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "absolute_before_relative": {"type": "boolean", "const": true},
+        "no_composite_score": {"type": "boolean", "const": true},
+        "missing_is_unknown": {"type": "boolean", "const": true},
+        "absence_is_not_success": {"type": "boolean", "const": true},
+        "hard_match_keys": {"$ref": "#/$defs/string_list"},
+        "stratify_or_normalize": {"$ref": "#/$defs/string_list"},
+        "quality_non_regression_rule": {"type": "string", "minLength": 1},
+        "confounders": {"$ref": "#/$defs/string_list"}
+      },
+      "required": [
+        "absolute_before_relative",
+        "no_composite_score",
+        "missing_is_unknown",
+        "absence_is_not_success",
+        "hard_match_keys",
+        "stratify_or_normalize",
+        "quality_non_regression_rule",
+        "confounders"
+      ]
+    },
+    "current_baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "facts": {"$ref": "#/$defs/string_list"},
+        "inferences": {"$ref": "#/$defs/string_list"},
+        "unknowns": {"$ref": "#/$defs/string_list"},
+        "next_connections": {"$ref": "#/$defs/string_list"}
+      },
+      "required": ["facts", "inferences", "unknowns", "next_connections"]
+    }
+  }
+}

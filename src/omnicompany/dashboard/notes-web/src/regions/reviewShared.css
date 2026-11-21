@@ -1,0 +1,203 @@
+/* 审阅队列共享样式(2026-08-14 从 material-notes.css 抽出): 札记画布审阅面与 dashboard 审阅台
+   同源。消费方根节点需定义 --canvas-bg/--canvas-card/--canvas-text/--canvas-muted 四个变量
+   (overlay 画布根已带; dashboard 审阅台在自己的页面根上定义同值)。 */
+
+.submission-verdict {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+  background: var(--fp-bp-tracing-strong);
+  font-size: 13px;
+}
+.submission-verdict button {
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--fp-border);
+  border-radius: 0;
+  background: var(--fp-bp-paper);
+  color: var(--canvas-text);
+  font: inherit;
+  cursor: pointer;
+}
+.submission-verdict button.pass { border-color: var(--fp-ok); color: var(--fp-ok); }
+
+/* 2026-08-16 compact: 勾/叉图标钮形态 —— 不占横条, 可内联进标题行(rf-bar)。 */
+.submission-verdict.compact {
+  flex: none;
+  gap: 6px;
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
+}
+.submission-verdict.compact button {
+  min-height: 26px;
+  width: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.submission-verdict.compact button svg { display: block; }
+.submission-verdict.done.compact { padding: 0 2px; }
+.submission-verdict button.fail { border-color: var(--fp-err); color: var(--fp-err); }
+.submission-verdict button:hover { background: var(--fp-bp-paper-2); }
+.submission-verdict.done {
+  min-height: 24px;
+  gap: 8px;
+  padding: 3px 12px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+  background: transparent;
+  color: var(--canvas-muted);
+  font-size: 11px;
+}
+.submission-verdict.done > span { font-weight: 600; }
+.submission-reason { display: inline-flex; align-items: center; gap: 4px; color: var(--canvas-text); }
+.submission-note {
+  min-width: 180px;
+  padding: 4px 8px;
+  border: 1px solid var(--fp-border-subtle);
+  border-radius: 0;
+  background: var(--fp-bp-solid);
+  color: var(--canvas-text);
+  font: inherit;
+}
+
+.material-review-view {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: auto;
+  padding: 64px 22px 18px; /* 顶 padding 让开左上角浮动工具条(absolute, ~50px 高) */
+  background: var(--canvas-bg);
+}
+.material-review-empty { color: var(--canvas-muted); padding: 40px; text-align: center; }
+.material-review-buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.material-review-bucket {
+  border: 1px solid var(--fp-border-subtle);
+  border-radius: 0;
+  background: var(--fp-bp-tracing);
+  padding: 10px;
+}
+.material-review-bucket > header {
+  display: flex;
+  justify-content: space-between;
+  color: var(--canvas-text);
+  font-weight: 600;
+  padding: 2px 4px 10px;
+}
+.material-review-bucket > header small { color: var(--canvas-muted); }
+.material-review-item {
+  border: 1px solid var(--fp-border-subtle);
+  border-radius: 0;
+  background: var(--canvas-card);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.material-review-open {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--canvas-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.material-review-open:hover { background: var(--fp-bp-paper-2); }
+.material-review-open img { max-width: 100%; max-height: 140px; object-fit: contain; border-radius: 0; background: var(--fp-bp-scene); }
+.material-review-open small { color: var(--canvas-muted); }
+.material-review-open small.reason { color: var(--fp-err); }
+.material-review-noimg { color: var(--canvas-muted); font-size: 12px; }
+.material-review-item .submission-verdict { border-bottom: 0; border-top: 1px solid var(--fp-border-subtle); }
+
+.material-review-scope { display: flex; gap: 2px; margin-bottom: 14px; }
+.material-review-scope button {
+  min-height: 30px;
+  padding: 4px 14px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--canvas-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.material-review-scope button.active { background: var(--fp-bp-paper-2); color: var(--canvas-text); border-color: var(--fp-border-subtle); }
+.material-review-item-actions { display: flex; align-items: center; flex-wrap: wrap; }
+.material-review-jump {
+  padding: 4px 10px;
+  color: var(--fp-link);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.material-review-jump:hover { text-decoration: underline; }
+.material-review-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.material-review-scope-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 12px;
+  border: 1px solid var(--fp-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--canvas-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.material-review-scope-toggle:hover { border-color: var(--fp-border-strong); color: var(--canvas-text); }
+.material-review-scope-toggle.active { background: var(--fp-bp-paper-2); color: var(--canvas-text); border-color: var(--fp-border-subtle); }
+.material-review-snippet {
+  display: block;
+  color: var(--canvas-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 66px;
+  overflow: hidden;
+}
+.material-review-open audio, .material-review-open video { max-width: 100%; max-height: 140px; }
+.material-review-open iframe { width: 100%; height: 140px; border: 0; border-radius: 0; background: var(--fp-bp-scene); pointer-events: none; }
+
+.material-review-resolved { margin-top: 16px; }
+.material-review-resolved summary {
+  cursor: pointer;
+  color: var(--canvas-muted);
+  font-size: 12.5px;
+  padding: 6px 2px;
+}
+.material-review-resolved summary:hover { color: var(--canvas-text); }
+
+/* full 变体(2026-08-14): 详情窗口主角位 —— 预览撑满宿主, 文本全文预排 */
+.material-review-snippet[data-variant="full"] {
+  max-height: none;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--canvas-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* full 态渲成 Markdown 后不能再 pre-wrap(会把段内换行当硬换行、表格前空白撑开); 高度交给外层滚动。 */
+.material-review-snippet.material-markdown-preview[data-variant="full"] {
+  white-space: normal;
+  height: auto;
+  padding: 0;
+  background: transparent;
+}
+img[data-variant="full"], video[data-variant="full"] {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: var(--fp-bp-scene);
+}
+audio[data-variant="full"] { width: 100%; }
+iframe[data-variant="full"] {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--fp-bp-scene);
+}

@@ -1,0 +1,332 @@
+/* ============================================================
+   overlay_file(Agent 暂存区文件页)· 蓝图 G 形态(2026-08-06)。
+   此前颜色走 token 但形态仍是通用文件浏览器: 柔光玻璃页头 / 素行 / 实底筛选框 /
+   11px 破字阶地板 / PDF 底写死 #202124。这轮统一到既有语汇:
+   chrome 透网格、文件名衬线、筛选=虚线测量件+黄铜焦点环、行=厚框纸件、
+   PDF 与 CLI 共用黑玻璃观察窗底。
+   ============================================================ */
+
+.ov-file-page {
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  color: var(--fp-text);
+  /* 页面根容器按 G.7 透出 #bp-grid 全局格纸, 不自铺也不上纯底色 */
+  background: transparent;
+}
+
+.ov-file-header {
+  min-height: 48px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--fp-border-subtle);
+  /* chrome 区透出 #bp-grid 统一网格(G.7 波四: 全 app 只有那一张格纸) */
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.ov-file-main-icon,
+.ov-file-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--fp-bp-brass-hi);
+}
+
+.ov-file-identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ov-file-identity strong,
+.ov-file-identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 文件名走衬线 display 栈, 与项目板卡名/multiagent 行标题同一档 */
+.ov-file-identity strong {
+  font-size: var(--fp-fs-2);
+  font-weight: 500;
+  font-family: var(--fp-bp-font-display);
+}
+
+/* 11px 破了 G 的 12px 功能文字地板(只有 chrome 区 aria-hidden 的刻度类可豁免) */
+.ov-file-identity span {
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
+}
+
+.ov-file-meta {
+  margin-left: auto;
+  min-width: 0;
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-file-tool {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 29px;
+  padding: 5px 9px;
+  border: 1px solid var(--fp-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--fp-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ov-file-tool:hover {
+  color: var(--fp-text);
+  border-color: var(--fp-border-strong);
+  background: var(--fp-bp-panel-hover);
+}
+
+.ov-file-tool:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.ov-file-body {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+}
+
+.ov-file-directory,
+.ov-file-code {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.ov-file-directory-tools {
+  min-height: 42px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--fp-border);
+  color: var(--fp-text-3);
+  font-size: var(--fp-fs-4);
+}
+
+.ov-file-filter {
+  width: min(360px, 60vw);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  /* 输入/筛选件 = 虚线测量件(G 口径), 聚焦转实线 + 黄铜环 —— 与 .v2-search / .bps-btn 同手感 */
+  border: 1px dashed var(--fp-border);
+  border-radius: var(--fp-bp-r1);
+  color: var(--fp-text-3);
+  background: transparent;
+  transition: border-color var(--fp-t-fast), box-shadow var(--fp-t-fast);
+}
+
+.ov-file-filter:focus-within {
+  border-style: solid;
+  border-color: var(--fp-bp-brass);
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft);
+  color: var(--fp-text-2);
+}
+
+.ov-file-filter input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fp-text);
+  font: 12px var(--fp-font-sans);
+}
+
+.ov-file-list {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 4px 0 12px;
+}
+
+.ov-file-row {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 24px minmax(160px, 1fr) minmax(100px, 220px) 86px 140px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--fp-border) 55%, transparent);
+  background: transparent;
+  color: var(--fp-text-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ov-file-row:hover,
+.ov-file-row:focus-visible {
+  outline: none;
+  background: var(--fp-bp-panel-hover);
+  color: var(--fp-text);
+}
+
+.ov-file-row-name,
+.ov-file-row-kind,
+.ov-file-row-size,
+.ov-file-row-time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-file-row-name {
+  font-size: 13px;
+}
+
+.ov-file-row-kind,
+.ov-file-row-size,
+.ov-file-row-time {
+  color: var(--fp-text-3);
+  font: 11px var(--fp-font-mono);
+}
+
+.ov-file-row-size {
+  text-align: right;
+}
+
+.ov-file-code-editor {
+  min-height: 0;
+  flex: 1;
+}
+
+.ov-file-loading,
+.ov-file-empty,
+.ov-file-truncated,
+.ov-file-error {
+  color: var(--fp-text-3);
+  font-size: 12px;
+}
+
+.ov-file-loading,
+.ov-file-empty {
+  padding: 24px;
+}
+
+.ov-file-truncated,
+.ov-file-error {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--fp-border);
+  background: color-mix(in srgb, var(--fp-warn) 10%, transparent);
+  color: var(--fp-warn);
+}
+
+.ov-file-error {
+  background: color-mix(in srgb, var(--fp-err) 10%, transparent);
+  color: var(--fp-err);
+}
+
+.ov-file-media {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  overflow: auto;
+  padding: 18px;
+  color: var(--fp-text-3);
+}
+
+.ov-file-image img,
+.ov-file-media video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.ov-file-media audio {
+  width: min(620px, 90%);
+}
+
+.ov-file-pdf {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  border: 0;
+  /* 2026-08-06: 原本写死 #202124(既不是蓝图也不是黑玻璃)。PDF 与 CLI 同属"嵌在图板上的
+     深色观察窗", 统一走终端那套黑玻璃底; iframe 里是外部内容, 只给窗框不干预内容。 */
+  background: var(--fp-term-bg-solid);
+  box-shadow:
+    inset 0 0 0 1px var(--fp-term-edge),
+    inset 0 0 28px var(--fp-term-glow);
+}
+
+.ov-file-unpreviewable {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  text-align: center;
+}
+
+.ov-file-unpreviewable strong {
+  color: var(--fp-text);
+  font-size: 15px;
+}
+
+.is-spinning {
+  animation: ov-file-spin 900ms linear infinite;
+}
+
+@keyframes ov-file-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+  .ov-file-meta {
+    display: none;
+  }
+
+  .ov-file-tool {
+    width: 30px;
+    overflow: hidden;
+    padding: 5px 7px;
+    gap: 20px;
+  }
+
+  .ov-file-row {
+    grid-template-columns: 22px minmax(120px, 1fr) 74px;
+  }
+
+  .ov-file-row-kind,
+  .ov-file-row-time {
+    display: none;
+  }
+}

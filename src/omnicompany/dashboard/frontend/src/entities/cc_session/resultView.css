@@ -1,0 +1,118 @@
+/* 产物缩略块 / 产物条 / 结果画廊 / 悬停预览 / 全屏查看器(2026-11-20) */
+.rv-tile {
+  position: relative; flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden;
+  padding: 0; border: 1px solid var(--fp-border); border-radius: 6px; background: var(--fp-bp-solid, #10141c);
+  color: var(--fp-text-2); cursor: zoom-in; text-align: left;
+}
+.rv-tile:hover { border-color: var(--fp-accent); }
+.rv-tile[data-size='shelf'] { width: 150px; height: 96px; }
+.rv-tile[data-size='grid'] { width: 100%; aspect-ratio: 4 / 3; }
+.rv-tile[data-size='hover'] { width: 100%; height: 100%; cursor: default; box-shadow: 0 12px 32px rgba(0, 0, 0, .45); }
+.rv-tile-cover { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; min-height: 0; flex: 1; }
+.rv-tile-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(0, 0, 0, .55); color: #fff; pointer-events: none;
+}
+.rv-tile-title {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 4px 6px;
+  font-size: 11px; color: var(--fp-text); border-bottom: 1px solid var(--fp-border);
+}
+.rv-tile-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-tile-title svg { flex: 0 0 auto; color: var(--fp-link); }
+.rv-tile-text {
+  flex: 1; min-height: 0; overflow: hidden; padding: 4px 7px; font-size: 9px; line-height: 1.45; color: var(--fp-text-2);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+.rv-tile[data-size='grid'] .rv-tile-text, .rv-tile[data-size='hover'] .rv-tile-text { font-size: 11px; }
+.rv-tile-text h1, .rv-tile-text h2, .rv-tile-text h3 { font-size: 1.1em; margin: 2px 0; }
+.rv-tile-text p, .rv-tile-text ul, .rv-tile-text ol, .rv-tile-text table { margin: 2px 0; }
+.rv-tile-text ul, .rv-tile-text ol { padding-left: 12px; }
+.rv-tile-text table { border-collapse: collapse; }
+.rv-tile-text td, .rv-tile-text th { border: 1px solid var(--fp-border); padding: 1px 3px; }
+.rv-tile-icon, .rv-tile-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  padding: 6px; font-size: 11px; color: var(--fp-text-3); text-align: center; overflow: hidden;
+}
+.rv-tile-icon span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-tile-icon svg { color: var(--fp-link); }
+
+.rv-shelf {
+  position: relative; z-index: 2; flex: 0 0 auto; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden;
+  padding: 6px 8px; border-top: 1px solid var(--fp-border); background: var(--fp-bg-overlay, rgba(0, 0, 0, .25));
+}
+
+.rv-gallery-root { position: relative; height: 100%; overflow: auto; }
+.rv-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 10px; }
+.rv-gallery-refresh { position: absolute; right: 8px; bottom: 8px; z-index: 2; background: var(--fp-bp-solid); }
+.rv-gallery-empty { height: 100%; display: grid; place-items: center; padding: 24px; color: var(--fp-text-3); font-size: 13px; text-align: center; }
+
+.rv-hover { position: fixed; z-index: 9000; pointer-events: none; }
+
+.rv-viewer {
+  position: fixed; inset: 0; z-index: 10000; display: flex; flex-direction: column;
+  background: rgba(4, 6, 10, .92); color: #e8edf5;
+}
+.rv-viewer-bar { position: absolute; top: 10px; right: 12px; z-index: 3; display: flex; align-items: center; gap: 6px; }
+.rv-viewer-count { margin-right: 6px; font-size: 12px; color: rgba(232, 237, 245, .7); }
+.rv-btn-icon {
+  width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 8px; background: rgba(20, 24, 32, .8); color: #e8edf5; cursor: pointer;
+}
+.rv-btn-icon:hover { background: rgba(60, 70, 90, .9); }
+.rv-nav {
+  position: absolute; top: 50%; z-index: 3; transform: translateY(-50%); width: 44px; height: 72px;
+  display: grid; place-items: center; border: 0; border-radius: 8px; background: rgba(20, 24, 32, .6); color: #e8edf5; cursor: pointer;
+}
+.rv-nav[data-side='left'] { left: 12px; }
+.rv-nav[data-side='right'] { right: 12px; }
+.rv-viewer-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 56px 64px 24px; }
+.rv-viewer-media { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 16px 48px rgba(0, 0, 0, .6); }
+.rv-viewer-card {
+  width: min(1100px, 100%); height: 100%; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--fp-border); border-radius: 10px; background: var(--fp-bp-solid, #10141c); color: var(--fp-text);
+}
+.rv-viewer-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--fp-border); }
+.rv-viewer-card-head strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+.rv-btn {
+  height: 26px; padding: 0 10px; border: 1px solid var(--fp-border); border-radius: 6px;
+  background: transparent; color: var(--fp-text-2); font-size: 12px; cursor: pointer;
+}
+.rv-viewer-card-body { flex: 1; min-height: 0; overflow: auto; }
+.rv-viewer-frame { position: relative; flex: 1; min-height: 0; }
+.rv-viewer-frame > div { position: absolute !important; inset: 0; width: auto !important; height: auto !important; }
+.rv-viewer-file { width: min(1200px, 100%); height: 100%; position: relative; border-radius: 10px; overflow: hidden; background: var(--fp-bp-solid); }
+.rv-viewer-file > section { position: absolute; inset: 0; }
+.rv-viewer-note { color: rgba(232, 237, 245, .7); font-size: 13px; }
+
+.rv-markdown { padding: 14px 20px 24px; font-size: 14px; line-height: 1.75; user-select: text; overflow-wrap: anywhere; }
+.rv-markdown h1, .rv-markdown h2, .rv-markdown h3 { font-size: 15px; margin: 16px 0 6px; }
+.rv-markdown p { margin: 6px 0; }
+.rv-markdown ul { list-style: disc; margin: 6px 0; padding-left: 22px; }
+.rv-markdown ol { list-style: decimal; margin: 6px 0; padding-left: 22px; }
+.rv-markdown table { border-collapse: collapse; margin: 8px 0; font-size: 13px; display: block; overflow-x: auto; }
+.rv-markdown th, .rv-markdown td { border: 1px solid var(--fp-border); padding: 4px 8px; vertical-align: top; }
+.rv-markdown img { max-width: 100%; height: auto; border-radius: 6px; cursor: zoom-in; }
+.rv-markdown a { color: var(--fp-link); }
+.rv-viewer-media-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+.rv-viewer-web { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+
+/* 终端链接旁的展开面板 */
+.rv-expand {
+  position: fixed; z-index: 9000; display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--fp-accent); border-radius: 8px; background: var(--fp-bp-solid, #10141c);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .5);
+}
+.rv-expand-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-bottom: 1px solid var(--fp-border); }
+.rv-expand-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--fp-text-2); user-select: text; }
+.rv-expand-btn {
+  width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 5px;
+  background: transparent; color: var(--fp-text-2); cursor: pointer;
+}
+.rv-expand-btn:hover { color: var(--fp-text); background: var(--fp-bp-panel-hover); }
+.rv-expand-body { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; }
+.rv-expand[data-kind='card'] .rv-expand-body, .rv-expand[data-kind='file'] .rv-expand-body, .rv-expand[data-kind='canvas'] .rv-expand-body { background: transparent; align-items: stretch; }
+.rv-expand-body > .rv-viewer-card, .rv-expand-body > .rv-viewer-file { width: 100%; height: 100%; border: 0; border-radius: 0; }
+.rv-expand-body .rv-viewer-card-head { padding: 6px 10px; }
+.rv-expand-body .rv-markdown { font-size: 13px; padding: 10px 14px 16px; }

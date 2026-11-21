@@ -1,0 +1,39 @@
+id: EXP-recheck-teams-with-h038
+type: experiment
+kind: offline_audit
+status: proposed
+
+question: "使用 H-038 的多模式错误处理规则重新审查 team 后，H-034 时代的缺陷比例是否下降，并且是否能更准确地区分真缺陷和合法替代模式？"
+
+tests_claims:
+  - H-038
+
+compares_against:
+  - H-034
+
+inputs:
+  target_set: "抽样 8-12 个 team"
+  source_artifacts:
+    - "src/omnicompany/packages/services/**/team.py"
+    - "src/omnicompany/packages/domains/**/team.py"
+
+method:
+  - "对每个 team 检查五种错误处理模式：显式 FAIL edge、AnchorSpec.routes、节点内 retry、外部 driver、dispatcher/黑板兜底。"
+  - "记录每个 team 匹配到的模式。"
+  - "将 H-034 字面判定结果与 H-038 多模式判定结果对比。"
+  - "人工抽查至少 3 个 disagreement case。"
+
+success_criteria:
+  - "H-038 能解释 V21/V26 中已知反例。"
+  - "H-038 的误报率低于 H-034。"
+  - "仍然能发现至少一个真实缺陷或明确给出无缺陷证据。"
+
+failure_criteria:
+  - "H-038 仍大量误判合法模式。"
+  - "五种模式不足以覆盖新的真实 team。"
+  - "人工审查认为多模式规则过于宽松，导致真缺陷被放过。"
+
+expected_outputs:
+  - "EXP-recheck-teams-with-h038-report.md"
+  - "新的 evidence 记录"
+  - "必要时派生 H-040 或证伪 H-038"

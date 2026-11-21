@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnicompany.dev/schemas/recovery-provider.v1.json",
+  "title": "Omni Recover provider source manifest",
+  "type": "object",
+  "required": ["name", "roots", "includes", "excludes"],
+  "properties": {
+    "name": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"},
+    "roots": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "includes": {"type": "array", "items": {"type": "string"}},
+    "excludes": {"type": "array", "items": {"type": "string"}},
+    "replace": {"type": "boolean", "default": false}
+  },
+  "additionalProperties": false
+}

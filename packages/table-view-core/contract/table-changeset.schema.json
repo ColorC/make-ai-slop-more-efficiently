@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "omni.table-changeset/v1",
+  "title": "TableChangeSet",
+  "description": "预期变更的 CRUD 原子。current* 字段由核心从 TableDoc 覆写，调用方写了也会被覆盖（杜绝编造当前值）。",
+  "type": "object",
+  "required": ["schema", "operations"],
+  "properties": {
+    "schema": { "const": "omni.table-changeset/v1" },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["crud"],
+        "properties": {
+          "crud": { "enum": ["Create", "Update", "Delete"] },
+          "key": { "type": "object", "description": "字段集合必须等于 TableDoc.key_fields（column 级 Delete 除外）" },
+          "field": { "type": "string", "description": "Update 必须具体字段；Delete 的 \"*\" 表示整行" },
+          "cells": { "type": "object", "description": "Create 的整行内容（标量视为 {v: 标量}），主键格必须与 key 一致" },
+          "target": { "description": "写进源的值" },
+          "target_source": { "description": "源侧表示（当与 target 不同）" },
+          "target_projection": { "description": "导出/投影后应出现的值（缺省回落 target）" },
+          "target_formula": { "type": ["string", "null"], "description": "写入公式原文；给了则该格变公式格" },
+          "delete_scope": { "enum": ["cell", "row", "column"], "description": "Delete 专用，默认 field==\"*\" 时 row、否则 cell" },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

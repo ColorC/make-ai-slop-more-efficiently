@@ -1,0 +1,19 @@
+id: CON-h038-attacks-h034
+type: conflict
+kind: undercut
+
+from: H-038
+to: H-034
+
+relation: attacks
+
+summary: "H-038 攻击 H-034 的 warrant：H-034 假定错误处理必须表现为显式 FAIL edge，但 H-038 指出存在多种合法错误处理模式。"
+
+evidence:
+  - EV-v21-csv-to-md-fail-retry
+  - EV-v26-five-fail-patterns
+
+resolution:
+  status: resolved
+  result: "H-034 global form falsified; H-034 local check retained."
+  decision: ADR-0001-downgrade-h034

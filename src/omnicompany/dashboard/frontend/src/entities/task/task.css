@@ -1,0 +1,1026 @@
+/* ============================================================
+   Todo（task-core 个人任务总线）—— 蓝图 G 页面形态。
+   规格: docs/plans/_cross/[2026-09-01]TASK-CORE-PERSONAL-TASK-BUS/spec-todo-frontend-rebuild.md
+
+   硬规矩（有测试闸门盯着，见 taskBus.test.ts「样式闸门」）:
+     · 圆角只用 var(--fp-bp-r1/r2/r3)，其余场合 0 或 50%；不出现 4/6/8px 这类"网页圆角"。
+     · 字号只用 var(--fp-fs-1..4)（18/15/13/12），12px 是地板，不写字面量。
+     · 颜色只用 var(--fp-*)，本文件零 hex / 零 rgba。
+     · 字重封顶 500 —— 层级靠字号 + 字距 + 大写，不靠加粗（制图等线字的道理）。
+     · 文字面平滑禁纹理；网格由 .bp-opaque-scene 铺一层与 #bp-grid 像素对齐的格纸
+       （侧栏不透明，盖死了全视口那张，只能这样把纹路拿回来）。
+     · 分区靠「面」不靠「线」：每个区域是一块板，板与板之间留空让格纸干净地露出来。
+       裸的横/竖分隔线一律不许压在格纸上（成因见下方「面板材质」一节）。
+   ============================================================ */
+
+.tk-root {
+  container: tk / inline-size;   /* 侧栏窄/宽/全屏三档形态全靠它，不看视口 */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  outline: none;
+  color: var(--fp-text);
+  font-family: var(--fp-font-sans);
+  font-size: var(--fp-fs-3);
+  line-height: var(--fp-lh);
+}
+
+.tk-root[data-busy='1'] { cursor: progress; }
+
+/* ── 面板材质：一片一个矩形，不许有裸线压在格纸上 ─────────────────────────
+ * 用户 2026-09-05：「文字部分还是带一下背景吧，然后也不要用横杠来划分，而是把各个
+ * 区域卡片化+玻璃纹理化…不要把任何横竖线暴露在背景下」。
+ *
+ * 成因：G 的格纸是钉在视口上的全屏贴图，1px 分隔线跟它同粗、同色系，一密就跟格线
+ * 咬在一起糊成摩尔纹；悬空的文字也在跟方格抢笔画。所以分区改用「面」：
+ * 每个区域一块板（玻璃/纯色），板与板之间留空 —— 格纸只在空处露出来，干干净净；
+ * 线只许出现在板面上（状态标尺、缩进引线那类结构记号），不许出现在格纸上。
+ *
+ * 材质（2026-09-05 二轮，用户：「这真是玻璃嘛，你看和其他的悬浮面板什么的一致吗」）：
+ * 一轮用的是蓝图玻璃 --fp-bp-panel-text，那是图纸色（--fp-surface 一族），**比场景底
+ * --fp-bg 更亮** —— 往上加亮读出来是「填了色的纸卡」，不是玻璃。全站悬浮件（通知面板、
+ * 预览卡 HoverCard、picker/select 弹层）走的是描图纸 --fp-glass / --fp-glass-2：
+ * 那是一味**比底更暗**的墨，压上去先暗一块，再靠亮边把厚度读出来 —— 这才是本版的玻璃。
+ * 所以板改用同一味墨、同一档模糊 --fp-blur，跟悬浮件是同一种材质。
+ *
+ * 常驻板 vs 悬浮件靠**边**分，不靠材质分：悬浮件 = 亮虚线 .75 + 纸叠 pop 影（飘着的）；
+ * 常驻板 = 实线绘图线 + 小硬影（钉在图板上的）。板面本身平铺一块墨，不打渐变、不加高光
+ * —— 悬浮面板就是平的，板上多一层光就又成两种东西了（用户 2026-09-05 三轮）。
+ *
+ * 档位：高性能（设置 → 界面 → 终端底 = 高性能）或 html.no-ambient 时，把同一味墨铺在
+ * 一层不透明场景底上 —— 得到的正好是「玻璃档背后只有图板时」的那个颜色，同族、不透明、
+ * 零 backdrop-filter（贵的是模糊，不是半透）。这页可能同时摆十几块板，模糊按面积收费。
+ */
+.tk-root {
+  --tk-pane: var(--fp-glass);
+  --tk-pane-2: var(--fp-glass-2);
+  --tk-pane-blur: var(--fp-blur);
+  --tk-pane-under: transparent;
+}
+:root[data-omni-terminal-renderer='gpu'] .tk-root,
+html.no-ambient .tk-root {
+  --tk-pane: var(--fp-glass-2);
+  --tk-pane-2: var(--fp-glass-2);
+  --tk-pane-blur: none;
+  --tk-pane-under: var(--fp-bp-scene);
+}
+
+.tk-cmd,
+.tk-filters,
+.tk-rail,
+.tk-msgs,
+.tk-stack > .tk-group,
+.tk-lanes > .tk-group,
+.tk-blank {
+  box-sizing: border-box;
+  /* 平的一块墨, 不打渐变(2026-09-05 用户「把你那渐变去掉吧」——
+     悬浮面板就是平铺一块 --fp-glass-2, 板上再罩一层顶高光就又不是一种东西了)。
+     第二层是高性能档才铺的不透明场景底。 */
+  background:
+    linear-gradient(var(--tk-pane), var(--tk-pane)),
+    var(--tk-pane-under);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--fp-bp-r2);
+  /* 内高光 = 玻璃的上棱; 外面那道是纸叠硬影 */
+  box-shadow: inset 0 1px 0 var(--fp-accent-weak), var(--fp-bp-shadow-sm);
+  backdrop-filter: var(--tk-pane-blur);
+  -webkit-backdrop-filter: var(--tk-pane-blur);
+}
+
+/* ── 命令条: 全页唯一一行 chrome（无页内标题，页签已经写着 Todo） ────────── */
+
+.tk-cmd {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  flex-wrap: wrap;
+  margin: var(--fp-s2) var(--fp-s3) 0;
+  padding: var(--fp-s2);
+}
+
+/* 在线状态只剩一枚 LED —— 文字状态是噪音，离线时 body 会整块换成空态说明 */
+.tk-led.v2-status {
+  flex: none;
+  padding: 0;
+  background: transparent;
+  min-width: var(--fp-s3);
+  justify-content: center;
+}
+
+.tk-search.v2-search { flex: 1 1 100%; max-width: none; min-width: 0; }
+
+.tk-cmd-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tk-cmd-tools::-webkit-scrollbar { display: none; }
+/* 侧栏窄态下这一行会被压扁：自绘下拉是 inline-flex，一 shrink 就只剩个 chevron，
+   「分组」「排序」变成两个空框（实拍抓到）。工具件一律不缩，宽度不够就整行横滑。 */
+.tk-cmd-tools > * { flex: none; }
+.tk-refresh { margin-left: auto; }
+
+@container tk (min-width: 560px) {
+  .tk-search.v2-search { flex: 0 1 260px; }
+  .tk-cmd-tools { flex: 0 0 auto; overflow: visible; }
+}
+
+/* ── 就地新建 composer（每个面板一个 `+` 点开；标题+描述+属性件，不必会语法） ── */
+
+.tk-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fp-s2);
+  margin: var(--fp-s1) 0 var(--fp-s3);
+  padding: var(--fp-s2);
+  border: 1px solid var(--fp-bp-brass);
+  border-radius: var(--fp-bp-r2);
+  background:
+    linear-gradient(var(--tk-pane), var(--tk-pane)),
+    var(--tk-pane-under);
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft), var(--fp-bp-shadow-sm);
+  backdrop-filter: var(--tk-pane-blur);
+  -webkit-backdrop-filter: var(--tk-pane-blur);
+}
+
+.tk-composer-title,
+.tk-composer-desc {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--fp-s1) var(--fp-s2);
+  border: 1px dashed var(--fp-border);
+  border-radius: var(--fp-bp-r1);
+  background: transparent;
+  color: var(--fp-text);
+  font-family: var(--fp-font-sans);
+}
+.tk-composer-title { font-size: var(--fp-fs-2); }
+.tk-composer-desc { font-size: var(--fp-fs-3); line-height: var(--fp-lh); resize: vertical; }
+
+.tk-composer-props {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  flex-wrap: wrap;
+}
+.tk-composer-props > * { flex: none; }
+
+.tk-composer-due {
+  box-sizing: border-box;
+  padding: var(--fp-s1) var(--fp-s2);
+  border: 1px dashed var(--fp-border);
+  border-radius: var(--fp-bp-r1);
+  background: transparent;
+  color: var(--fp-text-2);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  color-scheme: dark;
+}
+
+.tk-composer-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  flex-wrap: wrap;
+}
+.tk-composer-tip {
+  flex: 1;
+  min-width: 0;
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
+}
+
+.tk-echo {
+  padding: 0 var(--fp-s1);
+  border: 1px dashed var(--fp-border);
+  border-radius: var(--fp-bp-r1);
+  color: var(--fp-text-2);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
+  line-height: 1.6;
+}
+.tk-echo[data-kind='due']  { color: var(--fp-bp-brass-hi); border-color: var(--fp-bp-brass); }
+.tk-echo[data-kind='warn'] { color: var(--fp-warn); border-color: var(--fp-warn); }
+
+/* ── 动作菜单（右键 / 行尾 ⋯；容器玻璃与定位在 TaskMenu.tsx） ─────────────── */
+
+.tk-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  width: 100%;
+  padding: var(--fp-s1) var(--fp-s2);
+  border: 0;
+  border-radius: var(--fp-bp-r1);
+  background: transparent;
+  color: var(--fp-text);
+  font-family: var(--fp-font-sans);
+  font-size: var(--fp-fs-3);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tk-menu-item:hover:not(:disabled),
+.tk-menu-item[data-open='1'] { background: var(--fp-bp-paper-2); }
+.tk-menu-item:disabled { color: var(--fp-text-3); cursor: not-allowed; }
+.tk-menu-item[data-danger='1'] { color: var(--fp-err); }
+.tk-menu-item[data-danger='1']:hover { background: var(--fp-bp-seal-soft); }
+.tk-menu-item[aria-checked='true'] { color: var(--fp-bp-brass-hi); }
+.tk-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tk-menu-hint {
+  flex: none;
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
+}
+.tk-menu-check { flex: none; display: inline-grid; place-items: center; width: var(--fp-s3); color: var(--fp-bp-brass-hi); }
+.tk-menu-sep { display: block; height: 1px; margin: var(--fp-s1) 0; background: var(--fp-border-subtle); }
+
+/* ── 主体三列: 项目导轨 / 列表-看板 / 详情抽屉 ──────────────────────────── */
+
+.tk-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.tk-rail { display: none; }
+
+.tk-body {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fp-s2);
+  padding: var(--fp-s2) var(--fp-s3) var(--fp-s6);
+}
+/* 板一律不缩 —— 缩了是把内容挤扁，不是让页面变短。溢出交给 tk-body 自己滚。 */
+.tk-body > * { flex: none; }
+
+.tk-root[data-view='board'] .tk-body { padding-bottom: var(--fp-s3); }
+
+/* 全屏下行不该拉到 1900px 宽(标题在最左、元信号在最右, 眼睛要横跨整屏)。
+   封的是 body 的孩子而不是 body 本身 —— body 满宽, 停靠抽屉才贴得住右缘, 余下的空处
+   正好把格纸露出来。看板不封: 泳道本来就该用满。 */
+@container tk (min-width: 1180px) {
+  .tk-root[data-view='list'] .tk-body > * { max-width: 1120px; width: 100%; }
+}
+
+@container tk (min-width: 1100px) {
+  .tk-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: none;
+    width: 176px;
+    margin: var(--fp-s2) 0 var(--fp-s2) var(--fp-s3);
+    padding: var(--fp-s2);
+    overflow-y: auto;
+  }
+  .tk-projects-picker { display: none; }
+}
+
+/* ── 通用面板（账页的一节 / 看板的一道，同一个组件同一套样式） ──────────── */
+
+.tk-group { display: flex; flex-direction: column; min-width: 0; }
+
+/* 组头：名 → 未完成计数 → 向右延伸的引线 → `+`（图纸上的区段标题画法） */
+.tk-ghead {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  padding: var(--fp-s1) var(--fp-s1) var(--fp-s2);
+}
+.tk-group[data-layout='board'] .tk-ghead { padding: 0 0 var(--fp-s2); }
+
+.tk-ghead-hit {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fp-text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tk-ghead-hit:hover { color: var(--fp-text); }
+.tk-ghead .gh-name {
+  flex: none;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-3);
+  text-transform: uppercase;
+}
+.tk-group[data-layout='board'] .tk-ghead .gh-name { font-size: var(--fp-fs-4); }
+.tk-ghead .chev { flex: none; color: var(--fp-text-3); transition: transform var(--fp-t-fast) var(--fp-ease); }
+.tk-ghead-hit[aria-expanded='false'] .chev { transform: rotate(-90deg); }
+.tk-ghead .bp-dim { flex: none; color: var(--fp-bp-brass-hi); }
+
+/* `+` 常驻可见（看板里它是主要入口，藏起来等于没有） */
+.tk-add { flex: none; width: var(--fp-s5); height: var(--fp-s5); }
+.tk-add:hover { color: var(--fp-bp-brass-hi); }
+
+.tk-group-body { display: flex; flex-direction: column; min-width: 0; }
+.tk-items { display: flex; flex-direction: column; min-width: 0; }
+.tk-group[data-layout='board'] .tk-items { gap: var(--fp-s2); }
+
+/* 空面板 = 可点的虚线落区（既是"拖到这里"的靶，也是第二个新建入口） */
+.tk-group-empty {
+  margin: var(--fp-s1) 0 var(--fp-s2);
+  padding: var(--fp-s3);
+  border: 1px dashed var(--fp-bp-line-subtle);
+  border-radius: var(--fp-bp-r1);
+  background: transparent;
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+.tk-group-empty:hover { border-color: var(--fp-border); color: var(--fp-text-2); }
+
+/* 拖放：可落 = 黄铜实线高亮；不可落 = 朱红虚线 + 一句话理由 */
+.tk-group[data-drop='ok'] .tk-group-body {
+  box-shadow: inset 0 0 0 1px var(--fp-bp-brass);
+  background: var(--fp-bp-brass-soft);
+}
+.tk-group[data-drop='no'] .tk-group-body {
+  box-shadow: inset 0 0 0 1px var(--fp-bp-seal);
+}
+.tk-drop-reason {
+  margin: 0;
+  padding: var(--fp-s1) var(--fp-s2);
+  color: var(--fp-err);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+}
+
+/* ── 账页: 一节一块板, 板内的行不带任何分隔线 ───────────────────────────
+ * 旧版是「细线分隔的账页」。细线在格纸上读不出来(见「面板材质」), 于是分节的活
+ * 交给板本身: 一节 = 一块板, 板内靠留白与 hover/选中的「面」区分行, 不靠线。 */
+
+.tk-stack { display: flex; flex-direction: column; gap: var(--fp-s2); }
+.tk-stack > .tk-group { padding: var(--fp-s1) var(--fp-s2) var(--fp-s2); }
+
+.tk-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  min-height: var(--fp-s6);
+  padding-block: var(--fp-s1);
+  padding-right: var(--fp-s2);
+  padding-left: calc(var(--fp-s2) + var(--tk-depth, 0) * 18px);
+  border-radius: var(--fp-bp-r1);
+  cursor: grab;
+  transition: background var(--fp-t-fast);
+}
+.tk-row:active,
+.tk-card:active { cursor: grabbing; }
+.tk-row:hover { background: var(--fp-bp-panel-hover); }
+
+/* 选中 = 45° 剖面 hatch + 制图角缺口（结构标记，不是填色高亮） */
+.tk-row[data-selected='1'] {
+  background: var(--fp-bp-hatch), var(--fp-bp-panel-text);
+  box-shadow: inset 0 0 0 1px var(--fp-border-strong);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+}
+.tk-row[data-focused='1'] { box-shadow: inset 3px 0 0 var(--fp-bp-brass); }
+.tk-row[data-error='1']   { box-shadow: inset 3px 0 0 var(--fp-bp-seal); }
+.tk-row[data-drop-target='1'] {
+  box-shadow: inset 0 2px 0 var(--fp-bp-brass), inset 0 -1px 0 var(--fp-bp-brass);
+}
+
+/* 子任务缩进引线 */
+.tk-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--fp-s2) + (var(--tk-depth, 1) - 1) * 18px + 6px);
+  border-left: 1px dashed var(--fp-bp-line-subtle);
+}
+
+.tk-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fp-text);
+}
+[data-done='1'] .tk-title {
+  color: var(--fp-text-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--fp-bp-line-subtle);
+}
+
+.tk-meta { display: inline-flex; align-items: center; gap: var(--fp-s1); flex: none; }
+
+.tk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  max-width: 14ch;
+  overflow: hidden;
+  padding: 0 var(--fp-s1);
+  border: 1px solid var(--fp-bp-line-subtle);
+  border-radius: var(--fp-bp-r1);
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .04em;
+  line-height: 1.6;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* 纯文字 chip 改 inline-block —— inline-flex 容器上 text-overflow 不生效, 长项目名会被硬切 */
+.tk-chip[data-kind='project'] { display: inline-block; max-width: 12ch; vertical-align: middle; }
+.tk-chip[data-due='overdue'] { color: var(--fp-err); border-color: var(--fp-bp-seal); }
+.tk-chip[data-due='soon']    { color: var(--fp-bp-brass-hi); border-color: var(--fp-bp-brass); }
+.tk-chip-dim.bp-dim { flex: none; }
+
+[data-drag='1'] { opacity: .4; }
+
+/* 次动作按钮 hover 才现（触屏恒显）—— 但菜单开着时必须留住，否则一点就消失 */
+.tk-kebab {
+  flex: none;
+  width: var(--fp-s5);
+  height: var(--fp-s5);
+  opacity: 0;
+  transition: opacity var(--fp-t-fast);
+}
+.tk-row:hover .tk-kebab,
+.tk-card:hover .tk-kebab,
+.tk-kebab:focus-visible,
+.tk-kebab[data-open='1'] { opacity: 1; }
+@media (pointer: coarse) { .tk-kebab { opacity: .7; } }
+
+[data-menu='1'] { background: var(--fp-bp-panel-hover); }
+
+.tk-inline-err {
+  flex: none;
+  color: var(--fp-err);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+}
+
+/* ── 状态标记: 同色异形的线条件, 靠形状读状态, 不靠颜色 ─────────────────── */
+
+.tk-marker-btn {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding: var(--fp-s1);
+  border: 0;
+  border-radius: var(--fp-bp-r1);
+  background: transparent;
+  cursor: pointer;
+}
+.tk-marker-btn:hover { background: var(--fp-bp-panel-hover); }
+.tk-marker-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--fp-bp-brass-soft);
+}
+
+.tk-mark {
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border: 1px solid var(--fp-border-strong);
+  border-radius: var(--fp-bp-r1);
+  color: var(--fp-text-2);
+}
+
+/* 进行中 = 45° 剖面 hatch 匀速流动 + 朱红框（周期 7px → x 向无缝位移 9.9px） */
+.tk-mark[data-state='in-progress'] {
+  border-color: var(--fp-bp-seal);
+  background: var(--fp-bp-hatch);
+  animation: tk-flow 1.6s linear infinite;
+}
+@keyframes tk-flow { to { background-position: 9.9px 0; } }
+
+.tk-mark[data-state='in-review']::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: currentColor;
+}
+
+.tk-mark[data-state='paused']::before,
+.tk-mark[data-state='paused']::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: currentColor;
+}
+.tk-mark[data-state='paused']::before { left: 2px; }
+.tk-mark[data-state='paused']::after  { right: 2px; }
+
+.tk-mark[data-state='blocked'] { border-style: dashed; }
+.tk-mark[data-state='blocked']::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 50%;
+  height: 1px;
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
+.tk-mark[data-state='completed'] { color: var(--fp-ok); border-color: var(--fp-ok); }
+.tk-mark[data-state='completed']::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 0;
+  width: 3px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(42deg);
+}
+
+.tk-mark[data-state='cancelled'] { border-style: dashed; color: var(--fp-text-3); }
+.tk-mark[data-state='cancelled']::before,
+.tk-mark[data-state='cancelled']::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 50%;
+  height: 1px;
+  background: currentColor;
+}
+.tk-mark[data-state='cancelled']::before { transform: rotate(45deg); }
+.tk-mark[data-state='cancelled']::after  { transform: rotate(-45deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-mark[data-state='in-progress'] { animation: none; }
+}
+
+/* ── 看板布局：面板横排、snap 横滑；泳道之间只有绘图线，卡片浮在格纸上 ──── */
+
+.tk-lanes {
+  display: flex;
+  align-items: stretch;
+  gap: var(--fp-s2);
+  height: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: var(--fp-s2);
+}
+
+.tk-lanes > .tk-group {
+  flex: 0 0 auto;
+  width: min(84cqw, 300px);
+  min-width: 232px;
+  scroll-snap-align: start;
+  min-height: 0;
+  padding: var(--fp-s2);
+}
+@container tk (min-width: 700px) {
+  .tk-lanes > .tk-group { width: 248px; min-width: 0; }
+}
+.tk-lanes > .tk-group > .mo-collapse { min-height: 0; overflow-y: auto; }
+.tk-lanes .tk-group-body { padding-top: var(--fp-s2); }
+
+/* 卡片 = 厚框纸件。泳道本身已经是一块玻璃板了，卡面再叠一层模糊只会更糊也更贵，
+   所以卡走同一味墨的更实一档（--tk-pane-2，不带 backdrop-filter），靠亮边和硬影浮起来。 */
+.v2-card.tk-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "mark title kebab" "meta meta meta";
+  align-items: start;
+  gap: var(--fp-s1) var(--fp-s2);
+  width: 100%;
+  padding: var(--fp-s2) var(--fp-s3);
+  border-radius: var(--fp-bp-r2);
+  text-align: left;
+  background:
+    linear-gradient(var(--tk-pane-2), var(--tk-pane-2)),
+    var(--tk-pane-under);
+  border-color: var(--fp-border);
+  box-shadow: inset 0 1px 0 var(--fp-accent-weak), var(--fp-bp-shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.v2-card.tk-card:hover { background: var(--fp-bp-panel-hover); }
+.v2-card.tk-card .tk-marker-btn { grid-area: mark; }
+.v2-card.tk-card .tk-title {
+  grid-area: title;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  padding-top: 2px;
+}
+.v2-card.tk-card .tk-meta { grid-area: meta; flex-wrap: wrap; }
+.v2-card.tk-card .tk-kebab { grid-area: kebab; align-self: start; }
+.v2-card.tk-card[data-selected='1'] {
+  border-color: var(--fp-border-strong);
+  box-shadow: inset 0 0 0 1px var(--fp-bp-accent), var(--fp-bp-shadow-sm);
+}
+.v2-card.tk-card[data-focused='1'] { box-shadow: inset 3px 0 0 var(--fp-bp-brass), var(--fp-bp-shadow-sm); }
+.v2-card.tk-card[data-error='1']   { box-shadow: inset 3px 0 0 var(--fp-bp-seal), var(--fp-bp-shadow-sm); }
+.v2-card.tk-card[data-drop-target='1'] {
+  box-shadow: inset 0 2px 0 var(--fp-bp-brass), inset 0 -1px 0 var(--fp-bp-brass), var(--fp-bp-shadow-sm);
+}
+
+/* 按项目分组时，组头本身也是排序把手。落点不改任务字段，只记本地项目排位。 */
+.tk-ghead[data-panel-drag='1'] { cursor: grab; }
+.tk-ghead[data-panel-drag='1'] .tk-ghead-hit { cursor: grab; }
+.tk-ghead[data-panel-drag='1']:active { cursor: grabbing; }
+.tk-ghead[data-panel-drag='1']:active .tk-ghead-hit { cursor: grabbing; }
+.tk-group[data-panel-drop='1'] {
+  box-shadow: inset 0 2px 0 var(--fp-bp-brass), inset 0 -2px 0 var(--fp-bp-brass);
+}
+
+/* ── 空态 = 图纸上的未晒图区（虚线框 + 制图角标 + 打字机文案），不是红横幅 ── */
+
+.tk-blank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fp-s3);
+  max-width: 36ch;
+  margin: var(--fp-s6) auto;
+  padding: var(--fp-s5) var(--fp-s4);
+  border: 1px dashed var(--fp-border);
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .08em;
+  text-align: center;
+}
+.tk-blank p { margin: 0; line-height: 1.8; }
+
+/* ── L3 详情抽屉: 窄=底部覆盖, 宽=右侧停靠。列表永远不被顶跳。 ──────────── */
+
+.tk-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  background: var(--fp-bp-tracing-strong);
+}
+
+.tk-sheet {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(72%, 560px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* 表单/长文区不上玻璃: 半透面板会把底下的列表文字透上来跟输入框叠在一起(实测)。
+     --fp-bp-solid 正是 token 表里给"表格/长列表/输入框"的深图板底。 */
+  background: var(--fp-bp-solid);
+  border-top: var(--fp-bp-frame-w) solid var(--fp-border);
+  box-shadow: var(--fp-bp-shadow-pop);
+}
+
+@container tk (min-width: 781px) {
+  .tk-scrim { display: none; }
+  .tk-sheet {
+    position: static;
+    height: auto;
+    flex: none;
+    width: clamp(320px, 34%, 420px);
+    border-top: 0;
+    border-left: 1px solid var(--fp-border);
+    box-shadow: none;
+  }
+}
+
+.tk-sheet-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  padding: var(--fp-s2) var(--fp-s3);
+}
+.tk-sheet-id {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .08em;
+}
+
+.tk-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fp-s3);
+  padding: var(--fp-s3);
+}
+
+.tk-sheet-title {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--fp-s2);
+  border: 1px dashed var(--fp-border);
+  border-radius: var(--fp-bp-r1);
+  background: transparent;
+  color: var(--fp-text);
+  font-family: var(--fp-font-sans);
+  font-size: var(--fp-fs-2);
+}
+
+.tk-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: var(--fp-s2);
+}
+
+.tk-field { display: flex; flex-direction: column; gap: var(--fp-s1); min-width: 0; }
+.tk-field-wide { width: 100%; }
+.tk-field-k {
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.tk-field .bp-select { width: 100%; }
+
+.tk-date,
+.tk-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--fp-s1) var(--fp-s2);
+  border: 1px dashed var(--fp-border);
+  border-radius: var(--fp-bp-r1);
+  background: transparent;
+  color: var(--fp-text-2);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  color-scheme: dark;   /* 让原生日期弹层跟着暗色走, 不再是系统白 */
+}
+.tk-textarea {
+  font-family: var(--fp-font-sans);
+  font-size: var(--fp-fs-3);
+  line-height: var(--fp-lh);
+  resize: vertical;
+}
+
+.tk-sheet-actions { display: flex; align-items: center; gap: var(--fp-s2); flex-wrap: wrap; }
+.tk-sheet-archive { margin-left: auto; }
+
+.tk-sheet-err {
+  padding: var(--fp-s1) var(--fp-s2);
+  border-left: 2px solid var(--fp-bp-seal);
+  color: var(--fp-err);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+}
+
+.tk-sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fp-s2);
+  padding: var(--fp-s2);
+  border-radius: var(--fp-bp-r2);
+  background: var(--tk-pane-2);
+  box-shadow: inset 0 1px 0 var(--fp-accent-weak);
+}
+.tk-sec .bp-sechead { margin: 0; font-size: var(--fp-fs-4); }
+/* 区段标题向右延伸的那道引线也是一根裸横线 —— Todo 页里一律收掉 */
+.tk-root .bp-sechead::after { display: none; }
+
+.tk-links, .tk-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--fp-s1); }
+.tk-links li { display: flex; align-items: center; gap: var(--fp-s2); min-width: 0; }
+.tk-links code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fp-text-2);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+}
+.tk-links-state { flex: none; color: var(--fp-text-3); font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); }
+.tk-links-empty { color: var(--fp-text-3); font-family: var(--fp-font-mono); font-size: var(--fp-fs-4); }
+
+.tk-notes li { display: flex; gap: var(--fp-s2); align-items: baseline; }
+.tk-note-k {
+  flex: none;
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .1em;
+}
+.tk-note-b { min-width: 0; color: var(--fp-text-2); word-break: break-word; }
+
+.tk-sheet-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s3);
+  padding: var(--fp-s2);
+  border-radius: var(--fp-bp-r2);
+  background: var(--tk-pane-2);
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .08em;
+}
+
+/* ── L2 悬停预览内容（容器玻璃在 HoverCard.tsx，这里只管排版） ───────────── */
+
+.tk-pv-t { display: flex; align-items: center; gap: var(--fp-s2); color: var(--fp-text); font-size: var(--fp-fs-2); }
+.tk-pv-d {
+  margin-top: var(--fp-s2);
+  color: var(--fp-text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tk-pv-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  flex-wrap: wrap;
+  margin-top: var(--fp-s2);
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+  letter-spacing: .06em;
+}
+
+/* ── 优先度阶梯（个人附加层 task-core §10） ───────────────────────────────
+ * 一根刻度, 不写数字: 高度即等级, 读形不读数。名字与判据进 title, 悬停才要 ——
+ * 数字对人没有意义,「紧急处理单」才有; 何况列表本身已按阶梯排, 行上再写一遍是噪声。
+ * 颜色只做强弱层级, 不承载唯一信息(高度已经把等级说全了)。 */
+.tk-tier {
+  flex: none;
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  width: 3px;
+  height: 13px;
+  border-bottom: 1px solid var(--fp-bp-line-subtle);
+  cursor: help;
+}
+.tk-tier::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--fp-text-3);
+}
+.tk-tier[data-tier='5']::after { height: 100%; background: var(--fp-err); }
+.tk-tier[data-tier='4']::after { height: 80%;  background: var(--fp-bp-brass-hi); }
+.tk-tier[data-tier='3']::after { height: 60%; }
+.tk-tier[data-tier='2']::after { height: 42%; }
+.tk-tier[data-tier='1']::after { height: 26%; }
+.tk-tier[data-tier='0']::after { height: 12%; }
+
+/* 定级判据 —— 选了哪一级就写清楚凭什么, 不让人对着名字猜 */
+.tk-tier-why {
+  margin: 0;
+  padding: var(--fp-s1) var(--fp-s2);
+  border-left: 2px solid var(--fp-bp-line-subtle);
+  color: var(--fp-text-3);
+  font-size: var(--fp-fs-4);
+  line-height: 1.5;
+}
+
+/* ── 收件箱 / 提单子 ─────────────────────────────────────────────────── */
+.tk-mark[data-state='inbox'] { border-style: dotted; }
+
+
+/* ── 草稿恢复条 —— 写了一半不许丢 ────────────────────────────────────── */
+.tk-draft {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  padding: var(--fp-s2);
+  border: 1px dashed var(--fp-bp-brass);
+  border-radius: var(--fp-bp-r2);
+  background:
+    linear-gradient(var(--fp-bp-brass-soft), var(--fp-bp-brass-soft)),
+    linear-gradient(var(--tk-pane), var(--tk-pane)),
+    var(--tk-pane-under);
+  backdrop-filter: var(--tk-pane-blur);
+  -webkit-backdrop-filter: var(--tk-pane-blur);
+}
+.tk-draft-t {
+  flex: 1;
+  color: var(--fp-text-2);
+  font-size: var(--fp-fs-3);
+}
+.tk-draft-hint {
+  color: var(--fp-text-3);
+  font-size: var(--fp-fs-4);
+}
+
+/* ── 消息队列（Todo 页最上面那一段）─────────────────────────────────────
+ * 一行只有一件事：点它就去处理。别的全在悬浮出来的 ⋯ 或右键里 ——
+ * 平铺一排按钮等于把「每天用一次」和「每天用十次」摆得一样大。 */
+.tk-msgs { display: flex; flex-direction: column; padding: var(--fp-s1); }
+
+.tk-msg {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  padding: var(--fp-s1) var(--fp-s2);
+  border-radius: var(--fp-bp-r1);
+  cursor: pointer;
+}
+.tk-msg:hover { background: var(--fp-bp-panel-hover); }
+.tk-msg:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--fp-bp-brass-soft); }
+/* 有人在等你回话 —— 左侧一道朱红标尺，读的是位置不是颜色 */
+.tk-msg[data-kind='session'] {
+  border-left: 2px solid var(--fp-bp-seal);
+  padding-left: calc(var(--fp-s2) - 2px);
+}
+.tk-msg-src {
+  flex: none;
+  padding: 0 var(--fp-s1);
+  border: 1px solid var(--fp-bp-line-subtle);
+  border-radius: var(--fp-bp-r1);
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+}
+.tk-msg-t {
+  flex: 1;
+  min-width: 10ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fp-text-1);
+  font-size: var(--fp-fs-3);
+}
+.tk-msg .tk-kebab { opacity: 0; }
+.tk-msg:hover .tk-kebab,
+.tk-msg .tk-kebab[data-open='1'] { opacity: 1; }
+.tk-msg-deferred {
+  padding: var(--fp-s1) var(--fp-s2);
+  color: var(--fp-text-3);
+  font-size: var(--fp-fs-4);
+}
+/* 筛选：一个按钮，点了才展开 */
+.tk-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--fp-s2);
+  flex-wrap: wrap;
+  flex: none;
+  margin: var(--fp-s2) var(--fp-s3) 0;
+  padding: var(--fp-s2);
+}
+.v2-iconbtn[data-active='1'] { background: var(--fp-bp-panel-hover); color: var(--fp-text-1); }
+.tk-filter-on { color: var(--fp-bp-brass-hi); }
+/* 平铺队列里项目只是行尾的一个次要标记 —— 不是分组维度 */
+.tk-msg-p {
+  flex: none;
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fp-text-3);
+  font-family: var(--fp-font-mono);
+  font-size: var(--fp-fs-4);
+}

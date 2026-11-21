@@ -1,0 +1,14 @@
+name: Feature request
+description: 提一个想法 / 改进
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 想要什么 / 解决什么问题
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 你考虑过的替代方案（可选）

@@ -1,0 +1,7 @@
+id: "local"
+display_name: "Local Domain"
+version: "0.1.0"
+source_channel: "private:local"
+priority: 20        # 高于 route_accumulate(10)，路由时优先考虑私域节点
+active: true
+node_dir: "nodes/"

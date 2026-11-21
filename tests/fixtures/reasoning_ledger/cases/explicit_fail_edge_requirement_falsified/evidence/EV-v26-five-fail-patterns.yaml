@@ -1,0 +1,29 @@
+id: EV-v26-five-fail-patterns
+type: evidence
+kind: audit_finding
+
+summary: "V26 审计发现 OmniCompany 中至少存在五种错误处理模式，显式 condition=FAIL edge 只是其中一种。"
+
+supports:
+  - H-038
+
+attacks:
+  - H-034
+
+source:
+  source_type: report
+  artifact_path: "docs/plans/diagnosis/[2026-05-05]诊断重整/reports/v26_real_audit_findings_2026-05-07.md"
+  producer: "Meta audit"
+  method: "manual/LLM audit report"
+
+quality:
+  strength: high
+  limitation: "该审计发现至少五种模式，但仍不保证枚举完整。"
+  reproducibility: partial
+
+observed_patterns:
+  - "a: edges 显式 condition=FAIL 边"
+  - "b: AnchorSpec.routes 含 FAIL -> RouteAction"
+  - "c: 节点内 Verdict(FAIL)+RETRY"
+  - "d: 外部 driver 驱动"
+  - "e: MaterialDispatcher / 黑板架构"

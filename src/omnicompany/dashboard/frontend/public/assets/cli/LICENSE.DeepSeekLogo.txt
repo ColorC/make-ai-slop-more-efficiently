@@ -1,0 +1,1 @@
+deepseek-color.svg is the official DeepSeek brand mark (whale logo), sourced from DeepSeek's official web assets (https://fe-static.deepseek.com/chat/favicon.svg) and mirrored in the MIT-licensed deepseek-ai/deepseek-harness repository (apps/web/public/favicon.svg). Brand mark used for product identification in the CLI Hub provider icon row.

@@ -1,0 +1,13 @@
+{
+  "name": "@omni/material-note-core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Provider-neutral Material note canvas contract and entity-addressed mutation helpers.",
+  "license": "MIT",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": { ".": "./index.ts" },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  }
+}

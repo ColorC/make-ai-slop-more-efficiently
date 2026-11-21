@@ -1,0 +1,19 @@
+{
+  "name": "@omni/canvas-domain",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Canvas domain contract: descriptor, capability negotiation, adapter interface and disk reference implementation. Host-neutral (omnidashboard / workshop / any future surface).",
+  "license": "MIT",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./disk": "./disk.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@omni/material-core": "file:../material-core"
+  }
+}

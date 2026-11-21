@@ -1,0 +1,120 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "omnicompany"
+version = "0.3.0"
+description = "AI-native software factory — intent-driven, event-bus-native agent orchestration"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "omnicompany contributors" }
+]
+keywords = ["ai", "agent", "factory", "event-bus", "orchestration"]
+license = { file = "LICENSE" }
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+dependencies = [
+  "tzdata; sys_platform == 'win32'",
+  "cryptography>=46.0.0",
+  "pydantic>=2.0.0",
+  "typing-extensions>=4.0.1; python_version < '3.11'",
+  "python-ulid>=2.0.0",
+  "click>=8.0.0",
+  "jsonschema>=4.0",
+  "anthropic>=0.40.0",
+  "openai>=2.29.0,<3",
+  "python-dotenv>=1.0.0",
+  "pyyaml>=6.0.0",
+  "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+redis = [
+  "redis[hiredis]>=5.0.0",
+]
+evolution = [
+  "datasets>=2.0.0",
+]
+dashboard = [
+  "fastapi>=0.100.0",
+  "uvicorn[standard]>=0.20.0",
+  "jinja2>=3.1.0",
+  "psutil>=5.9.0",
+  "websockets>=12.0",
+  "pyte>=0.8.1",
+  # WorkHost's runtime socket is NaCl-box sealed (tweetnacl on its side); this is
+  # the matching primitive, and the only way to stream its terminals live.
+  "pynacl>=1.5.0",
+]
+selftest = [
+  "playwright>=1.40.0",
+]
+game-observatory = [
+  "numpy<2",
+  "pillow>=10.0",
+  "opencv-python<4.12",
+  "rapidocr-onnxruntime>=1.4.4",
+]
+game-observatory-stream = [
+  # FFmpeg's NVENC API in this wheel is compatible with the installed driver.
+  "av==16.0.1",
+]
+dev = [
+  "pytest>=7.0",
+  "pytest-asyncio>=0.21.0",
+  "ruff>=0.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/ColorC/make-ai-slop-more-efficiently"
+Repository = "https://github.com/ColorC/make-ai-slop-more-efficiently"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/omnicompany"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"config/agents/agent-environments.v1.json" = "omnicompany/config/agents/agent-environments.v1.json"
+"contracts/agent-runtime/v0/agent-runtime.schema.json" = "omnicompany/runtime/agent_runtime/contracts/v0/agent-runtime.schema.json"
+"scripts/session_recovery_cli.py" = "omnicompany/packages/services/recovery/_legacy/session_recovery_cli.py"
+"scripts/recovery_baseline_cli.py" = "omnicompany/packages/services/recovery/_legacy/recovery_baseline_cli.py"
+
+[project.scripts]
+omni = "omnicompany.cli.bootstrap:main"
+omni-recover = "omnicompany.packages.services.recovery.entrypoint:main"
+
+[project.entry-points."omni_recover.providers"]
+# Third-party packages may register provider adapter factories in this group.
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = '''
+-m 'not slow and not e2e'
+'''
+asyncio_mode = "strict"
+testpaths = ["tests"]
+markers = [
+  "e2e: 需要真实 API key 的端到端测试（THE_COMPANY_API_KEY）",
+  "slow: 慢测试 (>10s · 如 agent loop · 真跑 LLM 多轮)",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+# CI 阻断只看真 bug（语法错误 / pyflakes 错误类）。undefined-name（F82）因 ruff 对
+# 字符串前向引用注解误报而未纳入；海量 cosmetic（unused-import / f-string 占位符等）
+# 尚未清理，留作 good-first-issue 渐进收敛，不阻断构建。
+select = ["E9", "F63", "F7"]

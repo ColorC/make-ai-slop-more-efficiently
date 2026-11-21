@@ -1,0 +1,16 @@
+{
+  "name": "@omni/canvas-store",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Canvas note store: the single TS authority for material-note canvas documents (file layout, monotonic revision, CAS, idempotent mutations, entity clocks, text bodies). Consumed by workshop server and dashboard builtin domain — no second implementation anywhere.",
+  "license": "MIT",
+  "main": "./store.ts",
+  "types": "./store.ts",
+  "exports": { ".": "./store.ts" },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@omni/material-core": "file:../material-core"
+  }
+}

@@ -1,0 +1,788 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://workshop.example.com/schema/workshop/card/v1",
+  "title": "画布卡片 card v1",
+  "description": "画布上的一张卡。kind 决定结构（文字 / 资料 / 组 / 评论），adapter 只决定卡面怎么显示，内容协议看 material.representations[].format_tag。坐标单位是画布像素；有 parentId 时坐标相对父组卡。",
+  "type": "object",
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "adapter",
+    "x",
+    "y",
+    "width",
+    "height"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 220,
+      "description": "卡 id，画布内唯一；新建时自己取（字母数字 . _ -），之后不改。"
+    },
+    "kind": {
+      "enum": [
+        "text",
+        "material",
+        "group",
+        "comment"
+      ],
+      "description": "结构类型（封闭）：text 文字卡（正文在正文库）、material 资料卡（引用资料或文件）、group 组卡（框住子卡）、comment 评论。"
+    },
+    "title": {
+      "type": "string",
+      "description": "卡标题，人看得懂的中文。"
+    },
+    "adapter": {
+      "enum": [
+        "auto",
+        "text",
+        "markdown",
+        "image",
+        "pdf",
+        "audio",
+        "video",
+        "html",
+        "web",
+        "code",
+        "mindmap",
+        "copy-request",
+        "remote-play",
+        "link",
+        "file",
+        "legacy-note",
+        "unsupported",
+        "table",
+        "ui-bench"
+      ],
+      "description": "卡面显示方式（封闭）。文字卡用 text；表格卡用 table；界面工作台卡用 ui-bench（正文是 workshop.ui-bench/v1 JSON：页签 → 版本 → 分图）；组卡用 auto；引用资料页用 web。table 不在 TS 联合 MaterialAdapter 里（tableDocument.ts 用 string 绕开），已登记为待修。"
+    },
+    "text": {
+      "type": "string",
+      "description": "旧字段：卡内正文。服务端不存，正文一律走正文库（wsh canvas put --file）。",
+      "deprecated": true
+    },
+    "source": {
+      "description": "卡内容的来源。文字卡 = file（正文库文件，由服务端回填 path/token，不要手写）；链接 / 资料页 = link；旧笔记 = legacy-note。",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "path",
+            "token"
+          ],
+          "properties": {
+            "kind": {
+              "const": "file",
+              "description": "来源种类：file 正文库文件 / link 链接 / legacy-note 旧笔记。"
+            },
+            "path": {
+              "type": "string",
+              "description": "服务端回填的存储路径，不要手写。标准：相对画布存储根（projects/<项目>/material/notes/）的 posix 路径，文字卡 = texts/<editableId>.md；遗留：服务器绝对路径（2026-10-24 前写入端一律这样写），读取端照认。正文卡按 editableId 在本存储正文根解析，找不到才看这里；文件卡（无 editableId）这里就是它指向的文件。见 docs/model/README.md「文字卡正文路径」与 legacy-plan.md L1。"
+            },
+            "token": {
+              "type": "string",
+              "description": "服务端签发的读取令牌。"
+            },
+            "mime": {
+              "type": "string",
+              "description": "正文 MIME；表格卡为表格 JSON 的 MIME。"
+            },
+            "editableId": {
+              "type": "string",
+              "description": "正文库里的正文 id（= texts/<editableId>.md）。多张卡可共用同一正文。"
+            },
+            "tiers": {
+              "type": "array",
+              "description": "图片清晰度分档。",
+              "items": {
+                "type": "object",
+                "required": [
+                  "minZoom",
+                  "path",
+                  "token"
+                ],
+                "properties": {
+                  "minZoom": {
+                    "type": "number",
+                    "description": "缩放不小于此值时换用这一档。"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "这一档图片的存储路径（服务端签发）。"
+                  },
+                  "token": {
+                    "type": "string",
+                    "description": "这一档图片的读取令牌。"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "url"
+          ],
+          "properties": {
+            "kind": {
+              "const": "link",
+              "description": "来源种类：file 正文库文件 / link 链接 / legacy-note 旧笔记。"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1,
+              "description": "链接地址。引用资料时推荐同时写 material.material_ref + representation_id，URL 只作跳转。"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "legacy-note",
+              "description": "来源种类：file 正文库文件 / link 链接 / legacy-note 旧笔记。"
+            },
+            "id": {
+              "type": "string",
+              "description": "旧笔记 id（只读保留）。"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "material": {
+      "type": "object",
+      "description": "卡的资料信封（Material Core 投影）。服务端写入时会补全 id/labels/revision_ref/representations；引用资料时写 material_ref + representation_id。内部字段按 material.schema 另行 lint。",
+      "properties": {
+        "material_ref": {
+          "type": "string",
+          "description": "引用的资料 id（material:… / view:…）。"
+        },
+        "representation_id": {
+          "type": "string",
+          "description": "引用资料的哪个 representation。写了 material_ref 就必须写。"
+        }
+      },
+      "additionalProperties": true
+    },
+    "x": {
+      "type": "number",
+      "description": "左上角 x（像素）。有 parentId 时相对父组卡。"
+    },
+    "y": {
+      "type": "number",
+      "description": "左上角 y（像素）。有 parentId 时相对父组卡。"
+    },
+    "width": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "宽（像素）。"
+    },
+    "height": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "高（像素）。"
+    },
+    "fontSize": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "正文基础字号。"
+    },
+    "parentId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "所属组卡 id（必须是同画布上 kind=group 的卡）。"
+    },
+    "order": {
+      "type": "number",
+      "description": "组内阅读顺序，升序。"
+    },
+    "submission": {
+      "type": "object",
+      "required": [
+        "state",
+        "submittedAt",
+        "submittedBy"
+      ],
+      "description": "提审状态（审阅台用）。",
+      "properties": {
+        "state": {
+          "enum": [
+            "unreviewed",
+            "seen",
+            "fully-passed",
+            "not-fully-passed"
+          ],
+          "description": "提审状态。"
+        }
+      },
+      "additionalProperties": true
+    },
+    "positionLock": {
+      "type": "object",
+      "required": [
+        "locked"
+      ],
+      "description": "位置锁；锁定后自动布局与普通 agent 更新不得改坐标。",
+      "properties": {
+        "locked": {
+          "type": "boolean",
+          "description": "是否锁定。"
+        },
+        "actor": {
+          "type": "string",
+          "description": "谁锁的。"
+        },
+        "reason": {
+          "type": "string",
+          "description": "为什么锁。"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "锁定时间（ISO）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "positionSource": {
+      "$ref": "#/$defs/positionSource",
+      "description": "坐标来源：seed 生产方初始 / auto-layout 布局器 / user 人工。"
+    },
+    "sizeSource": {
+      "$ref": "#/$defs/positionSource",
+      "description": "尺寸来源；user 表示人手调过，自动收框只许撑大。"
+    },
+    "display": {
+      "type": "object",
+      "required": [
+        "pluginId"
+      ],
+      "description": "显示插件覆写。",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "覆写用的显示插件 id。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "fold": {
+      "type": "object",
+      "description": "折叠状态。",
+      "properties": {
+        "defaultCollapsed": {
+          "type": "boolean",
+          "description": "生产方给的初始折叠状态。"
+        },
+        "collapsed": {
+          "type": "boolean",
+          "description": "人手覆写的折叠状态；缺省按 defaultCollapsed。"
+        },
+        "memberIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "非组卡折叠时一起收起的卡；组卡默认收起全部子卡。"
+        },
+        "previewCardIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "组折叠后仍露出的子卡（产品预览）。"
+        },
+        "summary": {
+          "type": "string",
+          "description": "折叠后显示的一句话。"
+        },
+        "audience": {
+          "enum": [
+            "ai"
+          ],
+          "description": "ai = 主要给 AI 看，人看的视图默认折叠。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "samePositionContainer": {
+      "type": "object",
+      "required": [
+        "dimension",
+        "variants",
+        "activeVariant"
+      ],
+      "description": "组卡的同位切换声明（版本 / 方案切换）。只对 kind=group 有意义。",
+      "properties": {
+        "dimension": {
+          "type": "string",
+          "description": "切换维度名（版本 / 方案 / 平台）。"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "label"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "description": "切换项键（组内唯一）。"
+              },
+              "label": {
+                "type": "string",
+                "description": "切换项显示名。"
+              }
+            },
+            "additionalProperties": true
+          },
+          "description": "全部切换项。"
+        },
+        "activeVariant": {
+          "type": "string",
+          "description": "当前切换项键；所有视图只投影这一项。"
+        },
+        "presetRef": {
+          "type": "object",
+          "required": [
+            "profileId",
+            "profileRevision",
+            "presetId"
+          ],
+          "properties": {
+            "profileId": {
+              "type": "string",
+              "description": "预设档 id。"
+            },
+            "profileRevision": {
+              "type": "string",
+              "description": "预设档版本。"
+            },
+            "presetId": {
+              "type": "string",
+              "description": "档内预设 id。"
+            }
+          },
+          "additionalProperties": false,
+          "description": "按哪条组预设开槽位。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "samePositionMember": {
+      "type": "object",
+      "required": [
+        "slotId"
+      ],
+      "description": "子卡在同位容器里的槽位；variantKey 缺省 = 整组共用。",
+      "properties": {
+        "slotId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "槽位 id（来自组预设）。"
+        },
+        "variantKey": {
+          "type": "string",
+          "description": "属于哪个切换项；缺省 = 整组共用。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "comment": {
+      "type": "object",
+      "required": [
+        "subject",
+        "stance"
+      ],
+      "description": "这张卡是一句备注。",
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/slice",
+          "description": "这句备注说的是哪一块（切片）。"
+        },
+        "stance": {
+          "enum": [
+            "observation",
+            "inference",
+            "gap",
+            "decision"
+          ],
+          "description": "认识论身份：观测 / 推断 / 缺口 / 裁定；由来源声明，不从正文猜。"
+        },
+        "authority": {
+          "type": "string",
+          "description": "谁有权下这句话（来源 / 角色）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "commentThread": {
+      "type": "object",
+      "required": [
+        "targets",
+        "root"
+      ],
+      "description": "kind=comment 必带：评的是哪些卡。",
+      "properties": {
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "被评的卡 id（至少一张）；接续沿用根评论的 targets。"
+        },
+        "root": {
+          "type": "string",
+          "description": "线程根评论 id；根评论填自己的 id。"
+        },
+        "replyTo": {
+          "type": "string",
+          "description": "直接接续的那条评论 id；根评论不写。"
+        },
+        "semantic": {
+          "enum": [
+            "question",
+            "correction",
+            "decision",
+            "suggestion",
+            "approval",
+            "note"
+          ],
+          "description": "AI 后补的语义分类。"
+        },
+        "promotedTo": {
+          "type": "string",
+          "description": "评论被转正后指向的那张卡。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "created",
+        "updated"
+      ],
+      "description": "写入溯源，存储盖章，不要手写。",
+      "properties": {
+        "created": {
+          "type": "object",
+          "description": "首次写入的身份（人 / 机器 / 运行时 / 会话）。"
+        },
+        "updated": {
+          "type": "object",
+          "description": "最近一次写入的身份。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "derivedFrom": {
+      "type": "object",
+      "required": [
+        "card",
+        "revision",
+        "mode"
+      ],
+      "description": "派生关系（人改稿 / 评论转正）。",
+      "properties": {
+        "card": {
+          "type": "string",
+          "description": "源卡 id。"
+        },
+        "revision": {
+          "type": "number",
+          "description": "派生时源卡所在的画布版本。"
+        },
+        "mode": {
+          "enum": [
+            "human-edit-copy",
+            "promotion"
+          ],
+          "description": "human-edit-copy 人改 AI 稿的无损拷贝 / promotion 评论转正。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "presentation": {
+      "type": "object",
+      "description": "卡片外观。",
+      "properties": {
+        "state": {
+          "enum": [
+            "hidden",
+            "iconified"
+          ],
+          "description": "hidden 移出画布（可找回）、iconified 缩成图标。"
+        },
+        "frame": {
+          "enum": [
+            "panel",
+            "none"
+          ],
+          "description": "卡框：panel 有框 / none 无框。"
+        },
+        "title": {
+          "enum": [
+            "inside",
+            "above",
+            "none"
+          ],
+          "description": "标题位置：inside 框内 / above 框上 / none 不显示。"
+        },
+        "titleMinZoom": {
+          "type": "number",
+          "description": "缩放低于此值时不显示标题。"
+        },
+        "emphasis": {
+          "enum": [
+            "normal",
+            "highlight",
+            "muted"
+          ],
+          "description": "强调级别：normal / highlight / muted。"
+        },
+        "style": {
+          "type": "string",
+          "minLength": 1,
+          "description": "外观预设名（screen / annotation / artwork / label / slot-placeholder …）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "frozen": {
+      "type": "object",
+      "required": [
+        "capturedAt",
+        "from",
+        "fromAdapter"
+      ],
+      "description": "冻结快照元数据。",
+      "additionalProperties": true
+    },
+    "slices": {
+      "type": "array",
+      "description": "人在这张卡上划的切片（图上框、正文一段、表格单元格）。",
+      "items": {
+        "$ref": "#/$defs/slice"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "comment"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "commentThread"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "commentThread"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "group"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adapter": {
+            "const": "auto"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "positionSource": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "seed",
+            "auto-layout",
+            "user"
+          ],
+          "description": "坐标来源：seed / auto-layout / user。"
+        },
+        "actor": {
+          "type": "string",
+          "description": "谁定的坐标。"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "定坐标的时间（ISO）。"
+        }
+      },
+      "additionalProperties": false
+    },
+    "slice": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "description": "切片：element 界面元素 / region 图上区域 / range 文字一段 / step 步骤 / cells 表格单元格。",
+      "properties": {
+        "kind": {
+          "enum": [
+            "element",
+            "region",
+            "range",
+            "step",
+            "cells"
+          ],
+          "description": "切片种类：element 界面元素 / region 圈选区域 / range 文本段 / step 步骤 / cells 表格单元格。"
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "切片在 representation 内的稳定标识（element = 层级 path，region = 区域 id，range = 锚点 id 等）。"
+        },
+        "representationId": {
+          "type": "string",
+          "description": "落在卡的哪个 representation 上；缺省 = primary。"
+        },
+        "occurrence": {
+          "type": "number",
+          "description": "同一 ref 重复出现时的序号（0 起）。"
+        },
+        "box": {
+          "type": "object",
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "properties": {
+            "x": {
+              "type": "number",
+              "description": "左上 x（归一化）。"
+            },
+            "y": {
+              "type": "number",
+              "description": "左上 y（归一化）。"
+            },
+            "width": {
+              "type": "number",
+              "description": "宽（归一化）。"
+            },
+            "height": {
+              "type": "number",
+              "description": "高（归一化）。"
+            }
+          },
+          "additionalProperties": false,
+          "description": "element / region 的归一化包围盒（0..1，不存 px）。"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          },
+          "description": "套索多边形（归一化 [x,y] 点列，至少 3 点）；身份仍只认 box。"
+        },
+        "quote": {
+          "type": "string",
+          "description": "range 切片的原文摘录，重新锚定时先按它找；不参与身份。"
+        },
+        "label": {
+          "type": "string",
+          "description": "给人看的短名；不参与身份。"
+        },
+        "emphasis": {
+          "enum": [
+            "quiet",
+            "normal",
+            "highlight"
+          ],
+          "description": "切片的强调样式。"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "x-wsh": {
+    "kind": "card",
+    "title": "画布卡片",
+    "parent": "canvas",
+    "ts": "vendor/webworks/packages/material-core/note.ts → CanvasCardRecord",
+    "store": "data/projects/<项目>/material/notes/canvases/<lifecycle>/<画布>.json 的 cards[]；文字正文在 data/projects/<项目>/material/notes/texts/<editableId>.md",
+    "web": "/canvas?project=<项目>&canvas=<画布>#card=<卡>",
+    "commands": [
+      {
+        "verb": "ls",
+        "cmd": "wsh canvas cat <画布> --cards"
+      },
+      {
+        "verb": "get",
+        "cmd": "wsh canvas cat <画布> --card <卡>"
+      },
+      {
+        "verb": "new",
+        "cmd": "wsh canvas put <画布> --title <标题> --file 正文.md",
+        "note": "文字卡；资料 / 组 / 连线一起改用 apply"
+      },
+      {
+        "verb": "set",
+        "cmd": "wsh canvas apply <画布> --file patch.json",
+        "note": "按 id 合并字段；正文写在 cards[].body"
+      },
+      {
+        "verb": "rm",
+        "cmd": "wsh canvas rm <画布> --card <卡>"
+      }
+    ],
+    "example": {
+      "id": "goal-note",
+      "kind": "text",
+      "title": "本周目标",
+      "adapter": "text",
+      "x": 0,
+      "y": 0,
+      "width": 360,
+      "height": 240
+    },
+    "exampleNote": "apply 时写 {\"cards\":[{...上面的卡..., \"body\":\"# 本周目标\\n…\"}]}；source / material / provenance 由服务端补。"
+  }
+}
