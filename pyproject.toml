@@ -69,7 +69,7 @@ game-observatory = [
 ]
 game-observatory-stream = [
   # FFmpeg's NVENC API in this wheel is compatible with the installed driver.
-  "av==16.0.1",
+  "av==17.1.0",
 ]
 dev = [
   "pytest>=7.0",
